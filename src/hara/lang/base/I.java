@@ -300,22 +300,8 @@ public interface I {
 	
 		@Override
 		default long hashCalc(G.HashType t) {
-			Function<Object, Long> f;
-
-			switch(t) {
-			case MURMUR3: 
-				f = item -> Long.valueOf(hara.lang.base.Hash.hashMurmur(item));
-				break;
-			case SIP:
-				f = item -> Long.valueOf(hara.lang.base.Hash.hashSip(item));
-				break;
-			case SYSTEM:
-				f = item -> Long.valueOf(item.hashCode());
-				break;
-			default:
-				throw new UnsupportedOperationException("Not Supported");
-			}
-
+			
+			Function<Object, Long> f = G.hashFn(t);
 			return Iter.reduce(
 					iterator(), 
 					Long.valueOf(hashSeed().hashCode()),

@@ -9,7 +9,7 @@ import hara.lang.data.*;
 @SuppressWarnings("rawtypes")
 public interface RT {
 
-		
+		/*
 		public static Object first(Iterator it) {
 			return it.next();
 		}
@@ -58,4 +58,5 @@ public interface RT {
 		public static I.Conj<Object> conj(I.Conj<Object> c, Object item) {
 			return c.conj(item);
 		}
+		*/
 }

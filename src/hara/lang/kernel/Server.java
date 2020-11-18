@@ -4,6 +4,7 @@ import java.io.*;
 import java.lang.ref.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.stream.Collectors;
 import java.net.*;
 
 import hara.lang.base.*;
@@ -11,20 +12,22 @@ import hara.lang.base.*;
 @SuppressWarnings("rawtypes")
 public class Server implements I.Component {
 
-	static final int DEFAULT_PORT = 4164;
-
 	final ConcurrentHashMap<Thread, Reference<Conn>> CLIENTS = new ConcurrentHashMap<Thread, Reference<Conn>>();
 	final ReferenceQueue<Conn> RQ = new ReferenceQueue<Conn>();
 
+	public final Foundation _F;
+	public final String _key;
+	public final int _port;
 	public ServerSocket _socket;
-	public int _port;
 	public Thread _thread;
-	
-	public Server() {
-		this(DEFAULT_PORT);
+
+	public Server(Foundation F, String key) {
+		this(F, key, Foundation.DEFAULT_PORT);
 	}
 
-	public Server(int port){
+	public Server(Foundation F, String key, int port) {
+		_F = F;
+		_key = key;
 		_port = port;
 	}
 
@@ -36,7 +39,7 @@ public class Server implements I.Component {
 		CLIENTS.remove(th);
 		G.clearCache(RQ, CLIENTS);
 	}
-	
+
 	public int Clients() {
 		return CLIENTS.size();
 	}
@@ -45,11 +48,12 @@ public class Server implements I.Component {
 	public I.Component start() {
 		try {
 			_socket = new ServerSocket(_port);
+			System.out.println("PORT OPENED: " + _port);
 			Loop loop = new Loop(this, _socket);
 			_thread = new Thread(loop);
 			_thread.start();
-			
-		} catch(Throwable t) {
+
+		} catch (Throwable t) {
 			G.sneakyThrow(t);
 		}
 		return this;
@@ -59,11 +63,12 @@ public class Server implements I.Component {
 	public I.Component stop() {
 		_thread.interrupt();
 		_thread = null;
-		for(var entry : CLIENTS.entrySet()) {
+		for (var entry : CLIENTS.entrySet()) {
 			try {
 				entry.getValue().get().close();
 				entry.getKey().interrupt();
-			} catch (IOException e) {}
+			} catch (IOException e) {
+			}
 		}
 		return this;
 	}
@@ -87,12 +92,12 @@ public class Server implements I.Component {
 	public I.Metadata getProps() {
 		return null;
 	}
-	
+
 	private class Loop implements Runnable {
-		
+
 		Server _instance;
 		ServerSocket _socket;
-		
+
 		public Loop(Server instance, ServerSocket socket) {
 			_instance = instance;
 			_socket = socket;
@@ -101,7 +106,7 @@ public class Server implements I.Component {
 		@Override
 		public void run() {
 			try {
-				while(!_socket.isClosed()) {
+				while (!_socket.isClosed()) {
 					Socket s = _socket.accept();
 					Handler h = new Handler(_instance, s);
 					Thread th = new Thread(h);
@@ -109,12 +114,12 @@ public class Server implements I.Component {
 					_instance.register(th, h._conn);
 					th.start();
 				}
-			} catch (IOException e) {}
-			
+			} catch (IOException e) {
+			}
+
 		}
-		
+
 	}
-	
 
 	// ClientHandler class
 	private class Handler implements Runnable {
@@ -122,17 +127,32 @@ public class Server implements I.Component {
 		public final Server _instance;
 		public final Conn _conn;
 		private Thread _thread;
-		
+
 		// constructor
 		public Handler(Server instance, Socket s) throws IOException {
 			_instance = instance;
 			_conn = new Conn(s);
 		}
-		
+
 		public void setThread(Thread thread) {
 			_thread = thread;
 		}
+		
+		private void writeReturn(Conn conn, Object ret) throws IOException {
+			if (ret instanceof List) {
+				conn.write((List)ret);
+			} else if (ret instanceof String) {
+				conn.writeString((String)ret);
+			} else if (ret instanceof Long) {
+				conn.write(((Long)ret).longValue());
+			} else if (ret instanceof Throwable) {
+				conn.write((Throwable) ret);
+			} else if (ret instanceof byte[]) {
+				conn.write((byte[])ret);
+			}
+		}
 
+		@SuppressWarnings("unchecked")
 		@Override
 		public void run() {
 			try {
@@ -140,15 +160,16 @@ public class Server implements I.Component {
 					try {
 						Object obj = _conn.read();
 						if (obj instanceof List) {
-							Object cmd = ((List) obj).get(0);
-							if (cmd instanceof String) {
-								switch ((String) cmd) {
-								case "QUIT": _conn.close();
-									break;
-								default:
-									_conn.write("NOT SUPPORTED: " + cmd);
-								}
-							}
+							List args = (List) ((List) obj).stream()
+											.map(b -> new String((byte[])b))
+											.collect(Collectors.toList());
+							String arg0 = (String) args.get(0);
+							args.remove(0);
+							var cmd = Foundation.COMMAND.valueOf(arg0);
+							var ret = Foundation.runCommand(cmd, args);
+							writeReturn(_conn, ret);
+						} else {
+							_conn.write("NOT PROCESSED: " + obj);
 						}
 					} catch (Throwable t) {
 						_conn.write("ERR: " + t.getMessage());

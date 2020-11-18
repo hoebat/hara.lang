@@ -4,6 +4,7 @@ import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 public interface G {
 	
@@ -17,6 +18,23 @@ public interface G {
 
 	public static final HashType DEFAULT_HASH = HashType.MURMUR3;
 
+	
+	public static Function<Object, Long> hashFn(HashType t) {
+
+		switch(t) {
+		case MURMUR3: 
+			return item -> Long.valueOf(Hash.hashMurmur(item));
+		case SIP:
+			return item -> Long.valueOf(Hash.hashSip(item));
+		case SYSTEM:
+			return item -> Long.valueOf(item.hashCode());
+		default:
+			throw new UnsupportedOperationException("Not Supported");
+		}
+
+		
+	}
+	
 	@SuppressWarnings("unchecked")
 	public static int compare(Object k1, Object k2) {
 		if (k1 == k2)

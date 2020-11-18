@@ -7,8 +7,7 @@ import java.util.LinkedList;
 import java.util.List;
 
 /**
- * A lightweight implementation of the SocketConnection server protocol at
- * https://redis.io/topics/protocol
+ * A lightweight implementation of the SocketConnection server protocol at https://redis.io/topics/protocol
  * <p>
  * Effectively a complete SocketConnection client implementation.
  */
@@ -20,7 +19,7 @@ public class Conn implements Closeable {
 		/**
 		 * CRLF is used a lot.
 		 */
-		private static byte[] CRLF = new byte[] { '\r', '\n' };
+		private static byte[] CRLF = new byte[]{'\r', '\n'};
 
 		/**
 		 * This stream we will write to.
@@ -66,15 +65,14 @@ public class Conn implements Closeable {
 
 		void write(Throwable val) throws IOException {
 			out.write('-');
-			out.write((val.getMessage() + "").getBytes());
+			out.write((val.getMessage()+"").getBytes());
 			out.write(CRLF);
 		}
 
 		/**
 		 * Write a list of objects in the "RESP Arrays" format.
 		 *
-		 * @param list A list of objects that contains Strings, Longs, Integers and
-		 *             (recursively) Lists.
+		 * @param list A list of objects that contains Strings, Longs, Integers and (recursively) Lists.
 		 * @throws IOException              Propagated from the output stream.
 		 * @throws IllegalArgumentException If the list contains unencodable objects.
 		 * @link https://redis.io/topics/protocol#resp-arrays
@@ -102,7 +100,7 @@ public class Conn implements Closeable {
 				}
 			}
 		}
-
+    
 		void writeString(String val) throws IOException {
 			out.write('+');
 			out.write(val.getBytes());
@@ -121,7 +119,6 @@ public class Conn implements Closeable {
 		/**
 		 * Thrown whenever data could not be parsed.
 		 */
-		@SuppressWarnings("serial")
 		static class ProtocolException extends IOException {
 			ProtocolException(String msg) {
 				super(msg);
@@ -131,7 +128,6 @@ public class Conn implements Closeable {
 		/**
 		 * Thrown whenever an error string is decoded.
 		 */
-		@SuppressWarnings("serial")
 		static class ServerError extends IOException {
 			ServerError(String msg) {
 				super(msg);
@@ -155,8 +151,8 @@ public class Conn implements Closeable {
 		/**
 		 * Parse incoming data from the stream.
 		 * <p>
-		 * Based on each of the markers which will identify the type of data being sent,
-		 * the parsing is delegated to the type-specific methods.
+		 * Based on each of the markers which will identify the type of data being sent, the parsing
+		 * is delegated to the type-specific methods.
 		 *
 		 * @return The parsed object
 		 * @throws IOException       Propagated from the stream
@@ -166,34 +162,34 @@ public class Conn implements Closeable {
 			Object ret;
 			int read = this.input.read();
 			switch (read) {
-			case '+':
-				ret = this.parseSimpleString();
-				break;
-			case '-':
-				ret = new ServerError(new String(this.parseSimpleString()));
-				break;
-			case ':':
-				ret = this.parseNumber();
-				break;
-			case '$':
-				ret = this.parseBulkString();
-				break;
-			case '*':
-				long len = this.parseNumber();
-				if (len == -1) {
-					ret = null;
-				} else {
-					List<Object> arr = new LinkedList<>();
-					for (long i = 0; i < len; i++) {
-						arr.add(this.parse());
+				case '+':
+					ret = this.parseSimpleString();
+					break;
+				case '-':
+					ret = new ServerError(new String(this.parseSimpleString()));
+          break;
+				case ':':
+					ret = this.parseNumber();
+					break;
+				case '$':
+					ret = this.parseBulkString();
+					break;
+				case '*':
+					long len = this.parseNumber();
+					if (len == -1) {
+						ret = null;
+					} else {
+						List<Object> arr = new LinkedList<>();
+						for (long i = 0; i < len; i++) {
+							arr.add(this.parse());
+						}
+						ret = arr;
 					}
-					ret = arr;
-				}
-				break;
-			case -1:
-				return null;
-			default:
-				throw new ProtocolException("Unexpected input: " + (byte) read);
+					break;
+				case -1:
+					return null;
+				default:
+					throw new ProtocolException("Unexpected input: " + (byte) read);
 			}
 
 			return ret;
@@ -276,11 +272,10 @@ public class Conn implements Closeable {
 	/**
 	 * Used for reading responses from the server.
 	 */
-	public Socket socket;
+  public Socket socket;
 
 	/**
-	 * Construct the connection with the specified Socket as the server connection
-	 * with default buffer sizes.
+	 * Construct the connection with the specified Socket as the server connection with default buffer sizes.
 	 *
 	 * @param socket Connected socket to the server.
 	 * @throws IOException If a socket error occurs.
@@ -290,8 +285,7 @@ public class Conn implements Closeable {
 	}
 
 	/**
-	 * Construct the connection with the specified Socket as the server connection
-	 * with specified buffer sizes.
+	 * Construct the connection with the specified Socket as the server connection with specified buffer sizes.
 	 *
 	 * @param socket           Socket to connect to
 	 * @param inputBufferSize  buffer size in bytes for the input stream
@@ -299,9 +293,11 @@ public class Conn implements Closeable {
 	 * @throws IOException If a socket error occurs.
 	 */
 	public Conn(Socket socket, int inputBufferSize, int outputBufferSize) throws IOException {
-		this(new BufferedInputStream(socket.getInputStream(), inputBufferSize),
-				new BufferedOutputStream(socket.getOutputStream(), outputBufferSize));
-		this.socket = socket;
+		this(
+			new BufferedInputStream(socket.getInputStream(), inputBufferSize),
+			new BufferedOutputStream(socket.getOutputStream(), outputBufferSize)
+		);
+    this.socket = socket;
 	}
 
 	/**
@@ -310,7 +306,7 @@ public class Conn implements Closeable {
 	 * @param inputStream  Read from this stream
 	 * @param outputStream Write to this stream
 	 */
-	private Conn(InputStream inputStream, OutputStream outputStream) {
+	private Conn(BufferedInputStream inputStream, BufferedOutputStream outputStream) {
 		this.reader = new Parser(inputStream);
 		this.writer = new Encoder(outputStream);
 	}
@@ -324,7 +320,7 @@ public class Conn implements Closeable {
 	 * @throws IOException All protocol and io errors are IO exceptions.
 	 */
 	public <T> T call(Object... args) throws IOException {
-		write(args);
+    write(args);
 		return read();
 	}
 
@@ -338,6 +334,12 @@ public class Conn implements Closeable {
 	@SuppressWarnings("unchecked")
 	public <T> T read() throws IOException {
 		return (T) reader.parse();
+	}
+
+	@SuppressWarnings("rawtypes")
+	public void write(List args) throws IOException {
+		writer.write(args);
+		writer.flush();
 	}
 
 	public void write(Object... args) throws IOException {
@@ -364,10 +366,10 @@ public class Conn implements Closeable {
 		writer.writeString(val);
 		writer.flush();
 	}
-
-	public void close() throws IOException {
-		this.socket.close();
-	}
+  
+  public void close () throws IOException {
+    this.socket.close();
+  }
 
 	/**
 	 * Helper class for pipelining.
@@ -389,8 +391,9 @@ public class Conn implements Closeable {
 		 * @throws IOException Propagated from underlying server.
 		 */
 		public abstract List<Object> read() throws IOException;
-
-		public abstract int counter();
+    
+    
+    public abstract int counter();
 	}
 
 	/**
@@ -402,10 +405,10 @@ public class Conn implements Closeable {
 	public Pipeline pipeline() {
 		return new Pipeline() {
 			private int n = 0;
-
-			public int counter() {
-				return n;
-			}
+      
+      public int counter () {
+        return n;
+      }
 
 			public Pipeline call(Object... args) throws IOException {
 				writer.write(Arrays.asList((Object[]) args));

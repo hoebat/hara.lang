@@ -1,6 +1,7 @@
 package hara.lang.base;
 
 import java.util.Map.Entry;
+import java.util.function.Function;
 
 
 public interface T {
@@ -89,6 +90,16 @@ public interface T {
 		@Override
 		default G.ObjType getObjType() {
 			return G.ObjType.MAP;
+		}
+		
+		@Override
+		default long hashCalc(G.HashType t) {
+			Function<Object, Long> f = G.hashFn(t);
+			
+			return Iter.reduce(
+					iterator(), 
+					Long.valueOf(hashSeed().hashCode()),
+					(acc, item) -> acc + f.apply(item));
 		}
 	}
 
