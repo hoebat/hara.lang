@@ -10,6 +10,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.LongFunction;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import hara.lang.base.I.Cons;
@@ -257,6 +258,56 @@ public interface Iter {
 	public static <U> Iterator map(Iterator<U> it, CFn f) {
 		return from(it::hasNext, () -> f.invoke(it.next()));
 	}
+	
+	//
+	// Filter
+	//
+
+
+	  static final Object NONE = new Object();
+	  
+	  /**
+	   * @param it an iterator
+	   * @param f  a predicate
+	   * @return an iterator which only yields values that satisfy the predicate
+	   */
+	  public static <V> Iterator<V> filter(Iterator<V> it, Predicate<V> f) {
+	    return new Iterator<V>() {
+
+	      private Object next = NONE;
+	      private boolean done = false;
+
+	      private void prime() {
+	        if (next == NONE && !done) {
+	          while (it.hasNext()) {
+	            next = it.next();
+	            if (f.test((V) next)) {
+	              return;
+	            }
+	          }
+	          done = true;
+	        }
+	      }
+
+	      @Override
+	      public boolean hasNext() {
+	        prime();
+	        return !done;
+	      }
+
+	      @Override
+	      public V next() {
+	        prime();
+	        if (next == NONE) {
+	          throw new NoSuchElementException();
+	        }
+
+	        V val = (V) next;
+	        next = NONE;
+	        return val;
+	      }
+	    };
+	  }
 
 	//
 	// Reduce
