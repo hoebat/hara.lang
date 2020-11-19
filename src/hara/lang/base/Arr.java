@@ -3,6 +3,11 @@ package hara.lang.base;
 import java.util.Iterator;
 import java.util.function.BiFunction;
 
+import hara.lang.base.G.HashType;
+import hara.lang.base.I.Cons;
+import hara.lang.base.I.Empty;
+import hara.lang.base.T.SeqType;
+
 public interface Arr {
 
 	public class ToIter implements Iterator<Object> {
@@ -227,7 +232,9 @@ public interface Arr {
 	
 	}
 
-	public class ToSeq extends Obj.PT implements I.SeqArray<Object[], Object> {
+	public class ToSeq extends Obj.SEQ<Object>
+		implements 
+		I.SeqArray<Object[], Object> {
 	
 		public final Object[] _array;
 		final int _i;
@@ -306,7 +313,7 @@ public interface Arr {
 	}
 
 	@SuppressWarnings("rawtypes")
-	public static I.Seq toSeq(Object... array) {
+	public static T.SeqType toSeq(Object... array) {
 		if (array == null || array.length == 0)
 			return null;
 		return new ToSeq(array, 0);

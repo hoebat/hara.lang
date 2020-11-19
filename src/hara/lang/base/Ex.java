@@ -19,6 +19,19 @@ public interface Ex {
 			this.name = name;
 		}
 
+	}	
+
+
+	@SuppressWarnings("serial")
+	public class Unsupported extends UnsupportedOperationException {
+		
+		public Unsupported() {
+			super("Not Supported");
+		}
+		
+		public Unsupported(String message) {
+			super(message);
+		}
 	}
 
 	@SuppressWarnings("serial")

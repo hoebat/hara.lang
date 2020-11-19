@@ -199,18 +199,19 @@ public interface I {
 		long rangeMin();
 	}
 	
+	public interface Reducible<R, V> {
+		R reduce(IFn<R, ?, V, ?> f);
+
+		R reduce(IFn<R, ?, V, ?> f, R initial);
+	}
+	
 	public interface Realize<V> {
 		boolean isRealized();
 		V realize();
 	}
 
-	public interface Reduce {
-		Object reduce(Fn f);
-
-		Object reduce(Fn f, Object initial);
-	}
-
 	public interface Seq<E> extends
+		Cons<E>,
 		Iterable<E>,
 		Nth<E>, 
 		Count,
@@ -243,7 +244,7 @@ public interface I {
 	}
 
 	public interface SeqArray<C, V> 
-		extends SequentialLookupType<V>, 
+		extends SequentialLookupType<V>,
 				I.PeekFirst<V>, 
 				I.PeekLast<V>, 
 				I.Seq<V> {
@@ -399,25 +400,25 @@ public interface I {
 	}
 
 	public interface Validate {
-		default Fn getValidator() {
+		default CFn getValidator() {
 			return null;
 		}
 		default boolean validate(Object newVal) {
-			Fn f = getValidator();
+			CFn f = getValidator();
 			if (f == null) return true;
 			return (boolean)f.invoke(newVal);
 		}
 	}
 
 	public interface Watch {
-		default void addWatch(Object key, Fn f) {
+		default void addWatch(Object key, CFn f) {
 			throw new UnsupportedOperationException("Not Supported");
 		}
-		default Iterator<Map.Entry<Object, Fn>> getWatches() {
+		default Iterator<Map.Entry<Object, CFn>> getWatches() {
 			return null;
 		}
 		default void notifyWatches(Object oldVal, Object newVal) {
-			Iterator<Map.Entry<Object, Fn>> ws = getWatches();
+			Iterator<Map.Entry<Object, CFn>> ws = getWatches();
 			if(ws != null) {
 				Iter.map(ws, e -> e.getValue().invoke(e.getKey(), this, oldVal, newVal));
 			}

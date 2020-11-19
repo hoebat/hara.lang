@@ -3,7 +3,7 @@ package hara.lang.base;
 import java.util.concurrent.Callable;
 
 @SuppressWarnings("rawtypes")
-public interface Fn extends Callable, Runnable{
+public interface CFn extends Callable, Runnable{
 
 	@Override
 	default Object call() {
@@ -136,7 +136,7 @@ public interface Fn extends Callable, Runnable{
 		return applyToHelper(this, ret1(arglist, arglist = null));
 	}
 
-	static public Object applyToHelper(Fn ifn, I.Seq<Object> arglist) {
+	static public Object applyToHelper(CFn ifn, I.Seq<Object> arglist) {
 		switch ((int)arglist.count()) {
 		case 0:
 			arglist = null;

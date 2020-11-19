@@ -1,11 +1,7 @@
-package hara.lang.data;
-
-import java.util.function.Function;
-
-import hara.lang.base.*;
+package hara.lang.base;
 
 public interface Cons<E> extends
-	T.ConsType<E>,
+	T.SeqType<E>,
  	I.ObjType {
 
 	public static Empty<Object> EMPTY = new Empty<>(null);
@@ -34,7 +30,7 @@ public interface Cons<E> extends
 		}
 	}
 
-	public class Standard<E> extends Obj.PT implements Cons<E> {
+	public class Standard<E> extends Obj.SEQ<E> implements Cons<E> {
 
 		private final E _first;
 		private final I.Seq<E> _more;

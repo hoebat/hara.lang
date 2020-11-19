@@ -12,10 +12,12 @@ import java.util.function.Function;
 import java.util.function.LongFunction;
 import java.util.function.Supplier;
 
+import hara.lang.base.I.Cons;
+
 
 public interface Iter {
 
-	public class ToSeq<E> extends Obj.PT implements I.Seq<E>, I.SequentialType<E> {
+	public class ToSeq<E> extends Obj.SEQ<E> {
 
 		final Iterator<E> _iter;
 		final State<E> _state;
@@ -252,7 +254,7 @@ public interface Iter {
 	}
 
 	@SuppressWarnings("rawtypes")
-	public static <U> Iterator map(Iterator<U> it, Fn f) {
+	public static <U> Iterator map(Iterator<U> it, CFn f) {
 		return from(it::hasNext, () -> f.invoke(it.next()));
 	}
 
@@ -269,7 +271,7 @@ public interface Iter {
 	}
 
 	@SuppressWarnings("rawtypes")
-	public static Object reduce(Iterator it, Object init, Fn f) {
+	public static Object reduce(Iterator it, Object init, CFn f) {
 		var acc = init;
 		while (it.hasNext()) {
 			acc = f.invoke(acc, it.next());
@@ -278,7 +280,7 @@ public interface Iter {
 	}
 
 	@SuppressWarnings("rawtypes")
-	public static Object reduce(Iterator it, Fn f) {
+	public static Object reduce(Iterator it, CFn f) {
 		return reduce(it, f.invoke(), f);
 	}
 

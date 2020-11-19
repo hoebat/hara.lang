@@ -954,9 +954,9 @@ public interface Pm {
 	public class Delay implements I.Deref, I.Realize<Object> {
 		volatile Object _val;
 		volatile Throwable _ex;
-		volatile Fn _fn;
+		volatile CFn _fn;
 	
-		public Delay(Fn fn) {
+		public Delay(CFn fn) {
 			_fn = fn;
 			_val = null;
 			_ex = null;

@@ -12,7 +12,7 @@ public final class Keyword implements
 	I.Namespaced, 
 	I.Display,
 	I.ObjType,
-	Fn,
+	CFn,
 	I.Metadata {
 	private static ConcurrentHashMap<String, Reference<Keyword>> LU = new ConcurrentHashMap<String, Reference<Keyword>>();
 	private static ReferenceQueue<Keyword> RQ = new ReferenceQueue<Keyword>();

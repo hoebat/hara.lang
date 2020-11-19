@@ -34,7 +34,7 @@ public interface T {
 	}
 	
 
-	public interface ConsType<E>
+	public interface SeqType<E>
 			extends Coll<E>, 
 					I.Cons<E>, 
 					I.PushFirst<E>, 
@@ -44,18 +44,18 @@ public interface T {
 					I.SequentialType<E> {
 	
 		@Override
-		default ConsType<E> conj(E e) {
-			return (ConsType<E>) cons(e);
+		default SeqType<E> conj(E e) {
+			return (SeqType<E>) cons(e);
 		}
 	
 		@Override
-		default ConsType<E> popFirst() {
-			return (ConsType<E>) restMore();
+		default SeqType<E> popFirst() {
+			return (SeqType<E>) restMore();
 		}
 	
 		@Override
-		default ConsType<E> pushFirst(E v) {
-			return (ConsType<E>) cons(v);
+		default SeqType<E> pushFirst(E v) {
+			return (SeqType<E>) cons(v);
 		}
 	}
 

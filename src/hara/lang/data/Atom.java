@@ -45,20 +45,20 @@ public interface Atom {
 			_validator = null;
 		}
 		
-		public Standard(Object init, Fn validator) {
+		public Standard(Object init, CFn validator) {
 			super(init);
 			_validator = validator;
 		}
 
-		final Fn _validator;
-		final ConcurrentHashMap<Object, Fn> _watches = new ConcurrentHashMap<Object, Fn>();
+		final CFn _validator;
+		final ConcurrentHashMap<Object, CFn> _watches = new ConcurrentHashMap<Object, CFn>();
 
 		@Override
-		public Fn getValidator() {
+		public CFn getValidator() {
 			return _validator;
 		}
 		
-		public void addWatch(Object key, Fn f) {
+		public void addWatch(Object key, CFn f) {
 			_watches.put(key, f);
 		}
 		
@@ -66,7 +66,7 @@ public interface Atom {
 			_watches.remove(key);
 		}
 		
-		public Iterator<Map.Entry<Object, Fn>> getWatches() {
+		public Iterator<Map.Entry<Object, CFn>> getWatches() {
 			return _watches.entrySet().iterator();
 		}
 
@@ -76,7 +76,7 @@ public interface Atom {
 		
 		boolean compareAndSet(Object oldVal, Object newVal);
 
-		default Object swap(Fn f) {
+		default Object swap(CFn f) {
 			for (;;) {
 				var v = deref();
 				var newVal = f.invoke(v);
@@ -88,7 +88,7 @@ public interface Atom {
 			}
 		}
 
-		default Object swap(Fn f, Object arg) {
+		default Object swap(CFn f, Object arg) {
 			for (;;) {
 				var v = deref();
 				var newVal = f.invoke(v, arg);
@@ -100,7 +100,7 @@ public interface Atom {
 			}
 		}
 
-		default Object swap(Fn f, Object arg1, Object arg2) {
+		default Object swap(CFn f, Object arg1, Object arg2) {
 			for (;;) {
 				var v = deref();
 				var newVal = f.invoke(v, arg1, arg2);
@@ -112,7 +112,7 @@ public interface Atom {
 			}
 		}
 
-		default Object swap(Fn f, Object x, Object y, Object z) {
+		default Object swap(CFn f, Object x, Object y, Object z) {
 			for (;;) {
 				var v = deref();
 				var newVal = f.invoke(v, x, y, z);
