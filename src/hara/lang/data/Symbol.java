@@ -2,7 +2,7 @@ package hara.lang.data;
 
 import hara.lang.base.*;
 
-public class Symbol extends T.NamespacedType.PT implements T.StringType {
+public class Symbol extends C.NamespacedType.PT implements C.StringType {
 	
 	public Symbol(I.Metadata meta, String nsname) {
 		super(meta, nsname);

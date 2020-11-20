@@ -1,64 +1,71 @@
 package hara.lang.data;
 
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 import hara.lang.base.*;
+import hara.lang.base.I.WatchEntry;
 
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public interface Atom {
+public interface Atom<V> {
 
-	public abstract class Struct implements Swap {
-		final AtomicReference<Object> _state;
+	public abstract class Struct<R, V> implements Swap<R, V> {
+		final AtomicReference<V> _state;
 
-		public Struct(Object init) {
-			_state = new AtomicReference<Object>(init);
+		public Struct(V init) {
+			_state = new AtomicReference<V>(init);
 		}
 
 		@Override
-		public Object deref() {
+		public V deref() {
 			return _state.get();
 		}
 
-		public boolean compareAndSet(Object oldVal, Object newVal) {
+		public boolean compareAndSet(V oldVal, V newVal) {
 			return _state.compareAndSet(oldVal, newVal);
 		}
 
-		public Object reset(Object newVal) {
+		public V reset(V newVal) {
 			_state.set(newVal);
 			return newVal;
 		}
 	}
 	
-	public final class Basic extends Struct {
-		public Basic(Object state) {
+	public final class Basic<R, V> extends Struct<R, V> {
+		public Basic(V state) {
 			super(state);
 		}
 	}
 
-	public final class Standard extends Struct implements Swap {
+	public final class Standard<R, V> extends Struct<R, V> implements Swap<R, V> {
 
-		public Standard(Object init) {
+		final Predicate<V> _validator;
+		final ConcurrentHashMap<Object, Consumer<WatchEntry<R, V>>> _watches 
+			= new ConcurrentHashMap<Object, Consumer<WatchEntry<R, V>>>();
+
+		public Standard(V init) {
 			super(init);
 			_validator = null;
 		}
 		
-		public Standard(Object init, CFn validator) {
+		public Standard(V init, Predicate<V> validator) {
 			super(init);
 			_validator = validator;
 		}
 
-		final CFn _validator;
-		final ConcurrentHashMap<Object, CFn> _watches = new ConcurrentHashMap<Object, CFn>();
-
 		@Override
-		public CFn getValidator() {
+		public Predicate<V> getValidator() {
 			return _validator;
 		}
-		
-		public void addWatch(Object key, CFn f) {
+
+		@Override
+		public void addWatch(Object key, Consumer<WatchEntry<R, V>> f) {
 			_watches.put(key, f);
 		}
 		
@@ -66,20 +73,20 @@ public interface Atom {
 			_watches.remove(key);
 		}
 		
-		public Iterator<Map.Entry<Object, CFn>> getWatches() {
+		public Iterator<Map.Entry<Object, Consumer<WatchEntry<R, V>>>> getWatches() {
 			return _watches.entrySet().iterator();
 		}
 
 	}
 	
-	public interface Swap extends I.Watch, I.Validate, I.Deref {
+	public interface Swap<R, V> extends I.Watch<R, V>, I.Validate<V>, I.Deref<V> {
 		
-		boolean compareAndSet(Object oldVal, Object newVal);
+		boolean compareAndSet(V oldVal, V newVal);
 
-		default Object swap(CFn f) {
+		default Object swap(Function<V, V> f) {
 			for (;;) {
 				var v = deref();
-				var newVal = f.invoke(v);
+				var newVal = f.apply(v);
 				validate(newVal);
 				if (compareAndSet(v, newVal)) {
 					notifyWatches(v, newVal);
@@ -88,10 +95,10 @@ public interface Atom {
 			}
 		}
 
-		default Object swap(CFn f, Object arg) {
+		default Object swap(BiFunction<V, Object, V> f, Object arg) {
 			for (;;) {
 				var v = deref();
-				var newVal = f.invoke(v, arg);
+				var newVal = f.apply(v, arg);
 				validate(newVal);
 				if (compareAndSet(v, newVal)) {
 					notifyWatches(v, newVal);
@@ -100,22 +107,10 @@ public interface Atom {
 			}
 		}
 
-		default Object swap(CFn f, Object arg1, Object arg2) {
+		default Object swap(BiFunction<V, Object[], V> f, Object... vargs) {
 			for (;;) {
 				var v = deref();
-				var newVal = f.invoke(v, arg1, arg2);
-				validate(newVal);
-				if (compareAndSet(v, newVal)) {
-					notifyWatches(v, newVal);
-					return newVal;
-				}
-			}
-		}
-
-		default Object swap(CFn f, Object x, Object y, Object z) {
-			for (;;) {
-				var v = deref();
-				var newVal = f.invoke(v, x, y, z);
+				var newVal = f.apply(v, vargs);
 				validate(newVal);
 				if (compareAndSet(v, newVal)) {
 					notifyWatches(v, newVal);

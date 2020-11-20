@@ -8,7 +8,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import hara.lang.base.*;
 import hara.lang.base.G.HashType;
 
-public interface Vector<E> extends T.VectorType<E> {
+public interface Vector<E> extends C.VectorType<E> {
 
 	public interface Fn {
 
@@ -215,7 +215,7 @@ public interface Vector<E> extends T.VectorType<E> {
 		}
 	}
 
-	public class Mutable<E> extends T.RefType.MT implements Base<E>, I.ToPersistent {
+	public class Mutable<E> extends C.RefType.MT implements Base<E>, I.ToPersistent {
 
 		private int _size;
 		private int _shift;
@@ -355,7 +355,7 @@ public interface Vector<E> extends T.VectorType<E> {
 		}
 	}
 
-	public class Standard<E> extends T.RefType.PT implements Base<E>, I.ToMutable {
+	public class Standard<E> extends C.RefType.PT implements Base<E>, I.ToMutable {
 
 		// STATIC
 		public final static Standard<Object> EMPTY = new Standard<>(null, 0, Node.NODE_SHIFT, Node.EMPTY, new Object[] {});

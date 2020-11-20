@@ -8,11 +8,11 @@ import java.util.concurrent.ConcurrentHashMap;
 import hara.lang.base.*;
 
 public final class Keyword implements 
-	T.StringType,
+	C.StringType,
 	I.Namespaced, 
 	I.Display,
 	I.ObjType,
-	CFn,
+	I.Fn,
 	I.Metadata {
 	private static ConcurrentHashMap<String, Reference<Keyword>> LU = new ConcurrentHashMap<String, Reference<Keyword>>();
 	private static ReferenceQueue<Keyword> RQ = new ReferenceQueue<Keyword>();

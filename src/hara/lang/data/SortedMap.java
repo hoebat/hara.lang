@@ -14,7 +14,7 @@ import hara.lang.base.G.HashType;
 import static hara.lang.data.SortedMap.Color.*;
 
 public interface SortedMap<K, V> extends
-	T.MapType<K, V>,
+	C.MapType<K, V>,
 	I.Nth<Map.Entry<K, V>>, 
 	I.IndexedKV<K, V> {
 
@@ -552,7 +552,7 @@ public interface SortedMap<K, V> extends
 		}
 	}
 
-	public final class Mutable<K, V> extends T.RefType.MT 
+	public final class Mutable<K, V> extends C.RefType.MT 
 		implements Base<K, V>,
 				   I.ToPersistent{
 
@@ -617,7 +617,7 @@ public interface SortedMap<K, V> extends
 		}
 	}
 	
-	public final class Standard<K, V> extends T.RefType.PT 
+	public final class Standard<K, V> extends C.RefType.PT 
 		implements Base<K, V>, SortedMap<K, V>, I.ToMutable {
 
 		// STATIC

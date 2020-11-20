@@ -4,7 +4,7 @@ import java.util.Iterator;
 
 import hara.lang.base.G.ObjType;
 import hara.lang.base.I.Empty;
-import hara.lang.base.T.Coll;
+import hara.lang.base.C.Coll;
 
 public interface Obj {
 
@@ -64,7 +64,7 @@ public interface Obj {
 		Coll<V>, 
 		I.Seq<V>, 
 		I.ObjType,
-		T.SeqType<V>,
+		C.SeqType<V>,
 		I.SequentialType<V>{
 
 		public SEQ() {

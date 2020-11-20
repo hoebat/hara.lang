@@ -1,10 +1,14 @@
 package hara.lang.base;
 
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.function.BiFunction;
+import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 public interface I {
 
@@ -33,12 +37,12 @@ public interface I {
 		long count();
 	}
 
-	public interface Deref {
-		Object deref();
+	public interface Deref<V> {
+		V deref();
 	}
 
 	public interface DerefTimeout {
-		Object derefTimeout(long ms, T timeoutVal);
+		Object derefTimeout(long ms, C timeoutVal);
 	}
 
 	public interface Display {
@@ -65,6 +69,53 @@ public interface I {
 	
 	public interface Find<K, V> {
 		V find(K key);
+	}
+	
+	
+	public interface Fn<R, T1, T2> extends Function<Object[], R>{
+		
+		default Supplier<R> getArg0() {
+			throw new Ex.Arity(0, "No arity 0");
+		}
+		default Function<T1, R>   getArg1() {
+			throw new Ex.Arity(1, "No arity 1");
+		}
+		default BiFunction<T1, T2, R> getArg2() {
+			throw new Ex.Arity(2, "No arity 2");
+		}
+		default Function<Object[], R> getArgN(){
+			throw new Ex.Arity(0, "No arity N");
+		}
+		
+		default R invoke() {
+			return getArg0().get();
+		}
+		
+		default R invoke(T1 a1) {
+			return getArg1().apply(a1);
+		}
+		
+		default R invoke(T1 a1, T2 a2) {
+			return getArg2().apply(a1, a2);
+		}
+		
+		default R invoke(Object... vargs) {
+			return getArgN().apply(vargs);
+		}
+		
+		@SuppressWarnings("unchecked")
+		@Override
+		default R apply(Object[] input) {
+			int len = input.length;
+			switch(len) {
+			case 0: return (R)invoke();
+			case 1: return (R)invoke((T1)input[0]);
+			case 2: return (R)invoke((T1)input[0],(T2)input[2]);
+			default: 
+				return (R)invoke(input);
+			}
+		}
+		
 	}
 	
 	public interface Hash {
@@ -197,12 +248,6 @@ public interface I {
 	public interface Ranged {
 		long rangeMax();
 		long rangeMin();
-	}
-	
-	public interface Reducible<R, V> {
-		R reduce(IFn<R, ?, V, ?> f);
-
-		R reduce(IFn<R, ?, V, ?> f, R initial);
 	}
 	
 	public interface Realize<V> {
@@ -361,7 +406,7 @@ public interface I {
 	
 		@Override
 		default Iterator<Long> keys() {
-			return Iter.range(count(), (e) -> e);
+			return Iter.range(0, count());
 		}
 	
 		@Override
@@ -398,29 +443,46 @@ public interface I {
 			return Iter.toSeq(iterator());
 		};
 	}
+	
+	public interface Pair<K, V> extends Map.Entry<K, V> {
+		@Override
+		default V setValue(V value) {
+			throw new Ex.Unsupported();
+		}	
+	}
 
-	public interface Validate {
-		default CFn getValidator() {
+	
+	public interface Validate<V> {
+		default Predicate<V> getValidator() {
 			return null;
 		}
-		default boolean validate(Object newVal) {
-			CFn f = getValidator();
+		default boolean validate(V newVal) {
+			var f = getValidator();
 			if (f == null) return true;
-			return (boolean)f.invoke(newVal);
+			return f.test(newVal);
+		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	public class WatchEntry<R, V> extends T.Tup4.L<Object, R, V, V> {
+		
+		WatchEntry(Object key, Watch<R, V> ref, V oldVal, V newVal) {
+			super(null, key, (R) ref, oldVal, newVal);
 		}
 	}
 
-	public interface Watch {
-		default void addWatch(Object key, CFn f) {
+	public interface Watch<R, V> {
+		default void addWatch(Object key, Consumer<WatchEntry<R, V>> f) {
 			throw new UnsupportedOperationException("Not Supported");
 		}
-		default Iterator<Map.Entry<Object, CFn>> getWatches() {
+		default Iterator<Map.Entry<Object, Consumer<WatchEntry<R, V>>>> getWatches() {
 			return null;
 		}
-		default void notifyWatches(Object oldVal, Object newVal) {
-			Iterator<Map.Entry<Object, CFn>> ws = getWatches();
+		default void notifyWatches(V oldVal, V newVal) {
+			Iterator<Map.Entry<Object, Consumer<WatchEntry<R, V>>>> ws = getWatches();
 			if(ws != null) {
-				Iter.map(ws, e -> e.getValue().invoke(e.getKey(), this, oldVal, newVal));
+				ws.forEachRemaining(e -> e.getValue().accept(
+						new WatchEntry<R, V>(e.getKey(), this, oldVal, newVal)));
 			}
 		}
 		default void removeWatch(Object key) {

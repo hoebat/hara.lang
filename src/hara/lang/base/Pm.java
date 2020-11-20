@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 public interface Pm {
 
@@ -951,28 +952,24 @@ public interface Pm {
 		}
 	}
 
-	public class Delay implements I.Deref, I.Realize<Object> {
-		volatile Object _val;
+	public class Delay<V> implements I.Deref, I.Realize<V> {
+		volatile V _val;
 		volatile Throwable _ex;
-		volatile CFn _fn;
+		volatile Supplier<V> _fn;
 	
-		public Delay(CFn fn) {
+		public Delay(Supplier<V> fn) {
 			_fn = fn;
 			_val = null;
 			_ex = null;
 		}
 	
-		static public Object force(Object x) {
-			return (x instanceof Delay) ? ((Delay) x).deref() : x;
-		}
-	
-		public Object deref() {
+		public V deref() {
 			if (_fn != null) {
 				synchronized (this) {
 					// double check
 					if (_fn != null) {
 						try {
-							_val = _fn.invoke();
+							_val = _fn.get();
 						} catch (Throwable t) {
 							_ex = t;
 						}
@@ -991,7 +988,7 @@ public interface Pm {
 		}
 		
 		@Override
-		public Object realize() {
+		public V realize() {
 			return deref();
 		}
 	}

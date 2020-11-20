@@ -1,5 +1,7 @@
 package hara.lang.base;
 
+import java.util.NoSuchElementException;
+
 public interface Ex {
 
 	@SuppressWarnings("serial")
@@ -103,5 +105,14 @@ public interface Ex {
 			super(message, cause, enableSuppression, writableStackTrace);
 		}
 	}
+
+	@SuppressWarnings("serial")
+	public class OutOfBounds extends IndexOutOfBoundsException {}
+	
+	@SuppressWarnings("serial")
+	public class NoSuchElement extends NoSuchElementException {}
+
+	@SuppressWarnings("serial")
+	public class TODO extends RuntimeException {}
 
 }
