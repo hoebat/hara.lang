@@ -43,11 +43,23 @@ class MapTest {
 		
 		assertEquals(m.count(), 1);
 		assertEquals(m.lookup(k1).hashCode(), k2.hashCode());
+		assertEquals(k1.invoke(m), k2.hashCode());
 		
 		var n = m.assoc(k2, k1);
 		assertArrayEquals(
 				Iter.toArray(n.keys()),
 				Arr.objects(k1,k2));
+		Iter.pr(n.vals());
+	}
+
+
+
+	
+	@Test
+	void iterTests() {
+		Iter.pr(
+		Iter.partitionPair(
+				Iter.objects("A", "B", "C", "D")));
 	}
 
 }

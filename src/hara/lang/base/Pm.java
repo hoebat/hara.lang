@@ -704,6 +704,7 @@ public interface Pm {
 		}
 
 		// return a string representation of the invoking Complex object
+		@Override
 		public String toString() {
 			if (im == 0)
 				return re + "";
@@ -808,6 +809,7 @@ public interface Pm {
 		}
 
 		// See Section 3.3.
+		@Override
 		public boolean equals(Object x) {
 			if (x == null)
 				return false;
@@ -818,6 +820,7 @@ public interface Pm {
 		}
 
 		// See Section 3.3.
+		@Override
 		public int hashCode() {
 			return Objects.hash(re, im);
 		}
@@ -835,31 +838,38 @@ public interface Pm {
 			this.denominator = denominator;
 		}
 
+		@Override
 		public boolean equals(Object arg0) {
 			return arg0 != null && arg0 instanceof Ratio && ((Ratio) arg0).numerator.equals(numerator)
 					&& ((Ratio) arg0).denominator.equals(denominator);
 		}
 
+		@Override
 		public int hashCode() {
 			return numerator.hashCode() ^ denominator.hashCode();
 		}
 
+		@Override
 		public String toString() {
 			return numerator.toString() + "/" + denominator.toString();
 		}
 
+		@Override
 		public int intValue() {
 			return (int) doubleValue();
 		}
 
+		@Override
 		public long longValue() {
 			return bigIntegerValue().longValue();
 		}
 
+		@Override
 		public float floatValue() {
 			return (float) doubleValue();
 		}
 
+		@Override
 		public double doubleValue() {
 			return decimalValue(MathContext.DECIMAL64).doubleValue();
 		}
@@ -879,6 +889,7 @@ public interface Pm {
 			return numerator.divide(denominator);
 		}
 
+		@Override
 		public int compareTo(Object o) {
 			Number other = (Number) o;
 			return Num.compare(this, other);
@@ -892,6 +903,7 @@ public interface Pm {
 			_val = val;
 		}
 	
+		@Override
 		public V deref(){
 			return _val;
 		}

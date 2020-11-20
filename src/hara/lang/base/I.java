@@ -84,11 +84,12 @@ public interface I {
 		V find(K key);
 	}
 	
-	public interface Fn<R, T1, T2> extends Function<Object[], R>{
+	public interface Fn<R, T1, T2> extends Function<Object, R>{
 		
 		@SuppressWarnings("unchecked")
 		@Override
-		default R apply(Object[] input) {
+		default R apply(Object vargs) {
+			Object[] input = (Object[]) vargs;
 			int len = input.length;
 			switch(len) {
 			case 0: return invoke();
@@ -127,7 +128,6 @@ public interface I {
 		default R invoke(Object... vargs) {
 			return getArgN().apply(vargs);
 		}
-		
 	}
 
 	public interface Hash {

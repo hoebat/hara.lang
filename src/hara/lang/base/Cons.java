@@ -50,6 +50,7 @@ public interface Cons<E> extends
 		// I.Seq
 		//
 
+		@Override
 		public Standard<E> cons(E e) {
 			return new Cons.Standard<E>(null, e, this);
 		}

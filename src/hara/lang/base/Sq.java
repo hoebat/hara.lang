@@ -62,7 +62,7 @@ public interface Sq {
 			if (_seq == null)
 				return false;
 	
-			action.accept((T) _seq.first());
+			action.accept(_seq.first());
 			_seq = _seq.next();
 			return true;
 		}

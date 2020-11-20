@@ -12,63 +12,76 @@ public interface Num {
 		
 		// final static Var MATH_CONTEXT = Ut.MATH_CONTEXT;
 
+		@Override
 		final public Number add(Number x, Number y) {
 			MathContext mc = null; // (MathContext) MATH_CONTEXT.deref();
 			return mc == null ? toBigDecimal(x).add(toBigDecimal(y)) : toBigDecimal(x).add(toBigDecimal(y), mc);
 		}
 
+		@Override
 		public Ops combine(Ops y) {
 			return y.opsWith(this);
 		}
 
+		@Override
 		public Number dec(Number x) {
 			MathContext mc = null; // (MathContext) MATH_CONTEXT.deref();
 			BigDecimal bx = (BigDecimal) x;
 			return mc == null ? bx.subtract(BigDecimal.ONE) : bx.subtract(BigDecimal.ONE, mc);
 		}
 
+		@Override
 		public Number divide(Number x, Number y) {
 			MathContext mc = null; // (MathContext) MATH_CONTEXT.deref();
 			return mc == null ? toBigDecimal(x).divide(toBigDecimal(y)) : toBigDecimal(x).divide(toBigDecimal(y), mc);
 		}
 
+		@Override
 		public boolean eq(Number x, Number y) {
 			return toBigDecimal(x).compareTo(toBigDecimal(y)) == 0;
 		}
 
+		@Override
 		public boolean gte(Number x, Number y) {
 			return toBigDecimal(x).compareTo(toBigDecimal(y)) >= 0;
 		}
 
+		@Override
 		public Number inc(Number x) {
 			MathContext mc = null; // (MathContext) MATH_CONTEXT.deref();
 			BigDecimal bx = (BigDecimal) x;
 			return mc == null ? bx.add(BigDecimal.ONE) : bx.add(BigDecimal.ONE, mc);
 		}
 
+		@Override
 		public boolean isNeg(Number x) {
 			BigDecimal bx = (BigDecimal) x;
 			return bx.signum() < 0;
 		}
 
+		@Override
 		public boolean isPos(Number x) {
 			BigDecimal bx = (BigDecimal) x;
 			return bx.signum() > 0;
 		}
 
+		@Override
 		public boolean isZero(Number x) {
 			BigDecimal bx = (BigDecimal) x;
 			return bx.signum() == 0;
 		}
 
+		@Override
 		public boolean lt(Number x, Number y) {
 			return toBigDecimal(x).compareTo(toBigDecimal(y)) < 0;
 		}
 
+		@Override
 		public boolean lte(Number x, Number y) {
 			return toBigDecimal(x).compareTo(toBigDecimal(y)) <= 0;
 		}
 
+		@Override
 		final public Number multiply(Number x, Number y) {
 			MathContext mc = null; // (MathContext) MATH_CONTEXT.deref();
 			return mc == null ? toBigDecimal(x).multiply(toBigDecimal(y))
@@ -76,37 +89,45 @@ public interface Num {
 		}
 
 		// public Number subtract(Number x, Number y);
+		@Override
 		final public Number negate(Number x) {
 			MathContext mc = null; // (MathContext) MATH_CONTEXT.deref();
 			return mc == null ? ((BigDecimal) x).negate() : ((BigDecimal) x).negate(mc);
 		}
 
+		@Override
 		final public Ops opsWith(BigDecimalOps x) {
 			return this;
 		}
 
+		@Override
 		final public Ops opsWith(BigIntegerOps x) {
 			return this;
 		}
 
+		@Override
 		final public Ops opsWith(DoubleOps x) {
 			return DOUBLE_OPS;
 		}
 
+		@Override
 		final public Ops opsWith(LongOps x) {
 			return this;
 		}
 
+		@Override
 		final public Ops opsWith(RatioOps x) {
 			return this;
 		}
 
+		@Override
 		public Number quotient(Number x, Number y) {
 			MathContext mc = null; // (MathContext) MATH_CONTEXT.deref();
 			return mc == null ? toBigDecimal(x).divideToIntegralValue(toBigDecimal(y))
 					: toBigDecimal(x).divideToIntegralValue(toBigDecimal(y), mc);
 		}
 
+		@Override
 		public Number remainder(Number x, Number y) {
 			MathContext mc = null; // (MathContext) MATH_CONTEXT.deref();
 			return mc == null ? toBigDecimal(x).remainder(toBigDecimal(y))
@@ -115,92 +136,113 @@ public interface Num {
 	}
 
 	final static class BigIntegerOps extends OpsP {
+		@Override
 		final public Number add(Number x, Number y) {
 			return toBigInteger(x).add(toBigInteger(y));
 		}
 
+		@Override
 		public Ops combine(Ops y) {
 			return y.opsWith(this);
 		}
 
+		@Override
 		public Number dec(Number x) {
 			BigInteger bx = toBigInteger(x);
 			return bx.subtract(BigInteger.ONE);
 		}
 
+		@Override
 		public Number divide(Number x, Number y) {
 			return Num.divide(toBigInteger(x), toBigInteger(y));
 		}
 
+		@Override
 		public boolean eq(Number x, Number y) {
 			return toBigInteger(x).equals(toBigInteger(y));
 		}
 
+		@Override
 		public boolean gte(Number x, Number y) {
 			return toBigInteger(x).compareTo(toBigInteger(y)) >= 0;
 		}
 
+		@Override
 		public Number inc(Number x) {
 			BigInteger bx = toBigInteger(x);
 			return bx.add(BigInteger.ONE);
 		}
 
+		@Override
 		public boolean isNeg(Number x) {
 			BigInteger bx = toBigInteger(x);
 			return bx.signum() < 0;
 		}
 
+		@Override
 		public boolean isPos(Number x) {
 			BigInteger bx = toBigInteger(x);
 			return bx.signum() > 0;
 		}
 
+		@Override
 		public boolean isZero(Number x) {
 			BigInteger bx = toBigInteger(x);
 			return bx.signum() == 0;
 		}
 
+		@Override
 		public boolean lt(Number x, Number y) {
 			return toBigInteger(x).compareTo(toBigInteger(y)) == -1;
 		}
 
+		@Override
 		public boolean lte(Number x, Number y) {
 			return toBigInteger(x).compareTo(toBigInteger(y)) <= 0;
 		}
 
+		@Override
 		final public Number multiply(Number x, Number y) {
 			return toBigInteger(x).multiply(toBigInteger(y));
 		}
 
 		// public Number subtract(Number x, Number y);
+		@Override
 		final public Number negate(Number x) {
 			return toBigInteger(x).negate();
 		}
 
+		@Override
 		final public Ops opsWith(BigDecimalOps x) {
 			return BIGDECIMAL_OPS;
 		}
 
+		@Override
 		final public Ops opsWith(BigIntegerOps x) {
 			return this;
 		}
 
+		@Override
 		final public Ops opsWith(DoubleOps x) {
 			return DOUBLE_OPS;
 		}
 
+		@Override
 		final public Ops opsWith(LongOps x) {
 			return this;
 		}
 
+		@Override
 		final public Ops opsWith(RatioOps x) {
 			return RATIO_OPS;
 		}
 
+		@Override
 		public Number quotient(Number x, Number y) {
 			return toBigInteger(x).divide(toBigInteger(y));
 		}
 
+		@Override
 		public Number remainder(Number x, Number y) {
 			return toBigInteger(x).remainder(toBigInteger(y));
 		}
@@ -211,87 +253,108 @@ public interface Num {
 	}
 
 	final static class DoubleOps extends OpsP {
+		@Override
 		final public Number add(Number x, Number y) {
 			return Double.valueOf(x.doubleValue() + y.doubleValue());
 		}
 
+		@Override
 		public Ops combine(Ops y) {
 			return y.opsWith(this);
 		}
 
+		@Override
 		public Number dec(Number x) {
 			return Double.valueOf(x.doubleValue() - 1);
 		}
 
+		@Override
 		public Number divide(Number x, Number y) {
 			return Double.valueOf(x.doubleValue() / y.doubleValue());
 		}
 
+		@Override
 		public boolean eq(Number x, Number y) {
 			return x.doubleValue() == y.doubleValue();
 		}
 
+		@Override
 		public boolean gte(Number x, Number y) {
 			return x.doubleValue() >= y.doubleValue();
 		}
 
+		@Override
 		public Number inc(Number x) {
 			return Double.valueOf(x.doubleValue() + 1);
 		}
 
+		@Override
 		public boolean isNeg(Number x) {
 			return x.doubleValue() < 0;
 		}
 
+		@Override
 		public boolean isPos(Number x) {
 			return x.doubleValue() > 0;
 		}
 
+		@Override
 		public boolean isZero(Number x) {
 			return x.doubleValue() == 0;
 		}
 
+		@Override
 		public boolean lt(Number x, Number y) {
 			return x.doubleValue() < y.doubleValue();
 		}
 
+		@Override
 		public boolean lte(Number x, Number y) {
 			return x.doubleValue() <= y.doubleValue();
 		}
 
+		@Override
 		final public Number multiply(Number x, Number y) {
 			return Double.valueOf(x.doubleValue() * y.doubleValue());
 		}
 
 		// public Number subtract(Number x, Number y);
+		@Override
 		final public Number negate(Number x) {
 			return Double.valueOf(-x.doubleValue());
 		}
 
+		@Override
 		final public Ops opsWith(BigDecimalOps x) {
 			return this;
 		}
 
+		@Override
 		final public Ops opsWith(BigIntegerOps x) {
 			return this;
 		}
 
+		@Override
 		final public Ops opsWith(DoubleOps x) {
 			return this;
 		}
 
+		@Override
 		final public Ops opsWith(LongOps x) {
 			return this;
 		}
 
+		@Override
 		final public Ops opsWith(RatioOps x) {
 			return this;
 		}
 
+		@Override
 		public Number quotient(Number x, Number y) {
 			return Num.quotient(x.doubleValue(), y.doubleValue());
 		}
 
+		@Override
 		public Number remainder(Number x, Number y) {
 			return Num.remainder(x.doubleValue(), y.doubleValue());
 		}
@@ -307,10 +370,12 @@ public interface Num {
 			return u;
 		}
 
+		@Override
 		final public Number add(Number x, Number y) {
 			return num(Num.add(x.longValue(), y.longValue()));
 		}
 
+		@Override
 		final public Number addP(Number x, Number y) {
 			long lx = x.longValue(), ly = y.longValue();
 			long ret = lx + ly;
@@ -319,15 +384,18 @@ public interface Num {
 			return num(ret);
 		}
 
+		@Override
 		public Ops combine(Ops y) {
 			return y.opsWith(this);
 		}
 
+		@Override
 		public Number dec(Number x) {
 			long val = x.longValue();
 			return num(Num.dec(val));
 		}
 
+		@Override
 		public Number decP(Number x) {
 			long val = x.longValue();
 			if (val > Long.MIN_VALUE)
@@ -335,6 +403,7 @@ public interface Num {
 			return BIGINT_OPS.dec(x);
 		}
 
+		@Override
 		public Number divide(Number x, Number y) {
 			long n = x.longValue();
 			long val = y.longValue();
@@ -353,19 +422,23 @@ public interface Num {
 			return new Ratio(BigInteger.valueOf(n), BigInteger.valueOf(d));
 		}
 
+		@Override
 		public boolean eq(Number x, Number y) {
 			return x.longValue() == y.longValue();
 		}
 
+		@Override
 		public boolean gte(Number x, Number y) {
 			return x.longValue() >= y.longValue();
 		}
 
+		@Override
 		public Number inc(Number x) {
 			long val = x.longValue();
 			return num(Num.inc(val));
 		}
 
+		@Override
 		public Number incP(Number x) {
 			long val = x.longValue();
 			if (val < Long.MAX_VALUE)
@@ -373,30 +446,37 @@ public interface Num {
 			return BIGINT_OPS.inc(x);
 		}
 
+		@Override
 		public boolean isNeg(Number x) {
 			return x.longValue() < 0;
 		}
 
+		@Override
 		public boolean isPos(Number x) {
 			return x.longValue() > 0;
 		}
 
+		@Override
 		public boolean isZero(Number x) {
 			return x.longValue() == 0;
 		}
 
+		@Override
 		public boolean lt(Number x, Number y) {
 			return x.longValue() < y.longValue();
 		}
 
+		@Override
 		public boolean lte(Number x, Number y) {
 			return x.longValue() <= y.longValue();
 		}
 
+		@Override
 		final public Number multiply(Number x, Number y) {
 			return num(Num.multiply(x.longValue(), y.longValue()));
 		}
 
+		@Override
 		final public Number multiplyP(Number x, Number y) {
 			long lx = x.longValue(), ly = y.longValue();
 			if (lx == Long.MIN_VALUE && ly < 0)
@@ -408,11 +488,13 @@ public interface Num {
 		}
 
 		// public Number subtract(Number x, Number y);
+		@Override
 		final public Number negate(Number x) {
 			long val = x.longValue();
 			return num(Num.minus(val));
 		}
 
+		@Override
 		final public Number negateP(Number x) {
 			long val = x.longValue();
 			if (val > Long.MIN_VALUE)
@@ -420,52 +502,64 @@ public interface Num {
 			return BigInteger.valueOf(val).negate();
 		}
 
+		@Override
 		final public Ops opsWith(BigDecimalOps x) {
 			return BIGDECIMAL_OPS;
 		}
 
+		@Override
 		final public Ops opsWith(BigIntegerOps x) {
 			return BIGINT_OPS;
 		}
 
+		@Override
 		final public Ops opsWith(DoubleOps x) {
 			return DOUBLE_OPS;
 		}
 
+		@Override
 		final public Ops opsWith(LongOps x) {
 			return this;
 		}
 
+		@Override
 		final public Ops opsWith(RatioOps x) {
 			return RATIO_OPS;
 		}
 
+		@Override
 		public Number quotient(Number x, Number y) {
 			return num(x.longValue() / y.longValue());
 		}
 
+		@Override
 		public Number remainder(Number x, Number y) {
 			return num(x.longValue() % y.longValue());
 		}
 
+		@Override
 		final public Number unchecked_add(Number x, Number y) {
 			return num(Num.unchecked_add(x.longValue(), y.longValue()));
 		}
 
+		@Override
 		public Number unchecked_dec(Number x) {
 			long val = x.longValue();
 			return num(Num.unchecked_dec(val));
 		}
 
+		@Override
 		public Number unchecked_inc(Number x) {
 			long val = x.longValue();
 			return num(Num.unchecked_inc(val));
 		}
 
+		@Override
 		final public Number unchecked_multiply(Number x, Number y) {
 			return num(Num.unchecked_multiply(x.longValue(), y.longValue()));
 		}
 
+		@Override
 		final public Number unchecked_negate(Number x) {
 			long val = x.longValue();
 			return num(Num.unchecked_minus(val));
@@ -732,42 +826,52 @@ public interface Num {
 	}
 
 	static abstract class OpsP implements Ops {
+		@Override
 		public Number addP(Number x, Number y) {
 			return add(x, y);
 		}
 
+		@Override
 		public Number decP(Number x) {
 			return dec(x);
 		}
 
+		@Override
 		public Number incP(Number x) {
 			return inc(x);
 		}
 
+		@Override
 		public Number multiplyP(Number x, Number y) {
 			return multiply(x, y);
 		}
 
+		@Override
 		public Number negateP(Number x) {
 			return negate(x);
 		}
 
+		@Override
 		public Number unchecked_add(Number x, Number y) {
 			return add(x, y);
 		}
 
+		@Override
 		public Number unchecked_dec(Number x) {
 			return dec(x);
 		}
 
+		@Override
 		public Number unchecked_inc(Number x) {
 			return inc(x);
 		}
 
+		@Override
 		public Number unchecked_multiply(Number x, Number y) {
 			return multiply(x, y);
 		}
 
+		@Override
 		public Number unchecked_negate(Number x) {
 			return negate(x);
 		}
@@ -783,6 +887,7 @@ public interface Num {
 			return ret;
 		}
 
+		@Override
 		final public Number add(Number x, Number y) {
 			Ratio rx = toRatio(x);
 			Ratio ry = toRatio(y);
@@ -791,14 +896,17 @@ public interface Num {
 			return normalizeRet(ret, x, y);
 		}
 
+		@Override
 		public Ops combine(Ops y) {
 			return y.opsWith(this);
 		}
 
+		@Override
 		public Number dec(Number x) {
 			return Num.add(x, -1);
 		}
 
+		@Override
 		public Number divide(Number x, Number y) {
 			Ratio rx = toRatio(x);
 			Ratio ry = toRatio(y);
@@ -806,49 +914,58 @@ public interface Num {
 			return normalizeRet(ret, x, y);
 		}
 
+		@Override
 		public boolean eq(Number x, Number y) {
 			Ratio rx = toRatio(x);
 			Ratio ry = toRatio(y);
 			return rx.numerator.equals(ry.numerator) && rx.denominator.equals(ry.denominator);
 		}
 
+		@Override
 		public boolean gte(Number x, Number y) {
 			Ratio rx = toRatio(x);
 			Ratio ry = toRatio(y);
 			return Num.gte(rx.numerator.multiply(ry.denominator), ry.numerator.multiply(rx.denominator));
 		}
 
+		@Override
 		public Number inc(Number x) {
 			return Num.add(x, 1);
 		}
 
+		@Override
 		public boolean isNeg(Number x) {
 			Ratio r = (Ratio) x;
 			return r.numerator.signum() < 0;
 		}
 
+		@Override
 		public boolean isPos(Number x) {
 			Ratio r = (Ratio) x;
 			return r.numerator.signum() > 0;
 		}
 
+		@Override
 		public boolean isZero(Number x) {
 			Ratio r = (Ratio) x;
 			return r.numerator.signum() == 0;
 		}
 
+		@Override
 		public boolean lt(Number x, Number y) {
 			Ratio rx = toRatio(x);
 			Ratio ry = toRatio(y);
 			return Num.lt(rx.numerator.multiply(ry.denominator), ry.numerator.multiply(rx.denominator));
 		}
 
+		@Override
 		public boolean lte(Number x, Number y) {
 			Ratio rx = toRatio(x);
 			Ratio ry = toRatio(y);
 			return Num.lte(rx.numerator.multiply(ry.denominator), ry.numerator.multiply(rx.denominator));
 		}
 
+		@Override
 		final public Number multiply(Number x, Number y) {
 			Ratio rx = toRatio(x);
 			Ratio ry = toRatio(y);
@@ -857,31 +974,38 @@ public interface Num {
 		}
 
 		// public Number subtract(Number x, Number y);
+		@Override
 		final public Number negate(Number x) {
 			Ratio r = (Ratio) x;
 			return new Ratio(r.numerator.negate(), r.denominator);
 		}
 
+		@Override
 		final public Ops opsWith(BigDecimalOps x) {
 			return BIGDECIMAL_OPS;
 		}
 
+		@Override
 		final public Ops opsWith(BigIntegerOps x) {
 			return this;
 		}
 
+		@Override
 		final public Ops opsWith(DoubleOps x) {
 			return DOUBLE_OPS;
 		}
 
+		@Override
 		final public Ops opsWith(LongOps x) {
 			return this;
 		}
 
+		@Override
 		final public Ops opsWith(RatioOps x) {
 			return this;
 		}
 
+		@Override
 		public Number quotient(Number x, Number y) {
 			Ratio rx = toRatio(x);
 			Ratio ry = toRatio(y);
@@ -889,6 +1013,7 @@ public interface Num {
 			return normalizeRet(q, x, y);
 		}
 
+		@Override
 		public Number remainder(Number x, Number y) {
 			Ratio rx = toRatio(x);
 			Ratio ry = toRatio(y);
@@ -2116,7 +2241,7 @@ public interface Num {
 
 		double q = n / d;
 		if (q <= Long.MAX_VALUE && q >= Long.MIN_VALUE) {
-			return (double) (long) q;
+			return (long) q;
 		} else { // bigint quotient
 			return new BigDecimal(q).toBigInteger().doubleValue();
 		}

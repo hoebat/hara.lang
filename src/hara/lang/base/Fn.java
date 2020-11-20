@@ -347,6 +347,67 @@ public interface Fn {
 		public static ReduceIn reduceIn(Object step) {
 			return new ReduceIn(toFn(step).getArg2());
 		}
+		
+		public static Function U = new Function() {
+			@Override
+			public Object apply(Object f) {
+				return new Function() {
+					@Override
+					public Object apply(Object x) {
+						return ((Function)((Function)f).apply(f)).apply(x);
+					}
+					
+				};
+			}
+		};
+		
+		public class A implements Function {
+			final Function _f;
+			
+			public A(Function f) { _f = f; }
+
+			@Override
+			public Object apply(Object x) {
+				return _f.apply(U.apply(x));
+			}
+		}
+		
+		public static Function Z = new Function() {
+
+			@Override
+			public Object apply(Object f) {
+				A gA = new A((Function)f);
+				return gA.apply(gA);
+			}
+		};
+		
+		public static Function factorial = new Function() {
+
+			@Override
+			public Object apply(Object f) {
+				return new Function<Integer, Integer>() {
+
+					@Override
+					public Integer apply(Integer n) {
+						return (n == 0) ? 1 : n * (Integer)((Function)f).apply(n - 1);
+					}
+				};
+			}
+			
+		};
+		
+		
+		/*
+		public static Fn1 U = new Fn1(new Function() {
+			public Object apply(Object f) {
+				return new Fn1(new Function() {
+					@Override
+					public Object apply(Object x) {
+						return ((I.Fn)((I.Fn)f).apply(f)).apply(x);
+					}	
+				});
+			}
+		});*/
 	}
 	
 }

@@ -47,6 +47,7 @@ public interface Tup {
 
 			final A _a;
 
+			@Override
 			public A A() {
 				return _a;
 			}
@@ -199,6 +200,7 @@ public interface Tup {
 	@SuppressWarnings({"unchecked", "rawtypes"})
 	public interface Tup3<A, B, X> extends Tup2<A, B>, I.SequentialType, Coll.SeqType, I.Cons {
 
+		@Override
 		default long count() {
 			return 3;
 		}
@@ -283,6 +285,7 @@ public interface Tup {
 	@SuppressWarnings({"unchecked", "rawtypes"})
 	public interface Tup4<A, B, X, Y> extends Tup3<A, B, X>, I.SequentialType, Coll.SeqType, I.Cons {
 
+		@Override
 		default long count() {
 			return 4;
 		}

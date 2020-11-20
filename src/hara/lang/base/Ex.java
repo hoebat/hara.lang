@@ -51,10 +51,12 @@ public interface Ex {
 			}
 		}
 
+		@Override
 		public I.Metadata getData() {
 			return data;
 		}
 
+		@Override
 		public String toString() {
 			return "Ex.Info - " + getMessage() + " " + data.toString();
 		}
