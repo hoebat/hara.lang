@@ -12,11 +12,12 @@ import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
-@SuppressWarnings("unchecked")
+@SuppressWarnings({"unchecked", "rawtypes"})
 public class JavaBeanUtil {
 
 	private static final Pattern FIELD_SEPARATOR = Pattern.compile("\\.");
 	private static final MethodHandles.Lookup LOOKUP = MethodHandles.lookup();
+	
 	private static final ClassValue<Map<String, Function>> CACHE=new ClassValue<Map<String,Function>>(){@Override protected Map<String,Function>computeValue(Class<?>type){return new ConcurrentHashMap<>();}};
 
 	private JavaBeanUtil() {

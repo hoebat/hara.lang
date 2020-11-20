@@ -1,6 +1,5 @@
 package hara.lang.base;
 
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -11,18 +10,28 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 public interface I {
-
+	
 	public interface Assoc<K, V> {
 		Assoc<K, V> assoc(K k, V v);
 	}
 	
+	public interface Coll<V> extends 
+		Iterable<V>, 
+		Equality, 
+		Conj<V>, 
+		Empty, 
+		Count, 
+		Hash, 
+		ToSeq<V> {
+	}
+
 	public interface Component{
+		Metadata  getProps();
+		Metadata  getStatus();
+		boolean isStarted();
+		boolean isStopped();
 		Component start();
 		Component stop();
-		boolean isStopped();
-		boolean isStarted();
-		Metadata  getStatus();
-		Metadata  getProps();
 	}
 
 	public interface Conj<V> {
@@ -33,6 +42,10 @@ public interface I {
 		Cons<V> cons(V e);
 	}
 
+	public interface Context {
+		Object call(Object... args);
+	}
+	
 	public interface Count {
 		long count();
 	}
@@ -41,8 +54,8 @@ public interface I {
 		V deref();
 	}
 
-	public interface DerefTimeout {
-		Object derefTimeout(long ms, C timeoutVal);
+	public interface DerefTimeout<V> {
+		V derefTimeout(long ms, V timeoutVal);
 	}
 
 	public interface Display {
@@ -58,7 +71,7 @@ public interface I {
 	public interface Empty {
 		Empty empty();
 	}
-
+	
 	public interface Equality {
 		boolean equality(Object other);
 	}
@@ -71,9 +84,20 @@ public interface I {
 		V find(K key);
 	}
 	
-	
 	public interface Fn<R, T1, T2> extends Function<Object[], R>{
 		
+		@SuppressWarnings("unchecked")
+		@Override
+		default R apply(Object[] input) {
+			int len = input.length;
+			switch(len) {
+			case 0: return invoke();
+			case 1: return invoke((T1)input[0]);
+			case 2: return invoke((T1)input[0],(T2)input[2]);
+			default: 
+				return invoke(input);
+			}
+		}
 		default Supplier<R> getArg0() {
 			throw new Ex.Arity(0, "No arity 0");
 		}
@@ -83,6 +107,7 @@ public interface I {
 		default BiFunction<T1, T2, R> getArg2() {
 			throw new Ex.Arity(2, "No arity 2");
 		}
+		
 		default Function<Object[], R> getArgN(){
 			throw new Ex.Arity(0, "No arity N");
 		}
@@ -103,28 +128,9 @@ public interface I {
 			return getArgN().apply(vargs);
 		}
 		
-		@SuppressWarnings("unchecked")
-		@Override
-		default R apply(Object[] input) {
-			int len = input.length;
-			switch(len) {
-			case 0: return (R)invoke();
-			case 1: return (R)invoke((T1)input[0]);
-			case 2: return (R)invoke((T1)input[0],(T2)input[2]);
-			default: 
-				return (R)invoke(input);
-			}
-		}
-		
 	}
-	
+
 	public interface Hash {
-		
-		default G.HashType hashType() {
-			return G.DEFAULT_HASH;
-		}
-		
-		String hashSeed();
 		
 		default long hashCalc() {
 			return hashCalc(hashType());
@@ -134,10 +140,16 @@ public interface I {
 		
 		default long hashGet(){
 			return hashCalc(hashType());
-		};
+		}
 		
 		default long hashGet(G.HashType t) {
 			return hashCalc(t);
+		}
+		
+		String hashSeed();;
+		
+		default G.HashType hashType() {
+			return G.DEFAULT_HASH;
 		}
 	}
 
@@ -145,8 +157,7 @@ public interface I {
 		
 		long hashCurrent();
 
-		void hashPut(long hash);
-		
+		@Override
 		default long hashGet() {
 			long h = hashCurrent();
 			if(h == 0) {
@@ -156,21 +167,28 @@ public interface I {
 			return h;
 		}
 		
+		@Override
 		default long hashGet(G.HashType t) {
 			return (hashType() == t)
 					? hashGet()
 					: hashCalc(t);
 		}
+		
+		void hashPut(long hash);
 	}
 
 	public interface Indexed<K, V> {
 		K indexOf(V val);
 	}
-
+	
 	public interface IndexedKV<K, V> {
 		long indexOfKey(K key);
 
 		long indexOfVal(V val);
+	}
+
+	public interface InvokeIn {
+		Object invokeIn(Context context, Object... args);
 	}
 
 	public interface Lookup<K, V> extends Find<K, Map.Entry<K, V>> {
@@ -193,7 +211,7 @@ public interface I {
 		
 		G.MetaType getMetatype();
 	}
-
+	
 	public interface Mutable {}
 	
 	public interface Namespaced {
@@ -204,20 +222,28 @@ public interface I {
 	public interface Nth<V> {
 		V nth(long i);
 	}
-	
+
 	public interface ObjType extends Hash {
 		
 		G.ObjType getObjType();
 		
-		I.Metadata meta();
-
-		ObjType withMeta(I.Metadata meta);
-		
+		@Override
 		default String hashSeed() {
 			return "HARA::"+ getObjType().toString() + "";
 		}
-	}
 
+		I.Metadata meta();
+		
+		ObjType withMeta(I.Metadata meta);
+	}
+	
+	public interface Pair<K, V> extends Map.Entry<K, V> {
+		@Override
+		default V setValue(V value) {
+			throw new Ex.Unsupported();
+		}	
+	}
+	
 	public interface PeekFirst<E> {
 		E peekFirst();
 	}
@@ -244,12 +270,12 @@ public interface I {
 	public interface PushLast<E> {
 		PushLast<E> pushLast(E v);
 	}
-	
+
 	public interface Ranged {
 		long rangeMax();
 		long rangeMin();
 	}
-	
+
 	public interface Realize<V> {
 		boolean isRealized();
 		V realize();
@@ -269,7 +295,7 @@ public interface I {
 		E first();
 		@Override
 		default Iterator<E> iterator() {
-			return Sq.toIterator((Seq<E>) this);
+			return Sq.toIterator(this);
 		}
 		
 		default Seq<E> next() {
@@ -287,7 +313,7 @@ public interface I {
 
 		Seq<E> restMore();
 	}
-
+	
 	public interface SeqArray<C, V> 
 		extends SequentialLookupType<V>,
 				I.PeekFirst<V>, 
@@ -307,7 +333,7 @@ public interface I {
 		@SuppressWarnings("unchecked")
 		@Override
 		default Iterator<V> iterator() {
-			return G.toIter(rawArray());
+			return Arr.toIter(rawArray());
 		}
 	
 		@SuppressWarnings("unchecked")
@@ -337,46 +363,6 @@ public interface I {
 		}
 	}
 
-	public interface SequentialType<V> extends 
-		Iterable<V>, 
-		I.Count, 
-		I.Equality, 
-		I.Hash,
-		I.ObjType {
-	
-		@Override
-		default long hashCalc(G.HashType t) {
-			
-			Function<Object, Long> f = G.hashFn(t);
-			return Iter.reduce(
-					iterator(), 
-					Long.valueOf(hashSeed().hashCode()),
-					(acc, item) -> (acc * 31) + f.apply(item));
-		}
-	
-		@SuppressWarnings({ "unchecked", "rawtypes" })
-		@Override
-		default boolean equality(Object obj) {
-			if (obj instanceof SequentialType) {
-				return (count() == ((SequentialType) obj).count())
-						&& Eq.eqIterator(
-								(Iterator)this.iterator(), 
-								((SequentialType) obj).iterator());
-			} else if (obj instanceof java.util.List) {
-				return (this.count() == ((java.util.List) obj).size())
-						&& Eq.eqIterator(
-								(Iterator)this.iterator(), 
-								((java.util.List) obj).iterator());
-			} else {
-				return false;
-			}
-		}
-		
-		default G.ObjType getObjType() {
-			return G.ObjType.SEQUENTIAL;
-		}
-	}
-	
 	public interface SequentialLookupType<V>
 		extends SequentialType<V>, Iterable<V>, I.Count, I.Nth<V>, I.Lookup<Long, V>, I.PeekFirst<V>, I.PeekLast<V> {
 	
@@ -416,7 +402,7 @@ public interface I {
 	
 		@Override
 		default V peekFirst() {
-			return nth((long) 0);
+			return nth(0);
 		}
 	
 		@Override
@@ -430,27 +416,61 @@ public interface I {
 		}
 	}
 
+	public interface SequentialType<V> extends 
+		Iterable<V>, 
+		I.Count, 
+		I.Equality, 
+		I.Hash,
+		I.ObjType {
+	
+		@SuppressWarnings({ "unchecked", "rawtypes" })
+		@Override
+		default boolean equality(Object obj) {
+			if (obj instanceof SequentialType) {
+				return (count() == ((SequentialType) obj).count())
+						&& Eq.eqIterator(
+								(Iterator)this.iterator(), 
+								((SequentialType) obj).iterator());
+			} else if (obj instanceof java.util.List) {
+				return (this.count() == ((java.util.List) obj).size())
+						&& Eq.eqIterator(
+								(Iterator)this.iterator(), 
+								((java.util.List) obj).iterator());
+			} else {
+				return false;
+			}
+		}
+	
+		@Override
+		default G.ObjType getObjType() {
+			return G.ObjType.SEQUENTIAL;
+		}
+		
+		@Override
+		default long hashCalc(G.HashType t) {
+			
+			Function<Object, Long> f = G.hashFn(t);
+			return Iter.reduce(
+					iterator(), 
+					Long.valueOf(hashSeed().hashCode()),
+					(acc, item) -> (acc * 31) + f.apply(item));
+		}
+	}
+
 	public interface ToMutable extends Persistent {
 		Mutable toMutable();
 	}
-
+	
 	public interface ToPersistent extends Mutable {
 		Persistent toPersistent();
 	}
 
+	
 	public interface ToSeq<E> extends Iterable<E> {
 		default Seq<E> toSeq() {
 			return Iter.toSeq(iterator());
 		};
 	}
-	
-	public interface Pair<K, V> extends Map.Entry<K, V> {
-		@Override
-		default V setValue(V value) {
-			throw new Ex.Unsupported();
-		}	
-	}
-
 	
 	public interface Validate<V> {
 		default Predicate<V> getValidator() {
@@ -460,14 +480,6 @@ public interface I {
 			var f = getValidator();
 			if (f == null) return true;
 			return f.test(newVal);
-		}
-	}
-	
-	@SuppressWarnings("unchecked")
-	public class WatchEntry<R, V> extends T.Tup4.L<Object, R, V, V> {
-		
-		WatchEntry(Object key, Watch<R, V> ref, V oldVal, V newVal) {
-			super(null, key, (R) ref, oldVal, newVal);
 		}
 	}
 
@@ -487,6 +499,14 @@ public interface I {
 		}
 		default void removeWatch(Object key) {
 			throw new UnsupportedOperationException("Not Supported");
+		}
+	}
+
+	@SuppressWarnings("unchecked")
+	public class WatchEntry<R, V> extends Tup.Tup4.L<Object, R, V, V> {
+		
+		WatchEntry(Object key, Watch<R, V> ref, V oldVal, V newVal) {
+			super(null, key, (R) ref, oldVal, newVal);
 		}
 	}
 }

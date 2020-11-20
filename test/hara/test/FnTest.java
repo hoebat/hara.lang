@@ -24,7 +24,7 @@ class FnTest {
 	void MapSimple() {
 		
 		iterHas(
-		new H.Map<Integer, Integer>(
+		new Fn.Map<Integer, Integer>(
 				(i) -> i + 10
 			).invoke(Iter.ints(1,2,3)),
 		arr(11, 12, 13));	
@@ -34,7 +34,7 @@ class FnTest {
 	void FilterSimple() {
 
 		iterHas(
-		new H.Filter<Integer>(
+		new Fn.Filter<Integer>(
 				(i) -> i % 2 == 0
 			).invoke(Iter.ints(1,2,3,4)),
 		arr(2, 4));	
@@ -43,7 +43,7 @@ class FnTest {
 	@Test
 	void CompSimple() {
 		
-		H.Comp inc = new H.Comp(
+		Fn.Comp inc = new Fn.Comp(
 				new Function<Integer, Integer>() {
 					@Override
 					public Integer apply(Integer t) {

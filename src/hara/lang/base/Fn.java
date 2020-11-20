@@ -6,7 +6,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
-public interface H {
+public interface Fn {
 
 	public enum UnitType {
 		MAP, FILTER, MAPCAT, COMPLEX
@@ -122,8 +122,8 @@ public interface H {
 		final I.Fn[] _fns;
 
 		public Comp(Object... fns) {
-			Iterator it = Arr.toIterRev(fns);
-			_fns = Iter.toArray(Iter.map(it, H::toFn), I.Fn.class);
+			Iterator it = Arr.toRevIter(fns);
+			_fns = Iter.toArray(Iter.map(it, Fn::toFn), I.Fn.class);
 		}
 
 		public Comp(Object fn) {
@@ -297,7 +297,7 @@ public interface H {
 		public JuxtPair(Function<E, K> fk, Function<E, V> fv) {
 			_fk = fk;
 			_fv = fv;
-			_f1 = (e) -> new T.Tup2.L<K, V>(null, _fk.apply(e), _fv.apply(e));
+			_f1 = (e) -> new Tup.Tup2.L<K, V>(null, _fk.apply(e), _fv.apply(e));
 		}
 
 		@Override
@@ -316,7 +316,8 @@ public interface H {
 		public Juxt(Function... fns) {
 			_fns = fns;
 			Iterator<Function> it = Arr.toIter((Object)_fns);
-			_f1 = (e) -> Iter.toArray(Iter.map(it, f -> f.apply(e)));
+			_f1 = (e) -> Iter.toArray(
+					Iter.map(it, f -> f.apply(e)));
 		}
 
 		@Override
@@ -326,7 +327,7 @@ public interface H {
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public interface Fn {
+	public interface Static {
 		public static Fn1 identity = new Fn1(x -> x);
 		public static OFn comp(Object... fns) {return new Comp(fns);}
 		

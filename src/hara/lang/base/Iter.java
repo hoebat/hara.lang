@@ -1,11 +1,9 @@
 package hara.lang.base;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.ListIterator;
 import java.util.NoSuchElementException;
-import java.util.Objects;
 import java.util.Spliterator;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
@@ -17,247 +15,236 @@ import java.util.function.Supplier;
 
 public interface Iter {
 
-	public enum State {
-		READY, NOT_SET, DONE
-	}
+	public interface T {
 
-	public interface UnmodifiableIterator<E> extends Iterator<E> {
+		public interface UnmodifiableIteratorType<V> 
+			extends java.util.Iterator<V> {
 
-		@Override
-		default void remove() {
-			throw new UnsupportedOperationException();
-		}
-	}
-
-	public interface ProxyIterator extends Iterator<T> {
-
-		Iterator<T> delegate();
-
-		@Override
-		default boolean hasNext() {
-			return delegate().hasNext();
+			@Override
+			default void remove() {
+				throw new Ex.Unsupported();
+			}
 		}
 
-		@Override
-		default T next() {
-			return delegate().next();
+
+		public interface UnmodifiableListIteratorType<V> 
+			extends java.util.ListIterator<V> {
+
+			@Override
+			default void remove() {
+				throw new Ex.Unsupported();
+			}
+
+
+			@Override
+			default void set(V e) {
+				throw new Ex.Unsupported();
+
+			}
+
+			@Override
+			default void add(V e) {
+				throw new Ex.Unsupported();
+			}
 		}
 
-		@Override
-		default void remove() {
-			delegate().remove();
-		}
-	}
 
-	public class ToSeq<E> extends Obj.SEQ<E> {
+		public interface EmptySpliterator<V> 
+			extends java.util.Spliterator<V> {
 
-		final Iterator<E> _iter;
-		final State<E> _state;
+			@Override
+			default boolean tryAdvance(Consumer<? super V> action) {
+				return false;
+			}
 
-		static class State<V> {
-			volatile V _val;
-			volatile V _rest;
-		}
+			@Override
+			default Spliterator<V> trySplit() {
+				return null;
+			}
 
-		public static <E> ToSeq<E> create(Iterator<E> iter) {
-			if (iter.hasNext())
-				return new ToSeq<E>(iter);
-			return null;
-		}
+			@Override
+			default long estimateSize() {
+				return 0;
+			}
 
-		@SuppressWarnings("unchecked")
-		public ToSeq(Iterator<E> iter) {
-			_iter = iter;
-			_state = new State<E>();
-			_state._val = (E) _state;
-			_state._rest = (E) _state;
+			@Override
+			default int characteristics() {
+				return 0;
+			}
 		}
 
-		public ToSeq(I.Metadata meta, Iterator<E> iter, State<E> state) {
-			super(meta);
-			_iter = iter;
-			_state = state;
+		public interface EmptyIteratorType<V> extends UnmodifiableIteratorType<V> {
+
+			@Override
+			default boolean hasNext() {
+				return false;
+			}
+
+			@Override
+			default V next() {
+				throw new Ex.NoSuchElement();
+			}
+		}
+		
+		public interface EmptyListIteratorType<V> 
+			extends UnmodifiableListIteratorType<V> {
+
+			@Override
+			default boolean hasPrevious() {
+				return false;
+			}
+
+			@Override
+			default V previous() {
+				return null;
+			}
+
+			@Override
+			default int nextIndex() {
+				return -1;
+			}
+
+			@Override
+			default int previousIndex() {
+				return -1;
+			}
+			
+			@Override
+			default boolean hasNext() {
+				return false;
+			}
+
+			@Override
+			default V next() {
+				throw new NoSuchElementException();
+			}
 		}
 
-		public E first() {
-			if (_state._val == _state)
-				synchronized (_state) {
-					if (_state._val == _state)
-						_state._val = _iter.next();
-				}
-			return _state._val;
-		}
 
-		public ToSeq<E> withMeta(I.Metadata meta) {
-			return new ToSeq<E>(meta, _iter, _state);
-		}
+		public class ToSeq<E> extends Obj.SEQ<E> {
+		
+			final Iterator<E> _iter;
+			final State<E> _state;
+		
+			static class State<V> {
+				volatile V _val;
+				volatile V _rest;
+			}
+		
+			@SuppressWarnings("unchecked")
+			public ToSeq(Iterator<E> iter) {
+				_iter = iter;
+				_state = new State<E>();
+				_state._val = (E) _state;
+				_state._rest = (E) _state;
+			}
+		
+			public ToSeq(I.Metadata meta, Iterator<E> iter, State<E> state) {
+				super(meta);
+				_iter = iter;
+				_state = state;
+			}
+		
+			@Override
+			public E first() {
+				if (_state._val == _state)
+					synchronized (_state) {
+						if (_state._val == _state)
+							_state._val = _iter.next();
+					}
+				return _state._val;
+			}
 
-		@SuppressWarnings("unchecked")
-		@Override
-		public I.Seq<E> restMore() {
-			if (_state._rest == _state) {
-				synchronized (_state) {
-					if (_state._rest == _state) {
-						first();
-						_state._rest = _iter.hasNext() ? (E) (new ToSeq<E>(_iter)) : null;
+			@Override
+			public ToSeq<E> withMeta(I.Metadata meta) {
+				return new ToSeq<E>(meta, _iter, _state);
+			}
+		
+			@SuppressWarnings("unchecked")
+			@Override
+			public I.Seq<E> restMore() {
+				if (_state._rest == _state) {
+					synchronized (_state) {
+						if (_state._rest == _state) {
+							first();
+							_state._rest = _iter.hasNext() ? (E) (new ToSeq<E>(_iter)) : null;
+						}
 					}
 				}
+				return (I.Seq<E>) _state._rest;
 			}
-			return (I.Seq<E>) _state._rest;
+		
+			@Override
+			public boolean restEnd() {
+				return !_iter.hasNext();
+			}
 		}
 
-		@Override
-		public boolean restEnd() {
-			return !_iter.hasNext();
+
+		public enum State {
+			READY, NOT_SET, DONE
 		}
 	}
 
 	public interface Nil {
-
-		public class Iterator<V> implements java.util.Iterator<V> {
-
-			public static Iterator<Object> INSTANCE = new Iterator<Object>();
-
-			@Override
-			public boolean hasNext() {
-				return false;
-			}
-
-			@Override
-			public V next() {
-				throw new NoSuchElementException();
-			}
-
-			@Override
-			public void remove() {
-				throw new UnsupportedOperationException();
-			}
-		}
-
-		public class ListIterator<V> implements java.util.ListIterator<V> {
-
-			public static ListIterator<Object> INSTANCE = new ListIterator<Object>();
-
-			@Override
-			public boolean hasNext() {
-				return false;
-			}
-
-			@Override
-			public V next() {
-				throw new NoSuchElementException();
-			}
-
-			@Override
-			public void remove() {
-				throw new UnsupportedOperationException();
-			}
-
-			@Override
-			public boolean hasPrevious() {
-				return false;
-			}
-
-			@Override
-			public V previous() {
-				return null;
-			}
-
-			@Override
-			public int nextIndex() {
-				return -1;
-			}
-
-			@Override
-			public int previousIndex() {
-				return -1;
-			}
-
-			@Override
-			public void set(V e) {
-				throw new UnsupportedOperationException();
-
-			}
-
-			@Override
-			public void add(V e) {
-				throw new UnsupportedOperationException();
-			}
-		}
-
-		public class Spliterator<V> implements java.util.Spliterator<V> {
-
-			public static Spliterator<Object> INSTANCE = new Spliterator<Object>();
-
-			public boolean hasNext() {
-				return false;
-			}
-
-			public V next() {
-				throw new NoSuchElementException();
-			}
-
-			public void remove() {
-				throw new UnsupportedOperationException();
-			}
-
-			@Override
-			public boolean tryAdvance(Consumer<? super V> action) {
-				return false;
-			}
-
-			@Override
-			public Spliterator<V> trySplit() {
-				return null;
-			}
-
-			@Override
-			public long estimateSize() {
-				return 0;
-			}
-
-			@Override
-			public int characteristics() {
-				return 0;
-			}
-		}
-
+		public static Iterator<Object> ITERATOR = new Iterator<Object>();
+		public class Iterator<V> implements T.EmptyIteratorType<V> {}
+		public static ListIterator<Object> LIST_ITERATOR = new ListIterator<Object>();
+		public class ListIterator<V> implements T.EmptyListIteratorType<V> {}
+		public static Spliterator<Object> SPLITERATOR = new Spliterator<Object>();
+		public class Spliterator<V> implements T.EmptySpliterator<V> {}
 	}
 
 	public static Iterator<?> emptyIterator() {
-		return Nil.Iterator.INSTANCE;
+		return Nil.ITERATOR;
 	}
 
 	public static ListIterator<?> emptyListIterator() {
-		return Nil.ListIterator.INSTANCE;
+		return Nil.LIST_ITERATOR;
 	}
 
 	public static Spliterator<?> emptySpliterator() {
-		return Nil.Spliterator.INSTANCE;
+		return Nil.SPLITERATOR;
 	}
 
-	public static <V> Iter.ToSeq<V> toSeq(Iterator<V> iter) {
-		return new ToSeq<V>(iter);
+	public static <V> T.ToSeq<V> toSeq(Iterator<V> iter) {
+		return new T.ToSeq<V>(iter);
 	}
 
-	static Iterator<Object> from(Object... elements) {
-		Objects.requireNonNull(elements, "elements is null");
-		return new Iterator<Object>() {
-			int i = 0;
+	public static Iterator<Boolean> booleans(boolean... arr) {
+		return new Arr.T.ToIter_boolean(arr, 0);
+	}
 
-			@Override
-			public boolean hasNext() {
-				return i < elements.length;
-			}
+	public static Iterator<Byte> bytes(byte... arr) {
+		return new Arr.T.ToIter_byte(arr, 0);
+	}
+	
+	public static Iterator<Character> chars(char... arr) {
+		return new Arr.T.ToIter_char(arr, 0);
+	}
+	
+	public static Iterator<Short> shorts(short... arr) {
+		return new Arr.T.ToIter_short(arr, 0);
+	}
+	
+	public static Iterator<Integer> ints(int... arr) {
+		return new Arr.T.ToIter_int(arr, 0);
+	}
+	
+	public static Iterator<Long> longs(long... arr) {
+		return new Arr.T.ToIter_long(arr, 0);
+	}
+	
+	public static Iterator<Float> floats(float... arr) {
+		return new Arr.T.ToIter_float(arr, 0);
+	}
+	
+	public static Iterator<Double> doubles(double... arr) {
+		return new Arr.T.ToIter_double(arr, 0);
+	}
 
-			@Override
-			public Object next() {
-				if (!hasNext()) {
-					throw new NoSuchElementException();
-				}
-				return elements[i++];
-			}
-		};
+	public static Iterator<Object> objects(Object... arr) {
+		return new Arr.T.ToIter(arr, 0);
 	}
 
 	public static <V> Iterator<V> from(BooleanSupplier hasNext, Supplier<V> next) {
@@ -311,21 +298,68 @@ public interface Iter {
 
 	public static <U, R> R reduce(Iterator<U> it, R init, BiFunction<R, U, R> f) {
 		var acc = init;
-		while (it.hasNext()) {
-			acc = f.apply(acc, it.next());
-		}
+		while (it.hasNext()) {acc = f.apply(acc, it.next());}
 		return acc;
 	}
+	
+	//
+	// Equals
+	//
 
 	public static <V> boolean equals(Iterator<V> a, Iterator<V> b, BiPredicate<V, V> equals) {
 		while (a.hasNext()) {
-			if (!equals.test(a.next(), b.next())) {
-				return false;
-			}
+			if (!equals.test(a.next(), b.next())) { return false;}
 		}
 		return true;
 	}
 
+	//
+	// Filter
+	//
+
+	public static <V> Iterator<V> filter(Iterator<V> it, Predicate<V> f) {
+		return new Iterator<V>() {
+
+			private V next = null;
+			private T.State state = T.State.NOT_SET;
+
+			private void prime() {
+				if (state == T.State.NOT_SET) {
+					while (it.hasNext()) {
+						next = it.next();
+						if (f.test(next)) {
+							state = T.State.READY;
+							return;
+						}
+					}
+					state = T.State.DONE;
+				}
+			}
+
+			@Override
+			public boolean hasNext() {
+				prime();
+				return state != T.State.DONE;
+			}
+
+			@Override
+			public V next() {
+				prime();
+				if (next == T.State.DONE) {
+					throw new NoSuchElementException();
+				}
+
+				V val = (V) next;
+				state = T.State.NOT_SET;
+				return val;
+			}
+		};
+	}
+
+	//
+	// Range
+	//
+	
 	public static Iterator<Long> range(long min, long max) {
 		return new Iterator<Long>() {
 
@@ -346,12 +380,14 @@ public interface Iter {
 			}
 		};
 	}
-
+	
+	//
+	// Range
+	//
+	
 	public static <V> boolean contains(Iterator<V> iterator, Predicate<V> f) {
 		while (iterator.hasNext()) {
-			if (f.test(iterator.next())) {
-				return true;
-			}
+			if (f.test(iterator.next())) { return true; }
 		}
 		return false;
 	}
@@ -368,45 +404,10 @@ public interface Iter {
 		}
 		return sb.append(']').toString();
 	}
-
-	public static <V> Iterator<V> filter(Iterator<V> it, Predicate<V> f) {
-		return new Iterator<V>() {
-
-			private V next = null;
-			private State state = State.NOT_SET;
-
-			private void prime() {
-				if (state == State.NOT_SET) {
-					while (it.hasNext()) {
-						next = it.next();
-						if (f.test(next)) {
-							state = State.READY;
-							return;
-						}
-					}
-					state = State.DONE;
-				}
-			}
-
-			@Override
-			public boolean hasNext() {
-				prime();
-				return state != State.DONE;
-			}
-
-			@Override
-			public V next() {
-				prime();
-				if (next == State.DONE) {
-					throw new NoSuchElementException();
-				}
-
-				V val = (V) next;
-				state = State.NOT_SET;
-				return val;
-			}
-		};
-	}
+	
+	//
+	// Arrays
+	//
 
 	public static <E> ArrayList<E> toArrayList(Iterator<? extends E> it) {
 		ArrayList<E> list = new ArrayList<E>();
@@ -414,49 +415,15 @@ public interface Iter {
 		return list;
 	}
 	
-	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public static <E> E[] toArray(Iterator it) {
-		return (E[]) toArrayList(it).toArray();
+	public static Object[] toArray(Iterator<Object> it) {
+		return toArrayList(it).toArray();
 	}
 	
-	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public static <E> E[] toArray(Iterator it, Class<E> cls) {
-		ArrayList c = toArrayList(it);
-		
+	public static <E> E[] toArray(Iterator<E> it, Class<E> cls) {
+		ArrayList<E> c = toArrayList(it);
 		E[] arr = Arr.newArray(cls, c.size());
 		Arr.fillArray(c, arr);
 		return arr;
 	}
 
-	public static Iterator<Boolean> booleans(boolean... arr) {
-		return new Arr.ToIter_boolean(arr, 0);
-	}
-
-	public static Iterator<Byte> bytes(byte... arr) {
-		return new Arr.ToIter_byte(arr, 0);
-	}
-	
-	public static Iterator<Character> chars(char... arr) {
-		return new Arr.ToIter_char(arr, 0);
-	}
-	
-	public static Iterator<Short> shorts(short... arr) {
-		return new Arr.ToIter_short(arr, 0);
-	}
-	
-	public static Iterator<Integer> ints(int... arr) {
-		return new Arr.ToIter_int(arr, 0);
-	}
-	
-	public static Iterator<Long> longs(long... arr) {
-		return new Arr.ToIter_long(arr, 0);
-	}
-	
-	public static Iterator<Float> floats(float... arr) {
-		return new Arr.ToIter_float(arr, 0);
-	}
-	
-	public static Iterator<Double> doubles(double... arr) {
-		return new Arr.ToIter_double(arr, 0);
-	}
 }

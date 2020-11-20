@@ -3,8 +3,6 @@ package hara.lang.base;
 import java.util.Iterator;
 
 import hara.lang.base.G.ObjType;
-import hara.lang.base.I.Empty;
-import hara.lang.base.C.Coll;
 
 public interface Obj {
 
@@ -61,10 +59,10 @@ public interface Obj {
 	
 	abstract class SEQ<V> extends PT 
 		implements 
-		Coll<V>, 
+		I.Coll<V>, 
 		I.Seq<V>, 
 		I.ObjType,
-		C.SeqType<V>,
+		Coll.SeqType<V>,
 		I.SequentialType<V>{
 
 		public SEQ() {
@@ -97,12 +95,12 @@ public interface Obj {
 
 		@SuppressWarnings("rawtypes")
 		@Override
-		public Coll empty() {
+		public I.Coll empty() {
 			return Cons.EMPTY.withMeta(_meta);
 		}
 	}
 	
-	abstract class EMPTY<V> extends PT implements Coll<V>, I.Seq<V> {
+	abstract class EMPTY<V> extends PT implements I.Coll<V>, I.Seq<V> {
 	
 		public EMPTY() {
 			super(null);

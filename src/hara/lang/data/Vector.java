@@ -6,9 +6,8 @@ import java.util.NoSuchElementException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import hara.lang.base.*;
-import hara.lang.base.G.HashType;
 
-public interface Vector<E> extends C.VectorType<E> {
+public interface Vector<E> extends Coll.VectorType<E> {
 
 	public interface Fn {
 
@@ -187,10 +186,12 @@ public interface Vector<E> extends C.VectorType<E> {
 						? Fn.getNodeArrayFor(_root(), _size(), _shift(), _tail(), i, false)
 						: null;
 
+				@Override
 				public boolean hasNext() {
 					return i < end;
 				}
 
+				@Override
 				public E next() {
 					if (i < end) {
 						if (i - base == 32) {
@@ -203,6 +204,7 @@ public interface Vector<E> extends C.VectorType<E> {
 					}
 				}
 
+				@Override
 				public void remove() {
 					throw new UnsupportedOperationException();
 				}
@@ -215,7 +217,7 @@ public interface Vector<E> extends C.VectorType<E> {
 		}
 	}
 
-	public class Mutable<E> extends C.RefType.MT implements Base<E>, I.ToPersistent {
+	public class Mutable<E> extends Coll.RefType.MT implements Base<E>, I.ToPersistent {
 
 		private int _size;
 		private int _shift;
@@ -263,6 +265,7 @@ public interface Vector<E> extends C.VectorType<E> {
 			return _tail;
 		}
 
+		@Override
 		@SuppressWarnings("unchecked")
 		public Mutable<E> pushLast(E val) {
 			checkEditable();
@@ -345,7 +348,7 @@ public interface Vector<E> extends C.VectorType<E> {
 		@Override
 		public Standard<E> toPersistent() {
 			_root.edit.set(null);
-			return new Standard<>(_meta, _size, _shift, _root, (E[]) Fn.trimTail((Object[])_tail, _size));
+			return new Standard<>(_meta, _size, _shift, _root, (E[]) Fn.trimTail(_tail, _size));
 		}
 
 		@SuppressWarnings("unchecked")
@@ -355,7 +358,7 @@ public interface Vector<E> extends C.VectorType<E> {
 		}
 	}
 
-	public class Standard<E> extends C.RefType.PT implements Base<E>, I.ToMutable {
+	public class Standard<E> extends Coll.RefType.PT implements Base<E>, I.ToMutable {
 
 		// STATIC
 		public final static Standard<Object> EMPTY = new Standard<>(null, 0, Node.NODE_SHIFT, Node.EMPTY, new Object[] {});
@@ -434,7 +437,7 @@ public interface Vector<E> extends C.VectorType<E> {
 		public Standard<E> pushLast(E val) {
 			if (_size - Fn.tailoff(_size) < Node.NODE_MAXLEN) {
 				return new Standard<>(_meta, _size + 1, _shift, _root, 
-										(E[]) Fn.newTailAppend((Object[])_tail, val));
+										(E[]) Fn.newTailAppend(_tail, val));
 			}
 
 			Node new_root;

@@ -27,6 +27,7 @@ public interface Atom<V> {
 			return _state.get();
 		}
 
+		@Override
 		public boolean compareAndSet(V oldVal, V newVal) {
 			return _state.compareAndSet(oldVal, newVal);
 		}
@@ -69,10 +70,12 @@ public interface Atom<V> {
 			_watches.put(key, f);
 		}
 		
+		@Override
 		public void removeWatch(Object key) {
 			_watches.remove(key);
 		}
 		
+		@Override
 		public Iterator<Map.Entry<Object, Consumer<WatchEntry<R, V>>>> getWatches() {
 			return _watches.entrySet().iterator();
 		}

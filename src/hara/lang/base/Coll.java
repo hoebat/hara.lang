@@ -5,19 +5,9 @@ import java.util.Map.Entry;
 import java.util.function.Function;
 
 
-public interface C {
+public interface Coll {
 	
 
-	public interface Coll<V> extends 
-		Iterable<V>, 
-		I.Equality, 
-		I.Conj<V>, 
-		I.Empty, 
-		I.Count, 
-		I.Hash, 
-		I.ToSeq<V> {
-	}
-	
 	public interface StringType extends I.Hash {
 
 		@Override
@@ -36,7 +26,7 @@ public interface C {
 	
 
 	public interface SeqType<E>
-			extends Coll<E>, 
+			extends I.Coll<E>, 
 					I.Cons<E>, 
 					I.PushFirst<E>, 
 					I.PopFirst, 
@@ -61,7 +51,7 @@ public interface C {
 	}
 
 	public interface MapType<K, V>
-			extends Coll<Entry<K, V>>,
+			extends I.Coll<Entry<K, V>>,
 					I.ObjType,
 					I.Lookup<K, V>, 
 					I.Assoc<K, V>,
@@ -243,7 +233,7 @@ public interface C {
 	}
 
 	public interface VectorType<V>
-			extends Coll<V>, I.SequentialType<V>, I.SequentialLookupType<V>, I.Nth<V>, I.PopLast, I.PushLast<V> {
+			extends I.Coll<V>, I.SequentialType<V>, I.SequentialLookupType<V>, I.Nth<V>, I.PopLast, I.PushLast<V> {
 	
 		@Override
 		default VectorType<V> conj(V v) {
@@ -253,13 +243,9 @@ public interface C {
 
 	public interface SetType<E> {}
 	
-	public interface Context {}
-	
 	public interface DepsType<K, E> {
-		E depGet(Context ctx, K id);
-		SetType<E> depEntries(Context ctx, K id);
-		Iterator<K> depIds(Context ctx);
+		E depGet(I.Context ctx, K id);
+		SetType<E> depEntries(I.Context ctx, K id);
+		Iterator<K> depIds(I.Context ctx);
 	}
-
-	public interface Client {}
 }

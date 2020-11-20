@@ -20,9 +20,7 @@ public interface Ex {
 			this.actual = actual;
 			this.name = name;
 		}
-
 	}	
-
 
 	@SuppressWarnings("serial")
 	public class Unsupported extends UnsupportedOperationException {
@@ -114,5 +112,24 @@ public interface Ex {
 
 	@SuppressWarnings("serial")
 	public class TODO extends RuntimeException {}
+
+	@SuppressWarnings("serial")
+	public class Runtime extends RuntimeException {}
+
+	@SuppressWarnings("serial")
+	public class NULL extends NullPointerException {
+		public NULL(String string) { super(string);}}
+
+	@SuppressWarnings({ "unchecked"})
+	private static <T extends Throwable> void sneakyThrow0(Throwable t) throws T {
+		throw (T) t;
+	}
+	
+	public static RuntimeException Sneaky(Throwable t) {
+		if (t == null)
+			throw new NullPointerException();
+		sneakyThrow0(t);
+		return null;
+	}
 
 }

@@ -3,7 +3,7 @@ package hara.lang.base;
 import java.util.Iterator;
 
 
-public interface T {
+public interface Tup {
 
 	public final static Tup0 EMPTY = new Tup0(null);
 
@@ -16,7 +16,7 @@ public interface T {
 	}
 
 	@SuppressWarnings({"unchecked", "rawtypes"})
-	public class Tup0 extends Obj.EMPTY implements I.SequentialType, C.SeqType {
+	public class Tup0 extends Obj.EMPTY implements I.SequentialType, Coll.SeqType {
 
 		public Tup0(I.Metadata meta) {
 			super(meta);
@@ -34,7 +34,7 @@ public interface T {
 	}
 
 	@SuppressWarnings({"unchecked", "rawtypes"})
-	public interface Tup1<A> extends I.SequentialType, C.SeqType, I.Cons {
+	public interface Tup1<A> extends I.SequentialType, Coll.SeqType, I.Cons {
 
 		@Override
 		default long count() {
@@ -58,7 +58,7 @@ public interface T {
 
 			@Override
 			public Iterator iterator() {
-				return Iter.from(_a);
+				return Iter.objects(_a);
 			}
 
 			@Override
@@ -102,9 +102,13 @@ public interface T {
 			}
 		}
 	}
+	
+	public static <K, V>  Tup2.L<K, V> pair(K key, V val) {
+		return new Tup2.L<K, V>(null, key, val);
+	}
 
 	@SuppressWarnings({"unchecked", "rawtypes"})
-	public interface Tup2<A, B> extends Tup1<A>, I.SequentialType, C.SeqType, I.Cons {
+	public interface Tup2<A, B> extends Tup1<A>, I.SequentialType, Coll.SeqType, I.Cons {
 
 		@Override
 		default long count() {
@@ -145,7 +149,7 @@ public interface T {
 
 			@Override
 			public Iterator iterator() {
-				return Iter.from(_a, _b);
+				return Iter.objects(_a, _b);
 			}
 
 
@@ -193,7 +197,7 @@ public interface T {
 
 
 	@SuppressWarnings({"unchecked", "rawtypes"})
-	public interface Tup3<A, B, X> extends Tup2<A, B>, I.SequentialType, C.SeqType, I.Cons {
+	public interface Tup3<A, B, X> extends Tup2<A, B>, I.SequentialType, Coll.SeqType, I.Cons {
 
 		default long count() {
 			return 3;
@@ -230,7 +234,7 @@ public interface T {
 
 			@Override
 			public Iterator iterator() {
-				return Iter.from(_a, _b, _c);
+				return Iter.objects(_a, _b, _c);
 			}
 
 
@@ -277,7 +281,7 @@ public interface T {
 	}
 
 	@SuppressWarnings({"unchecked", "rawtypes"})
-	public interface Tup4<A, B, X, Y> extends Tup3<A, B, X>, I.SequentialType, C.SeqType, I.Cons {
+	public interface Tup4<A, B, X, Y> extends Tup3<A, B, X>, I.SequentialType, Coll.SeqType, I.Cons {
 
 		default long count() {
 			return 4;
@@ -320,7 +324,7 @@ public interface T {
 
 			@Override
 			public Iterator iterator() {
-				return Iter.from(_a, _b, _c, _d);
+				return Iter.objects(_a, _b, _c, _d);
 			}
 
 

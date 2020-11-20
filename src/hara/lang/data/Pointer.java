@@ -2,12 +2,13 @@ package hara.lang.data;
 
 import hara.lang.base.*;
 
-public class Pointer extends C.NamespacedType.PT implements C.StringType {
+public class Pointer extends Coll.NamespacedType.PT implements Coll.StringType {
 
 	public Pointer(I.Metadata meta, String ns, String name) {
 		super(meta, ns, name);
 	}
 
+	@Override
 	public String toString(){
 		return "#'" + pathString();
 	}

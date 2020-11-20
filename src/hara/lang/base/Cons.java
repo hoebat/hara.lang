@@ -1,7 +1,7 @@
 package hara.lang.base;
 
 public interface Cons<E> extends
-	C.SeqType<E>,
+	Coll.SeqType<E>,
  	I.ObjType {
 
 	public static Empty<Object> EMPTY = new Empty<>(null);

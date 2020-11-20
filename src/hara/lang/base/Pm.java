@@ -4,7 +4,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.MathContext;
 import java.util.Objects;
-import java.util.function.Supplier;
 
 public interface Pm {
 
@@ -886,140 +885,15 @@ public interface Pm {
 		}
 	}
 
-	public class Clock {
+	public final class Reduced<V> implements I.Deref<V>{
+		V _val;
 	
-		private final static Clock _clock;
-	
-		static {
-			_clock = new Clock();
-		}
-	
-		private final long _tsys;
-		private final long _toff;
-	
-		private Clock() {
-			_tsys = System.currentTimeMillis() * 1000000;
-	
-			// typically 36 ns, between these two lines.
-			_toff = System.nanoTime();
-		}
-	
-		public static final long currentTimeNanos() {
-			return _clock._tsys + (System.nanoTime() - _clock._toff);
-		}
-	
-		public static final long currentTimeMicros() {
-			return currentTimeNanos() / 1000;
-		}
-	
-		public static final long currentTimeMillis() {
-			return currentTimeNanos() / 1000000;
-		}
-	
-	}
-
-	public class Counter implements I.Deref {
-	
-		private int _c;
-	
-		public Counter(int count) {
-			_c = count;
-		}
-	
-		public int inc() {
-			return _c += 1;
-		}
-	
-		public int inc(int n) {
-			return _c += n;
-		}
-	
-		public int dec() {
-			return _c -= 1;
-		}
-	
-		public int dec(int n) {
-			return _c -= n;
-		}
-	
-		public int reset(int count) {
-			_c = count;
-			return count;
-		}
-	
-		public Integer deref() {
-			return _c;
-		}
-	}
-
-	public class Delay<V> implements I.Deref, I.Realize<V> {
-		volatile V _val;
-		volatile Throwable _ex;
-		volatile Supplier<V> _fn;
-	
-		public Delay(Supplier<V> fn) {
-			_fn = fn;
-			_val = null;
-			_ex = null;
-		}
-	
-		public V deref() {
-			if (_fn != null) {
-				synchronized (this) {
-					// double check
-					if (_fn != null) {
-						try {
-							_val = _fn.get();
-						} catch (Throwable t) {
-							_ex = t;
-						}
-						_fn = null;
-					}
-				}
-			}
-			if (_ex != null)
-				throw G.sneakyThrow(_ex);
-			return _val;
-		}
-	
-		@Override
-		synchronized public boolean isRealized() {
-			return _fn == null;
-		}
-		
-		@Override
-		public V realize() {
-			return deref();
-		}
-	}
-
-	public final class Reduced implements I.Deref{
-		Object _val;
-	
-		public Reduced(Object val){
+		public Reduced(V val){
 			_val = val;
 		}
 	
-		public Object deref(){
+		public V deref(){
 			return _val;
 		}
-	}
-
-	final public class Volatile implements I.Deref {
-	
-		public volatile Object _val;
-	
-		public Volatile(Object val) {
-			_val = val;
-		}
-	
-		public Object deref() {
-			return _val;
-		}
-	
-		public Object reset(Object newval) {
-			return _val = newval;
-		}
-	
 	}
 }

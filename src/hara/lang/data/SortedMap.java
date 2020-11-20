@@ -9,12 +9,10 @@ import java.util.function.BiFunction;
 import java.util.function.BinaryOperator;
 
 import hara.lang.base.*;
-import hara.lang.base.G.HashType;
-
 import static hara.lang.data.SortedMap.Color.*;
 
 public interface SortedMap<K, V> extends
-	C.MapType<K, V>,
+	Coll.MapType<K, V>,
 	I.Nth<Map.Entry<K, V>>, 
 	I.IndexedKV<K, V> {
 
@@ -552,7 +550,7 @@ public interface SortedMap<K, V> extends
 		}
 	}
 
-	public final class Mutable<K, V> extends C.RefType.MT 
+	public final class Mutable<K, V> extends Coll.RefType.MT 
 		implements Base<K, V>,
 				   I.ToPersistent{
 
@@ -617,7 +615,7 @@ public interface SortedMap<K, V> extends
 		}
 	}
 	
-	public final class Standard<K, V> extends C.RefType.PT 
+	public final class Standard<K, V> extends Coll.RefType.PT 
 		implements Base<K, V>, SortedMap<K, V>, I.ToMutable {
 
 		// STATIC
@@ -634,7 +632,7 @@ public interface SortedMap<K, V> extends
 
 		@SuppressWarnings("unchecked")
 		public static <K, V> Standard<K, V> empty(I.Metadata meta) {
-			Standard<K, V> ret = (Standard<K, V>)EMPTY;
+			Standard<K, V> ret = EMPTY;
 			return (meta == null)
 					? ret
 					: ret.withMeta(meta);
