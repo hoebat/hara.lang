@@ -337,7 +337,15 @@ public interface It {
 	public static <E> Iterator<E> objects(E... arr) {
 		return new Arr.T.ToIter<E>(arr, 0);
 	}
-
+	
+	public static <E> Iterator<E> from(E[] arr) {
+		return new Arr.T.ToIter<>(arr, 0);
+	}
+	
+	public static <E> Iterator<E> from(Iterable<E> coll) {
+		return coll.iterator();
+	}
+	
 	public static <E> Iterator<E> from(BooleanSupplier hasNext, Supplier<E> next) {
 		return new Iterator<E>() {
 			@Override
@@ -378,19 +386,57 @@ public interface It {
 		};
 	}
 
+	//
+	// Collect
+	//
+	
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public static <R> R collect(
-			Function<Iterator, R> terminal, 
-			Iterator it, 
+	public static <E, R> R collect(
+			Function<Iterator, R> term, 
+			E[] array, 
 			Function<Iterator, Iterator>... pl) {
-		return terminal.apply(stream(it, pl));
+		return term.apply(stream(from(array), pl));
 	}
 	
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public static Iterator stream(
+	public static <E, R> R collect(
+			Function<Iterator, R> term, 
+			Iterable<E> coll, 
+			Function<Iterator, Iterator>... pl) {
+		return term.apply(stream(from(coll), pl));
+	}
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public static <R> R collect(
+			Function<Iterator, R> term, 
 			Iterator it, 
+			Function<Iterator, Iterator>... pl) {
+		return term.apply(stream(it, pl));
+	}
+
+	//
+	// Stream
+	//
+	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public static  <E, R> Iterator<R> stream(
+			Iterator<E> it, 
 			Function<Iterator, Iterator>... fns) {
-		return Arr.reduce((itr, f) -> f.apply(itr), it, fns);
+		return (Iterator<R>) Arr.reduce((itr, f) -> f.apply(itr), it, fns);
+	}
+	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public static <E, R> Iterator<R> stream(
+			E[] array,
+			Function<Iterator, Iterator>... fns) {
+		return (Iterator<R>) Arr.reduce((itr, f) -> f.apply(itr), from(array), fns);
+	}
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public static <E, R> Iterator<R> stream(
+			Iterable<E> coll,
+			Function<Iterator, Iterator>... fns) {
+		return (Iterator<R>) Arr.reduce((itr, f) -> f.apply(itr), coll.iterator(), fns);
 	}
 
 	//
@@ -661,7 +707,7 @@ public interface It {
 				}
 			}
 		}
-		return Tup.pair(new PairIterator(), new PairIterator());
+		return Std.pair(new PairIterator(), new PairIterator());
 	}
 
 	public static <E> Iterator<E> constantly(E t) {
@@ -768,7 +814,7 @@ public interface It {
 				if (!hasNext()) {
 					throw new Ex.NoSuchElement();
 				}
-				return Tup.pair(it0.next(), it1.next());
+				return Std.pair(it0.next(), it1.next());
 			}
 		};
 	}
@@ -794,7 +840,7 @@ public interface It {
 			@Override
 			public I.Pair<E, E> next() {
 				if(it.hasNext()) {
-					var pair = Tup.pair(_v0, it.next());
+					var pair = Std.pair(_v0, it.next());
 					_state = T.State.NOT_SET;
 					return pair;
 				}

@@ -131,6 +131,8 @@ public interface I {
 			return getArgN().apply(vargs);
 		}
 	}
+	
+	public interface OFn extends Fn<Object, Object, Object> {}
 
 	public interface Hash {
 		
@@ -504,7 +506,7 @@ public interface I {
 		}
 
 		@SuppressWarnings("unchecked")
-		public class WatchEntry<R, V> extends Tup.Tup4.L<Object, R, V, V> {
+		public class WatchEntry<R, V> extends Std.Tup4.L<Object, R, V, V> {
 			
 			WatchEntry(Object key, Watch<R, V> ref, V oldVal, V newVal) {
 				super(null, key, (R) ref, oldVal, newVal);

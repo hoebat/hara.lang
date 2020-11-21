@@ -2,19 +2,14 @@ package hara.lang.base;
 
 import java.util.Iterator;
 
-
-public interface Tup {
+public interface Std {
 
 	public final static Tup0 EMPTY = new Tup0(null);
 
-	public interface Fn {
-
-		public static Tup0 empty(I.Metadata meta) {
-			return (meta == null) ? EMPTY : new Tup0(meta);
-		}
-
+	public static Tup0 empty(I.Metadata meta) {
+		return (meta == null) ? EMPTY : new Tup0(meta);
 	}
-
+	
 	@SuppressWarnings({"unchecked", "rawtypes"})
 	public class Tup0 extends Obj.EMPTY implements I.SequentialType, Coll.SeqType {
 
@@ -99,7 +94,7 @@ public interface Tup {
 
 			@Override
 			public I.Seq restMore() {
-				return Fn.empty(_meta);
+				return Std.empty(_meta);
 			}
 		}
 	}
@@ -347,7 +342,7 @@ public interface Tup {
 			}
 			
 			@Override 
-			public Cons.Standard cons(Object e) {
+			public Cons cons(Object e) {
 				throw new Ex.TODO();
 				//return Cons.empty(meta) (_meta, e, _a, _b, _c);
 			}
@@ -371,6 +366,89 @@ public interface Tup {
 			public Tup3.L restMore() {
 				return new Tup3.L(_meta, _b, _c, _d);
 			}
+		}
+	}
+
+	public class Cons<E> extends Obj.SEQ<E> implements 
+		Coll.SeqType<E>,
+		I.ObjType {
+		
+		public static Cons0<Object> EMPTY = new Cons0<>(null);
+		
+		@SuppressWarnings("unchecked")
+		public static <E> Coll.SeqType<E> empty(I.Metadata meta) {
+			return (Cons0<E>) (meta == null ? EMPTY : EMPTY.withMeta(meta));
+		}
+	
+		private final E _first;
+		private final I.Seq<E> _more;
+	
+		public Cons(I.Metadata meta, E first, I.Seq<E> more) {
+			super(meta);
+			_first = first;
+			_more = more;
+		}
+	
+		@Override
+		public final Cons<E> withMeta(I.Metadata meta) {
+			return (meta() == meta) ? this : new Cons<E>(meta, _first, _more);
+		}
+	
+		//
+		// I.Seq
+		//
+	
+		@Override
+		public Cons<E> cons(E e) {
+			return new Cons<E>(null, e, this);
+		}
+		
+		@Override
+		public final E first() {
+			return _first;
+		}
+	
+		@SuppressWarnings("unchecked")
+		@Override
+		public final I.Seq<E> restMore() {
+			return (_more != null) ? _more : (I.Seq<E>) EMPTY;
+		}
+	
+		@Override
+		public final boolean restEnd() {
+			return _more == null;
+		}
+		
+		@SuppressWarnings("unchecked")
+		@Override
+		public Cons0<E> empty() {
+			return (Cons0<E>) Cons.empty(_meta);
+		}
+	
+		@Override
+		public long count() {
+			return 1 + ((_more == null) ? 0 : _more.count());
+		}
+	}
+
+	public final class Cons0<E> extends Obj.EMPTY<E> implements 
+		Coll.SeqType<E>,
+		I.ObjType {
+	
+		public Cons0(I.Metadata meta) {
+			super(meta);
+		}
+	
+		@Override
+		public Cons0<E> withMeta(I.Metadata meta) {
+			return (meta() == meta) 
+				? this 
+				: new Cons0<E>(meta);
+		}
+		
+		@Override
+		public Cons<E> cons(E e) {
+			return new Cons<E>(_meta, e, null);
 		}
 	}
 }

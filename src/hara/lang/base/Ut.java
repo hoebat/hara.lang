@@ -151,7 +151,7 @@ public interface Ut {
 		@Override
 		public Entry<K, Reference<V>> find(K key) {
 			var ret = _lu.getOrDefault(key, null);
-			return (ret == null) ? null : Tup.pair(key, ret);
+			return (ret == null) ? null : Std.pair(key, ret);
 		}
 
 		@Override

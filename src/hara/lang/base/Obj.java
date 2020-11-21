@@ -80,12 +80,12 @@ public interface Obj {
 		
 		@Override
 		public SEQ<V> cons(V e) {
-			return new Cons.Standard<V>(_meta, e, this);
+			return new Std.Cons<V>(_meta, e, this);
 		}
 		
 		@Override
 		public SEQ<V> conj(V e) {
-			return new Cons.Standard<V>(_meta, e, this);
+			return new Std.Cons<V>(_meta, e, this);
 		}
 
 		@Override
@@ -96,7 +96,7 @@ public interface Obj {
 		@SuppressWarnings("rawtypes")
 		@Override
 		public I.Coll empty() {
-			return Cons.EMPTY.withMeta(_meta);
+			return Std.Cons.EMPTY.withMeta(_meta);
 		}
 	}
 	

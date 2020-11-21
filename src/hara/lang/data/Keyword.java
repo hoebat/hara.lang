@@ -9,7 +9,7 @@ public final class Keyword implements
 	I.Namespaced, 
 	I.Display,
 	I.ObjType,
-	Fn.OFn,
+	I.OFn,
 	I.Metadata {
 	public static Ut.RefCache<String, Keyword> GLOBAL = new Ut.RefCache<String, Keyword>();
 	
