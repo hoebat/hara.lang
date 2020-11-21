@@ -87,7 +87,7 @@ public interface Coll {
 		default long hashCalc(G.HashType t) {
 			Function<Object, Long> f = G.hashFn(t);
 			
-			return Iter.reduce(
+			return It.reduce(
 					iterator(), 
 					Long.valueOf(hashSeed().hashCode()),
 					(acc, item) -> acc + f.apply(item));

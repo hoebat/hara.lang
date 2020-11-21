@@ -1,45 +1,50 @@
 package hara.lang.kernel;
 
-import java.lang.ref.Reference;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import hara.lang.base.Arr;
+import hara.lang.base.Ex;
+import hara.lang.base.I;
+import hara.lang.base.It;
+import hara.lang.base.Ut;
+
 @SuppressWarnings("rawtypes")
-public class Foundation {
+public class Foundation implements I.Context {
 
 	static final int DEFAULT_PORT = 4164;
-
-	public static final ConcurrentHashMap<String, Reference<Server>> SERVERS = new ConcurrentHashMap<String, Reference<Server>>();
-
-	public static final ConcurrentHashMap<String, Reference<Session>> SESSIONS = new ConcurrentHashMap<String, Reference<Session>>();
+	
+	public final Ut.RefCache<String, Server> SERVERS = new Ut.RefCache<>();
+	
+	public final Ut.RefCache<String, Session.RT> SESSIONS = new Ut.RefCache<>();
 
 	public enum COMMAND {
-		//
-		//
-		SHUTDOWN, HELP, DIR, PING, ECHO, SLURP,
-
-		//
-		//
-		OS_PWD, OS_CD, OS_LS, OS_RUN,
-
-		//
-		//
-		JVM_HOME, JVM_PROPS, JVM_ENV, JVM_VERSION, JVM_VENDOR, JVM_BOOTPATH, JVM_CLASSPATH, JVM_CLASSLOADER,
-		JVM_INVOKE,
-
-		//
-		//
-		SERVER_START, SERVER_INFO, SERVER_LIST, SERVER_STOP,
-
-		//
-		//
-		SESSION_START, SESSION_STOP, SESSION_LIST, SESSION_INFO, SESSION_LOAD, SESSION_CLASSPATH, SESSION_ENV,
-		SESSION_EVAL,
+		HELP, SHUTDOWN, DIR, PING, ECHO, OS, JVM, SERVER, SESSION
+	}
+	
+	public enum OS {
+		HELP, PWD, LS, RUN
+	}
+	
+	public enum JVM {
+		HELP, HOME, PROPS, ENV, VERSION, VENDOR, BOOTPATH, 
+		CLASSPATH, CP, CLASSLOADER,
+	}
+	
+	public enum SERVER {
+		HELP, NEW, EXISTS, LIST, INFO, STOP
+	}
+	
+	public enum SESSION {
+		HELP, NEW, EXISTS, LIST, INFO, STOP, LOAD, 
+		CLASSPATH, CP, CLASSLOADER, EVAL,
+	}
+	
+	public enum CLASSPATH {
+		ADD, LOAD, LIST, FIND
 	}
 
 	@SuppressWarnings("unchecked")
@@ -55,7 +60,18 @@ public class Foundation {
 
 	@SuppressWarnings("unchecked")
 	public static Object run(Function<List<String>, Object> f, Object... args) {
-		List input = (args.length == 1 && args[0] instanceof List) ? (List) args[0] : Arrays.asList(args);
+		List input = (args.length == 1 && args[0] instanceof List) 
+				? (List) args[0] 
+				: Arrays.asList(args);
+		return f.apply(input);
+	}
+
+
+	@SuppressWarnings("unchecked")
+	public static Object runIn(Function<List<String>, Object> f, I.Context c, Object... args) {
+		List input = (args.length == 1 && args[0] instanceof List) 
+				? (List) args[0] 
+				: Arrays.asList(args);
 		return f.apply(input);
 	}
 
@@ -68,78 +84,164 @@ public class Foundation {
 		public static Object JVM_PROPS(List<String> args) {
 			return (args.size() == 0) ? mapToList(System.getProperties()) : System.getProperty(args.get(0));
 		}
+
+		public static List runDIR(Foundation F) {
+			return Arrays.asList("SERVERS", It.toArrayList(F.SERVERS.keys()), "SESSIONS",
+					It.toArrayList(F.SESSIONS.keys()));
+		}
+
+		public static String runProcess(List<String> args) {
+			try {
+				var p = new ProcessBuilder().command(args).start();
+				return new String(p.getInputStream().readAllBytes());
+			} catch(Throwable t) {
+				throw Ex.Sneaky(t);
+			} 
+		}
+
+
+		@SuppressWarnings("unchecked")
+		public static List runHELP(Foundation F, Object enums) {
+			return It.toArrayList(
+					It.map(Arr.toIter(enums), (x) -> x.toString()));
+		}
+
+		public static Object runJVM(Foundation F, List<String> args) {
+			JVM cmd = JVM.valueOf(args.get(0));
+			args.remove(0);
+			
+			switch(cmd) {
+			case HELP: 			return Fn.runHELP(F, JVM.values());
+			case BOOTPATH:  	return run(Fn::JVM_PROPS, "sun.boot.library.path");
+			case CP:
+			case CLASSPATH: 	return run(Fn::JVM_PROPS, "java.class.path");
+			case CLASSLOADER: 	return ClassLoader.getSystemClassLoader().toString();
+			case ENV:     		return run(Fn::JVM_ENV, args);
+			case HOME:    		return run(Fn::JVM_PROPS, "java.home");
+			case PROPS:   		return run(Fn::JVM_PROPS, args);
+			case VENDOR:  		return run(Fn::JVM_PROPS, "java.vendor");
+			case VERSION: 		return run(Fn::JVM_PROPS, "java.version");
+			}
+			throw new Ex.Unsupported();
+		}
+		
+		public static Object runServer(Foundation F, List<String> args) {
+			SERVER cmd = SERVER.valueOf(args.get(0));
+			args.remove(0);
+			switch(cmd) {			
+			case HELP: return Fn.runHELP(F, SERVER.values());
+			case INFO:
+				break;
+			case LIST:
+				break;
+			case NEW:
+				break;
+			case STOP:
+				break;
+			case EXISTS:
+				break;
+			}
+			throw new Ex.Unsupported();
+		}
+		
+		public static Object runOS(Foundation F, List<String> args) {
+			OS cmd = OS.valueOf(args.get(0));
+			args.remove(0);
+			switch(cmd) {
+			case HELP:  return Fn.runHELP(F, OS.values());
+			case LS: 	args.add(0, "ls");
+						return runProcess(args);
+			case PWD: 	return run(Fn::JVM_ENV, "PWD");
+			case RUN: 	return runProcess(args);
+			}
+
+			throw new Ex.Unsupported();
+		}
+		
+		public static Object runSessionFor(Foundation F, String key, Function<Session.RT, Object> f) {
+			Session.RT s = F.SESSIONS.get(key);
+			return (s != null) ? f.apply(s) : null;
+		}
+		
+		public static Object runSessionCreate(Foundation F, List<String> args) {
+			var key = args.get(0);
+			var s = F.SESSIONS.get(key);
+			if (s != null) {
+				throw new Ex.Runtime("Session already exists: " + key);
+			} else {
+				F.SESSIONS.register(key, new Session.RT(F, key));
+				return key;
+			}
+		}
+
+		public static Object runSessionClasspath(Session.RT rt, List<String> args) {
+			CLASSPATH cmd = (args.size() == 1) 
+								? CLASSPATH.LIST
+								: CLASSPATH.valueOf(args.get(1));
+			if(cmd == CLASSPATH.LIST) {
+				System.out.println("LIST");
+				return rt.getClasspath();
+			}
+		
+			
+			args.remove(0);
+			args.remove(0); 
+			switch(cmd) {
+			case ADD:    return rt.addClasspath(args);
+			case FIND:   return rt.findClasspath(args);
+			//case LOAD:   return rt.loadClasspath(args);
+			}
+			throw new Ex.Unsupported();
+		}
+		
+
+		public static Object runSession(Foundation F, List<String> args) {
+			SESSION cmd = SESSION.valueOf(args.get(0));
+			args.remove(0);
+			
+			switch(cmd) {
+			case HELP:  return Fn.runHELP(F, SESSION.values());
+			case EXISTS: runSessionFor(F, args.get(0), (rt) -> rt != null);
+
+			case NEW: return runSessionCreate(F, args);
+			case CP:
+			case CLASSPATH: return runSessionFor(F, args.get(0), 
+					(rt) -> runSessionClasspath(rt, args));
+			//case INFO:  return runSessionFor(F, args.get(0), (rt) -> rt.getInfo());
+			case LIST:  return It.toArrayList(F.SESSIONS.keys());
+			//case LOAD:  return runSessionFor(F, args.get(0), (rt) -> rt.load(args));
+			//case STOP:  return runSessionFor(F, args.get(0), (rt) -> rt.stop());
+			case CLASSLOADER: break;
+			case EVAL: break;
+			}
+			throw new Ex.Unsupported();
+		}
+	}
+	
+	public static Object runCommand(Foundation F, List<String> args) {
+		var cmd = COMMAND.valueOf(args.get(0));
+		args.remove(0);
+		
+		switch (cmd) {
+		case HELP: return Fn.runHELP(F, COMMAND.values());
+		case PING: return "PONG";
+		case ECHO: return args;
+		case DIR:  return Fn.runDIR(F);
+		case JVM:  return Fn.runJVM(F, args);
+		case OS:   return Fn.runOS(F, args);
+		case SERVER: return Fn.runServer(F, args);
+		case SESSION: return Fn.runSession(F, args);
+		case SHUTDOWN: 
+			System.exit(1);
+			return null;
+		default:
+			throw new Ex.Unsupported();
+		}
 	}
 
-	public static Object runCommand(COMMAND cmd, List<String> args) {
-		switch (cmd) {
-		case DIR:
-			return Arrays.asList("SERVERS", Collections.list(SERVERS.keys()), "SESSIONS",
-					Collections.list(SESSIONS.keys()));
-		case PING:
-			return "PONG";
-		case ECHO:
-			return args;
-		case HELP:
-			return COMMAND.values();
-		case JVM_ENV:
-			return run(Fn::JVM_ENV, args);
-		case JVM_HOME:
-			return run(Fn::JVM_PROPS, "java.home");
-		case JVM_PROPS:
-			return run(Fn::JVM_PROPS, args);
-		case JVM_VENDOR:
-			return run(Fn::JVM_PROPS, "java.vendor");
-		case JVM_VERSION:
-			return run(Fn::JVM_PROPS, "java.version");
-		case JVM_CLASSPATH:
-			return run(Fn::JVM_PROPS, "java.class.path");
-		case JVM_BOOTPATH:
-			return run(Fn::JVM_PROPS, "sun.boot.library.path");
-		case JVM_CLASSLOADER:
-			return ClassLoader.getSystemClassLoader().toString();
-		case JVM_INVOKE:
-			return null;
-
-		case SERVER_INFO:
-			break;
-		case SERVER_LIST:
-			break;
-		case SERVER_START:
-			break;
-		case SERVER_STOP:
-			break;
-		case SESSION_CLASSPATH:
-			break;
-		case SESSION_ENV:
-			break;
-		case SESSION_EVAL:
-			break;
-		case SESSION_INFO:
-			break;
-		case SESSION_LIST:
-			break;
-		case SESSION_LOAD:
-			break;
-		case SESSION_START:
-			break;
-		case SESSION_STOP:
-			break;
-		case SHUTDOWN:
-			break;
-		case SLURP:
-			break;
-		case OS_CD:
-			break;
-		case OS_LS:
-			break;
-		case OS_PWD:
-			break;
-		case OS_RUN:
-			break;
-		default:
-			break;
-
-		}
+	@Override
+	public Object call(Object... args) {
+		// TODO Auto-generated method stub
 		return null;
 	}
 

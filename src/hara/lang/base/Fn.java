@@ -123,7 +123,7 @@ public interface Fn {
 
 		public Comp(Object... fns) {
 			Iterator it = Arr.toRevIter(fns);
-			_fns = Iter.toArray(Iter.map(it, Fn::toFn), I.Fn.class);
+			_fns = It.toArray(It.map(it, Fn::toFn), I.Fn.class);
 		}
 
 		public Comp(Object fn) {
@@ -132,7 +132,7 @@ public interface Fn {
 
 		@Override
 		public Function getArg1() {
-			return (x) -> Iter.reduce(Arr.toIter((Object[]) _fns), x, (acc, f) -> ((I.Fn) f).invoke(acc));
+			return (x) -> It.reduce(Arr.toIter((Object[]) _fns), x, (acc, f) -> ((I.Fn) f).invoke(acc));
 		}
 	}
 
@@ -148,7 +148,7 @@ public interface Fn {
 			_f1 = new Function<Iterator<E>, R>() {
 				@Override
 				public R apply(Iterator<E> it) {
-					return Iter.reduce(it, _init.get(), _step);
+					return It.reduce(it, _init.get(), _step);
 				}
 			};
 		}
@@ -179,7 +179,7 @@ public interface Fn {
 			_f2 = new BiFunction<R, Iterator<E>, R>() {
 				@Override
 				public R apply(R self, Iterator<E> it) {
-					return Iter.reduce(it, self, _step);
+					return It.reduce(it, self, _step);
 				}
 			};
 		}
@@ -202,7 +202,7 @@ public interface Fn {
 
 		public Map(Function<E, R> unit) {
 			_unit = unit;
-			_xf = (it) -> Iter.map(it, _unit);
+			_xf = (it) -> It.map(it, _unit);
 		}
 
 		@Override
@@ -227,7 +227,7 @@ public interface Fn {
 
 		public Filter(Predicate<E> pred) {
 			_pred = pred;
-			_xf = (it) -> Iter.filter(it, _pred);
+			_xf = (it) -> It.filter(it, _pred);
 		}
 
 		@Override
@@ -316,8 +316,8 @@ public interface Fn {
 		public Juxt(Function... fns) {
 			_fns = fns;
 			Iterator<Function> it = Arr.toIter((Object)_fns);
-			_f1 = (e) -> Iter.toArray(
-					Iter.map(it, f -> f.apply(e)));
+			_f1 = (e) -> It.toArray(
+					It.map(it, f -> f.apply(e)));
 		}
 
 		@Override

@@ -11,7 +11,7 @@ public final class Keyword implements
 	I.ObjType,
 	Fn.OFn,
 	I.Metadata {
-	public static Ut.RefCache<String, Keyword> CACHE = new Ut.RefCache<String, Keyword>();
+	public static Ut.RefCache<String, Keyword> GLOBAL = new Ut.RefCache<String, Keyword>();
 	
 	private final String _ns;
 	private final String _name;
@@ -26,10 +26,10 @@ public final class Keyword implements
 	public static Keyword create(String ns, String name) {
 		String full = (ns == null) ? name : ns + "/" + name;
 		
-		return CACHE.getOrCreate(full, () -> {
+		return GLOBAL.getOrCreate(full, () -> {
 			var k = new Keyword(ns, name, full);
 			k.hashGet();
-			return new WeakReference<Keyword>(k, CACHE.getQueue());
+			return new WeakReference<Keyword>(k, GLOBAL.getQueue());
 		});	
 	}
 	

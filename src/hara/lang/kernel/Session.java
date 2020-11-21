@@ -1,33 +1,79 @@
 package hara.lang.kernel;
 
-import java.io.ObjectStreamException;
-import java.io.Serializable;
-import java.lang.ref.Reference;
-import java.lang.ref.ReferenceQueue;
-import java.lang.ref.SoftReference;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
-import java.util.HashMap;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.List;
 
 import hara.lang.base.*;
-import hara.lang.experimental.AReference;
-import hara.lang.experimental.IPersistentMap;
-import hara.lang.experimental.ISeq;
-import hara.lang.experimental.Namespace;
-import hara.lang.experimental.Symbol;
-import hara.lang.experimental.Var;
 
-public class Session {
+public interface Session {
 
-	public static URL[] EMPTY_URLS = new URL[] {};
 
 	@SuppressWarnings("rawtypes")
-	public class Loader extends URLClassLoader {
-		final HashMap<Integer, Object[]> CONSTANTS = new HashMap<Integer, Object[]>();
-		final ConcurrentHashMap<String, Reference<Class>> LU = new ConcurrentHashMap<String, Reference<Class>>();
-		final ReferenceQueue<Class> RQ = new ReferenceQueue<Class>();
+	public class RT implements I.Context {
+		public final Foundation _F;
+		public final String _key;
+		public final Loader _loader;
+		public Ut.RefCache<String, Class> REGISTRY;
+		
+		
+		public RT(Foundation F, String key) {
+			_F = F;
+			_key = key;
+			_loader = new Loader();
+		}
+
+		@Override
+		public Object call(Object... args) {
+			System.out.println("CALLED: " + args);
+			return null;
+		}
+		
+		@SuppressWarnings("unchecked")
+		public List<String> getClasspath() {
+			return (List<String>)
+					It.collect(
+					  It::toArrayList,
+					  Arr.toIter((Object)_loader.getURLs()),
+					  (it) -> It.map(it, url -> url.toString()));
+		}
+		
+		public List<String> addClasspath(List<String> paths) {
+			paths.iterator().forEachRemaining(
+				(path) -> {
+					try {
+						_loader.addURL(new URL(path));
+					} catch (MalformedURLException e) {
+						e.printStackTrace();
+					}
+				});
+			return getClasspath();
+		}
+		
+		@SuppressWarnings("unchecked")
+		public List<String> findClasspath(List<String> names) {
+			return (List<String>)
+					It.collect(
+					  It::toArrayList,
+					  names.iterator(),
+					  (it) -> It.keep(it, (n) -> {
+						try {
+							_loader.loadClass((String)n);
+							return n;
+						} catch (Throwable t) {
+							return null;
+						}
+					}));	
+		}
+	}
+
+	@SuppressWarnings("rawtypes")
+	public class Loader extends URLClassLoader implements I.Watch<Loader, Class> {
+
+		public static URL[] EMPTY_URLS = new URL[] {};
+		
+		final Ut.RefCache<String, Class> CACHE = new Ut.RefCache<>();
 
 		public Loader() {
 			super(EMPTY_URLS, ClassLoader.getSystemClassLoader());
@@ -38,32 +84,23 @@ public class Session {
 		}
 
 		public Class defineClass(String name, byte[] bytes, Object srcForm) {
-			G.clearCache(RQ, LU);
 			Class c = defineClass(name, bytes, 0, bytes.length);
-			LU.put(name, new SoftReference<Class>(c, RQ));
+			CACHE.register(name, c);
 			return c;
 		}
 
 		public Class<?> findInMemoryClass(String name) {
-			Reference<Class> cr = LU.get(name);
-			if (cr != null) {
-				Class c = cr.get();
-				if (c != null)
-					return c;
-				else
-					LU.remove(name, cr);
-			}
-			return null;
+			var cr = CACHE.getLookup().get(name);
+			return (cr != null) ? cr.get() : null;
 		}
 
+		@Override
 		protected Class<?> findClass(String name) throws ClassNotFoundException {
 			Class c = findInMemoryClass(name);
-			if (c != null)
-				return c;
-			else
-				return super.findClass(name);
+			return (c != null) ? c : super.findClass(name);
 		}
 
+		@Override
 		protected synchronized Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
 			Class c = findLoadedClass(name);
 			if (c == null) {
@@ -76,20 +113,14 @@ public class Session {
 			return c;
 		}
 
-		public void registerConstants(int id, Object[] val) {
-			CONSTANTS.put(id, val);
-		}
-
-		public Object[] getConstants(int id) {
-			return CONSTANTS.get(id);
-		}
-
+		@Override
 		public void addURL(URL url) {
 			super.addURL(url);
 		}
 
 	}
 
+	/*
 	public class Namespace extends AReference implements Serializable {
 		final public Symbol name;
 		transient final AtomicReference<IPersistentMap> mappings = new AtomicReference<IPersistentMap>();
@@ -301,6 +332,6 @@ public class Session {
 			return findOrCreate(name);
 		}
 	}
-	
+	*/
 	
 }

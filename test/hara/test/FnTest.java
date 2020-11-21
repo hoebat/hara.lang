@@ -18,7 +18,7 @@ class FnTest {
 		return arr;
 	}
 	public static void iterHas(Iterator it, Object[] arr) {
-		assertArrayEquals(arr, Iter.toArray(it));
+		assertArrayEquals(arr, It.toArray(it));
 	}
 
 	public interface CB {
@@ -139,7 +139,7 @@ class FnTest {
 		iterHas(
 		new Fn.Map<Integer, Integer>(
 				(i) -> i + 10
-			).invoke(Iter.ints(1,2,3)),
+			).invoke(It.ints(1,2,3)),
 		arr(11, 12, 13));	
 	}	
 	
@@ -149,7 +149,7 @@ class FnTest {
 		iterHas(
 		new Fn.Filter<Integer>(
 				(i) -> i % 2 == 0
-			).invoke(Iter.ints(1,2,3,4)),
+			).invoke(It.ints(1,2,3,4)),
 		arr(2, 4));	
 	}	
 	

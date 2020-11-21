@@ -320,12 +320,11 @@ public interface Hash {
 	public static long hashMurmur(Object o) {
 		if(o instanceof I.Hash) {
 			return ((I.Hash) o).hashGet(G.HashType.MURMUR3);
-		} else { 
-			
-		};
-		if (o == null)
+		} else if (o == null) {
 			return 0;
-		return o.hashCode();
+		} else {
+			return o.hashCode();
+		}
 	}
 
 	public static long hashSip(Object o) {

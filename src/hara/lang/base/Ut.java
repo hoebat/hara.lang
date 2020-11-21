@@ -2,6 +2,7 @@ package hara.lang.base;
 
 import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
+import java.lang.ref.WeakReference;
 import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
@@ -137,7 +138,7 @@ public interface Ut {
 
 	}
 	
-	public final class RefCache<K, V> implements I.Lookup<K, Reference<V>> {
+	public final class RefCache<K, V> implements I.Lookup<K, Reference<V>>, I.Count {
 
 		final ConcurrentHashMap<K, Reference<V>> _lu;
 		final ReferenceQueue<V> _rq;
@@ -176,6 +177,19 @@ public interface Ut {
 			return _lu;
 		}
 		
+		public void register(K key, V obj) {
+			_lu.put(key, new WeakReference<V>(obj, _rq));
+		}
+		
+		public void deregister(K key) {
+			_lu.remove(key);
+		}
+		
+		public V get(K key) {
+			var ref = _lu.get(key);
+			return (ref != null) ? ref.get() : null;
+		}
+		
 		public V getOrCreate(K key, Supplier<Reference<V>> f) {
 			var ref = _lu.get(key);
 			if (ref != null) {
@@ -195,32 +209,14 @@ public interface Ut {
 				while (_rq.poll() != null) {}
 				
 				var it = _lu.entrySet().iterator();
-				Iter.filter(it, (e) -> (e.getValue() == null) || (e.getValue().get() == null))
+				It.filter(it, (e) -> (e.getValue() == null) || (e.getValue().get() == null))
 					.forEachRemaining((e) -> _lu.remove(e.getKey()));
 			}
 		}
-	}
 
-	@SuppressWarnings("unchecked")
-	public static int compare(Object k1, Object k2) {
-		if (k1 == k2)
-			return 0;
-		if (k1 != null) {
-			if (k2 == null)
-				return 1;
-			if (k1 instanceof Number)
-				return Num.compare((Number) k1, (Number) k2);
-			return ((Comparable<Object>) k1).compareTo(k2);
+		@Override
+		public long count() {
+			return _lu.size();
 		}
-		return -1;
 	}
-
-	public static boolean equals(Object k1, Object k2) {
-		return (k1 == k2) ? true : (k1 != null && k1.equals(k2));
-	}
-
-	public static boolean identical(Object k1, Object k2) {
-		return k1 == k2;
-	}
-	
 }

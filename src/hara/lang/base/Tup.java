@@ -59,7 +59,7 @@ public interface Tup {
 
 			@Override
 			public Iterator iterator() {
-				return Iter.objects(_a);
+				return It.objects(_a);
 			}
 
 			@Override
@@ -150,7 +150,7 @@ public interface Tup {
 
 			@Override
 			public Iterator iterator() {
-				return Iter.objects(_a, _b);
+				return It.objects(_a, _b);
 			}
 
 
@@ -236,7 +236,7 @@ public interface Tup {
 
 			@Override
 			public Iterator iterator() {
-				return Iter.objects(_a, _b, _c);
+				return It.objects(_a, _b, _c);
 			}
 
 
@@ -327,7 +327,7 @@ public interface Tup {
 
 			@Override
 			public Iterator iterator() {
-				return Iter.objects(_a, _b, _c, _d);
+				return It.objects(_a, _b, _c, _d);
 			}
 
 

@@ -116,7 +116,8 @@ public interface Ex {
 	public class TODO extends RuntimeException {}
 
 	@SuppressWarnings("serial")
-	public class Runtime extends RuntimeException {}
+	public class Runtime extends RuntimeException {
+		public Runtime(String string) {super(string);}}
 
 	@SuppressWarnings("serial")
 	public class NULL extends NullPointerException {

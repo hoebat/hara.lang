@@ -128,7 +128,7 @@ public interface Obj {
 		@SuppressWarnings({ "unchecked", "rawtypes" })
 		@Override
 		public Iterator iterator() {
-			return Iter.emptyIterator();
+			return It.emptyIterator();
 		}
 	
 		@Override

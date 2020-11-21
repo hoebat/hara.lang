@@ -1,9 +1,9 @@
 package hara.lang.base;
 
 import java.lang.reflect.Array;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 
 public interface Arr {
 	
@@ -46,25 +46,39 @@ public interface Arr {
 	public static Object[] objects(Object... arr) {
 		return arr; 
 	}
+	
+	public static <R, E> R reduce(BiFunction<R, E, R> f, R init, E[] elements) {
+		R out = init;
+		for(E e : elements) {
+			out = f.apply(out, e);
+		}
+		return out;
+	}
 
 	public interface T {
 
-		public class ToIter implements Iterator<Object> {
-			final Object[] _array;
+		public class ToIter<E> implements Iterator<E> {
+			final E[] _array;
 			int _i;
 		
-			ToIter(Object array, int i) {
+			public ToIter(E[] array, int i) {
 				_i = i;
-				_array = (Object[]) array;
+				_array = array;
 			}
 		
+			@SuppressWarnings("unchecked")
+			public ToIter(Object array, int i) {
+				_i = i;
+				_array = (E[])array;
+			}
+
 			@Override
 			public boolean hasNext() {
 				return _array != null && _i < _array.length;
 			}
 		
 			@Override
-			public Object next() {
+			public E next() {
 				if (_array != null && _i < _array.length)
 					return _array[_i++];
 				throw new java.util.NoSuchElementException();
@@ -382,7 +396,7 @@ public interface Arr {
 	@SuppressWarnings("rawtypes")
 	public static Iterator toIter(Object array) {
 		if (array == null || java.lang.reflect.Array.getLength(array) == 0)
-			return Iter.emptyIterator();
+			return It.emptyIterator();
 		Class aclass = array.getClass();
 		if (aclass == int[].class)
 			return new T.ToIter_int((int[]) array, 0);
@@ -402,27 +416,7 @@ public interface Arr {
 			return new T.ToIter_boolean((boolean[]) array, 0);
 		return new T.ToIter(array, 0);
 	}
-
-	@SuppressWarnings("rawtypes")
-	public static Iterator toIter(Object... array) {
-		if (array == null || array.length == 0)
-			return Iter.emptyIterator();
-		return new T.ToIter(array, 0);
-	}
-
-	@SuppressWarnings("unchecked")
-	public static <E> E[] newArray(Class<E> type, int length) {
-		return (E[]) Array.newInstance(type, length);
-	}
-
-	@SuppressWarnings("unchecked")
-	public static <E> E[] newArray(E[] reference, int length) {
-		Class<?> type = reference.getClass().getComponentType();
-
-		E[] result = (E[]) Array.newInstance(type, length);
-		return result;
-	}
-
+	
 	public static <E> E[] concat(E[] first, E[] second, Class<E> type) {
 		E[] result = newArray(type, first.length + second.length);
 		System.arraycopy(first, 0, result, 0, first.length);
@@ -430,56 +424,55 @@ public interface Arr {
 		return result;
 	}
 
-	public static <E> E[] concat(E element, E[] array) {
-		E[] result = newArray(array, array.length + 1);
-		result[0] = element;
-		System.arraycopy(array, 0, result, 1, array.length);
-		return result;
+	@SuppressWarnings("unchecked")
+	public static <E> E[] newArray(Class<E> type, int length) {
+		return (E[]) Array.newInstance(type, length);
 	}
 	
-	public static <E> E[] concat(E[] array, E element) {
-		E[] result = Arrays.copyOf(array, array.length + 1);
-		result[array.length] = element;
-		return result;
+	@SuppressWarnings({"unchecked" })
+	public static <E> Iterator<E> toIter(E... array) {
+		if (array == null || array.length == 0)
+			return (Iterator<E>) It.emptyIterator();
+		return new T.ToIter<E>(array, 0);
 	}
 
 
-	  public static void checkPositionIndexes(int start, int end, int size) {
+	  public static void checkPosition(int start, int end, int size) {
 	    if (start < 0 || end < start || end > size) {
 	      throw new IndexOutOfBoundsException();
 	    }
 	  }
 
-	public static Object[] fillArray(Iterable<?> elements, Object[] array) {
-		int i = 0;
-		for (Object element : elements) {
-			array[i++] = element;
-		}
-		return array;
-	}
-
-	static void swap(Object[] array, int i, int j) {
-		Object temp = array[i];
+	static <E> void swap(E[] array, int i, int j) {
+		E temp = array[i];
 		array[i] = array[j];
 		array[j] = temp;
 	}
 
-	static Object[] checkNotNull(Object... array) {
+	@SafeVarargs
+	static <E> E[] checkNotNull(E... array) {
 		return checkNotNull(array, array.length);
 	}
 
-	static Object[] checkNotNull(Object[] array, int length) {
+	static <E> E[]checkNotNull(E[] array, int length) {
 		for (int i = 0; i < length; i++) {
 			checkNotNull(array[i], i);
 		}
 		return array;
 	}
-
-	static Object checkNotNull(Object element, int index) {
-		if (element == null) {
-			throw new Ex.NULL("at index " + index);
+	
+	public static <E> E[] fillArray(Iterator<E> it, E[] array) {
+		int i = 0;
+		while(it.hasNext()) {
+			array[i++] = it.next();
 		}
-		return element;
+		return array;
+	}
+	
+	@SuppressWarnings("unchecked")
+	public static <E, R> R[] map(Function<E, R> f, Class<E> type, E[] array) {
+		var out = (R[]) Array.newInstance(type, array.length);
+		return (R[]) fillArray(toIter(array), out);
 	}
 
 }

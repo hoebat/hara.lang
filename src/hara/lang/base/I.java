@@ -9,6 +9,8 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
+import hara.lang.experimental.Sq;
+
 public interface I {
 	
 	public interface Assoc<K, V> {
@@ -392,7 +394,7 @@ public interface I {
 	
 		@Override
 		default Iterator<Long> keys() {
-			return Iter.range(0, count());
+			return It.range(0, count());
 		}
 	
 		@Override
@@ -450,7 +452,7 @@ public interface I {
 		default long hashCalc(G.HashType t) {
 			
 			Function<Object, Long> f = G.hashFn(t);
-			return Iter.reduce(
+			return It.reduce(
 					iterator(), 
 					Long.valueOf(hashSeed().hashCode()),
 					(acc, item) -> (acc * 31) + f.apply(item));
@@ -468,7 +470,7 @@ public interface I {
 	
 	public interface ToSeq<E> extends Iterable<E> {
 		default Seq<E> toSeq() {
-			return Iter.toSeq(iterator());
+			return It.toSeq(iterator());
 		};
 	}
 	
@@ -500,13 +502,14 @@ public interface I {
 		default void removeWatch(Object key) {
 			throw new UnsupportedOperationException("Not Supported");
 		}
-	}
 
-	@SuppressWarnings("unchecked")
-	public class WatchEntry<R, V> extends Tup.Tup4.L<Object, R, V, V> {
-		
-		WatchEntry(Object key, Watch<R, V> ref, V oldVal, V newVal) {
-			super(null, key, (R) ref, oldVal, newVal);
+		@SuppressWarnings("unchecked")
+		public class WatchEntry<R, V> extends Tup.Tup4.L<Object, R, V, V> {
+			
+			WatchEntry(Object key, Watch<R, V> ref, V oldVal, V newVal) {
+				super(null, key, (R) ref, oldVal, newVal);
+			}
 		}
 	}
+
 }

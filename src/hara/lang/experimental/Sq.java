@@ -1,4 +1,4 @@
-package hara.lang.base;
+package hara.lang.experimental;
 
 import java.util.Iterator;
 import java.util.NoSuchElementException;
@@ -6,6 +6,10 @@ import java.util.Spliterator;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
+
+import hara.lang.base.I;
+import hara.lang.base.It;
+import hara.lang.base.I.Seq;
 
 public interface Sq {
 
@@ -102,7 +106,7 @@ public interface Sq {
 
 	@SuppressWarnings("unchecked")
 	public static <V> java.util.Iterator<V> toIterator(I.Seq<V> seq) {
-		return (Iterator<V>) (seq.restEnd() ? Iter.emptyIterator() : new Sq.ToIterator<V>(seq));
+		return (Iterator<V>) (seq.restEnd() ? It.emptyIterator() : new Sq.ToIterator<V>(seq));
 	}
 
 }

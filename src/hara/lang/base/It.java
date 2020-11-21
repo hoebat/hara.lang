@@ -16,7 +16,7 @@ import java.util.function.Supplier;
 
 import java.util.concurrent.atomic.AtomicReference;
 
-public interface Iter {
+public interface It {
 
 	public interface T {
 
@@ -333,8 +333,9 @@ public interface Iter {
 		return new Arr.T.ToIter_double(arr, 0);
 	}
 
-	public static Iterator<Object> objects(Object... arr) {
-		return new Arr.T.ToIter(arr, 0);
+	@SafeVarargs
+	public static <E> Iterator<E> objects(E... arr) {
+		return new Arr.T.ToIter<E>(arr, 0);
 	}
 
 	public static <E> Iterator<E> from(BooleanSupplier hasNext, Supplier<E> next) {
@@ -375,6 +376,21 @@ public interface Iter {
 				throw new UnsupportedOperationException();
 			}
 		};
+	}
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public static <R> R collect(
+			Function<Iterator, R> terminal, 
+			Iterator it, 
+			Function<Iterator, Iterator>... pl) {
+		return terminal.apply(stream(it, pl));
+	}
+	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public static Iterator stream(
+			Iterator it, 
+			Function<Iterator, Iterator>... fns) {
+		return Arr.reduce((itr, f) -> f.apply(itr), it, fns);
 	}
 
 	//
@@ -568,7 +584,7 @@ public interface Iter {
 	public static <E> E[] toArray(Iterator<E> it, Class<E> cls) {
 		ArrayList<E> c = toArrayList(it);
 		E[] arr = Arr.newArray(cls, c.size());
-		Arr.fillArray(c, arr);
+		Arr.fillArray(c.iterator(), arr);
 		return arr;
 	}
 

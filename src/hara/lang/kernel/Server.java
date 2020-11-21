@@ -12,8 +12,7 @@ import hara.lang.base.*;
 @SuppressWarnings("rawtypes")
 public class Server implements I.Component {
 
-	final ConcurrentHashMap<Thread, Reference<Conn>> CLIENTS = new ConcurrentHashMap<Thread, Reference<Conn>>();
-	final ReferenceQueue<Conn> RQ = new ReferenceQueue<Conn>();
+	final Ut.RefCache<Thread, Conn> CLIENTS = new Ut.RefCache<>();
 
 	public final Foundation _F;
 	public final String _key;
@@ -30,18 +29,9 @@ public class Server implements I.Component {
 		_key = key;
 		_port = port;
 	}
-
-	public void register(Thread th, Conn client) {
-		CLIENTS.put(th, new WeakReference<Conn>(client, RQ));
-	}
-
-	public void deregister(Thread th) {
-		CLIENTS.remove(th);
-		G.clearCache(RQ, CLIENTS);
-	}
-
-	public int Clients() {
-		return CLIENTS.size();
+	
+	public long count() {
+		return CLIENTS.count();
 	}
 
 	@Override
@@ -52,9 +42,8 @@ public class Server implements I.Component {
 			Loop loop = new Loop(this, _socket);
 			_thread = new Thread(loop);
 			_thread.start();
-
 		} catch (Throwable t) {
-			G.sneakyThrow(t);
+			throw Ex.Sneaky(t);
 		}
 		return this;
 	}
@@ -63,7 +52,7 @@ public class Server implements I.Component {
 	public I.Component stop() {
 		_thread.interrupt();
 		_thread = null;
-		for (var entry : CLIENTS.entrySet()) {
+		for (var entry : CLIENTS.getLookup().entrySet()) {
 			try {
 				entry.getValue().get().close();
 				entry.getKey().interrupt();
@@ -111,7 +100,7 @@ public class Server implements I.Component {
 					Handler h = new Handler(_instance, s);
 					Thread th = new Thread(h);
 					h.setThread(th);
-					_instance.register(th, h._conn);
+					_instance.CLIENTS.register(th, h._conn);
 					th.start();
 				}
 			} catch (IOException e) {
@@ -149,6 +138,8 @@ public class Server implements I.Component {
 				conn.write((Throwable) ret);
 			} else if (ret instanceof byte[]) {
 				conn.write((byte[])ret);
+			} else {
+				conn.writeString(ret.toString());
 			}
 		}
 
@@ -163,10 +154,7 @@ public class Server implements I.Component {
 							List args = (List) ((List) obj).stream()
 											.map(b -> new String((byte[])b))
 											.collect(Collectors.toList());
-							String arg0 = (String) args.get(0);
-							args.remove(0);
-							var cmd = Foundation.COMMAND.valueOf(arg0);
-							var ret = Foundation.runCommand(cmd, args);
+							var ret = Foundation.runCommand(_instance._F, args);
 							writeReturn(_conn, ret);
 						} else {
 							_conn.write("NOT PROCESSED: " + obj);
@@ -176,7 +164,7 @@ public class Server implements I.Component {
 					}
 				}
 			} catch (Throwable t) {
-				_instance.deregister(_thread);
+				_instance.CLIENTS.deregister(_thread);
 			}
 
 		}

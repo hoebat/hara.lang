@@ -354,7 +354,11 @@ public interface Vector<E> extends Coll.VectorType<E> {
 		@SuppressWarnings("unchecked")
 		@Override
 		public Mutable<E> empty() {
-			return new Mutable<E>(null, 0, Node.NODE_SHIFT, Node.EMPTY, (E[]) new Object[] {});
+			_size = 0;
+			_shift = Node.NODE_SHIFT;
+			_root = Node.EMPTY;
+			_tail = (E[]) new Object[] {};
+			return this;
 		}
 	}
 

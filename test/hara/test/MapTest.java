@@ -16,7 +16,7 @@ class MapTest {
 		var k1 = Keyword.create("hello");
 		var k2 = Keyword.create("hello");
 		assertArrayEquals(
-				Iter.toArray(Keyword.CACHE.keys()),
+				It.toArray(Keyword.GLOBAL.keys()),
 				Arr.objects("hello"));
 		
 		assertEquals(k1, k2);
@@ -31,7 +31,7 @@ class MapTest {
 		var k3 = Keyword.create("hello/world");
 		assertNotEquals(k1, k3);
 		assertArrayEquals(
-				Iter.toArray(Keyword.CACHE.keys()),
+				It.toArray(Keyword.GLOBAL.keys()),
 				Arr.objects("hello", "hello/world"));
 	}
 	
@@ -47,9 +47,9 @@ class MapTest {
 		
 		var n = m.assoc(k2, k1);
 		assertArrayEquals(
-				Iter.toArray(n.keys()),
+				It.toArray(n.keys()),
 				Arr.objects(k1,k2));
-		Iter.pr(n.vals());
+		It.pr(n.vals());
 	}
 
 
@@ -57,9 +57,9 @@ class MapTest {
 	
 	@Test
 	void iterTests() {
-		Iter.pr(
-		Iter.partitionPair(
-				Iter.objects("A", "B", "C", "D")));
+		It.pr(
+		It.partitionPair(
+				It.objects("A", "B", "C", "D")));
 	}
 
 }

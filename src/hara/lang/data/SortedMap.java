@@ -425,7 +425,7 @@ public interface SortedMap<K, V> extends
 		public static <K, V> Iterator<Map.Entry<K, V>> iterator(Node<K, V> root) {
 
 			if (root.size == 0) {
-				return (Iterator<Entry<K, V>>) Iter.emptyIterator();
+				return (Iterator<Entry<K, V>>) It.emptyIterator();
 			}
 
 			return new Iterator<Map.Entry<K, V>>() {
@@ -523,12 +523,12 @@ public interface SortedMap<K, V> extends
 
 		@Override
 		default Iterator<K> keys() {
-			return Iter.map(iterator(), (n) -> n.getKey());
+			return It.map(iterator(), (n) -> n.getKey());
 		}
 
 		@Override
 		default Iterator<V> vals() {
-			return Iter.map(iterator(), (n) -> n.getValue());
+			return It.map(iterator(), (n) -> n.getValue());
 		}
 		
 		@Override
