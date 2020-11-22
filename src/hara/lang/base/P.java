@@ -5,7 +5,7 @@ import java.math.BigInteger;
 import java.math.MathContext;
 import java.util.Objects;
 
-public interface Pm {
+public interface P {
 
 	public interface Bits {
 
@@ -675,24 +675,6 @@ public interface Pm {
 		}
 	}
 
-	public interface Type {
-
-		public static boolean isInteger(Object x) {
-			return (x instanceof Integer) || (x instanceof Long) || (x instanceof BigInteger);
-		}
-
-		/**
-		 * ********************* Checks ******************************
-		 */
-		public static boolean isPrimitive(Class<?> c) {
-			return (c != null) && c.isPrimitive() && !(c == Void.TYPE);
-		}
-
-		public static Class<? extends Object> type(Object x) {
-			return (x != null) ? x.getClass() : null;
-		}
-	}
-
 	public class Complex {
 		private final double re; // the real part
 		private final double im; // the imaginary part
@@ -893,19 +875,6 @@ public interface Pm {
 		public int compareTo(Object o) {
 			Number other = (Number) o;
 			return Num.compare(this, other);
-		}
-	}
-
-	public final class Reduced<V> implements I.Deref<V>{
-		V _val;
-	
-		public Reduced(V val){
-			_val = val;
-		}
-	
-		@Override
-		public V deref(){
-			return _val;
 		}
 	}
 }

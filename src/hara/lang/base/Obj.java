@@ -62,8 +62,8 @@ public interface Obj {
 		I.Coll<V>, 
 		I.Seq<V>, 
 		I.ObjType,
-		Coll.SeqType<V>,
-		I.SequentialType<V>{
+		Data.SeqType<V>,
+		Data.SequentialType<V>{
 
 		public SEQ() {
 			super(null);
@@ -80,12 +80,12 @@ public interface Obj {
 		
 		@Override
 		public SEQ<V> cons(V e) {
-			return new Std.Cons<V>(_meta, e, this);
+			return new Std.T.Cons<V>(_meta, e, this);
 		}
 		
 		@Override
 		public SEQ<V> conj(V e) {
-			return new Std.Cons<V>(_meta, e, this);
+			return new Std.T.Cons<V>(_meta, e, this);
 		}
 
 		@Override
@@ -96,7 +96,7 @@ public interface Obj {
 		@SuppressWarnings("rawtypes")
 		@Override
 		public I.Coll empty() {
-			return Std.Cons.EMPTY.withMeta(_meta);
+			return Std.T.Cons.EMPTY.withMeta(_meta);
 		}
 	}
 	

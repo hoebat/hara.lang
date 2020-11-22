@@ -4,6 +4,7 @@ import java.lang.reflect.Array;
 import java.util.Iterator;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 public interface Arr {
 	
@@ -51,6 +52,15 @@ public interface Arr {
 		R out = init;
 		for(E e : elements) {
 			out = f.apply(out, e);
+		}
+		return out;
+	}
+	
+	public static <R, E> R reduce(BiFunction<R, E, R> f, R init, E[] elements, Supplier<Boolean> end) {
+		R out = init;
+		for(E e : elements) {
+			out = f.apply(out, e);
+			if (end.get()) {return out;}
 		}
 		return out;
 	}
@@ -339,7 +349,7 @@ public interface Arr {
 			}
 		}
 
-		public class ToSeq extends Obj.SEQ<Object> implements I.SeqArray<Object[], Object> {
+		public class ToSeq extends Obj.SEQ<Object> implements Data.SeqArray<Object[], Object> {
 		
 			public final Object[] _array;
 			final int _i;

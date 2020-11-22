@@ -360,7 +360,7 @@ public interface It {
 		};
 	}
 
-	public static <E> Iterator<E> fromLookup(I.SequentialLookupType<E> vec) {
+	public static <E> Iterator<E> fromLookup(Data.SequentialLookupType<E> vec) {
 
 		return new Iterator<E>() {
 			long _cnt = vec.count();
@@ -455,6 +455,15 @@ public interface It {
 		var _acc = init;
 		while (it.hasNext()) {
 			_acc = f.apply(_acc, it.next());
+		}
+		return _acc;
+	}
+
+	public static <E, R> R reduce(Iterator<E> it, R init, BiFunction<R, E, R> f, Supplier<Boolean> end) {
+		var _acc = init;
+		while (it.hasNext()) {
+			_acc = f.apply(_acc, it.next());
+			if(end.get()) { return _acc; }
 		}
 		return _acc;
 	}
@@ -615,7 +624,7 @@ public interface It {
 	// Arrays
 	//
 
-	public static <E> ArrayList<E> toArrayList(Iterator<? extends E> it) {
+	public static <E> ArrayList<E> toJList(Iterator<? extends E> it) {
 		ArrayList<E> list = new ArrayList<E>();
 		while (it.hasNext()) {
 			list.add(it.next());
@@ -624,11 +633,11 @@ public interface It {
 	}
 
 	public static Object[] toArray(Iterator<?> it) {
-		return toArrayList(it).toArray();
+		return toJList(it).toArray();
 	}
 
 	public static <E> E[] toArray(Iterator<E> it, Class<E> cls) {
-		ArrayList<E> c = toArrayList(it);
+		ArrayList<E> c = toJList(it);
 		E[] arr = Arr.newArray(cls, c.size());
 		Arr.fillArray(c.iterator(), arr);
 		return arr;

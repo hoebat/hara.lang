@@ -6,12 +6,9 @@ import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicReference;
 
 import hara.lang.base.*;
-import hara.lang.base.I.Assoc;
-import hara.lang.base.I.Dissoc;
-import hara.lang.base.I.Empty;
 import hara.lang.base.Ut.Counter;
 
-public interface Map<K, V> extends Coll.MapType<K, V>{
+public interface Map<K, V> extends Data.MapType<K, V>{
 
 	public interface Node<K, V> {
 		Node<K, V> assoc(
@@ -62,7 +59,7 @@ public interface Map<K, V> extends Coll.MapType<K, V>{
 		}
 	}
 	
-	public interface Fn {
+	public interface S {
 		
 		public static int mask(int hash, int shift) {
 			return (hash >>> shift) & 0x01f;
@@ -110,7 +107,7 @@ public interface Map<K, V> extends Coll.MapType<K, V>{
 		}
 
 		private Node<K, V> copyAndSet(AtomicReference<Thread> edit, int idx, Object val) {
-			if (Fn.isAllowedToEdit(edit, _edit)) {
+			if (S.isAllowedToEdit(edit, _edit)) {
 				_array[idx] = val;
 				return this;
 			} else {
@@ -125,15 +122,15 @@ public interface Map<K, V> extends Coll.MapType<K, V>{
 			if ((32 < shift) && (current_hash == hash)) {
 				return new BranchNode<K, V>(edit, current_hash, 2, new Object[] { current_key, current_val, key, val });
 			} else {
-				final int current_mask = Fn.mask(current_hash, shift);
-				final int mask = Fn.mask(hash, shift);
+				final int current_mask = S.mask(current_hash, shift);
+				final int mask = S.mask(hash, shift);
 
 				if (current_mask == mask) {
 					final Node<K, V> new_node = mergeTwoKeyValuePairs(edit, (shift + 5), current_hash, current_key,
 							current_val, hash, key, val);
-					return new DataNode<K, V>(edit, 0, Fn.bitpos(current_hash, shift), new Object[] { new_node });
+					return new DataNode<K, V>(edit, 0, S.bitpos(current_hash, shift), new Object[] { new_node });
 				} else {
-					final int new_datamap = Fn.bitpos(current_hash, shift) | Fn.bitpos(hash, shift);
+					final int new_datamap = S.bitpos(current_hash, shift) | S.bitpos(hash, shift);
 
 					if (current_mask < mask) {
 						return new DataNode<K, V>(edit, new_datamap, 0, new Object[] { current_key, current_val, key, val });
@@ -160,7 +157,7 @@ public interface Map<K, V> extends Coll.MapType<K, V>{
 		@SuppressWarnings("unchecked")
 		public Node<K, V> assoc(AtomicReference<Thread> edit, int shift, int hash, 
 				K key, V val, Counter added_leaf) {
-			final int bit = Fn.bitpos(hash, shift);
+			final int bit = S.bitpos(hash, shift);
 
 			if ((_datamap & bit) != 0) {
 				final int idx = bitmapNodeIndex(_datamap, bit);
@@ -169,7 +166,7 @@ public interface Map<K, V> extends Coll.MapType<K, V>{
 					return copyAndSet(edit, ((2 * idx) + 1), val);
 				} else {
 					final Object current_val = _array[((2 * idx) + 1)];
-					final Node<K, V> new_node = mergeTwoKeyValuePairs(edit, (shift + 5), (int)Hash.hashMurmur(current_key),
+					final Node<K, V> new_node = mergeTwoKeyValuePairs(edit, (shift + 5), (int)Fn.hashMurmur(current_key),
 							current_key, current_val, hash, key, val);
 					added_leaf.inc();
 
@@ -231,7 +228,7 @@ public interface Map<K, V> extends Coll.MapType<K, V>{
 
 		@SuppressWarnings("unchecked")
 		public Node<K, V> without(AtomicReference<Thread> edit, int shift, int hash, K key, Counter removed_leaf) {
-			final int bit = Fn.bitpos(hash, shift);
+			final int bit = S.bitpos(hash, shift);
 
 			if ((_datamap & bit) != 0) {
 				final int idx = bitmapNodeIndex(_datamap, bit);
@@ -239,7 +236,7 @@ public interface Map<K, V> extends Coll.MapType<K, V>{
 				if (Eq.eq(key, _array[(2 * idx)])) {
 					removed_leaf.inc();
 					if ((Integer.bitCount(_datamap) == 2) && (_nodemap == 0)) {
-						final int new_datamap = (shift == 0) ? (_datamap ^ bit) : Fn.bitpos(hash, 0);
+						final int new_datamap = (shift == 0) ? (_datamap ^ bit) : S.bitpos(hash, 0);
 						if (idx == 0) {
 							return new DataNode<K, V>(edit, new_datamap, 0, new Object[] { _array[2], _array[3] });
 						} else {
@@ -277,12 +274,12 @@ public interface Map<K, V> extends Coll.MapType<K, V>{
 
 		@SuppressWarnings("unchecked")
 		public NodeEntry<K, V> find(int shift, int hash, K key) {
-			final int bit = Fn.bitpos(hash, shift);
+			final int bit = S.bitpos(hash, shift);
 
 			if ((_datamap & bit) != 0) {
 				final int idx = bitmapNodeIndex(_datamap, bit);
 				final K current_key = (K)_array[(2 * idx)];
-				if (Eq.equals(current_key, key)) {
+				if (Fn.equals(current_key, key)) {
 					return new NodeEntry<K, V>(current_key,(V) _array[bit - 1]);
 				} else {
 					return null;
@@ -401,7 +398,7 @@ public interface Map<K, V> extends Coll.MapType<K, V>{
 		public Node<K, V> assoc(AtomicReference<Thread> edit, int shift, int hash, K key, V val,
 				Counter addedLeaf) {
 			int idx = findIndex(key);
-			if (Fn.isAllowedToEdit(edit, _edit)) {
+			if (S.isAllowedToEdit(edit, _edit)) {
 				BranchNode<K, V> new_node = (edit == _edit) 
 						? this 
 						: new BranchNode<K, V>(edit, _hash, _size, _array.clone());
@@ -428,7 +425,7 @@ public interface Map<K, V> extends Coll.MapType<K, V>{
 					final int hash_idx = (Eq.eq(key, _array[0])) ? 2 : 0;
 					return DataNode.EMPTY.assoc(edit, 0, hash, _array[hash_idx], _array[(hash_idx + 1)], removed_leaf);
 				default:
-					return new BranchNode<K, V>(edit, hash, (_size - 1), Fn.removePair(_array, (idx / 2)));
+					return new BranchNode<K, V>(edit, hash, (_size - 1), S.removePair(_array, (idx / 2)));
 				}
 			}
 			return this;
@@ -469,6 +466,8 @@ public interface Map<K, V> extends Coll.MapType<K, V>{
 		public Object[] getArray() {
 			return _array;
 		}
+
+
 	}
 
 
@@ -478,11 +477,40 @@ public interface Map<K, V> extends Coll.MapType<K, V>{
 
 		@Override
 		default NodeEntry<K, V> find(K key) {
-			return _root().find(0, (int)Hash.hashMurmur(key), key);
+			return _root().find(0, (int)Fn.hashMurmur(key), key);
+		}
+
+		@Override
+		default Iterator<Entry<K, V>> iterator() {
+			// TODO Auto-generated method stub
+			return null;
+		}
+
+		@Override
+		default boolean equality(Object other) {
+			// TODO Auto-generated method stub
+			return false;
+		}
+
+		@Override
+		default long count() {
+			return _size();
+		}
+
+		@Override
+		default Iterator<K> keys() {
+			// TODO Auto-generated method stub
+			return null;
+		}
+
+		@Override
+		default Iterator<V> vals() {
+			// TODO Auto-generated method stub
+			return null;
 		}
 	}
 
-	public final class Mutable<K, V> extends Coll.RefType.MT 
+	public final class Mutable<K, V> extends Data.RefType.MT 
 		implements Base<K, V>, I.ToPersistent{
 
 		private volatile Node<K, V> _root;
@@ -527,7 +555,7 @@ public interface Map<K, V> extends Coll.MapType<K, V>{
 		public Mutable<K, V> assoc(K key, V val) {_leafFlag.reset(0);
 			
 			var n0 = ((_root == null) ? DataNode.EMPTY : _root);
-			var n1 = n0.assoc(_edit, 0, (int)Hash.hashMurmur(key), key, val, _leafFlag);
+			var n1 = n0.assoc(_edit, 0, (int)Fn.hashMurmur(key), key, val, _leafFlag);
 			if (n1 != _root) { _root = n1; }
 			_size += _leafFlag.deref();
 			return this;
@@ -537,7 +565,7 @@ public interface Map<K, V> extends Coll.MapType<K, V>{
 		public Mutable<K, V>  dissoc(K key) {
 			if (_root == null) return this;
 			_leafFlag.reset(0);
-			var n = _root.without(_edit, 0, (int)Hash.hashMurmur(key), key, _leafFlag);
+			var n = _root.without(_edit, 0, (int)Fn.hashMurmur(key), key, _leafFlag);
 			if (n != _root) { _root = n; }
 			_size -= _leafFlag.deref();
 			return this;
@@ -562,49 +590,13 @@ public interface Map<K, V> extends Coll.MapType<K, V>{
 		}
 
 		@Override
-		public Iterator<Entry<K, V>> iterator() {
-			// TODO Auto-generated method stub
-			return null;
-		}
-
-		@Override
-		public boolean equality(Object other) {
-			// TODO Auto-generated method stub
-			return false;
-		}
-
-		@Override
-		public Empty empty() {
-			// TODO Auto-generated method stub
-			return null;
-		}
-
-		@Override
-		public long count() {
-			// TODO Auto-generated method stub
-			return 0;
-		}
-
-		@Override
-		public String hashSeed() {
-			// TODO Auto-generated method stub
-			return null;
-		}
-
-		@Override
-		public Iterator<K> keys() {
-			// TODO Auto-generated method stub
-			return null;
-		}
-
-		@Override
-		public Iterator<V> vals() {
+		public I.Empty empty() {
 			// TODO Auto-generated method stub
 			return null;
 		}
 	}
 
-	public class Standard<K, V>  extends Coll.RefType.PT 
+	public class Standard<K, V>  extends Data.RefType.PT 
 		implements Base<K, V>, 
 		I.ToMutable {
 
@@ -624,7 +616,7 @@ public interface Map<K, V> extends Coll.MapType<K, V>{
 		public Standard<K, V> assoc(K key, V val) {
 			var added_leaf = new Counter(0);
 			var n0 = (Node<K, V>)(_root == null ? DataNode.EMPTY : _root);
-			var n1 = n0.assoc(null, 0, (int)Hash.hashMurmur(key), key, val, added_leaf);
+			var n1 = n0.assoc(null, 0, (int)Fn.hashMurmur(key), key, val, added_leaf);
 			
 			return (n1 == _root) 
 					? this
@@ -635,7 +627,7 @@ public interface Map<K, V> extends Coll.MapType<K, V>{
 			if (_root == null) {
 				return this;
 			}
-			Node<K, V> new_root = _root.without(null, 0, (int)Hash.hashMurmur(key), key, new Counter(0));
+			Node<K, V> new_root = _root.without(null, 0, (int)Fn.hashMurmur(key), key, new Counter(0));
 			if (new_root == _root) {
 				return this;
 			}
@@ -657,50 +649,16 @@ public interface Map<K, V> extends Coll.MapType<K, V>{
 			return (meta() == meta) ? this : new Standard<K, V>(meta, _size, _root);
 		}
 
+
 		@Override
-		public Iterator<Entry<K, V>> iterator() {
+		public I.Empty empty() {
 			// TODO Auto-generated method stub
 			return null;
 		}
 
-		@Override
-		public boolean equality(Object other) {
-			// TODO Auto-generated method stub
-			return false;
-		}
 
 		@Override
-		public Empty empty() {
-			// TODO Auto-generated method stub
-			return null;
-		}
-
-		@Override
-		public long count() {
-			// TODO Auto-generated method stub
-			return 0;
-		}
-
-		@Override
-		public String hashSeed() {
-			// TODO Auto-generated method stub
-			return null;
-		}
-
-		@Override
-		public Iterator<K> keys() {
-			// TODO Auto-generated method stub
-			return null;
-		}
-
-		@Override
-		public Iterator<V> vals() {
-			// TODO Auto-generated method stub
-			return null;
-		}
-
-		@Override
-		public hara.lang.base.I.Mutable toMutable() {
+		public I.Mutable toMutable() {
 			// TODO Auto-generated method stub
 			return null;
 		}

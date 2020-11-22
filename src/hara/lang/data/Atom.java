@@ -36,18 +36,20 @@ public interface Atom<V> {
 			return newVal;
 		}
 	}
-	
-	public final class Basic<R, V> extends Struct<R, V> {
+
+	@SuppressWarnings("rawtypes")
+	public final class Basic<V> extends Struct<Atom, V> {
 		public Basic(V state) {
 			super(state);
 		}
 	}
 
-	public final class Standard<R, V> extends Struct<R, V> implements Swap<R, V> {
+	@SuppressWarnings("rawtypes")
+	public final class Standard<V> extends Struct<Atom, V> implements Swap<Atom, V> {
 
 		final Predicate<V> _validator;
-		final ConcurrentHashMap<Object, Consumer<WatchEntry<R, V>>> _watches 
-			= new ConcurrentHashMap<Object, Consumer<WatchEntry<R, V>>>();
+		final ConcurrentHashMap<Object, Consumer<WatchEntry<Atom, V>>> _watches 
+			= new ConcurrentHashMap<Object, Consumer<WatchEntry<Atom, V>>>();
 
 		public Standard(V init) {
 			super(init);
@@ -65,7 +67,7 @@ public interface Atom<V> {
 		}
 
 		@Override
-		public void addWatch(Object key, Consumer<WatchEntry<R, V>> f) {
+		public void addWatch(Object key, Consumer<WatchEntry<Atom, V>> f) {
 			_watches.put(key, f);
 		}
 		
@@ -75,7 +77,7 @@ public interface Atom<V> {
 		}
 		
 		@Override
-		public Iterator<Map.Entry<Object, Consumer<WatchEntry<R, V>>>> getWatches() {
+		public Iterator<Map.Entry<Object, Consumer<WatchEntry<Atom, V>>>> getWatches() {
 			return _watches.entrySet().iterator();
 		}
 

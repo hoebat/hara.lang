@@ -86,8 +86,8 @@ public class Foundation implements I.Context {
 		}
 
 		public static List runDIR(Foundation F) {
-			return Arrays.asList("SERVERS", It.toArrayList(F.SERVERS.keys()), "SESSIONS",
-					It.toArrayList(F.SESSIONS.keys()));
+			return Arrays.asList("SERVERS", It.toJList(F.SERVERS.keys()), "SESSIONS",
+					It.toJList(F.SESSIONS.keys()));
 		}
 
 		public static String runProcess(List<String> args) {
@@ -102,7 +102,7 @@ public class Foundation implements I.Context {
 
 		@SuppressWarnings("unchecked")
 		public static List runHELP(Foundation F, Object enums) {
-			return It.toArrayList(
+			return It.toJList(
 					It.map(Arr.toIter(enums), (x) -> x.toString()));
 		}
 
@@ -208,7 +208,7 @@ public class Foundation implements I.Context {
 			case CLASSPATH: return runSessionFor(F, args.get(0), 
 					(rt) -> runSessionClasspath(rt, args));
 			//case INFO:  return runSessionFor(F, args.get(0), (rt) -> rt.getInfo());
-			case LIST:  return It.toArrayList(F.SESSIONS.keys());
+			case LIST:  return It.toJList(F.SESSIONS.keys());
 			//case LOAD:  return runSessionFor(F, args.get(0), (rt) -> rt.load(args));
 			//case STOP:  return runSessionFor(F, args.get(0), (rt) -> rt.stop());
 			case CLASSLOADER: break;

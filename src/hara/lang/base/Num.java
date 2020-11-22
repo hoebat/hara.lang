@@ -4,7 +4,7 @@ import java.math.BigInteger;
 import java.math.BigDecimal;
 import java.math.MathContext;
 
-import hara.lang.base.Pm.Ratio;
+import hara.lang.base.P.Ratio;
 
 public interface Num {
 
@@ -1174,7 +1174,7 @@ public interface Num {
 		Class<? extends Object> xc = x.getClass();
 
 		if (xc == Long.class || xc == Integer.class || xc == Short.class || xc == Byte.class)
-			return Pm.Cast.longCast(x);
+			return P.Cast.longCast(x);
 		// no bignums, no decimals
 		throw new IllegalArgumentException("bit operation not supported for: " + xc);
 	}

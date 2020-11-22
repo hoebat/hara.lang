@@ -34,7 +34,7 @@ public interface Session {
 		public List<String> getClasspath() {
 			return (List<String>)
 					It.collect(
-					  It::toArrayList,
+					  It::toJList,
 					  Arr.toIter((Object)_loader.getURLs()),
 					  (it) -> It.map(it, url -> url.toString()));
 		}
@@ -55,7 +55,7 @@ public interface Session {
 		public List<String> findClasspath(List<String> names) {
 			return (List<String>)
 					It.collect(
-					  It::toArrayList,
+					  It::toJList,
 					  names.iterator(),
 					  (it) -> It.keep(it, (n) -> {
 						try {

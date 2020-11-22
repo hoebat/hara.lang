@@ -1,10 +1,13 @@
 package hara.lang.base;
 
+import java.math.BigInteger;
 import java.util.Iterator;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+
+import hara.lang.base.G.HashType;
 
 public interface Fn {
 
@@ -200,7 +203,7 @@ public interface Fn {
 			public JuxtPair(Function<E, K> fk, Function<E, V> fv) {
 				_fk = fk;
 				_fv = fv;
-				_f1 = (e) -> new Std.Tup2.L<K, V>(null, _fk.apply(e), _fv.apply(e));
+				_f1 = (e) -> Std.pair(_fk.apply(e), _fv.apply(e));
 			}
 		
 			@Override
@@ -275,15 +278,29 @@ public interface Fn {
 		
 			final Supplier<R> _init;
 			final BiFunction<R, E, R> _step;
+			final Supplier<Boolean> _end;
 			final Function<Iterator<E>, R> _f1;
 		
 			public Reduce(Supplier<R> init, BiFunction<R, E, R> step) {
 				_init = init;
 				_step = step;
+				_end = null;
 				_f1 = new Function<Iterator<E>, R>() {
 					@Override
 					public R apply(Iterator<E> it) {
 						return It.reduce(it, _init.get(), _step);
+					}
+				};
+			}
+		
+			public Reduce(Supplier<R> init, BiFunction<R, E, R> step, Supplier<Boolean> end) {
+				_init = init;
+				_step = step;
+				_end = end;
+				_f1 = new Function<Iterator<E>, R>() {
+					@Override
+					public R apply(Iterator<E> it) {
+						return It.reduce(it, _init.get(), _step, _end);
 					}
 				};
 			}
@@ -306,15 +323,29 @@ public interface Fn {
 
 		public class ReduceIn<E, R> implements I.Fn<R, R, Iterator<E>>, T.Rf<E, R>{
 		
+			
 			final BiFunction<R, E, R> _step;
+			final Supplier<Boolean> _end;
 			final BiFunction<R, Iterator<E>, R> _f2;
 		
 			public ReduceIn(BiFunction<R, E, R> step) {
 				_step = step;
+				_end = null;
 				_f2 = new BiFunction<R, Iterator<E>, R>() {
 					@Override
 					public R apply(R self, Iterator<E> it) {
 						return It.reduce(it, self, _step);
+					}
+				};
+			}
+		
+			public ReduceIn(BiFunction<R, E, R> step, Supplier<Boolean> end) {
+				_step = step;
+				_end = end;
+				_f2 = new BiFunction<R, Iterator<E>, R>() {
+					@Override
+					public R apply(R self, Iterator<E> it) {
+						return It.reduce(it, self, _step, _end);
 					}
 				};
 			}
@@ -371,6 +402,10 @@ public interface Fn {
 		return end - start;
 	}
 	
+	public static <E, R> H.Map<E, R> map(Function<E, R> f) {
+		return new H.Map<E, R>(f);
+	}
+	
 	@SuppressWarnings("unchecked")
 	public static <E, R, F> H.Reduce<E, R> reduce(R init, F step) {
 		return new H.Reduce<E, R>(T.toFn(init).getArg0(), T.toFn(init).getArg2());
@@ -381,6 +416,16 @@ public interface Fn {
 		return new H.Reduce<E, R>(init, step);
 	}
 
+	// Reduce
+	public static <E, R> H.Reduce<E, R> reduce(Supplier<R> init, BiFunction<R, E, R> step, Supplier<Boolean> end) {
+		return new H.Reduce<E, R>(init, step, end);
+	}
+
+	// Reduce In
+	public static <E, R> H.ReduceIn<E, R> reduceIn(BiFunction<R, E, R> step, Supplier<Boolean> end) {
+		return new H.ReduceIn<E, R>(step);
+	}
+
 	// Reduce In
 	public static <E, R> H.ReduceIn<E, R> reduceIn(BiFunction<R, E, R> step) {
 		return new H.ReduceIn<E, R>(step);
@@ -389,6 +434,75 @@ public interface Fn {
 	@SuppressWarnings("unchecked")
 	public static <E, R, F> H.ReduceIn<E, R> reduceIn(F step) {
 		return new H.ReduceIn<E, R>(T.toFn(step).getArg2());
+	}
+
+	public static boolean equals(Object k1, Object k2) {
+		return (k1 == k2) ? true : (k1 != null && k1.equals(k2));
+	}
+
+	public static boolean identical(Object k1, Object k2) {
+		return k1 == k2;
+	}
+
+	@SuppressWarnings("unchecked")
+	public static int compare(Object k1, Object k2) {
+		if (k1 == k2)
+			return 0;
+		if (k1 != null) {
+			if (k2 == null)
+				return 1;
+			if (k1 instanceof Number)
+				return Num.compare((Number) k1, (Number) k2);
+			return ((Comparable<Object>) k1).compareTo(k2);
+		}
+		return -1;
+	}
+
+	public static long hashMurmur(Object o) {
+		if(o instanceof I.Hash) {
+			return ((I.Hash) o).hashGet(G.HashType.MURMUR3);
+		} else if (o == null) {
+			return 0;
+		} else {
+			return o.hashCode();
+		}
+	}
+
+	public static long hashSip(Object o) {
+		if (o == null)
+			return 0;
+		return o.hashCode();
+	}
+
+	public static Function<Object, Long> hashFn(HashType t) {
+	
+		switch(t) {
+		case MURMUR3: 
+			return item -> Long.valueOf(hashMurmur(item));
+		case SIP:
+			return item -> Long.valueOf(hashSip(item));
+		case SYSTEM:
+			return item -> Long.valueOf(item.hashCode());
+		default:
+			throw new UnsupportedOperationException("Not Supported");
+		}		
+	}
+
+	//
+	// Checks
+	//
+	
+	
+	public static boolean isInteger(Object x) {
+		return (x instanceof Integer) || (x instanceof Long) || (x instanceof BigInteger);
+	}
+
+	public static boolean isPrimitive(Class<?> c) {
+		return (c != null) && c.isPrimitive() && !(c == Void.TYPE);
+	}
+
+	public static Class<? extends Object> type(Object x) {
+		return (x != null) ? x.getClass() : null;
 	}
 	
 }

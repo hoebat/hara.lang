@@ -12,7 +12,7 @@ import hara.lang.base.*;
 import static hara.lang.data.SortedMap.Color.*;
 
 public interface SortedMap<K, V> extends
-	Coll.MapType<K, V>,
+	Data.MapType<K, V>,
 	I.Nth<Map.Entry<K, V>>, 
 	I.IndexedKV<K, V> {
 
@@ -46,15 +46,15 @@ public interface SortedMap<K, V> extends
 		}
 
 		public Node<K, V> redden() {
-			return c == BLACK && size > 0 && l.c == BLACK && r.c == BLACK ? Fn.node(RED, l, k, v, r) : this;
+			return c == BLACK && size > 0 && l.c == BLACK && r.c == BLACK ? S.node(RED, l, k, v, r) : this;
 		}
 
 		public Node<K, V> blacken() {
-			return c == RED ? Fn.node(BLACK, l, k, v, r) : this;
+			return c == RED ? S.node(BLACK, l, k, v, r) : this;
 		}
 
 		public Node<K, V> unblacken() {
-			return c == DOUBLE_BLACK ? Fn.node(BLACK, l, k, v, r) : this;
+			return c == DOUBLE_BLACK ? S.node(BLACK, l, k, v, r) : this;
 		}
 
 		public Node<K, V> remove(K key, Comparator<K> comparator) {
@@ -68,16 +68,16 @@ public interface SortedMap<K, V> extends
 			} else {
 				int cmp = comparator.compare(key, k);
 				if (cmp < 0) {
-					return Fn.node(c, l._remove(key, comparator), k, v, r).rotate();
+					return S.node(c, l._remove(key, comparator), k, v, r).rotate();
 				} else if (cmp > 0) {
-					return Fn.node(c, l, k, v, r._remove(key, comparator)).rotate();
+					return S.node(c, l, k, v, r._remove(key, comparator)).rotate();
 				} else if (size == 1) {
 					return c == BLACK ? DOUBLE_EMPTY_NODE : EMPTY_NODE;
 				} else if (r.size == 0) {
 					return l.blacken();
 				} else {
-					Node<K, V> min = Fn.min(r);
-					return Fn.node(c, l, min.k, min.v, r.removeMin()).rotate();
+					Node<K, V> min = S.min(r);
+					return S.node(c, l, min.k, min.v, r.removeMin()).rotate();
 				}
 			}
 		}
@@ -89,15 +89,15 @@ public interface SortedMap<K, V> extends
 		@SuppressWarnings("unchecked")
 		private Node<K, V> _put(K key, V value, BinaryOperator<V> merge, Comparator<K> comparator) {
 			if (size == 0) {
-				return Fn.node(c == DOUBLE_BLACK ? BLACK : RED, EMPTY_NODE, key, value, EMPTY_NODE);
+				return S.node(c == DOUBLE_BLACK ? BLACK : RED, EMPTY_NODE, key, value, EMPTY_NODE);
 			} else {
 				int cmp = comparator.compare(key, this.k);
 				if (cmp < 0) {
-					return Fn.node(c, l._put(key, value, merge, comparator), k, v, r).balance();
+					return S.node(c, l._put(key, value, merge, comparator), k, v, r).balance();
 				} else if (cmp > 0) {
-					return Fn.node(c, l, k, v, r._put(key, value, merge, comparator)).balance();
+					return S.node(c, l, k, v, r._put(key, value, merge, comparator)).balance();
 				} else {
-					return Fn.node(c, l, key, merge.apply(v, value), r);
+					return S.node(c, l, key, merge.apply(v, value), r);
 				}
 			}
 		}
@@ -131,40 +131,40 @@ public interface SortedMap<K, V> extends
 				// (R (BB? a-x-b) y (B czd))
 				// (balance (B (R (-B a-x-b) y c) z d))
 				if (l.c == DOUBLE_BLACK && r.c == BLACK) {
-					return Fn.black(Fn.red(l.unblacken(), k, v, r.l), r.k, r.v, r.r).balance();
+					return S.black(S.red(l.unblacken(), k, v, r.l), r.k, r.v, r.r).balance();
 				}
 
 				// (R (B axb) y (BB? c-z-d))
 				// (balance (B a x (R b y (-B c-z-d))))
 				if (r.c == DOUBLE_BLACK && l.c == BLACK) {
-					return Fn.black(l.l, l.k, l.v, Fn.red(l.r, k, v, r.unblacken())).balance();
+					return S.black(l.l, l.k, l.v, S.red(l.r, k, v, r.unblacken())).balance();
 				}
 			} else if (c == BLACK) {
 
 				// (B (BB? a-x-b) y (B czd))
 				// (balance (BB (R (-B a-x-b) y c) z d))
 				if (l.c == DOUBLE_BLACK && r.c == BLACK) {
-					return Fn.node(DOUBLE_BLACK, Fn.red(l.unblacken(), k, v, r.l), r.k, r.v, r.r).balance();
+					return S.node(DOUBLE_BLACK, S.red(l.unblacken(), k, v, r.l), r.k, r.v, r.r).balance();
 				}
 
 				// (B (B axb) y (BB? c-z-d))
 				// (balance (BB a x (R b y (-B c-z-d))))
 				if (l.c == BLACK && r.c == DOUBLE_BLACK) {
-					return Fn.node(DOUBLE_BLACK, l.l, l.k, l.v, Fn.red(l.r, k, v, r.unblacken())).balance();
+					return S.node(DOUBLE_BLACK, l.l, l.k, l.v, S.red(l.r, k, v, r.unblacken())).balance();
 				}
 
 				// (B (BB? a-w-b) x (R (B cyd) z e))
 				// (B (balance (B (R (-B a-w-b) x c) y d)) z e)
 				if (l.c == DOUBLE_BLACK && r.c == RED && r.l.c == BLACK) {
 					Node<K, V> rl = r.l;
-					return Fn.black(Fn.black(Fn.red(l.unblacken(), k, v, rl.l), rl.k, rl.v, rl.r).balance(), r.k, r.v, r.r);
+					return S.black(S.black(S.red(l.unblacken(), k, v, rl.l), rl.k, rl.v, rl.r).balance(), r.k, r.v, r.r);
 				}
 
 				// (B (R a w (B bxc)) y (BB? d-z-e))
 				// (B a w (balance (B b x (R c y (-B d-z-e)))))
 				if (l.c == RED && l.r.c == BLACK && r.c == DOUBLE_BLACK) {
 					Node<K, V> lr = l.r;
-					return Fn.black(l.l, l.k, l.v, Fn.black(lr.l, lr.k, lr.v, Fn.red(lr.r, k, v, r.unblacken())).balance());
+					return S.black(l.l, l.k, l.v, S.black(lr.l, lr.k, lr.v, S.red(lr.r, k, v, r.unblacken())).balance());
 				}
 			}
 
@@ -178,14 +178,14 @@ public interface SortedMap<K, V> extends
 				// (B (R (R a x b) y c) z d)
 				// (R (B a x b) y (B c z d))
 				if (l.l.c == RED) {
-					return Fn.red(l.l.blacken(), l.k, l.v, Fn.black(l.r, k, v, r));
+					return S.red(l.l.blacken(), l.k, l.v, S.black(l.r, k, v, r));
 				}
 
 				// (B (R a x (R b y c)) z d)
 				// (R (B a x b) y (B c z d))
 				if (l.r.c == RED) {
 					Node<K, V> lr = l.r;
-					return Fn.red(Fn.black(l.l, l.k, l.v, lr.l), lr.k, lr.v, Fn.black(lr.r, k, v, r));
+					return S.red(S.black(l.l, l.k, l.v, lr.l), lr.k, lr.v, S.black(lr.r, k, v, r));
 				}
 			}
 
@@ -194,13 +194,13 @@ public interface SortedMap<K, V> extends
 				// (R (B a x b) y (B c z d))
 				if (r.l.c == RED) {
 					Node<K, V> rl = r.l;
-					return Fn.red(Fn.black(l, k, v, rl.l), rl.k, rl.v, Fn.black(rl.r, r.k, r.v, r.r));
+					return S.red(S.black(l, k, v, rl.l), rl.k, rl.v, S.black(rl.r, r.k, r.v, r.r));
 				}
 
 				// (B a x (R b y (R c z d))
 				// (R (B a x b) y (B c z d))
 				if (r.r.c == RED) {
-					return Fn.red(Fn.black(l, k, v, r.l), r.k, r.v, r.r.blacken());
+					return S.red(S.black(l, k, v, r.l), r.k, r.v, r.r.blacken());
 				}
 			}
 
@@ -212,14 +212,14 @@ public interface SortedMap<K, V> extends
 			// (B (B a x b) y (B c z d))
 			if (l.c == RED && l.r.c == RED) {
 				Node<K, V> lr = l.r;
-				return Fn.black(Fn.black(l.l, l.k, l.v, lr.l), lr.k, lr.v, Fn.black(lr.r, k, v, r));
+				return S.black(S.black(l.l, l.k, l.v, lr.l), lr.k, lr.v, S.black(lr.r, k, v, r));
 			}
 
 			// (BB a x (R (R b y c) z d))
 			// (B (B a x b) y (B c z d))
 			if (r.c == RED && r.l.c == RED) {
 				Node<K, V> rl = r.l;
-				return Fn.black(Fn.black(l, k, v, rl.l), rl.k, rl.v, Fn.black(rl.r, r.k, r.v, r.r));
+				return S.black(S.black(l, k, v, rl.l), rl.k, rl.v, S.black(rl.r, r.k, r.v, r.r));
 			}
 
 			return this;
@@ -237,7 +237,7 @@ public interface SortedMap<K, V> extends
 				}
 			}
 
-			return Fn.node(c, l.removeMin(), k, v, r).rotate();
+			return S.node(c, l.removeMin(), k, v, r).rotate();
 		}
 
 		public long floorIndex(K key, Comparator<K> comparator, long offset) {
@@ -285,7 +285,7 @@ public interface SortedMap<K, V> extends
 				return l.slice(min, max, comparator);
 			}
 
-			return Fn.node(c, l.slice(min, max, comparator), k, v, r.slice(min, max, comparator)).rotate();
+			return S.node(c, l.slice(min, max, comparator), k, v, r.slice(min, max, comparator)).rotate();
 		}
 
 		@SuppressWarnings({ "unchecked", "hiding" })
@@ -342,7 +342,7 @@ public interface SortedMap<K, V> extends
 		}
 	}
 
-	public interface Fn {
+	public interface S {
 
 		public static <K, V> Node<K, V> min(Node<K, V> n) {
 			for (;;) {
@@ -495,7 +495,7 @@ public interface SortedMap<K, V> extends
 		
 		@Override
 		default Node<K, V> find(K key) {
-			return Fn.find(_root(), key, _comparator());
+			return S.find(_root(), key, _comparator());
 		}
 
 		@Override
@@ -503,7 +503,7 @@ public interface SortedMap<K, V> extends
 			if (idx < 0 || idx >= count()) {
 				throw new IndexOutOfBoundsException(String.format("%d must be within [0,%d)", idx, count()));
 			}
-			return Fn.nth(_root(), (int) idx);
+			return S.nth(_root(), (int) idx);
 		}
 
 		@Override
@@ -518,7 +518,7 @@ public interface SortedMap<K, V> extends
 
 		@Override
 		default Iterator<Entry<K, V>> iterator() {
-			return Fn.iterator(_root());
+			return S.iterator(_root());
 		}
 
 		@Override
@@ -533,7 +533,7 @@ public interface SortedMap<K, V> extends
 		
 		@Override
 		default long indexOfKey(K key) {
-			return Fn.indexOf(_root(), key, _comparator());
+			return S.indexOf(_root(), key, _comparator());
 		}
 
 		@Override
@@ -550,7 +550,7 @@ public interface SortedMap<K, V> extends
 		}
 	}
 
-	public final class Mutable<K, V> extends Coll.RefType.MT 
+	public final class Mutable<K, V> extends Data.RefType.MT 
 		implements Base<K, V>,
 				   I.ToPersistent{
 
@@ -615,7 +615,7 @@ public interface SortedMap<K, V> extends
 		}
 	}
 	
-	public final class Standard<K, V> extends Coll.RefType.PT 
+	public final class Standard<K, V> extends Data.RefType.PT 
 		implements Base<K, V>, SortedMap<K, V>, I.ToMutable {
 
 		// STATIC

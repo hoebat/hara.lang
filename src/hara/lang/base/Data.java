@@ -2,10 +2,11 @@ package hara.lang.base;
 
 import java.util.Iterator;
 import java.util.Map.Entry;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 
-public interface Coll {
+public interface Data {
 	
 
 	public interface StringType extends I.Hash {
@@ -14,7 +15,7 @@ public interface Coll {
 		default long hashCalc(G.HashType t) {
 			switch(t) {
 			case SYSTEM: return (hashSeed()+"|"+toString()).hashCode();
-			case MURMUR3: return Hash.Murmur3.hashChars(hashSeed()+"|"+toString());
+			case MURMUR3: return Ut.Murmur3.hashChars(hashSeed()+"|"+toString());
 			case SIP:
 				break;
 			default:
@@ -32,7 +33,7 @@ public interface Coll {
 					I.PopFirst, 
 					I.Conj<E>, 
 					I.Seq<E>, 
-					I.SequentialType<E> {
+					SequentialType<E> {
 	
 		@Override
 		default SeqType<E> conj(E e) {
@@ -85,7 +86,7 @@ public interface Coll {
 		
 		@Override
 		default long hashCalc(G.HashType t) {
-			Function<Object, Long> f = G.hashFn(t);
+			Function<Object, Long> f = Fn.hashFn(t);
 			
 			return It.reduce(
 					iterator(), 
@@ -233,7 +234,7 @@ public interface Coll {
 	}
 
 	public interface VectorType<V>
-			extends I.Coll<V>, I.SequentialType<V>, I.SequentialLookupType<V>, I.Nth<V>, I.PopLast, I.PushLast<V> {
+			extends I.Coll<V>, SequentialType<V>, SequentialLookupType<V>, I.Nth<V>, I.PopLast, I.PushLast<V> {
 	
 		@Override
 		default VectorType<V> conj(V v) {
@@ -247,5 +248,151 @@ public interface Coll {
 		E depGet(I.Context ctx, K id);
 		SetType<E> depEntries(I.Context ctx, K id);
 		Iterator<K> depIds(I.Context ctx);
+	}
+
+
+	public interface SequentialLookupType<V>
+		extends SequentialType<V>, Iterable<V>, I.Count, I.Nth<V>, I.Lookup<Long, V>, I.PeekFirst<V>, I.PeekLast<V> {
+	
+		@Override
+		default Entry<Long, V> find(Long idx) {
+			if (idx >= 0 && idx < count()) {
+				V out = nth(idx);
+				return new Entry<Long, V>() {
+					@Override
+					public Long getKey() {
+						return idx;
+					}
+	
+					@Override
+					public V getValue() {
+						return out;
+					}
+	
+					@Override
+					public V setValue(V value) {
+						throw new UnsupportedOperationException("Not Supported");
+					}
+				};
+			}
+			throw new IndexOutOfBoundsException();
+		}
+	
+		@Override
+		default Iterator<Long> keys() {
+			return It.range(0, count());
+		}
+	
+		@Override
+		default V lookup(Long idx) {
+			return nth(idx);
+		}
+	
+		@Override
+		default V peekFirst() {
+			return nth(0);
+		}
+	
+		@Override
+		default V peekLast() {
+			return nth(count() - 1);
+		}
+	
+		@Override
+		default Iterator<V> vals() {
+			return this.iterator();
+		}
+	}
+
+
+	public interface SequentialType<V> extends 
+		Iterable<V>, 
+		I.Count, 
+		I.Equality, 
+		I.Hash,
+		I.ObjType {
+	
+		@SuppressWarnings({ "unchecked", "rawtypes" })
+		@Override
+		default boolean equality(Object obj) {
+			if (obj instanceof SequentialType) {
+				return (count() == ((SequentialType) obj).count())
+						&& Eq.eqIterator(
+								(Iterator)this.iterator(), 
+								((SequentialType) obj).iterator());
+			} else if (obj instanceof java.util.List) {
+				return (this.count() == ((java.util.List) obj).size())
+						&& Eq.eqIterator(
+								(Iterator)this.iterator(), 
+								((java.util.List) obj).iterator());
+			} else {
+				return false;
+			}
+		}
+	
+		@Override
+		default G.ObjType getObjType() {
+			return G.ObjType.SEQUENTIAL;
+		}
+		
+		@Override
+		default long hashCalc(G.HashType t) {
+			
+			Function<Object, Long> f = Fn.hashFn(t);
+			return It.reduce(
+					iterator(), 
+					Long.valueOf(hashSeed().hashCode()),
+					(acc, item) -> (acc * 31) + f.apply(item));
+		}
+	}
+
+
+	public interface SeqArray<C, V> 
+		extends SequentialLookupType<V>,
+				I.PeekFirst<V>, 
+				I.PeekLast<V>, 
+				I.Seq<V> {
+		
+		@Override
+		default long count() {
+			return rawLength() - rawIndex() - 1;
+		}
+	
+		@Override
+		default V first() {
+			return nth(0);
+		}
+	
+		@SuppressWarnings("unchecked")
+		@Override
+		default Iterator<V> iterator() {
+			return Arr.toIter(rawArray());
+		}
+	
+		@SuppressWarnings("unchecked")
+		@Override
+		default SeqArray<C, V> next() {
+			if (count() > 0) return (SeqArray<C, V>) restMore();
+			return null;
+		}
+	
+		@Override
+		default V nth(long idx) {
+			C arr = rawArray();
+			return (arr == null) ? null : rawFn().apply(arr, rawIndex() + idx);
+		}
+	
+		C rawArray();
+	
+		BiFunction<C, Long, V> rawFn();
+	
+		long rawIndex();
+	
+		long rawLength();
+	
+		@Override
+		default boolean restEnd() {
+			return count() < 1;
+		}
 	}
 }

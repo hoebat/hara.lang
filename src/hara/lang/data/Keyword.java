@@ -5,7 +5,7 @@ import hara.lang.base.*;
 
 public final class Keyword implements
 	Comparable<Keyword>,
-	Coll.StringType,
+	Data.StringType,
 	I.Namespaced, 
 	I.Display,
 	I.ObjType,

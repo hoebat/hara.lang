@@ -7,9 +7,9 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import hara.lang.base.*;
 
-public interface Vector<E> extends Coll.VectorType<E> {
+public interface Vector<E> extends Data.VectorType<E> {
 
-	public interface Fn {
+	public interface S {
 
 		// STATIC METHODS
 		public static Node editableRoot(Node node) {
@@ -33,7 +33,7 @@ public interface Vector<E> extends Coll.VectorType<E> {
 				Node root, int size, int shift, 
 				E[] tail, int i, boolean editable) {
 			if (i >= 0 && i < size) {
-				if (i >= Fn.tailoff(size)) {
+				if (i >= S.tailoff(size)) {
 					return tail;
 				}
 				Node node = root;
@@ -84,7 +84,7 @@ public interface Vector<E> extends Coll.VectorType<E> {
 		public static Node pushTail(
 				Node root, int size, int level, 
 				Node parent, Node _tailnode, boolean editable) {
-			if (editable == true) parent = Fn.editableNode(parent, root.edit);
+			if (editable == true) parent = S.editableNode(parent, root.edit);
 			int subidx = ((size - 1) >>> level) & Node.NODE_MASK;
 			var ret = new Node(parent.edit, parent.array.clone());
 			Node nodeToInsert;
@@ -93,7 +93,7 @@ public interface Vector<E> extends Coll.VectorType<E> {
 			} else {
 				Node child = (Node) parent.array[subidx];
 				nodeToInsert = (child == null) 
-						? Fn.newPath(root.edit, level - Node.NODE_SHIFT, _tailnode)
+						? S.newPath(root.edit, level - Node.NODE_SHIFT, _tailnode)
 						: pushTail(root, size, level - Node.NODE_SHIFT, child, _tailnode, editable);
 			}
 			ret.array[subidx] = nodeToInsert;
@@ -103,7 +103,7 @@ public interface Vector<E> extends Coll.VectorType<E> {
 		public static Node popTail(
 				Node root, int size, int level, 
 				Node node, boolean editable) {
-			if (editable == true) node = Fn.editableNode(node, root.edit);
+			if (editable == true) node = S.editableNode(node, root.edit);
 			int subidx = ((size - 2) >>> level) & Node.NODE_MASK;
 			if (level > Node.NODE_SHIFT) {
 				Node newchild = popTail(root, size, level - Node.NODE_SHIFT, (Node) node.array[subidx], editable);
@@ -183,7 +183,7 @@ public interface Vector<E> extends Coll.VectorType<E> {
 				int i = start;
 				int base = i - (i % 32);
 				E[] array = (start < count()) 
-						? Fn.getNodeArrayFor(_root(), _size(), _shift(), _tail(), i, false)
+						? S.getNodeArrayFor(_root(), _size(), _shift(), _tail(), i, false)
 						: null;
 
 				@Override
@@ -195,7 +195,7 @@ public interface Vector<E> extends Coll.VectorType<E> {
 				public E next() {
 					if (i < end) {
 						if (i - base == 32) {
-							array = Fn.getNodeArrayFor(_root(), _size(), _shift(), _tail(), i, false);
+							array = S.getNodeArrayFor(_root(), _size(), _shift(), _tail(), i, false);
 							base += 32;
 						}
 						return array[i++ & 0x01f];
@@ -217,7 +217,7 @@ public interface Vector<E> extends Coll.VectorType<E> {
 		}
 	}
 
-	public class Mutable<E> extends Coll.RefType.MT implements Base<E>, I.ToPersistent {
+	public class Mutable<E> extends Data.RefType.MT implements Base<E>, I.ToPersistent {
 
 		private int _size;
 		private int _shift;
@@ -226,7 +226,7 @@ public interface Vector<E> extends Coll.VectorType<E> {
 
 		@SuppressWarnings("unchecked")
 		public Mutable(Base<E> v) {
-			this(v.meta(), v._size(), v._shift(), Fn.editableRoot(v._root()), (E[]) Fn.makeTail(v._tail()));
+			this(v.meta(), v._size(), v._shift(), S.editableRoot(v._root()), (E[]) S.makeTail(v._tail()));
 		}
 
 		public Mutable(I.Metadata meta, int size, int shift, Node root, E[] tail) {
@@ -271,7 +271,7 @@ public interface Vector<E> extends Coll.VectorType<E> {
 			checkEditable();
 			int i = _size;
 			// room in _tail?
-			if (i - Fn.tailoff(_size) < Node.NODE_MAXLEN) {
+			if (i - S.tailoff(_size) < Node.NODE_MAXLEN) {
 				_tail[i & Node.NODE_MASK] = val;
 				++_size;
 				return this;
@@ -286,10 +286,10 @@ public interface Vector<E> extends Coll.VectorType<E> {
 			if ((_size >>> Node.NODE_SHIFT) > (1 << _shift)) {
 				new_root = new Node(_root.edit);
 				new_root.array[0] = _root;
-				new_root.array[1] = Fn.newPath(_root.edit, _shift, _tailnode);
+				new_root.array[1] = S.newPath(_root.edit, _shift, _tailnode);
 				new_shift += Node.NODE_SHIFT;
 			} else
-				new_root = Fn.pushTail(_root, _size, _shift, _root, _tailnode, true);
+				new_root = S.pushTail(_root, _size, _shift, _root, _tailnode, true);
 			_root = new_root;
 			_shift = new_shift;
 			++_size;
@@ -299,14 +299,14 @@ public interface Vector<E> extends Coll.VectorType<E> {
 		@Override
 		public E nth(long i) {
 			checkEditable();
-			E[] node = Fn.getNodeArrayFor(_root, _size, _shift, _tail, (int) i, true);
+			E[] node = S.getNodeArrayFor(_root, _size, _shift, _tail, (int) i, true);
 			return node[(int) i & Node.NODE_MASK];
 		}
 
 		@Override
 		public Mutable<E> assoc(Integer idx, E e) {
 			checkEditable();
-			E[] node = Fn.getNodeArrayFor(_root, _size, _shift, _tail, idx, true);
+			E[] node = S.getNodeArrayFor(_root, _size, _shift, _tail, idx, true);
 			node[idx & Node.NODE_MASK] = e;
 			return this;
 		}
@@ -326,15 +326,15 @@ public interface Vector<E> extends Coll.VectorType<E> {
 				return this;
 			}
 
-			E[] newtail = Fn.getNodeArrayFor(_root, _size, _shift, _tail, _size - 2, true);
+			E[] newtail = S.getNodeArrayFor(_root, _size, _shift, _tail, _size - 2, true);
 
-			Node newroot = Fn.popTail(_root, _size, _shift, _root, true);
+			Node newroot = S.popTail(_root, _size, _shift, _root, true);
 			int newshift = _shift;
 			if (newroot == null) {
 				newroot = new Node(_root.edit);
 			}
 			if (_shift > Node.NODE_SHIFT && newroot.array[1] == null) {
-				newroot = Fn.editableNode((Node) newroot.array[0], _root.edit);
+				newroot = S.editableNode((Node) newroot.array[0], _root.edit);
 				newshift -= Node.NODE_SHIFT;
 			}
 			_root = newroot;
@@ -348,7 +348,7 @@ public interface Vector<E> extends Coll.VectorType<E> {
 		@Override
 		public Standard<E> toPersistent() {
 			_root.edit.set(null);
-			return new Standard<>(_meta, _size, _shift, _root, (E[]) Fn.trimTail(_tail, _size));
+			return new Standard<>(_meta, _size, _shift, _root, (E[]) S.trimTail(_tail, _size));
 		}
 
 		@SuppressWarnings("unchecked")
@@ -362,7 +362,7 @@ public interface Vector<E> extends Coll.VectorType<E> {
 		}
 	}
 
-	public class Standard<E> extends Coll.RefType.PT implements Base<E>, I.ToMutable {
+	public class Standard<E> extends Data.RefType.PT implements Base<E>, I.ToMutable {
 
 		// STATIC
 		public final static Standard<Object> EMPTY = new Standard<>(null, 0, Node.NODE_SHIFT, Node.EMPTY, new Object[] {});
@@ -418,7 +418,7 @@ public interface Vector<E> extends Coll.VectorType<E> {
 
 		@Override
 		public E nth(long i) {
-			E[] node = Fn.getNodeArrayFor(_root, _size, _shift, _tail, (int) i, false);
+			E[] node = S.getNodeArrayFor(_root, _size, _shift, _tail, (int) i, false);
 			return node[(int) i & Node.NODE_MASK];
 		}
 
@@ -426,9 +426,9 @@ public interface Vector<E> extends Coll.VectorType<E> {
 		@Override
 		public Standard<E> assoc(Integer i, E val) {
 			if (i >= 0 && i < _size) {
-				return (i >= Fn.tailoff(_size))
-					? new Standard<>(_meta, _size, _shift, _root, (E[]) Fn.newTail(_tail, i, val))
-					: new Standard<>(_meta, _size, _shift, Fn.assoc(_root, _shift, i, val), _tail);
+				return (i >= S.tailoff(_size))
+					? new Standard<>(_meta, _size, _shift, _root, (E[]) S.newTail(_tail, i, val))
+					: new Standard<>(_meta, _size, _shift, S.assoc(_root, _shift, i, val), _tail);
 			}
 			if (i == _size) {
 				return pushLast(val);
@@ -439,9 +439,9 @@ public interface Vector<E> extends Coll.VectorType<E> {
 		@SuppressWarnings("unchecked")
 		@Override
 		public Standard<E> pushLast(E val) {
-			if (_size - Fn.tailoff(_size) < Node.NODE_MAXLEN) {
+			if (_size - S.tailoff(_size) < Node.NODE_MAXLEN) {
 				return new Standard<>(_meta, _size + 1, _shift, _root, 
-										(E[]) Fn.newTailAppend(_tail, val));
+										(E[]) S.newTailAppend(_tail, val));
 			}
 
 			Node new_root;
@@ -450,10 +450,10 @@ public interface Vector<E> extends Coll.VectorType<E> {
 			if ((_size >>> Node.NODE_SHIFT) > (1 << _shift)) {
 				new_root = new Node(_root.edit);
 				new_root.array[0] = _root;
-				new_root.array[1] = Fn.newPath(_root.edit, _shift, _tailnode);
+				new_root.array[1] = S.newPath(_root.edit, _shift, _tailnode);
 				new_shift += Node.NODE_SHIFT;
 			} else {
-				new_root = Fn.pushTail(_root, _size, _shift, _root, _tailnode, false);
+				new_root = S.pushTail(_root, _size, _shift, _root, _tailnode, false);
 			}
 			return new Standard<>(_meta, _size + 1, new_shift, new_root, (E[]) new Object[] { val });
 		}
@@ -465,14 +465,14 @@ public interface Vector<E> extends Coll.VectorType<E> {
 				throw new IllegalStateException("Can't pop empty vector");
 			if (_size == 1)
 				return empty(_meta);
-			if (_size - Fn.tailoff(_size) > 1) {
+			if (_size - S.tailoff(_size) > 1) {
 				E[] newTail = (E[]) new Object[_tail.length - 1];
 				System.arraycopy(_tail, 0, newTail, 0, newTail.length);
 				return new Standard<E>(_meta, _size - 1, _shift, _root, newTail);
 			}
-			E[] newtail = Fn.getNodeArrayFor(_root, _size, _shift, _tail, _size - 2, false);
+			E[] newtail = S.getNodeArrayFor(_root, _size, _shift, _tail, _size - 2, false);
 
-			Node new_root = Fn.popTail(_root, _size, _shift, _root, false);
+			Node new_root = S.popTail(_root, _size, _shift, _root, false);
 			int new_shift = _shift;
 			if (new_root == null) {
 				new_root = Node.EMPTY;

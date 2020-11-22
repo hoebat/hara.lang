@@ -11,7 +11,6 @@ import hara.lang.base.I;
 @SuppressWarnings({"unchecked"})
 class EqTest {
 
-	/*
 	@Test
 	void consConjEquals() {
 		var x = L.cons().cons(1).cons(2);
@@ -26,6 +25,5 @@ class EqTest {
 		
 		assert(((I.Equality) x).equality(y));
 	}
-	*/
 
 }

@@ -2,7 +2,7 @@ package hara.lang.data;
 
 import hara.lang.base.*;
 
-public class Pointer extends Coll.NamespacedType.PT implements Coll.StringType {
+public class Pointer extends Data.NamespacedType.PT implements Data.StringType {
 
 	public Pointer(I.Metadata meta, String ns, String name) {
 		super(meta, ns, name);
