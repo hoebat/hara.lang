@@ -1,4 +1,4 @@
-package hara.lang.module;
+package hara.lang.lib;
 
 import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.ElementType.TYPE;

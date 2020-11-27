@@ -725,7 +725,7 @@ public interface It {
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public static Object[] toArray(Object input, Function<Iterator, Iterator>... pl) {
 		Iterator it = iter(input);
-		return (Object[]) collect(
+		return collect(
 				It::toArray,
 				it,
 				pl);

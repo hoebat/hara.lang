@@ -1,4 +1,4 @@
-package hara.lang.interpreter;
+package hara.lang.lib;
 
 import java.lang.invoke.*;
 import java.lang.reflect.*;

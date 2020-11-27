@@ -1,4 +1,4 @@
-package hara.lang.interpreter;
+package hara.lang.lib;
 
 import java.io.IOException;
 import java.io.PushbackReader;
@@ -12,9 +12,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import hara.lang.base.*;
-import hara.lang.base.Data.MapType;
 import hara.lang.data.*;
-import hara.lang.module.Builtin;
 
 public interface Read {
 
@@ -690,7 +688,7 @@ public interface Read {
 				Object o = read(r, true, null, true, opts);
 				if (o instanceof I.ObjType) {
 					Data.MapType ometa = (Data.MapType) ((I.ObjType) o).meta();
-					ometa = (MapType) Builtin.merge(ometa, meta);
+					ometa = (Data.MapType) Builtin.merge(ometa, meta);
 					return ((I.ObjType) o).withMeta(ometa);
 				} else
 					throw new IllegalArgumentException("Metadata can only be applied to I.ObjTypes");

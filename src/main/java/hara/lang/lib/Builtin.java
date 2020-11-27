@@ -1,4 +1,4 @@
-package hara.lang.module;
+package hara.lang.lib;
 
 import java.math.BigInteger;
 import java.util.Iterator;
@@ -6,12 +6,10 @@ import java.util.Map.Entry;
 import java.util.function.Supplier;
 
 import hara.lang.base.*;
-import hara.lang.base.Data.MapType;
-import hara.lang.base.Fn.H;
 import hara.lang.base.Std.T;
 import hara.lang.data.*;
-import static hara.lang.module.Module.ReduceInit.*;
-import static hara.lang.module.Module.ReduceType.*;
+import static hara.lang.lib.Module.ReduceInit.*;
+import static hara.lang.lib.Module.ReduceType.*;
 
 @SuppressWarnings({ "unchecked", "rawtypes" })
 @Module.Ns(name = "global")
@@ -83,7 +81,7 @@ public interface Builtin {
 	public static  T.Tup3.L tup(Object a, Object b, Object c) {
 		return new T.Tup3.L(null, a, b, c);
 	}
-/*
+
 	@Module.Var(name = "tup")	
 	public static  T.Tup4.L tup(Object a, Object b, Object c, Object d) {
 		return new T.Tup4.L(null, a, b, c, d);
@@ -92,7 +90,7 @@ public interface Builtin {
 	@Module.Var(name = "tup")	
 	public static  T.Tup5.L tup(Object a, Object b, Object c, Object d, Object e) {
 		return new T.Tup5.L(null, a, b, c, d, e);
-	}*/
+	}
 	
 	
 	/*
@@ -305,7 +303,7 @@ public interface Builtin {
 	public static Data.MapType merge(Data.MapType target, Iterator<Entry> it) {
 		return It.reduce(it, target,
 				(m, e) -> {
-					return (MapType) m.assoc(e.getKey(), e.getValue());
+					return (Data.MapType) m.assoc(e.getKey(), e.getValue());
 				});
 	}
 	
@@ -332,7 +330,7 @@ public interface Builtin {
 	@Module.Var(name = "comp")
 	@Module.Fn(vargs = true)
 	public static <F> I.OFn comp(F... fns) {
-		return new H.Comp(fns);
+		return new Fn.H.Comp(fns);
 	}
 
 	//

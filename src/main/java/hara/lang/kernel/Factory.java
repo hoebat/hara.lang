@@ -15,14 +15,13 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import hara.lang.base.*;
-import hara.lang.base.I.Pair;
 import hara.lang.data.List;
 import hara.lang.data.Map;
 import hara.lang.data.Queue;
 import hara.lang.data.Symbol;
 import hara.lang.data.Vector;
-import hara.lang.module.*;
-import hara.lang.module.Module;
+import hara.lang.lib.*;
+import hara.lang.lib.Module;
 
 public interface Factory {
 

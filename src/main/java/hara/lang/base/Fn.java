@@ -1,20 +1,12 @@
 package hara.lang.base;
 
 import java.lang.invoke.MethodHandle;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
-
-import hara.lang.base.Fn.T.Fn0;
-import hara.lang.base.Fn.T.Fn1;
-import hara.lang.base.Fn.T.Fn2;
-import hara.lang.base.Fn.T.Pred1;
-import hara.lang.base.Fn.T.Pred2;
-import hara.lang.base.G.HashType;
 
 public interface Fn {
 
@@ -209,7 +201,7 @@ public interface Fn {
 					var len = args.length;
 					var f = _fns.lookup(len);
 					if(f == null) {
-						throw new Ex.Arity(args.length, "Not Supported");
+						throw new Ex.Arity(args.length, "");
 					}
 					try {
 						return (R) ((MethodHandle)f).invokeWithArguments(Arr.toList(args));
@@ -602,7 +594,7 @@ public interface Fn {
 		return o.hashCode();
 	}
 
-	public static Function<Object, Long> hashFn(HashType t) {
+	public static Function<Object, Long> hashFn(G.HashType t) {
 	
 		switch(t) {
 		case MURMUR3: 
@@ -618,27 +610,27 @@ public interface Fn {
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public static I.Fn toFn(Supplier f) {
-		return new Fn0(f);
+		return new T.Fn0(f);
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public static I.Fn toFn(Function f) {
-		return new Fn1(f);
+		return new T.Fn1(f);
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public static I.Fn toFn(Predicate p) {
-		return new Pred1(p);
+		return new T.Pred1(p);
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public static I.Fn toFn(BiFunction f) {
-		return new Fn2(f);
+		return new T.Fn2(f);
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public static I.Fn toFn(BiPredicate p) {
-		return new Pred2(p);
+		return new T.Pred2(p);
 	}
 
 	@SuppressWarnings({ "rawtypes"})
@@ -675,7 +667,7 @@ public interface Fn {
 		return new T.FnVargs(f);
 	}
 
-	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@SuppressWarnings({ "rawtypes"})
 	public static I.Fn toExact(MethodHandle mh, int num) {
 		return new T.FnExact(mh, num);
 	}

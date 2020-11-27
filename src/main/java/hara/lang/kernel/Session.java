@@ -10,9 +10,9 @@ import java.util.function.*;
 
 import hara.lang.base.*;
 import hara.lang.data.*;
-import hara.lang.interpreter.Read;
-import hara.lang.interpreter.Reflect;
-import hara.lang.module.Builtin;
+import hara.lang.lib.Read;
+import hara.lang.lib.Reflect;
+import hara.lang.lib.Builtin;
 
 public interface Session {
 
