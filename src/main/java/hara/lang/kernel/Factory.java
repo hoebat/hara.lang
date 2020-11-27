@@ -15,13 +15,13 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import hara.lang.base.*;
+import hara.lang.base.Module;
 import hara.lang.data.List;
 import hara.lang.data.Map;
 import hara.lang.data.Queue;
 import hara.lang.data.Symbol;
 import hara.lang.data.Vector;
 import hara.lang.lib.*;
-import hara.lang.lib.Module;
 
 public interface Factory {
 
@@ -120,8 +120,8 @@ public interface Factory {
 		var init = reduceInit(opts.init());
 		switch (opts.type()) {
 		case ARRAY: return Fn.toReduceArray(init, f);
-		case INIT:  return Fn.toReduceArray(init, f);
-		case SELF:  throw new Ex.TODO();
+		case INIT:  return Fn.toReduceInit(init, f);
+		case SELF:  return Fn.toReduceSelf(init, f);
 		default:    throw new Ex.Unsupported();
 		}
 	}
@@ -131,7 +131,7 @@ public interface Factory {
 		return Fn.toVargs(To.function(m));
 	}
 
-	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@SuppressWarnings({ "rawtypes"})
 	public static I.Fn fnExact(Method m, int count) {
 		return Fn.toExact(To.collector(m), count);
 	}

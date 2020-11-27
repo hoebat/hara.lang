@@ -14,7 +14,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public interface Atom<V> {
 
-	public abstract class Struct<R, V> implements Swap<R, V>, I.Reset<V> {
+	public abstract class Struct<R, V> implements Swap<R, V>, I.Reset<V>, I.Display {
 		final AtomicReference<V> _state;
 
 		public Struct(V init) {
@@ -27,7 +27,7 @@ public interface Atom<V> {
 		}
 
 		@Override
-		public boolean compareAndSet(V oldVal, V newVal) {
+		public boolean cas(V oldVal, V newVal) {
 			return _state.compareAndSet(oldVal, newVal);
 		}
 
@@ -35,6 +35,11 @@ public interface Atom<V> {
 		public V reset(V newVal) {
 			_state.set(newVal);
 			return newVal;
+		}
+
+		@Override
+		public String display() {
+			return "#atom [" + _state.get() + "]";
 		}
 	}
 
@@ -86,14 +91,14 @@ public interface Atom<V> {
 	
 	public interface Swap<R, V> extends I.Watch<R, V>, I.Validate<V>, I.Deref<V> {
 		
-		boolean compareAndSet(V oldVal, V newVal);
+		boolean cas(V oldVal, V newVal);
 
 		default Object swap(Function<V, V> f) {
 			for (;;) {
 				var v = deref();
 				var newVal = f.apply(v);
 				validate(newVal);
-				if (compareAndSet(v, newVal)) {
+				if (cas(v, newVal)) {
 					notifyWatches(v, newVal);
 					return newVal;
 				}
@@ -105,7 +110,7 @@ public interface Atom<V> {
 				var v = deref();
 				var newVal = f.apply(v, arg);
 				validate(newVal);
-				if (compareAndSet(v, newVal)) {
+				if (cas(v, newVal)) {
 					notifyWatches(v, newVal);
 					return newVal;
 				}
@@ -117,7 +122,7 @@ public interface Atom<V> {
 				var v = deref();
 				var newVal = f.apply(v, vargs);
 				validate(newVal);
-				if (compareAndSet(v, newVal)) {
+				if (cas(v, newVal)) {
 					notifyWatches(v, newVal);
 					return newVal;
 				}

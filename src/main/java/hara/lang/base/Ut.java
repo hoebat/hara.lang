@@ -41,7 +41,7 @@ public interface Ut {
 		}
 	}
 	
-	public class Flag implements I.Deref<Boolean>, I.Reset<Boolean> {
+	public class Flag implements I.Deref<Boolean>, I.Reset<Boolean>, I.Display {
 		private boolean _val;
 		
 		public Flag(boolean val) {
@@ -57,9 +57,14 @@ public interface Ut {
 		public Boolean deref() {
 			return _val;
 		}
+		
+		@Override
+		public String display() {
+			return "#flag [" + _val + "]";
+		}
 	}
 
-	public class Counter implements I.Deref<Integer>, I.Reset<Integer> {
+	public class Counter implements I.Deref<Integer>, I.Reset<Integer>, I.Display {
 
 		private int _c;
 
@@ -91,6 +96,11 @@ public interface Ut {
 		@Override
 		public Integer deref() {
 			return _c;
+		}
+		
+		@Override
+		public String display() {
+			return "#counter [" + _c + "]";
 		}
 	}
 
@@ -136,7 +146,7 @@ public interface Ut {
 		}
 	}
 
-	public final class Volatile<V> implements I.Deref<V>, I.Reset<V> {
+	public final class Volatile<V> implements I.Deref<V>, I.Reset<V>, I.Display {
 
 		public volatile V _val;
 
@@ -152,6 +162,11 @@ public interface Ut {
 		@Override
 		public V reset(V newval) {
 			return _val = newval;
+		}
+
+		@Override
+		public String display() {
+			return "#volatile [" + _val + "]";
 		}
 
 	}
@@ -550,19 +565,6 @@ public interface Ut {
 		 */
 		public static long rotateLeft(long value, int shift) {
 			return (value << shift) | value >>> (64 - shift);
-		}
-	}
-
-	public final class Reduced<V> implements I.Deref<V>{
-		V _val;
-	
-		public Reduced(V val){
-			_val = val;
-		}
-	
-		@Override
-		public V deref(){
-			return _val;
 		}
 	}
 }

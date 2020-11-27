@@ -58,29 +58,10 @@ public interface Session {
 		}
 	}
 
-	public class Global implements Data.EnvType {
+	public class GlobalEnv implements Data.EnvType {
 		
 		public static Map.Standard<Symbol, Var> methods = 
 			Factory.loadModule(Builtin.class);
-		
-		/*
-		public static Map.Standard<Symbol, Data.VarType> methods 
-			= Builtin.hashMap(new Object[] {
-				Builtin.symbol("+"), new Var("+", Fn.toReduceInit(0, Builtin::add)),
-				Builtin.symbol("-"), new Var("-", Fn.toReduceArray(0, Builtin::minus)),
-				Builtin.symbol("*"), new Var("*", Fn.toReduceInit(1, Builtin::multiply)),
-				Builtin.symbol("/"), new Var("/", Fn.toReduceArray(1, Builtin::divide)),
-				Builtin.symbol("list"), new Var("list", Fn.toVargs(Builtin::list)),
-				Builtin.symbol("vector"), new Var("vector", Fn.toVargs(Builtin::vector)),
-				Builtin.symbol("vec"), new Var("vec", Fn.toFn(Builtin::vec)),
-				Builtin.symbol("hashmap"), new Var("hashmap", Fn.toVargs(Builtin::hashMap)),
-				Builtin.symbol("hashset"), new Var("hashset", Fn.toVargs(Builtin::hashSet)),
-				Builtin.symbol("pair"), new Var("pair", Fn.toFn(Builtin::pair)),
-				Builtin.symbol("type"), new Var("type", Fn.toFn(Builtin::type)),
-				//Builtin.symbol("merge"), new Var("merge", Fn.toFn(Builtin::merge)),
-				//Builtin.symbol("flag"), new Var("flag", Fn.toFn(Builtin::flag)),
-			});
-		*/
 
 		@Override
 		public Data.EnvType getParent() {
@@ -93,20 +74,43 @@ public interface Session {
 		}
 	}
 	
+	public class RTEnv implements Data.EnvType {
+		
+		final Data.EnvType _parent;
+		final RT _rt;
+		
+		public RTEnv(Data.EnvType parent, RT rt) {
+			_parent = parent;
+			_rt = rt;
+		}
+		
+		@Override
+		public Data.EnvType getParent() {
+			return _parent;
+		}
+
+		@SuppressWarnings("unchecked")
+		@Override
+		public Map.Standard<Symbol, Var> getMap() {
+			return Map.Standard.EMPTY;
+		}		
+	}
+	
 	@SuppressWarnings("rawtypes")
 	public class RT implements I.Context {
 		public final Foundation _F;
 		public final String _key;
 		public final Loader _loader;
-		public final Global _env;
+		public final Data.EnvType _global;
+		public final Data.EnvType _env;
 		public Ut.RefCache<String, Class> REGISTRY;
-		
 		
 		public RT(Foundation F, String key) {
 			_F = F;
 			_key = key;
 			_loader = new Loader();
-			_env = new Global();
+			_global = new GlobalEnv();
+			_env = new RTEnv(_global, this);
 		}
 
 		@Override
@@ -239,24 +243,46 @@ public interface Session {
 	}
 
 	public interface Eval {
-	
+
 		@SuppressWarnings({ "rawtypes", "unchecked" })
-		public static Object apply(Object f, Object[] elems) {
+		public static Object apply(Object f, Iterator it) {
 			if (f instanceof I.Fn) {
-				return ((I.Fn) f).apply(elems);
+				return ((I.Fn) f).apply(it);
 			} else if (f instanceof Supplier) {
 				return ((Supplier) f).get();
 			} else if (f instanceof Consumer) {
-				((Consumer) f).accept(elems[0]);
+				((Consumer) f).accept(it.next());
 				return null;
 			} else if (f instanceof Predicate) {
-				return ((Predicate) f).test(elems[0]);
+				return ((Predicate) f).test(it.next());
 			} else if (f instanceof Function) {
-				return ((Function) f).apply(elems[0]);
+				return ((Function) f).apply(it.next());
 			} else if (f instanceof BiFunction) {
-				return ((BiFunction) f).apply(elems[0], elems[1]);
+				return ((BiFunction) f).apply(it.next(), it.next());
 			} else if (f instanceof BiPredicate) {
-				return ((BiPredicate) f).test(elems[0], elems[1]);
+				return ((BiPredicate) f).test(it.next(), it.next());
+			} else {
+				throw new Ex.Unsupported();
+			}
+		}
+		
+		@SuppressWarnings({ "rawtypes", "unchecked" })
+		public static Object apply(Object f, Object[] arr) {
+			if (f instanceof I.Fn) {
+				return ((I.Fn) f).apply(arr);
+			} else if (f instanceof Supplier) {
+				return ((Supplier) f).get();
+			} else if (f instanceof Consumer) {
+				((Consumer) f).accept(arr[0]);
+				return null;
+			} else if (f instanceof Predicate) {
+				return ((Predicate) f).test(arr[0]);
+			} else if (f instanceof Function) {
+				return ((Function) f).apply(arr[0]);
+			} else if (f instanceof BiFunction) {
+				return ((BiFunction) f).apply(arr[0], arr[1]);
+			} else if (f instanceof BiPredicate) {
+				return ((BiPredicate) f).test(arr[0], arr[1]);
 			} else {
 				throw new Ex.Unsupported();
 			}
@@ -281,28 +307,26 @@ public interface Session {
 				if (fst == Symbol.create(".")) {
 					return evalReflect(ast, env);
 				} else {
-					Var v = (Var) env.getMap().lookup((Symbol) fst);
+					Var v = (Var) env.find((Symbol) fst);
 					if (v == null) {
 						throw new Ex.Runtime("Not found: " + Builtin.prStr(fst));
 					}
 					if (v.isMacro()) {
 						f = v.deref();
-						var ret = apply(f, It.toArray(ast, (Function)It.drop(1)));
+						var ret = apply(f, Arr.toArray((List)ast.popFirst()));
 						return eval(ret, env);
 					}
 				}
 			}
 	
-			ArrayList elems = It.toArrayList(
-					ast,
-					(Function)It.map(obj -> eval(obj, env)));
-			return apply(elems.get(0), It.toArray(elems, (Function)It.drop(1)));
+			Object[] arr =  Arr.map((Function)obj -> eval(obj, env), Object.class, Arr.toArray(ast));
+			return apply(arr[0], Arr.toIter(arr, 1, arr.length));
 		}
 	
 		@SuppressWarnings({ "rawtypes", "unchecked", "unused" })
 		public static Object eval(Object ast, Data.EnvType env) {
 			if (ast instanceof Symbol) {
-				Var v = (Var) env.getMap().lookup((Symbol) ast);
+				Var v = (Var) env.find((Symbol) ast);
 				if (v.isMacro()) {
 					throw new Ex.Runtime("Cannot return a macro value");
 				} else if (v != null) {
@@ -317,8 +341,8 @@ public interface Session {
 						eval(e.getKey(), env),
 						eval(e.getValue(), env));
 				return Builtin.hashMap(It.toArray(ast, (Function)It.mapcat(mf)));
-			} else if (ast instanceof I.Coll) {
-				return It.toArray(ast, (Function)It.map(obj -> eval(obj, env)));
+			} else if (ast instanceof Data.LinearType) {
+				return Builtin.vector(It.toArray(ast, (Function)It.map(obj -> eval(obj, env))));
 			} else {
 				return ast;
 			}

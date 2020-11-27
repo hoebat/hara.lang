@@ -556,12 +556,12 @@ public interface Data {
 		
 		@Override
 		default String startString() {
-			return "(";
+			return "[";
 		}
 
 		@Override
 		default String endString() {
-			return ")";
+			return "]";
 		}
 	}
 
@@ -575,10 +575,21 @@ public interface Data {
 		Boolean isMacro();
 	}
 
-	public interface EnvType {
+	public interface EnvType extends I.Find<Symbol, VarType> {
 		EnvType getParent();
 
 		MapType<Symbol, ? extends VarType> getMap();
+		
+		default VarType find(Symbol s) {
+			VarType v = getMap().lookup(s);
+			if(v == null) {
+				EnvType env = getParent();
+				if(env != null) {
+					return env.find(s);
+				}
+			}
+			return v;
+		}
 	}
 
 }

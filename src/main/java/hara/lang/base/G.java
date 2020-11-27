@@ -33,6 +33,8 @@ public interface G {
 			return It.display(((java.util.List)e).iterator());
 		} else if (e instanceof Iterator){
 			return It.display((Iterator)e);
+		} else if (e.getClass().isArray()){
+			return It.display(Arr.toIter(e));
 		} else {
 			return e.toString();
 		}

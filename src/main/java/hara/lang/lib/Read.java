@@ -12,6 +12,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import hara.lang.base.*;
+import hara.lang.base.Data.VectorType;
 import hara.lang.data.*;
 
 public interface Read {
@@ -688,6 +689,7 @@ public interface Read {
 				Object o = read(r, true, null, true, opts);
 				if (o instanceof I.ObjType) {
 					Data.MapType ometa = (Data.MapType) ((I.ObjType) o).meta();
+					
 					ometa = (Data.MapType) Builtin.merge(ometa, meta);
 					return ((I.ObjType) o).withMeta(ometa);
 				} else
@@ -695,12 +697,16 @@ public interface Read {
 			}
 		}
 
-		public static class VectorReader implements BiFunction<PushbackReader, Map, Vector> {
+		public static class VectorReader implements BiFunction<PushbackReader, Map, Data.LinearType> {
 			@Override
-			public Vector apply(PushbackReader r, Map opts) {
+			public Data.LinearType apply(PushbackReader r, Map opts) {
 				ArrayList list = readDelimitedList(']', r, true, opts);
-
-				return Builtin.vector(list.toArray());
+				
+				if(list.size() > 5) {
+					return Builtin.vector(list.toArray());
+				} else {
+					return Builtin.tup(list.toArray());
+				}
 			}
 		}
 

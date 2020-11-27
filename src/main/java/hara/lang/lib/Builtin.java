@@ -1,15 +1,18 @@
 package hara.lang.lib;
 
+import static hara.lang.base.Module.ReduceInit.*;
+import static hara.lang.base.Module.ReduceType.*;
+
 import java.math.BigInteger;
 import java.util.Iterator;
 import java.util.Map.Entry;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import hara.lang.base.*;
+import hara.lang.base.Module;
 import hara.lang.base.Std.T;
 import hara.lang.data.*;
-import static hara.lang.lib.Module.ReduceInit.*;
-import static hara.lang.lib.Module.ReduceType.*;
 
 @SuppressWarnings({ "unchecked", "rawtypes" })
 @Module.Ns(name = "global")
@@ -42,7 +45,17 @@ public interface Builtin {
 	public static Object divide(Object x, Object y) {
 		return Num.divide(x, y);
 	}
-
+	
+	@Module.Var(name = "inc")
+	public static Object inc(Object x) {
+		return Num.add(x, 1);
+	}
+	
+	@Module.Var(name = "dec")
+	public static Object dec(Object x) {
+		return Num.minus(x, 1);
+	}
+	
 	//
 	// Print
 	//
@@ -92,10 +105,7 @@ public interface Builtin {
 		return new T.Tup5.L(null, a, b, c, d, e);
 	}
 	
-	
-	/*
-	@Module.Fn(vargs = true)	
-	public static Object tup(Object[] xs) {
+	public static Data.LinearType tup(Object[] xs) {
 		switch(xs.length) {
 		case 0: return T.Tup0.EMPTY;
 		case 1: return new T.Tup1.L(null, xs[0]);
@@ -103,10 +113,9 @@ public interface Builtin {
 		case 3: return new T.Tup3.L(null, xs[0], xs[1], xs[2]);
 		case 4: return new T.Tup4.L(null, xs[0], xs[1], xs[2], xs[3]); 
 		case 5: return new T.Tup5.L(null, xs[0], xs[1], xs[2], xs[3], xs[4]);
-		default: return list(xs);
+		default: throw new Ex.Arity(xs.length, "");
 		}
 	}
-	*/
 
 	@Module.Var(name = "atom")
 	public static <V> Atom.Standard<V> atom(V val) {
@@ -144,8 +153,12 @@ public interface Builtin {
 
 	@Module.Var(name = "vector")
 	@Module.Fn(vargs = true)
-	public static Vector.Standard vector(Object[] elements) {
-		return Vector.Standard.from(null, elements);
+	public static Data.LinearType vector(Object[] elements) {
+		if(elements.length > 5) {
+			return Vector.Standard.from(null, elements);
+		} else {
+			return tup(elements);
+		}
 	}
 
 	@Module.Var(name = "vec")
@@ -289,7 +302,7 @@ public interface Builtin {
 	}
 
 	//
-	// Collection
+	// Merge
 	//
 	
 	public static java.util.Map merge(java.util.Map target, Iterator<Entry> it) {
@@ -310,7 +323,9 @@ public interface Builtin {
 	@Module.Var(name = "merge")
 	@Module.Reduce(type=ARRAY, init=EMPTY_MAP)
 	public static Object merge(Object target, Object other) {
-		if(target instanceof java.util.Map) {
+		if (target == null) {
+			return other;
+	    } else if(target instanceof java.util.Map) {
 			return merge((java.util.Map)target, It.iter(other));
 		} else if (target instanceof Data.MapType) {
 			return merge((Data.MapType)target, It.iter(other));
@@ -318,6 +333,45 @@ public interface Builtin {
 			throw new Ex.Unsupported();
 		}
 	}
+	
+	//
+	// Array
+	//
+
+
+	@Module.Var(name = "cons")
+	@Module.Reduce(type=SELF, init=EMPTY_LIST)
+	public static Object cons(Object target, Object e) {
+		if (target instanceof I.Cons) {
+			return ((I.Cons) target).cons(e);
+		} else if (target instanceof java.util.List) {
+			((java.util.List) target).add(0, e);;
+			return target;
+		} else {
+			throw new Ex.Unsupported();
+		}
+	}
+	
+	@Module.Var(name = "conj")
+	@Module.Reduce(type=SELF, init=EMPTY_VECTOR)
+	public static Object conj(Object target, Object e) {
+		if (target instanceof I.Coll) {
+			return ((I.Coll) target).conj(e);
+		} else if (target instanceof java.util.List) {
+			((java.util.List) target).add(e);
+			return target;
+		} else if (target instanceof java.util.Map) {
+			var entry = (Entry)e;
+			((java.util.Map) target).put(entry.getKey(), entry.getValue());
+			return target;
+		} else if (target instanceof java.util.Set) {
+			((java.util.Set) target).add(e);
+			return target;
+		} else {
+			throw new Ex.Unsupported();
+		}
+	}
+	
 
 	@Module.Var(name = "bench:fn")
 	public static long bench(Supplier f) {
@@ -329,8 +383,8 @@ public interface Builtin {
 
 	@Module.Var(name = "comp")
 	@Module.Fn(vargs = true)
-	public static <F> I.OFn comp(F... fns) {
-		return new Fn.H.Comp(fns);
+	public static <F> I.OFn comp(Object fns) {
+		return new Fn.H.Comp(Arr.toArray(fns));
 	}
 
 	//
@@ -412,5 +466,80 @@ public interface Builtin {
 	@Module.Var(name = "equals")
 	public static boolean equals(Object k1, Object k2) {
 		return (k1 == k2) ? true : (k1 != null && k1.equals(k2));
+	}
+	
+	@Module.Var(name = "=")
+	public static boolean equivalent(Object k1, Object k2) {
+		return Eq.eq(k1, k2);
+	}
+
+	@Module.Var(name = "range")
+	public static Iterator<Long> range(Long max) {
+		return It.range(max);
+	}
+	
+	@Module.Var(name = "range")
+	public static Iterator<Long> range(Long min, Long max) {
+		return It.range(min, max);
+	}
+	
+	@Module.Var(name = "map")
+	public static Iterator map(Object f, Object source) {
+		var it  = It.iter(source);
+		I.Fn fn = Fn.toFn(f);
+		return It.from(it::hasNext, () -> fn.invoke(it.next()));
+	}
+
+	@Module.Var(name = "map")
+	public static I.Fn<Iterator, Iterator, Object> map(Object f) {
+		return Fn.toFn((Function)(source) -> map(f, source));
+	}
+	
+	/*
+	@Module.Var(name = "stream")
+	public static Iterator stream(Object source, Object f) {
+		var it = It.iter(source);
+		return (Iterator) Fn.toFn(f).invoke(it);
+	}
+
+	@Module.Var(name = "stream")
+	*/
+
+	@Module.Var(name = "objects")
+	@Module.Fn(vargs = true)
+	public static Object[] arr(Object vargs) {
+		return Arr.toArray(vargs);
+	}
+	
+	@Module.Var(name = "pipe")
+	@Module.Fn(vargs = true)
+	public static Function<Iterator, Iterator> pipe(Object vargs) {
+		Object[] pl = Arr.toArray(vargs);
+		I.Fn[] fns = (I.Fn[])Arr.map((Function)Fn::toFn, I.Fn.class, pl);
+		return (it) -> Arr.reduce((i, f) -> (Iterator)f.invoke(i), it, fns);
+	}
+
+	public static Object apply(I.Fn f, Iterator it) {
+		return f.apply(Arr.toArray(it));
+	}
+	
+	@Module.Var(name = "apply")
+	@Module.Fn(vargs = true)
+	public static Object apply(Object vargs) {
+		Object[] args = Arr.toArray(vargs);
+		I.Fn f = Fn.toFn(args[0]);
+		var lit = It.iter(args[args.length - 1]);
+		return apply(f, It.concat(Arr.toIter(args, 1, args.length - 1), lit));
+	}
+	
+	@Module.Var(name = "call")
+	@Module.Fn(vargs = true)
+	public static Object call(Object vargs) {
+		Object[] args = Arr.toArray(vargs);
+		G.prn(args[1], args[1].getClass().getSuperclass());
+		I.Fn f = Fn.toFn(args[1]);
+		return apply(f, It.concat(
+				It.objects(args[0]),
+				It.drop(Arr.toIter(args), 2)));
 	}
 }

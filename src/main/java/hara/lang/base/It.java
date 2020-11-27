@@ -238,8 +238,11 @@ public interface It {
 	}
 
 	@SuppressWarnings("rawtypes")
+	@Module.Var(name = "iter")
 	public static Iterator iter(Object obj) {
-		if(obj instanceof Iterable) {
+		if(obj == null) {
+			return Nil.ITERATOR;
+		} else if(obj instanceof Iterable) {
 			return ((Iterable)obj).iterator();
 		} else if (obj instanceof Iterator) {
 			return (Iterator)obj;
@@ -318,32 +321,6 @@ public interface It {
 		return true;
 	}
 
-	public static <E> Iterator<E> fromLookup(Data.SequentialLookupType<E> vec) {
-
-		return new Iterator<E>() {
-			long _cnt = vec.count();
-			long _i = 0;
-
-			@Override
-			public boolean hasNext() {
-				return _i < _cnt;
-			}
-
-			@Override
-			public E next() {
-				if (_i < _cnt)
-					return vec.nth(_i++);
-				else
-					throw new NoSuchElementException();
-			}
-
-			@Override
-			public void remove() {
-				throw new UnsupportedOperationException();
-			}
-		};
-	}
-
 	//
 	// Collect
 	//
@@ -372,43 +349,39 @@ public interface It {
 		return term.apply(stream(it, pl));
 	}
 
-	/*
-	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public static <R> Function<Iterator, R> collect(
-			Function<Iterator, R> term,
-			Function<Iterator, Iterator>... pl) {
-		return it -> collect(term, it, pl);
-	}*/
 
 	//
 	// Stream
 	//
-	
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public static  <E, R> Iterator<R> stream(
 			Iterator<E> it, 
 			Function<Iterator, Iterator>... fns) {
 		return (Iterator<R>) Arr.reduce((itr, f) -> f.apply(itr), it, fns);
 	}
-	
-	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public static <E, R> Iterator<R> stream(
-			E[] array,
-			Function<Iterator, Iterator>... fns) {
-		return (Iterator<R>) Arr.reduce((itr, f) -> f.apply(itr), from(array), fns);
-	}
-
-	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public static <E, R> Iterator<R> stream(
-			Iterable<E> coll,
-			Function<Iterator, Iterator>... fns) {
-		return (Iterator<R>) Arr.reduce((itr, f) -> f.apply(itr), coll.iterator(), fns);
-	}
 
 	//
 	// Reduce
 	//
 
+
+	public static <E> E reduce(Iterator<E> it, BiFunction<E, E, E> f) {
+		var _acc = it.next();
+		while (it.hasNext()) {
+			_acc = f.apply(_acc, it.next());
+		}
+		return _acc;
+	}
+
+	public static <E> E reduce(Iterator<E> it, BiFunction<E, E, E> f, Supplier<Boolean> end) {
+		var _acc = it.next();
+		while (it.hasNext()) {
+			_acc = f.apply(_acc, it.next());
+			if(end.get()) { return _acc; }
+		}
+		return _acc;
+	}
+	
 	public static <E, R> R reduce(Iterator<E> it, R init, BiFunction<R, E, R> f) {
 		var _acc = init;
 		while (it.hasNext()) {
@@ -416,7 +389,7 @@ public interface It {
 		}
 		return _acc;
 	}
-
+	
 	public static <E, R> R reduce(Iterator<E> it, R init, BiFunction<R, E, R> f, Supplier<Boolean> end) {
 		var _acc = init;
 		while (it.hasNext()) {
@@ -426,17 +399,10 @@ public interface It {
 		return _acc;
 	}
 
-	public static <E, R> Function<Iterator<E>, R> reduce(R init, BiFunction<R, E, R> f) {
-		return it -> reduce(it, init, f);
-	}
-
-	public static <E, R> Function<Iterator<E>, R> reduce(R init, BiFunction<R, E, R> f, Supplier<Boolean> end) {
-		return it -> reduce(it, init, f, end);
-	}
-
 	//
 	// Map
 	//
+
 
 	public static <E, R> Function<Iterator<E>, Iterator<R>> map(Function<E, R> f) {
 		return (it) -> map(it, f);
@@ -444,6 +410,14 @@ public interface It {
 	
 	public static <E, R> Iterator<R> map(Iterator<E> it, Function<E, R> f) {
 		return from(it::hasNext, () -> f.apply(it.next()));
+	}
+	
+	public static <E> Consumer<Iterator<E>> each(Consumer<E> f) {
+		return (it) -> it.forEachRemaining(f);
+	}
+	
+	public static <E> void each(Iterator<E> it, Consumer<E> f) {
+		it.forEachRemaining(f);
 	}
 
 
@@ -480,8 +454,6 @@ public interface It {
 			}
 		};
 	}
-
-	
 
 	//
 	// Filter
@@ -608,6 +580,10 @@ public interface It {
 	//
 	// Range
 	//
+	
+	public static Iterator<Long> range(long max) {
+		return range(0, max);
+	}
 
 	public static Iterator<Long> range(long min, long max) {
 		return new Iterator<Long>() {
@@ -893,6 +869,21 @@ public interface It {
 			}
 		}
 		return false;
+	}
+	
+
+	public static <E> Function<Iterator<E>, E> some(Predicate<? super E> pred) {
+		return it -> some(it, pred);
+	}
+
+	public static <E> E some(Iterator<E> it, Predicate<? super E> pred) {
+		while (it.hasNext()) {
+			var e = it.next();
+			if (pred.test(e)) {
+				return e;
+			}
+		}
+		return null;
 	}
 
 	public static <E> Iterator<E> iterate(E seed, Function<? super E, ? extends E> f) {

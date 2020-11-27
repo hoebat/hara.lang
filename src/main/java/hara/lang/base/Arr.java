@@ -8,6 +8,8 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
+import hara.lang.base.I.Fn;
+
 public interface Arr {
 	
 	public static boolean[] booleans(boolean... arr) {
@@ -103,10 +105,19 @@ public interface Arr {
 		public class ToIter<E> implements Iterator<E> {
 			final E[] _array;
 			int _i;
-		
+			int _end;
+
+			
+			public ToIter(E[] array, int i, int end) {
+				_i = i;
+				_array = array;
+				_end = end;
+			}
+			
 			public ToIter(E[] array, int i) {
 				_i = i;
 				_array = array;
+				_end = array.length;
 			}
 		
 			@SuppressWarnings("unchecked")
@@ -117,12 +128,12 @@ public interface Arr {
 
 			@Override
 			public boolean hasNext() {
-				return _array != null && _i < _array.length;
+				return _array != null && _i < _end;
 			}
 		
 			@Override
 			public E next() {
-				if (_array != null && _i < _array.length)
+				if (_array != null && _i < _end)
 					return _array[_i++];
 				throw new java.util.NoSuchElementException();
 			}
@@ -382,6 +393,16 @@ public interface Arr {
 			}
 		}
 	}
+	
+	public static Object[] toArray(Object obj) {
+		if(obj instanceof Iterator) {
+			return It.toArray((Iterator<?>)obj);
+		} else if (obj.getClass().isArray()) {
+			return (Object[])obj;
+		} else {
+			return It.toArray(It.iter(obj));
+		}
+	}
 
 	@SuppressWarnings("rawtypes")	
 	public static Iterator toRevIter(Object[] array) {
@@ -436,6 +457,13 @@ public interface Arr {
 		return new T.ToIter<E>(array, 0);
 	}
 
+	@SuppressWarnings({"unchecked" })
+	public static <E> Iterator<E> toIter(E[] array, int start, int end) {
+		if (array == null || array.length == 0)
+			return (Iterator<E>) It.emptyIterator();
+		return new T.ToIter<E>(array, start, end);
+	}
+
 
 	  public static void checkPosition(int start, int end, int size) {
 	    if (start < 0 || end < start || end > size) {
@@ -469,10 +497,9 @@ public interface Arr {
 		return array;
 	}
 	
-	@SuppressWarnings("unchecked")
-	public static <E, R> R[] map(Function<E, R> f, Class<E> type, E[] array) {
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public static <E, R> R[] map(Function<E, R> f, Class type, E[] array) {
 		var out = (R[]) Array.newInstance(type, array.length);
-		return (R[]) fillArray(toIter(array), out);
+		return (R[]) fillArray(It.map(toIter(array), f), out);
 	}
-
 }
