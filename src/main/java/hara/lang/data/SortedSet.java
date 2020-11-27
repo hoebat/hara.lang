@@ -1,0 +1,140 @@
+package hara.lang.data;
+
+import java.util.Iterator;
+
+import hara.lang.base.*;
+
+public interface SortedSet<E> extends Data.SetType<E> {
+	
+	public interface Base<E> extends SortedSet<E> {
+		
+		public SortedMap<E, E> _lookup();
+		
+		@Override
+		default Iterator<E> iterator() {
+			return _lookup().keys();
+		}
+
+		@Override
+		default long count() {
+			return _lookup().count();
+		}
+
+
+		@Override
+		default E find(E key) {
+			var rec = _lookup().find(key);
+			return (rec == null) ? null : rec.getValue();
+		}
+	}
+
+	public class Mutable<E>  extends Data.RefType.MT 
+		implements Base<E>, I.ToPersistent {
+		
+		private SortedMap.Mutable<E, E> _lookup;
+		
+
+		public Mutable(I.Metadata meta) {
+			super(meta);
+			_lookup = new SortedMap.Mutable<E, E>(meta);
+		}
+
+		public Mutable(I.Metadata meta, SortedMap.Mutable<E, E> lookup) {
+			super(meta);
+			_lookup = lookup;
+		}
+
+		@SuppressWarnings("unchecked")
+		public static <E> Mutable<E> from(I.Metadata meta, E... objs) {
+			Mutable<E> mut = new Mutable<E>(meta);
+			return Arr.reduce((arr, e) -> arr.conj(e) , mut, objs);
+		}
+
+		@Override
+		public Mutable<E> conj(E e) {
+			_lookup.assoc(e, e);
+			return this;
+		}
+
+		@Override
+		public Mutable<E> empty() {
+			_lookup.empty();
+			return this;
+		}
+
+		@Override
+		public Mutable<E> dissoc(E k) {
+			_lookup.dissoc(k);
+			return this;
+		}
+
+		@Override
+		public Standard<E> toPersistent() {
+			return new Standard<E>(_meta, _lookup.toPersistent());
+		}
+
+		@Override
+		public SortedMap<E, E> _lookup() {
+			return _lookup;
+		}
+		
+	}
+	
+	public class Standard<E>  extends Data.RefType.PT 
+		implements Base<E>, I.ToMutable {
+
+		private final SortedMap.Standard<E, E> _lookup;
+
+		@SuppressWarnings("rawtypes")
+		public static Standard EMPTY = new Standard(null);
+		
+		@SuppressWarnings("unchecked")
+		public Standard(I.Metadata meta) {
+			super(meta);
+			_lookup = SortedMap.Standard.EMPTY;
+		}
+		
+		public Standard(I.Metadata meta, SortedMap.Standard<E, E> lookup) {
+			super(meta);
+			_lookup = lookup;
+		}
+
+		@Override
+		public Standard<E> conj(E e) {
+			return new Standard<E>(_meta, _lookup.assoc(e, e));
+		}
+
+		@SuppressWarnings("unchecked")
+		public static <E> Standard<E> from(I.Metadata meta, E... elements){
+			return Mutable.from(meta, elements).toPersistent();
+		}
+
+		@SuppressWarnings("unchecked")
+		@Override
+		public Standard<E> empty() {
+			return (_meta == null) ? EMPTY : EMPTY.withMeta(_meta);
+		}
+
+		@Override
+		public Standard<E> withMeta(I.Metadata meta) {
+			return (_meta == meta) ? this : new Standard<E>(meta, _lookup);
+		}
+
+		@Override
+		public Standard<E> dissoc(E k) {
+			var nlookup = _lookup.dissoc(k);
+			return (nlookup == _lookup) ? this : new Standard<E>(_meta, nlookup);
+		}
+
+		@Override
+		public Mutable<E> toMutable() {
+			return new Mutable<E>(_meta, _lookup.toMutable());
+		}
+		
+		@Override
+		public SortedMap<E, E> _lookup() {
+			return _lookup;
+		}
+		
+	}
+}
