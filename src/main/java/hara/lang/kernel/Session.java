@@ -9,6 +9,8 @@ import java.util.Map.Entry;
 import java.util.function.*;
 
 import hara.lang.base.*;
+import hara.lang.base.Module;
+import hara.lang.base.Ut.RefCache;
 import hara.lang.data.*;
 import hara.lang.lib.Read;
 import hara.lang.lib.Reflect;
@@ -39,12 +41,12 @@ public interface Session {
 
 		@Override
 		public Boolean isDynamic() {
-			return (Boolean) ((Map)_meta).lookup(Builtin.keyword("dynamic"), false);
+			return (Boolean) ((Map)_meta).lookup(Builtin.Basic.keyword("dynamic"), false);
 		}
 
 		@Override
 		public Boolean isMacro() {
-			return (Boolean) ((Map)_meta).lookup(Builtin.keyword("macro"), false);
+			return (Boolean) ((Map)_meta).lookup(Builtin.Basic.keyword("macro"), false);
 		}
 
 		@Override
@@ -58,10 +60,23 @@ public interface Session {
 		}
 	}
 
-	public class GlobalEnv implements Data.EnvType {
+	public class StaticEnv implements Data.EnvType {
 		
-		public static Map.Standard<Symbol, Var> methods = 
-			Factory.loadModule(Builtin.class);
+		@SuppressWarnings({ "unchecked", "rawtypes" })
+		public static Map.Standard<Symbol, Var> methods =
+			It.reduce(
+				It.objects(
+						Factory.loadModule(Builtin.Basic.class),
+						Factory.loadModule(Builtin.Collection.class),
+						Factory.loadModule(Builtin.Java.class),
+						Factory.loadModule(Builtin.Lambda.class),
+						Factory.loadModule(Builtin.Ops.class),
+						Factory.loadModule(Builtin.Structure.class),
+						Factory.loadModule(Builtin.Time.class),
+						Factory.loadModule(Builtin.Util.class)),
+				null,
+				(a, b) -> (Map.Standard)Builtin.Collection.merge((Map)a, (Map)b));
+			
 
 		@Override
 		public Data.EnvType getParent() {
@@ -79,6 +94,8 @@ public interface Session {
 		final Data.EnvType _parent;
 		final RT _rt;
 		
+
+
 		public RTEnv(Data.EnvType parent, RT rt) {
 			_parent = parent;
 			_rt = rt;
@@ -109,7 +126,7 @@ public interface Session {
 			_F = F;
 			_key = key;
 			_loader = new Loader();
-			_global = new GlobalEnv();
+			_global = new StaticEnv();
 			_env = new RTEnv(_global, this);
 		}
 
@@ -117,6 +134,18 @@ public interface Session {
 		public Object call(Object... args) {
 			System.out.println("CALLED: " + args);
 			return null;
+		}
+
+		public Foundation getFoundation() {
+			return _F;
+		}
+		
+		public Loader getClassLoader() {
+			return _loader;
+		}
+
+		public Ut.RefCache<String, Class> getClassRegistry() {
+			return REGISTRY;
 		}
 		
 		@SuppressWarnings("unchecked")
@@ -156,10 +185,17 @@ public interface Session {
 					}));	
 		}
 		
-		public Object eval(String input) {
-			var ast = Read.LispReader.readString(input, null);
-			var out = Eval.eval(ast, _env);
-			return out;
+		public <AST> Object eval(AST input) {
+			return Eval.eval(input, _env);
+		}
+		
+		@SuppressWarnings("unchecked")
+		public <AST> AST readString(String input) {
+			return (AST) Read.LispReader.readString(input, null);
+		}
+		
+		public Object evalString(String input) {
+			return evalString(readString(input));
 		}
 		
 		public Object invokeStaticMethodVariadic(String className, String methodName, Object... args) {
@@ -309,43 +345,108 @@ public interface Session {
 				} else {
 					Var v = (Var) env.find((Symbol) fst);
 					if (v == null) {
-						throw new Ex.Runtime("Not found: " + Builtin.prStr(fst));
+						throw new Ex.Runtime("Not found: " + G.display(fst));
 					}
 					if (v.isMacro()) {
 						f = v.deref();
-						var ret = apply(f, Arr.toArray((List)ast.popFirst()));
+						var ret = apply(f, It.iter(ast.popFirst()));
 						return eval(ret, env);
 					}
 				}
 			}
-	
-			Object[] arr =  Arr.map((Function)obj -> eval(obj, env), Object.class, Arr.toArray(ast));
-			return apply(arr[0], Arr.toIter(arr, 1, arr.length));
+			Iterator it = It.map(It.iter(ast), obj -> eval(obj, env));
+			return apply(it.next(), It.toArray(it));
 		}
 	
-		@SuppressWarnings({ "rawtypes", "unchecked", "unused" })
+		@SuppressWarnings({ "rawtypes", "unchecked" })
 		public static Object eval(Object ast, Data.EnvType env) {
 			if (ast instanceof Symbol) {
 				Var v = (Var) env.find((Symbol) ast);
-				if (v.isMacro()) {
-					throw new Ex.Runtime("Cannot return a macro value");
-				} else if (v != null) {
-					return v.deref();
-				} else {
+				if (v == null) {
 					throw new Ex.Runtime("Cannot find symbol");
-				}
+				} else if (v.isMacro()) {
+					throw new Ex.Runtime("Cannot return a macro value");
+				} else {
+					return v.deref();
+				} 
 			} else if (ast instanceof List) {
 				return evalList((List) ast, env);
 			} else if (ast instanceof Data.MapType) {
-				Function<Entry, Iterator<Object>> mf = (e) -> It.objects(
+				Function<Entry, Entry> mf = (e) -> Builtin.Structure.pair(
 						eval(e.getKey(), env),
 						eval(e.getValue(), env));
-				return Builtin.hashMap(It.toArray(ast, (Function)It.mapcat(mf)));
+				return Map.Standard.into(It.map(It.iter(ast), mf));
 			} else if (ast instanceof Data.LinearType) {
-				return Builtin.vector(It.toArray(ast, (Function)It.map(obj -> eval(obj, env))));
+				return Builtin.Structure.vector(It.toArrayList(It.map(It.iter(ast), obj -> eval(obj, env))));
 			} else {
 				return ast;
 			}
 		}
+	}
+
+	@Module.Ns(name = "builtin", tag = "rt")
+	public interface Methods {
+	
+		@Module.Var(name = "eval")
+		@Module.Fn(rt = true)
+		public static <AST> Object eval(RT rt, AST input) {
+			return rt.eval(input);
+		}
+
+		@SuppressWarnings("rawtypes")
+		@Module.Var(name = "class:for")
+		@Module.Fn(rt = true)
+		public static Class classFor(RT rt, String name) {
+			try {
+				return Class.forName(name, true, rt.getClassLoader());
+			} catch (ClassNotFoundException t) {
+				throw Ex.Sneaky(t);
+			}
+		}
+		
+		@Module.Var(name = "read-string")
+		@Module.Fn(rt = true)
+		public static <AST> AST readString(RT rt, String input) {
+			return rt.readString(input);
+		}
+		
+		@Module.Var(name = "sys:loader")
+		@Module.Fn(rt = true)
+		public static Loader sysloader(RT rt) {
+			return rt.getClassLoader();
+		}
+		
+		@Module.Var(name = "sys:foundation")
+		@Module.Fn(rt = true)
+		public static Foundation sysFoundation(RT rt) {
+			return rt.getFoundation();
+		}
+		
+		@SuppressWarnings("rawtypes")
+		@Module.Var(name = "sys:registry")
+		@Module.Fn(rt = true)
+		public static RefCache<String, Class> sysRegistry(RT rt) {
+			return rt.getClassRegistry();
+		}
+		
+		@Module.Var(name = "sys:add-paths")
+		@Module.Fn(rt = true, vargs = true)
+		public static ArrayList<String> sysAddPath(RT rt, String[] paths) {
+			return rt.addClasspath(paths);
+		}
+		
+		@Module.Var(name = "sys:list-paths")
+		@Module.Fn(rt = true)
+		public static ArrayList<String> sysAddPath(RT rt) {
+			return rt.getClasspath();
+		}
+		
+		@Module.Var(name = "invoke:static")
+		@Module.Fn(rt = true)
+		public static Object invokeStatic(RT rt, String cls, String method, Object[] args) {
+			return rt.invokeStaticMethod(cls, method, args);
+		}
+	
+		
 	}
 }

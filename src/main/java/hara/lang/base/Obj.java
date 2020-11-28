@@ -2,6 +2,8 @@ package hara.lang.base;
 
 import java.util.Iterator;
 
+import hara.lang.base.G.HashType;
+
 public interface Obj {
 
 	abstract class MT implements I.ObjType, I.Mutable, I.Hash {
@@ -117,6 +119,38 @@ public interface Obj {
 			return Std.T.Cons.EMPTY.withMeta(_meta);
 		}
 	}*/
+	
+	abstract class FN extends PT {
+		
+		public FN() {
+			super(null);
+		}
+
+		public FN(I.Metadata meta) {
+			super(meta);
+		}
+
+		@Override
+		public G.ObjType getObjType() {
+			return G.ObjType.FUNCTION;
+		}
+
+		@Override
+		public FN withMeta(I.Metadata meta) {
+			throw new Ex.Unsupported();
+		}
+
+		@Override
+		public long hashCalc(HashType t) {
+			return Fn.hashFn(t).apply(hashSeed()) * 31 + ((I.Hash)_meta).hashCalc(t);
+		}
+
+		@Override
+		public String display() {
+			 return "#fn " + _meta + "";
+		}
+		
+	}
 	
 	abstract class EMPTY<E> extends PT implements I.Coll<E>, I.Nth<E> {
 	

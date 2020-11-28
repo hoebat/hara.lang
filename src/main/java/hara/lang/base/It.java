@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.ListIterator;
+import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Spliterator;
 import java.util.function.BiFunction;
@@ -242,11 +243,13 @@ public interface It {
 	public static Iterator iter(Object obj) {
 		if(obj == null) {
 			return Nil.ITERATOR;
-		} else if(obj instanceof Iterable) {
-			return ((Iterable)obj).iterator();
 		} else if (obj instanceof Iterator) {
 			return (Iterator)obj;
-		} else if (obj.getClass().isArray()) {
+		} else if(obj instanceof Iterable) {
+			return ((Iterable)obj).iterator();
+		} else if(obj instanceof java.util.Map) {
+			return ((java.util.Map)obj).entrySet().iterator();
+		}  else if (obj.getClass().isArray()) {
 			return Arr.toIter(obj);
 		} else {
 			throw new Ex.Unsupported();
@@ -376,8 +379,8 @@ public interface It {
 	public static <E> E reduce(Iterator<E> it, BiFunction<E, E, E> f, Supplier<Boolean> end) {
 		var _acc = it.next();
 		while (it.hasNext()) {
-			_acc = f.apply(_acc, it.next());
 			if(end.get()) { return _acc; }
+			_acc = f.apply(_acc, it.next());
 		}
 		return _acc;
 	}
@@ -393,10 +396,46 @@ public interface It {
 	public static <E, R> R reduce(Iterator<E> it, R init, BiFunction<R, E, R> f, Supplier<Boolean> end) {
 		var _acc = init;
 		while (it.hasNext()) {
-			_acc = f.apply(_acc, it.next());
 			if(end.get()) { return _acc; }
+			_acc = f.apply(_acc, it.next());
 		}
 		return _acc;
+	}
+	
+	@SuppressWarnings("unchecked")
+	public static <E, R> R reduceIn(Iterator<E> it, R init, BiFunction<R, E, R> f) {
+		R _init;
+		boolean _change = false;
+		if(init instanceof I.ToMutable) {
+			_init = (R)((I.ToMutable)init).toMutable();
+			_change = true;
+		} else {
+			_init = init;
+		}
+		R out = reduce(it, _init, f);
+		if(out instanceof I.ToPersistent && _change == true) {
+			return (R)((I.ToPersistent)out).toPersistent();
+		} else {
+			return out;
+		}
+	}
+	
+	@SuppressWarnings("unchecked")
+	public static <E, R> R reduceIn(Iterator<E> it, R init, BiFunction<R, E, R> f, Supplier<Boolean> end) {
+		R _init;
+		boolean _change = false;
+		if(init instanceof I.ToMutable) {
+			_init = (R)((I.ToMutable)init).toMutable();
+			_change = true;
+		} else {
+			_init = init;
+		}
+		R out = reduce(it, _init, f, end);
+		if(out instanceof I.ToPersistent && _change == true) {
+			return (R)((I.ToPersistent)out).toPersistent();
+		} else {
+			return out;
+		}
 	}
 
 	//
@@ -641,7 +680,7 @@ public interface It {
 	public static <E> String display(
 			Iterator<E> it, String start, 
 			String end, String sep) {
-		return toString(it, start, end, sep, G::displayItem);
+		return toString(it, start, end, sep, G::display);
 	}
 	
 	public static <E> String display(Iterator<E> it) {
@@ -707,9 +746,10 @@ public interface It {
 				pl);
 	}
 
-	public static <E> E[] toArray(Iterator<E> it, Class<E> cls) {
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public static <E> E[] toArray(Iterator<E> it, Class cls) {
 		ArrayList<E> c = toArrayList(it);
-		E[] arr = Arr.newArray(cls, c.size());
+		E[] arr = (E[]) Arr.newArray(cls, c.size());
 		Arr.fillArray(c.iterator(), arr);
 		return arr;
 	}
@@ -932,7 +972,7 @@ public interface It {
 		};
 	}
 
-	public default <A, B> Iterator<I.Pair<A, B>> zipPair(Iterator<A> it0, Iterator<B> it1) {
+	public static <A, B> Iterator<I.Pair<A, B>> zipPair(Iterator<A> it0, Iterator<B> it1) {
 		return new Iterator<I.Pair<A, B>>() {
 			@Override
 			public boolean hasNext() {
@@ -949,9 +989,29 @@ public interface It {
 			}
 		};
 	}
+
+	@SuppressWarnings({ "rawtypes"})
+	public static Iterator<Object[]> zip(Iterator<Iterator<Object>> input) {
+		Iterator[] its = It.toArray(input, Iterator.class);
+		
+		return new Iterator<Object[]>() {
+			@Override
+			public boolean hasNext() {
+				return Arr.every((it) -> it.hasNext(), its);
+			}
+
+			@Override
+			public Object[] next() {
+				if (!hasNext()) {
+					throw new Ex.NoSuchElement();
+				}
+				return Arr.map((it) -> ((Iterator)it).next(), Object.class, its);
+			}
+		};
+	}
 	
-	public static <E> Iterator<I.Pair<E, E>> partitionPair(Iterator<E> it) {
-		return new Iterator<I.Pair<E, E>>() {
+	public static <E> Iterator<Entry<E, E>> partitionPair(Iterator<E> it) {
+		return new Iterator<Entry<E, E>>() {
 			E _v0;
 			T.State _state = T.State.NOT_SET;
 			

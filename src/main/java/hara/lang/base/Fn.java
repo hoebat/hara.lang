@@ -1,13 +1,10 @@
 package hara.lang.base;
 
 import java.lang.invoke.MethodHandle;
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.function.BiFunction;
-import java.util.function.BiPredicate;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
+import java.util.function.*;
+
+import hara.lang.data.List;
 
 public interface Fn {
 
@@ -17,11 +14,16 @@ public interface Fn {
 
 	public interface T {
 
-		public class Fn0<R> implements I.Fn<R, Object, Object> {
+		public class Fn0<R> extends Obj.FN implements I.Fn<R, Object, Object> {
 
 			final Supplier<R> _f0;
 
 			Fn0(Supplier<R> f0) {
+				this(null, f0);
+			}
+			
+			Fn0(I.Metadata meta, Supplier<R> f0) {
+				super(meta);
 				_f0 = f0;
 			}
 
@@ -31,11 +33,16 @@ public interface Fn {
 			}
 		}
 
-		public class Pred1<T1> implements I.Fn<Boolean, T1, Object> {
+		public class Pred1<T1> extends Obj.FN implements I.Fn<Boolean, T1, Object> {
 
 			final Predicate<T1> _p1;
 
 			Pred1(Predicate<T1> p1) {
+				this(null, p1);
+			}
+			
+			Pred1(I.Metadata meta, Predicate<T1> p1) {
+				super(meta);
 				_p1 = p1;
 			}
 
@@ -45,11 +52,16 @@ public interface Fn {
 			}
 		}
 
-		public class Fn1<R, T1> implements I.Fn<R, T1, Object> {
+		public class Fn1<R, T1> extends Obj.FN implements I.Fn<R, T1, Object> {
 
 			final Function<T1, R> _f1;
 
 			Fn1(Function<T1, R> f1) {
+				this(null, f1);
+			}
+
+			Fn1(I.Metadata meta, Function<T1, R> f1) {
+				super(meta);
 				_f1 = f1;
 			}
 
@@ -59,11 +71,16 @@ public interface Fn {
 			}
 		}
 
-		public class Pred2<T1, T2> implements I.Fn<Boolean, T1, T2> {
+		public class Pred2<T1, T2> extends Obj.FN implements I.Fn<Boolean, T1, T2> {
 
 			final BiPredicate<T1, T2> _p2;
 
 			Pred2(BiPredicate<T1, T2> p2) {
+				this(null, p2);
+			}
+			
+			Pred2(I.Metadata meta, BiPredicate<T1, T2> p2) {
+				super(meta);
 				_p2 = p2;
 			}
 
@@ -73,11 +90,16 @@ public interface Fn {
 			}
 		}
 
-		public class Fn2<R, T1, T2> implements I.Fn<R, T1, T2> {
+		public class Fn2<R, T1, T2> extends Obj.FN implements I.Fn<R, T1, T2> {
 
 			final BiFunction<T1, T2, R> _f2;
 
 			Fn2(BiFunction<T1, T2, R> f2) {
+				this(null, f2);
+			}
+			
+			Fn2(I.Metadata meta, BiFunction<T1, T2, R> f2) {
+				super(meta);
 				_f2 = f2;
 			}
 
@@ -87,7 +109,7 @@ public interface Fn {
 			}
 		}
 
-		public class FnN<R, T1, T2> implements I.Fn<R, T1, T2> {
+		public class FnN<R, T1, T2> extends Obj.FN implements I.Fn<R, T1, T2> {
 
 			final Supplier<R> _f0;
 			final Function<T1, R> _f1;
@@ -95,6 +117,11 @@ public interface Fn {
 			final Function<Object, R> _fN;
 
 			FnN(Supplier<R> f0, Function<T1, R> f1, BiFunction<T1, T2, R> f2, Function<Object, R> fN) {
+				this(null, f0, f1, f2, fN);
+			}
+			
+			FnN(I.Metadata meta, Supplier<R> f0, Function<T1, R> f1, BiFunction<T1, T2, R> f2, Function<Object, R> fN) {
+				super(meta);
 				_f0 = f0;
 				_f1 = f1;
 				_f2 = f2;
@@ -134,11 +161,16 @@ public interface Fn {
 			Function<Iterator<E>, Iterator<R>> getXf();
 		}
 
-		public class FnExact<R> implements I.Fn<R, Object, Object> {
+		public class FnExact<R> extends Obj.FN implements I.Fn<R, Object, Object> {
 			final MethodHandle _mh;
 			final int _num;
 
 			FnExact(MethodHandle mh, int num) {
+				this(null, mh, num);
+			}
+			
+			FnExact(I.Metadata meta, MethodHandle mh, int num) {
+				super(meta);
 				_mh = mh;
 				_num = num;
 			}
@@ -160,14 +192,19 @@ public interface Fn {
 			}
 		}
 
-		public class FnMulti<R> implements I.Fn<R, Object, Object> {
+		public class FnMulti<R> extends Obj.FN implements I.Fn<R, Object, Object> {
 			final Supplier<R> _f0;
 			final Function<Object, R> _f1;
 			final BiFunction<Object, Object, R> _f2;
 			final Data.MapType<Integer, Object> _fns;
 
-			@SuppressWarnings({ "unchecked", "rawtypes" })
 			FnMulti(Data.MapType<Integer, Object> fns) {
+				this(null, fns);
+			}
+
+			@SuppressWarnings({ "unchecked", "rawtypes" })
+			FnMulti(I.Metadata meta, Data.MapType<Integer, Object> fns) {
+				super(meta);
 				_f0 = (Supplier) fns.lookup(0);
 				_f1 = (Function) fns.lookup(1);
 				_f2 = (BiFunction) fns.lookup(2);
@@ -229,10 +266,15 @@ public interface Fn {
 
 		}
 
-		public class FnVargs<R> implements I.Fn<R, Object, Object> {
+		public class FnVargs<R> extends Obj.FN implements I.Fn<R, Object, Object> {
 			final Function<Object, R> _fn;
 
 			FnVargs(Function<Object, R> fn) {
+				this(null, fn);
+			}
+			
+			FnVargs(I.Metadata meta, Function<Object, R> fn) {
+				super(meta);
 				_fn = fn;
 			}
 
@@ -243,12 +285,18 @@ public interface Fn {
 
 			@Override
 			public Function<Object, R> getArg1() {
-				return (e) -> _fn.apply(Arr.objects(e));
+				return (e) -> {
+					G.prn(e, Arr.objects(e));
+					return _fn.apply(Arr.objects(e));
+				};
 			}
 
 			@Override
 			public BiFunction<Object, Object, R> getArg2() {
-				return (e0, e1) -> _fn.apply(Arr.objects(e0, e1));
+				return (e0, e1) -> {
+					var out =  _fn.apply(Arr.objects(e0, e1));
+					return out;
+				};
 			}
 
 			@Override
@@ -257,12 +305,18 @@ public interface Fn {
 			}
 		}
 
-		public class FnReduceArray<E> implements I.Fn<E, E, E> {
+		public class FnReduceArray<E> extends Obj.FN implements I.Fn<E, E, E> {
 			final E _init;
 			final BiFunction<E, E, E> _f2;
 
-			@SuppressWarnings({ "rawtypes", "unchecked" })
+			@SuppressWarnings({ "rawtypes" })
 			FnReduceArray(E init, BiFunction p) {
+				this(null, init, p);
+			}
+			
+			@SuppressWarnings({ "rawtypes", "unchecked" })
+			FnReduceArray(I.Metadata meta, E init, BiFunction p) {
+				super(meta);
 				_init = init;
 				_f2 = p;
 			}
@@ -289,12 +343,18 @@ public interface Fn {
 			}
 		}
 
-		public class FnReduceInit<E> implements I.Fn<E, E, E> {
+		public class FnReduceInit<E> extends Obj.FN implements I.Fn<E, E, E> {
 			final E _init;
 			final BiFunction<E, E, E> _f2;
 
-			@SuppressWarnings({ "rawtypes", "unchecked" })
+			@SuppressWarnings({ "rawtypes" })
 			FnReduceInit(E init, BiFunction p) {
+				this(null, init, p);
+			}
+			
+			@SuppressWarnings({ "rawtypes", "unchecked" })
+			FnReduceInit(I.Metadata meta, E init, BiFunction p) {
+				super(meta);
 				_init = init;
 				_f2 = p;
 			}
@@ -317,19 +377,22 @@ public interface Fn {
 			@SuppressWarnings({ "unchecked", "rawtypes" })
 			@Override
 			public Function getArgN() {
-				return (es) -> {
-					return It.reduce(It.iter(es), _init, _f2);
-
-				};
+				return (es) -> It.reduce(It.iter(es), _init, _f2);
 			}
 		}
 
-		public class FnReduceSelf<E, R> implements I.Fn<R, R, E> {
+		public class FnReduceSelf<E, R> extends Obj.FN implements I.Fn<R, R, E> {
 			final R _init;
 			final BiFunction<R, E, R> _f2;
 
-			@SuppressWarnings({ "rawtypes", "unchecked" })
+			@SuppressWarnings({ "rawtypes" })
 			FnReduceSelf(R init, BiFunction p) {
+				this(null, init, p);
+			}
+
+			@SuppressWarnings({ "rawtypes", "unchecked" })
+			FnReduceSelf(I.Metadata meta, R init, BiFunction p) {
+				super(meta);
 				_init = init;
 				_f2 = p;
 			}
@@ -377,13 +440,9 @@ public interface Fn {
 
 			final I.Fn[] _fns;
 
-			public Comp(Object... fns) {
+			public Comp(Object[] fns) {
 				Iterator it = Arr.toRevIter(fns);
 				_fns = It.toArray(It.map(it, Fn::toFn), I.Fn.class);
-			}
-
-			public Comp(Object fn) {
-				this(new Object[] { fn });
 			}
 
 			@Override
@@ -391,8 +450,44 @@ public interface Fn {
 				return (x) -> It.reduce(Arr.toIter((Object[]) _fns), x, (acc, f) -> ((I.Fn) f).invoke(acc));
 			}
 		}
+		
+		@SuppressWarnings({ "rawtypes", "unchecked" })
+		public class Partial implements I.OFn {
 
-		public class Filter<E> implements I.Fn<Iterator<E>, Iterator<E>, Object>, T.Xf<E, E> {
+			final I.Fn _f;
+			final List _args;
+
+			public Partial(Object[] vars) {
+				if(vars == null || vars.length == 0) {
+					throw new Ex.Runtime("Input cannot be null or with length 0");
+				}
+				_f = Fn.toFn(vars[0]);
+				_args = List.Standard.into(Arr.toIter(vars, 1, vars.length));
+			}
+
+			@Override
+			public Supplier getArg0() {
+				return () -> _f.apply(_args);
+			}
+
+			@Override
+			public Function getArg1() {
+				return (x) -> _f.apply(_args.conj(x));
+			}
+
+			@Override
+			public BiFunction getArg2() {
+				return (x, y) -> _f.apply(_args.conj(x).conj(y));
+			}
+
+			@Override
+			public Function getArgN() {
+				return (args) -> _f.apply(
+						It.concat(It.iter(_args), It.iter(args)));
+			}
+		}
+
+		public class Filter<E> extends Obj.FN implements I.Fn<Iterator<E>, Iterator<E>, Object>, T.Xf<E, E> {
 
 			final Predicate<E> _pred;
 			final Function<Iterator<E>, Iterator<E>> _xf;
@@ -424,7 +519,7 @@ public interface Fn {
 		}
 
 		@SuppressWarnings("rawtypes")
-		public class Juxt<E> implements I.Fn<Object[], E, Object> {
+		public class Juxt<E> extends Obj.FN implements I.Fn<Object[], E, Object> {
 
 			final Function[] _fns;
 			final Function<E, Object[]> _f1;
@@ -442,7 +537,7 @@ public interface Fn {
 			}
 		}
 
-		public class JuxtPair<E, K, V> implements I.Fn<I.Pair<K, V>, E, Object> {
+		public class JuxtPair<E, K, V> extends Obj.FN implements I.Fn<I.Pair<K, V>, E, Object> {
 
 			final Function<E, K> _fk;
 			final Function<E, V> _fv;
@@ -493,7 +588,7 @@ public interface Fn {
 		}
 
 		@SuppressWarnings("rawtypes")
-		public class Pipe<E, R> implements I.Fn<Iterator<R>, Iterator<E>, Object>, T.Xf<E, R> {
+		public class Pipe<E, R> extends Obj.FN implements I.Fn<Iterator<R>, Iterator<E>, Object>, T.Xf<E, R> {
 
 			final T.Xf[] _pipe;
 			final Function<Iterator<E>, Iterator<R>> _xf;
@@ -533,7 +628,7 @@ public interface Fn {
 			}
 		}
 
-		public class Reduce<E, R> implements I.Fn<R, Iterator<E>, Object>, T.Rf<E, R> {
+		public class Reduce<E, R> extends Obj.FN implements I.Fn<R, Iterator<E>, Object>, T.Rf<E, R> {
 
 			final Supplier<R> _init;
 			final BiFunction<R, E, R> _step;
@@ -570,7 +665,7 @@ public interface Fn {
 			}
 		}
 
-		public class ReduceIn<E, R> implements I.Fn<R, R, Iterator<E>>, T.Rf<E, R> {
+		public class ReduceIn<E, R> extends Obj.FN implements I.Fn<R, R, Iterator<E>>, T.Rf<E, R> {
 
 			final BiFunction<R, E, R> _step;
 			final Supplier<Boolean> _end;
@@ -679,77 +774,82 @@ public interface Fn {
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public static I.Fn toFn(Supplier f) {
+	public static I.Fn toFn(I.Metadata meta, Supplier f) {
 		return new T.Fn0(f);
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public static I.Fn toFn(Function f) {
+	public static I.Fn toFn(I.Metadata meta, Function f) {
 		return new T.Fn1(f);
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public static I.Fn toFn(Predicate p) {
+	public static I.Fn toFn(I.Metadata meta, Predicate p) {
 		return new T.Pred1(p);
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public static I.Fn toFn(BiFunction f) {
+	public static I.Fn toFn(I.Metadata meta, BiFunction f) {
 		return new T.Fn2(f);
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public static I.Fn toFn(BiPredicate p) {
+	public static I.Fn toFn(I.Metadata meta, BiPredicate p) {
 		return new T.Pred2(p);
 	}
 
 	@SuppressWarnings({ "rawtypes" })
 	public static I.Fn toFn(Object f) {
+		return toFn(null, f);
+	}
+	
+	@SuppressWarnings({ "rawtypes" })
+	public static I.Fn toFn(I.Metadata meta, Object f) {
 		if (f instanceof I.Fn) {
 			return (I.Fn) f;
 		} else if (f instanceof Supplier) {
-			return toFn((Supplier) f);
+			return toFn(meta, (Supplier) f);
 		} else if (f instanceof Function) {
-			return toFn((Function) f);
+			return toFn(meta, (Function) f);
 		} else if (f instanceof Predicate) {
-			return toFn((Predicate) f);
+			return toFn(meta, (Predicate) f);
 		} else if (f instanceof BiFunction) {
-			return toFn((BiFunction) f);
+			return toFn(meta, (BiFunction) f);
 		} else if (f instanceof BiPredicate) {
-			return toFn((BiPredicate) f);
+			return toFn(meta, (BiPredicate) f);
 		} else {
 			throw new Ex.Unsupported();
 		}
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public static I.Fn toReduceInit(Object init, BiFunction f) {
-		return new T.FnReduceInit(init, f);
+	public static I.Fn toReduceInit(I.Metadata meta, Object init, BiFunction f) {
+		return new T.FnReduceInit(meta, init, f);
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public static I.Fn toReduceArray(Object init, BiFunction f) {
-		return new T.FnReduceArray(init, f);
+	public static I.Fn toReduceArray(I.Metadata meta, Object init, BiFunction f) {
+		return new T.FnReduceArray(meta, init, f);
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public static I.Fn toReduceSelf(Object init, BiFunction f) {
-		return new T.FnReduceSelf(init, f);
+	public static I.Fn toReduceSelf(I.Metadata meta, Object init, BiFunction f) {
+		return new T.FnReduceSelf(meta, init, f);
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public static I.Fn toVargs(Function<Object, Object> f) {
-		return new T.FnVargs(f);
+	public static I.Fn toVargs(I.Metadata meta, Function<Object, Object> f) {
+		return new T.FnVargs(meta, f);
 	}
 
 	@SuppressWarnings({ "rawtypes" })
-	public static I.Fn toExact(MethodHandle mh, int num) {
-		return new T.FnExact(mh, num);
+	public static I.Fn toExact(I.Metadata meta, MethodHandle mh, int num) {
+		return new T.FnExact(meta, mh, num);
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public static I.Fn toMulti(Data.MapType<Integer, Object> fns) {
-		return new T.FnMulti(fns);
+	public static I.Fn toMulti(I.Metadata meta, Data.MapType<Integer, Object> fns) {
+		return new T.FnMulti(meta, fns);
 	}
 
 	//

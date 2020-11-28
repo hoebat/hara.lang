@@ -12,14 +12,16 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import hara.lang.base.*;
-import hara.lang.base.Data.VectorType;
 import hara.lang.data.*;
+import static hara.lang.lib.Builtin.Basic.*;
+import static hara.lang.lib.Builtin.Collection.*;
+import static hara.lang.lib.Builtin.Structure.*;
 
 public interface Read {
 
 	public class LineNumberingReader extends PushbackReader {
 
-		private static final int newline = (int) '\n';
+		private static final int newline = '\n';
 
 		private boolean _atLineStart = true;
 		private boolean _prev;
@@ -59,6 +61,7 @@ public interface Read {
 			return _columnNumber;
 		}
 
+		@Override
 		public int read() throws IOException {
 			int c = super.read();
 			_prev = _atLineStart;
@@ -74,6 +77,7 @@ public interface Read {
 			return c;
 		}
 
+		@Override
 		public void unread(int c) throws IOException {
 			super.unread(c);
 			_atLineStart = _prev;
@@ -164,7 +168,7 @@ public interface Read {
 		static public Object readString(String s, Map opts) {
 			PushbackReader r = new PushbackReader(new java.io.StringReader(s));
 
-			return read(r, (opts == null) ? Builtin.hashMap(new Object[] {}) : opts);
+			return read(r, (opts == null) ? hashMap(new Object[] {}) : opts);
 		}
 
 		static void unread(PushbackReader r, int ch) {
@@ -475,7 +479,7 @@ public interface Read {
 
 			@Override
 			public Character apply(PushbackReader reader, Map opts) {
-				PushbackReader r = (PushbackReader) reader;
+				PushbackReader r = reader;
 				int ch = readSingle(r);
 				if (ch == -1)
 					throw new Ex.Runtime("EOF while reading character");
@@ -549,12 +553,12 @@ public interface Read {
 							ch = readSingle(r);
 							if (Character.digit(ch, 16) == -1)
 								throw new Ex.Runtime("Invalid unicode escape: \\u" + (char) ch);
-							ch = readUnicodeChar((PushbackReader) r, ch, 16, 4, true);
+							ch = readUnicodeChar(r, ch, 16, 4, true);
 							break;
 						}
 						default: {
 							if (Character.isDigit(ch)) {
-								ch = readUnicodeChar((PushbackReader) r, ch, 8, 3, false);
+								ch = readUnicodeChar(r, ch, 8, 3, false);
 								if (ch > 0377)
 									throw new Ex.Runtime("Octal escape sequence must be in range [0, 377].");
 							} else
@@ -635,7 +639,7 @@ public interface Read {
 
 		public static class SymbolicValueReader implements BiFunction<PushbackReader, Map, Object> {
 
-			static Map specials = Builtin.hashMap(new Object[] {
+			static Map specials = hashMap(new Object[] {
 					Symbol.create(null, "Inf"), Double.POSITIVE_INFINITY,
 					Symbol.create(null, "-Inf"), Double.NEGATIVE_INFINITY, 
 					Symbol.create(null, "NaN"), Double.NaN });
@@ -661,14 +665,14 @@ public interface Read {
 				line = ((LineNumberingReader) r).getLineNumber();
 				column = ((LineNumberingReader) r).getColumnNumber() - 1;
 			}
-			return Builtin.hashMap(Arr.objects(Builtin.keyword("line"), line, Builtin.keyword("column"), column));
+			return hashMap(Arr.objects(keyword("line"), line, keyword("column"), column));
 		}
 
 		public static class ListReader implements BiFunction<PushbackReader, Map, List> {
 			@Override
 			public List apply(PushbackReader r, Map opts) {
 				ArrayList list = readDelimitedList(')', r, true, opts);
-				return (list.isEmpty()) ? List.Standard.EMPTY : Builtin.list(list.toArray());
+				return (list.isEmpty()) ? List.Standard.EMPTY : list(list);
 			}
 		}
 
@@ -680,9 +684,9 @@ public interface Read {
 				Object meta = read(r, true, null, true, opts);
 
 				if (meta instanceof Symbol || meta instanceof String)
-					meta = Builtin.hashMap(Arr.objects(Builtin.keyword("tag"), meta));
+					meta = hashMap(Arr.objects(keyword("tag"), meta));
 				else if (meta instanceof Keyword)
-					meta = Builtin.hashMap(Arr.objects(meta, G.T));
+					meta = hashMap(Arr.objects(meta, G.T));
 				else if (!(meta instanceof Map))
 					throw new IllegalArgumentException("Metadata must be Symbol,Keyword,String or ");
 
@@ -690,7 +694,7 @@ public interface Read {
 				if (o instanceof I.ObjType) {
 					Data.MapType ometa = (Data.MapType) ((I.ObjType) o).meta();
 					
-					ometa = (Data.MapType) Builtin.merge(ometa, meta);
+					ometa = (Data.MapType) merge(ometa, meta);
 					return ((I.ObjType) o).withMeta(ometa);
 				} else
 					throw new IllegalArgumentException("Metadata can only be applied to I.ObjTypes");
@@ -701,11 +705,10 @@ public interface Read {
 			@Override
 			public Data.LinearType apply(PushbackReader r, Map opts) {
 				ArrayList list = readDelimitedList(']', r, true, opts);
-				
 				if(list.size() > 5) {
-					return Builtin.vector(list.toArray());
+					return vector(list);
 				} else {
-					return Builtin.tup(list.toArray());
+					return tup(list.toArray());
 				}
 			}
 		}
@@ -720,7 +723,7 @@ public interface Read {
 				}
 
 				// TODO: Check for same keys
-				return Builtin.orderedMap(list.toArray());
+				return orderedMap(list);
 			}
 		}
 
@@ -729,7 +732,7 @@ public interface Read {
 			public OrderedSet apply(PushbackReader r, Map opts) {
 				ArrayList list = readDelimitedList('}', r, true, opts);
 				// TODO: Check for same entries
-				return Builtin.orderedSet(list.toArray());
+				return orderedSet(list);
 			}
 		}
 
@@ -737,7 +740,7 @@ public interface Read {
 			@Override
 			public Queue apply(PushbackReader r, Map opts) {
 				ArrayList list = readDelimitedList(']', r, true, opts);
-				return Builtin.queue(list.toArray());
+				return queue(list);
 			}
 		}
 	}

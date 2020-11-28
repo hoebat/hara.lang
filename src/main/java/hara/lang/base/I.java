@@ -28,7 +28,6 @@ public interface I {
 		default String display() {
 			return It.display(iterator(), startString(), endString(), sepString());
 		}
-
 	}
 
 	public interface Component {
@@ -102,24 +101,51 @@ public interface I {
 
 	public interface Fn<R, T1, T2> extends Function<Object, R> {
 
-		@SuppressWarnings({ "unchecked", "rawtypes" })
+		@SuppressWarnings("rawtypes")
+		public static <R, T1, T2> R applyAsIterator(Fn<R, T1, T2> f, Iterator vargs) {
+			return f.getArgN().apply(vargs);
+		}
+
+		@SuppressWarnings({ "rawtypes", "unchecked" })
+		public static <R, T1, T2> R applyAsIterator(Fn<R, T1, T2> f, Iterator it, long size) {
+			switch ((int)size) {
+			case 0:  return f.getArg0().get();
+			case 1:  return f.getArg1().apply((T1)it.next());
+			case 2:  return f.getArg2().apply((T1)it.next(), (T2)it.next());
+			default: return f.getArgN().apply(it);
+			}
+		}
+
+		@SuppressWarnings("unchecked")
+		public static <R, T1, T2> R applyAsArray(Fn<R, T1, T2> f, Object[] vargs) {
+			int len = vargs.length;
+			switch (len) {
+			case 0:  return f.getArg0().get();
+			case 1:  return f.getArg1().apply((T1)vargs[0]);
+			case 2:  return f.getArg2().apply((T1)vargs[0], (T2)(T1)vargs[1]);
+			default: return f.getArgN().apply(vargs);
+			}
+		}
+		
+		@SuppressWarnings({"rawtypes" })
 		@Override
 		default R apply(Object vargs) {
 			if (vargs instanceof Iterator) {
-				Iterator it = (Iterator) vargs;
-				return (R) getArgN().apply(it);
+				return applyAsIterator(this, (Iterator)vargs);
 			} else if (vargs.getClass().isArray()) {
-				Object[] input = (Object[]) vargs;
-				int len = input.length;
-				switch (len) {
-				case 0:  return invoke();
-				case 1:  return invoke((T1) input[0]);
-				case 2:  return invoke((T1) input[0], (T2) input[1]);
-				default: return invoke(input);
-				}
+				return applyAsArray(this, (Object[])vargs);
+			} else if (vargs instanceof java.util.List) {
+				var l = (java.util.List)vargs;
+				return applyAsIterator(this, l.iterator(), l.size());
+			} else if (vargs instanceof Data.LinearType) {
+				var l = (Data.LinearType)vargs;
+				return applyAsIterator(this, l.iterator(), l.count());
+			} else if (vargs instanceof Iterable) {
+				return applyAsIterator(this, (Iterator)vargs);
 			} else {
 				throw new Ex.Unsupported();
 			}
+
 		}
 
 		default Supplier<R> getArg0() {

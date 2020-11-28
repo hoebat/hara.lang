@@ -60,7 +60,7 @@ public interface Ut {
 		
 		@Override
 		public String display() {
-			return "#flag [" + _val + "]";
+			return "#flag <" + _val + ">";
 		}
 	}
 
@@ -100,11 +100,11 @@ public interface Ut {
 		
 		@Override
 		public String display() {
-			return "#counter [" + _c + "]";
+			return "#counter <" + _c + ">";
 		}
 	}
 
-	public class Delay<V> implements I.Deref<V>, I.Realize<V> {
+	public class Delay<V> implements I.Deref<V>, I.Realize<V>, I.Display {
 		volatile V _val;
 		volatile Throwable _ex;
 		volatile Supplier<V> _fn;
@@ -144,6 +144,12 @@ public interface Ut {
 		public V realize() {
 			return deref();
 		}
+
+		@Override
+		public String display() { 
+			return isRealized() ? "#delay <" + G.display(_val) + ">" : "#delay.pending<>";
+		}
+
 	}
 
 	public final class Volatile<V> implements I.Deref<V>, I.Reset<V>, I.Display {
@@ -166,7 +172,7 @@ public interface Ut {
 
 		@Override
 		public String display() {
-			return "#volatile [" + _val + "]";
+			return "#vol <" + _val + ">";
 		}
 
 	}

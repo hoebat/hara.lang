@@ -526,6 +526,7 @@ public interface SortedMap<K, V> extends
 		}
 	}
 
+	@SuppressWarnings("unchecked")
 	public final class Mutable<K, V> extends Data.RefType.MT 
 		implements Base<K, V>,
 				   I.ToPersistent{
@@ -539,19 +540,26 @@ public interface SortedMap<K, V> extends
 			_comparator = comparator;
 		}
 
-		@SuppressWarnings("unchecked")
 		public Mutable(I.Metadata meta) {
 			this(meta, Node.EMPTY_NODE, (Comparator<K>) Comparator.naturalOrder());
 		}
-
-		@SuppressWarnings("unchecked")
+		
+		@SuppressWarnings( "rawtypes" )
 		public static <K, V> Mutable<K, V> from(I.Metadata meta, Object... elements){
+			return into(new Mutable<K, V>(null), (Iterator)It.partitionPair(Arr.toIter(elements)));
+		}
 
-			var map = new Mutable<K, V>(null);
+		public static <K, V> Mutable<K, V> into(Iterator<Entry<K, V>> it) {
+			return into(new Mutable<K, V>(null), it);
+		}
+
+		public static <K, V> Mutable<K, V> into(
+				Mutable<K, V> map,
+				Iterator<Entry<K, V>> it){
 			return It.reduce(
-					It.partitionPair(Arr.toIter(elements)),
+					it,
 					map,
-					(m, e) -> m.assoc((K)e.getKey(), (V)e.getValue()));
+					(m, e) -> m.assoc(e.getKey(), e.getValue()));
 		}
 		
 		public Mutable<K, V> assocWith(K key, V value, BinaryOperator<V> merge) {
@@ -583,7 +591,6 @@ public interface SortedMap<K, V> extends
 			return new Standard<K, V>(_meta, _root, _comparator);
 		}
 
-		@SuppressWarnings("unchecked")
 		@Override
 		public Mutable<K, V> empty() {
 			_root = Node.EMPTY_NODE;
@@ -601,11 +608,12 @@ public interface SortedMap<K, V> extends
 		}
 	}
 	
+	@SuppressWarnings("unchecked")
 	public final class Standard<K, V> extends Data.RefType.PT 
 		implements Base<K, V>, SortedMap<K, V>, I.ToMutable {
 
 		// STATIC
-		@SuppressWarnings({ "rawtypes", "unchecked" })
+		@SuppressWarnings("rawtypes")
 		public final static Standard EMPTY = new Standard(null, Node.EMPTY_NODE, Comparator.naturalOrder());
 		public final Comparator<K> _comparator;
 		public final Node<K, V> _root;
@@ -616,12 +624,18 @@ public interface SortedMap<K, V> extends
 			_comparator = comparator;
 		}
 		
-		@SuppressWarnings("unchecked")
 		public static <K, V> Standard<K, V> from(I.Metadata meta, Object... elements){
 			return (Standard<K, V>) Mutable.from(meta, elements).toPersistent();
 		}
+		
+		public static <K, V> Standard<K, V> into(Iterator<Entry<K, V>> it) {
+			return Mutable.into(it).toPersistent();
+		}
 
-		@SuppressWarnings("unchecked")
+		public static <K, V> Standard<K, V> into(Standard<K, V> map, Iterator<Entry<K, V>> it){
+			return Mutable.into(map.toMutable(), it).toPersistent();
+		}
+
 		public static <K, V> Standard<K, V> empty(I.Metadata meta) {
 			Standard<K, V> ret = EMPTY;
 			return (meta == null)

@@ -1,6 +1,7 @@
 package hara.lang.base;
 
 import java.util.Iterator;
+import java.util.Map.Entry;
 import java.util.regex.Pattern;
 
 public interface G {
@@ -14,9 +15,25 @@ public interface G {
 	public enum ObjType { KEYWORD, SYMBOL, POINTER, FUNCTION, MAP, SET, ITERATOR, SEQUENTIAL}
 
 	public static final HashType DEFAULT_HASH = HashType.MURMUR3;
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public static String displayList(java.util.List l) {
+		return "#j " + It.display(l.iterator());
+	}
 	
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public static String displayItem(Object e) {
+	public static String displayMap(java.util.Map m) {
+		return "#j " + It.toString(m.entrySet().iterator(), "{", "}", ",", 
+					(entry) -> display(((Entry)entry).getKey()) + " " + display(((Entry)entry).getValue()));
+	}
+	
+	@SuppressWarnings("rawtypes")
+	public static String displayMapEntry(Entry e) {
+		return "[" + display(e.getKey()) + " " + display(e.getValue()) +  "]";
+	}
+	
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public static String display(Object e) {
 		if(e == null) {
 			return "nil";
 		} else if (e instanceof I.Display) {
@@ -30,11 +47,15 @@ public interface G {
 		} else if (e instanceof Class) {
 			return ((Class)e).getName();
 		} else if (e instanceof java.util.List) {
-			return It.display(((java.util.List)e).iterator());
+			return displayList((java.util.List)e);
+		} else if (e instanceof java.util.Map) {
+			return displayMap((java.util.Map)e);
+		} else if (e instanceof Entry) {
+			return displayMapEntry((Entry)e);
 		} else if (e instanceof Iterator){
-			return It.display((Iterator)e);
+			return "#i " + It.display((Iterator)e);
 		} else if (e.getClass().isArray()){
-			return It.display(Arr.toIter(e));
+			return "#arr " + It.display(Arr.toIter(e));
 		} else {
 			return e.toString();
 		}

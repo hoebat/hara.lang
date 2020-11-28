@@ -131,6 +131,15 @@ public interface Queue<E> extends
 			return new Mutable(meta);
 		}
 
+
+		public static <E> Mutable<E> into(Iterator<E> it) {
+			return into(new Mutable<E>(null), it);
+		}
+		
+		public static <E> Mutable<E> into(Mutable<E> coll, Iterator<E> it) {
+			return It.reduce(it, coll, (m, e) -> m.pushLast(e));
+		}
+
 		@SuppressWarnings({ "unchecked"})
 		@Override
 		public Mutable<E> pushLast(E e) {
@@ -279,7 +288,15 @@ public interface Queue<E> extends
 		public static <E> Standard<E> from(I.Metadata meta, E... objs) {
 			return Mutable.from(meta, objs).toPersistent();
 		}
-
+		
+		public static <E> Standard<E> into(Iterator<E> it) {
+			return Mutable.into(it).toPersistent();
+		}
+		
+		@SuppressWarnings("unchecked")
+		public static <E> Standard<E> into(Standard<E> coll, Iterator<E> it) {
+			return Mutable.into(coll.toMutable(), it).toPersistent();
+		}
 
 		@SuppressWarnings({ "unchecked", "rawtypes" })
 		@Override
@@ -381,7 +398,7 @@ public interface Queue<E> extends
 
 		@Override
 		@SuppressWarnings({ "rawtypes", "unchecked" })
-		public I.Mutable toMutable() {
+		public Mutable toMutable() {
 			var head = ((Vector.Standard<E>)_head).toMutable();
 			var tail = ((Vector.Standard<E>)_tail).toMutable();
 			var buff = ((List.Standard)_buffer).toMutable();

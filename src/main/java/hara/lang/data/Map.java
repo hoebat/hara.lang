@@ -582,6 +582,7 @@ public interface Map<K, V> extends Data.MapType<K, V> {
 		}
 	}
 
+	@SuppressWarnings("unchecked")
 	public final class Mutable<K, V> extends Data.RefType.MT 
 		implements Base<K, V>, I.ToPersistent{
 
@@ -598,29 +599,28 @@ public interface Map<K, V> extends Data.MapType<K, V> {
 			_size = size;
 		}
 
-		@SuppressWarnings("unchecked")
 		public static <K, V> Mutable<K, V> empty(I.Metadata meta) {
 			return new Mutable<K, V>(meta, new AtomicReference<Thread>(Thread.currentThread()), DataNode.EMPTY, 0);
 		}
 
-		@SuppressWarnings("unchecked")
+		@SuppressWarnings("rawtypes")
 		public static <K, V> Mutable<K, V> from(I.Metadata meta, Object... elements){
+			return into(empty(meta), (Iterator)It.partitionPair(Arr.toIter(elements)));
+		}
 
-			Mutable<K, V> map = empty(null);
-			return It.reduce(
-					It.partitionPair(Arr.toIter(elements)),
-					map,
-					(m, e) -> m.assoc((K)e.getKey(), (V)e.getValue()));
+		public static <K, V> Mutable<K, V> into(Iterator<Entry<K, V>> it) {
+			return into(empty(null), it);
 		}
 
 		public static <K, V> Mutable<K, V> into(
 				Mutable<K, V> map,
-				Iterator<I.Pair<K, V>> it){
+				Iterator<Entry<K, V>> it){
 			return It.reduce(
 					it,
 					map,
 					(m, e) -> m.assoc(e.getKey(), e.getValue()));
 		}
+		
 
 		private void ensureEditable() {
 			if (_edit.get() == null) {
@@ -628,7 +628,6 @@ public interface Map<K, V> extends Data.MapType<K, V> {
 			}
 		}
 
-		@SuppressWarnings("unchecked")
 		public static <K, V> Mutable<K, V> create(I.Metadata meta, Base<K, V> other) {
 			var ret = empty(meta);
 			for (Object o : other) {
@@ -638,7 +637,6 @@ public interface Map<K, V> extends Data.MapType<K, V> {
 			return (Mutable<K, V>) ret;
 		}
 
-		@SuppressWarnings("unchecked")
 		@Override
 		public Mutable<K, V> assoc(K key, V val) {_leafFlag.reset(0);
 			
@@ -677,7 +675,6 @@ public interface Map<K, V> extends Data.MapType<K, V> {
 			return new Standard<K, V>(_meta, _size, _root);
 		}
 
-		@SuppressWarnings("unchecked")
 		@Override
 		public I.Empty empty() {
 			_size = 0;
@@ -686,13 +683,14 @@ public interface Map<K, V> extends Data.MapType<K, V> {
 		}
 	}
 
+	@SuppressWarnings("unchecked")
 	public class Standard<K, V> extends Data.RefType.PT 
 		implements Base<K, V>, I.ToMutable {
 
 		private final int _size;
 		private final Node<K, V> _root;
 
-		@SuppressWarnings({ "rawtypes", "unchecked" })
+		@SuppressWarnings("rawtypes")
 		final public static Standard EMPTY = new Standard(null, 0, DataNode.EMPTY);		
 
 		Standard(I.Metadata meta, int size, Node<K, V> root) {
@@ -701,21 +699,19 @@ public interface Map<K, V> extends Data.MapType<K, V> {
 			_root = root;
 		}
 
-		@SuppressWarnings("unchecked")
 		public static <K, V> Standard<K, V> from(I.Metadata meta, Object... elements){
 			return (Standard<K, V>) Mutable.from(meta, elements).toPersistent();
 		}
 		
-		public static <K, V> Standard<K, V> into(Iterator<I.Pair<K, V>> it) {
-			return Mutable.into(Mutable.empty(null), it).toPersistent();
+		public static <K, V> Standard<K, V> into(Iterator<Entry<K, V>> it) {
+			return Mutable.into(it).toPersistent();
 		}
 
-		public static <K, V> Standard<K, V> into(Standard<K, V> map, Iterator<I.Pair<K, V>> it){
+		public static <K, V> Standard<K, V> into(Standard<K, V> map, Iterator<Entry<K, V>> it){
 			return Mutable.into(map.toMutable(), it).toPersistent();
 		}
 
 		@Override
-		@SuppressWarnings("unchecked")
 		public Standard<K, V> assoc(K key, V val) {
 			var added_leaf = new Counter(0);
 			var n0 = _root == null ? DataNode.EMPTY : _root;
@@ -753,7 +749,6 @@ public interface Map<K, V> extends Data.MapType<K, V> {
 			return (meta() == meta) ? this : new Standard<K, V>(meta, _size, _root);
 		}
 
-		@SuppressWarnings("unchecked")
 		@Override
 		public Standard<K, V> empty() {
 			return (_meta == null) ? EMPTY : EMPTY.withMeta(_meta);

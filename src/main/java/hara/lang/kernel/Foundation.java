@@ -203,7 +203,7 @@ public class Foundation implements I.Context {
 			case HELP:  return Fn.runHELP(F, SESSION.values());
 			case EXISTS: return runSessionFor(F, args.get(0), (rt) -> rt != null);
 			case EVAL: 
-				return runSessionFor(F, args.get(0), rt -> rt.eval(args.get(1)));
+				return runSessionFor(F, args.get(0), rt -> rt.evalString(args.get(1)));
 			case NEW: return runSessionCreate(F, args);
 			case CP:
 			case CLASSPATH: return runSessionFor(F, args.get(0), 

@@ -8,8 +8,6 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
-import hara.lang.base.I.Fn;
-
 public interface Arr {
 	
 	public static boolean[] booleans(boolean... arr) {
@@ -77,7 +75,14 @@ public interface Arr {
 		return out;
 	}
 	
-	public static <E> boolean contains(Predicate<E> f, E[] elements) {
+	public static <E> boolean every(Predicate<E> f, E[] elements) {
+		for(E e : elements) {
+			if(!f.test(e)) return false;
+		}
+		return true;
+	}
+	
+	public static <E> boolean any(Predicate<E> f, E[] elements) {
 		for(E e : elements) {
 			if(f.test(e)) return true;
 		}
@@ -94,7 +99,7 @@ public interface Arr {
 	public static <E> String display(E[] elements) {
 		String s = "";
 		for(E e : elements) {
-			s += (G.displayItem(e) + " ");
+			s += (G.display(e) + " ");
 		}
 		return s;
 	}
@@ -118,12 +123,6 @@ public interface Arr {
 				_i = i;
 				_array = array;
 				_end = array.length;
-			}
-		
-			@SuppressWarnings("unchecked")
-			public ToIter(Object array, int i) {
-				_i = i;
-				_array = (E[])array;
 			}
 
 			@Override
@@ -414,7 +413,7 @@ public interface Arr {
 		return Arrays.asList(arr);
 	}
 
-	@SuppressWarnings("rawtypes")
+	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public static Iterator toIter(Object array) {
 		if (array == null || java.lang.reflect.Array.getLength(array) == 0)
 			return It.emptyIterator();
@@ -435,7 +434,7 @@ public interface Arr {
 			return new T.ToIter_short((short[]) array, 0);
 		if (aclass == boolean[].class)
 			return new T.ToIter_boolean((boolean[]) array, 0);
-		return new T.ToIter(array, 0);
+		return new T.ToIter((Object[])array, 0);
 	}
 	
 	public static <E> E[] concat(E[] first, E[] second, Class<E> type) {
@@ -500,6 +499,6 @@ public interface Arr {
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public static <E, R> R[] map(Function<E, R> f, Class type, E[] array) {
 		var out = (R[]) Array.newInstance(type, array.length);
-		return (R[]) fillArray(It.map(toIter(array), f), out);
+		return fillArray(It.map(toIter(array), f), out);
 	}
 }

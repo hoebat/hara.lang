@@ -34,6 +34,7 @@ public interface Module {
 	@Documented
 	public @interface Fn {
 	    boolean vargs()   default false; 
+	    boolean rt()      default false;
 	}
 	
 	@Retention(RUNTIME)
@@ -41,6 +42,7 @@ public interface Module {
 	@Documented
 	public @interface Ns {
 	    String name() default "";
+	    String tag()  default "";
 	}
 	
 	@Retention(RUNTIME)

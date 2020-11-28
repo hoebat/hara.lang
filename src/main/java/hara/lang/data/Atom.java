@@ -39,7 +39,7 @@ public interface Atom<V> {
 
 		@Override
 		public String display() {
-			return "#atom [" + _state.get() + "]";
+			return "#atom <" + G.display(_state.get()) + ">";
 		}
 	}
 

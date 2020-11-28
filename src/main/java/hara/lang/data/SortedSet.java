@@ -50,6 +50,14 @@ public interface SortedSet<E> extends Data.SetType<E> {
 			return Arr.reduce((arr, e) -> arr.conj(e) , mut, objs);
 		}
 
+		public static <E> Mutable<E> into(Iterator<E> it) {
+			return into(new Mutable<E>(null), it);
+		}
+		
+		public static <E> Mutable<E> into(Mutable<E> coll, Iterator<E> it) {
+			return It.reduce(it, coll, (m, e) -> m.conj(e));
+		}
+
 		@Override
 		public Mutable<E> conj(E e) {
 			_lookup.assoc(e, e);
@@ -107,6 +115,14 @@ public interface SortedSet<E> extends Data.SetType<E> {
 		@SuppressWarnings("unchecked")
 		public static <E> Standard<E> from(I.Metadata meta, E... elements){
 			return Mutable.from(meta, elements).toPersistent();
+		}
+
+		public static <E> Standard<E> into(Iterator<E> it) {
+			return Mutable.into(it).toPersistent();
+		}
+		
+		public static <E> Standard<E> into(Standard<E> coll, Iterator<E> it) {
+			return Mutable.into(coll.toMutable(), it).toPersistent();
 		}
 
 		@SuppressWarnings("unchecked")

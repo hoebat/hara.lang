@@ -3,6 +3,7 @@ package hara.lang.base;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import hara.lang.base.I.PopFirst;
@@ -185,9 +186,9 @@ public interface Data {
 		default String display() {
 			return It.toString(
 				iterator(), startString(), endString(), sepString(),
-				(o) -> G.displayItem(o.getKey()) 
+				(o) -> G.display(o.getKey()) 
 						+ " "
-						+ G.displayItem(o.getValue()));
+						+ G.display(o.getValue()));
 		}
 		
 		
@@ -217,14 +218,16 @@ public interface Data {
 			}
 		}
 		
+		@SuppressWarnings({ "unchecked", "rawtypes" })
 		@Override
-		default public V invoke(K key) {
-			return lookup(key);
+		default public Function getArg1() {
+			return key -> lookup((K) key);
 		}
-		
+
+		@SuppressWarnings({ "unchecked", "rawtypes" })
 		@Override
-		default public V invoke(K key, V notFound) {
-			return lookup(key, notFound);
+		default public BiFunction getArg2() {
+			return (key, notFound) -> lookup((K)key, (V)notFound);
 		}
 	
 	}
@@ -580,6 +583,7 @@ public interface Data {
 
 		MapType<Symbol, ? extends VarType> getMap();
 		
+		@Override
 		default VarType find(Symbol s) {
 			VarType v = getMap().lookup(s);
 			if(v == null) {

@@ -253,16 +253,18 @@ public interface Vector<E> extends Data.VectorType<E>, I.Assoc<Integer, E> {
 
 		@SuppressWarnings("unchecked")
 		public static <E> Mutable<E> from(I.Metadata meta, E... objs) {
-			var vec = Mutable.empty(meta);
+			var vec = empty(meta);
 			return Arr.reduce((v, e) -> v.pushLast(e), vec, objs);
 		}
 
 		@SuppressWarnings("unchecked")
-		public static <E> Mutable<E> from(I.Metadata meta, Iterator<E> it) {
-			var vec = Mutable.empty(meta);
-			return It.reduce(it, vec, (v, e) -> v.pushLast(e));
+		public static <E> Mutable<E> into(Iterator<E> it) {
+			return into(empty(null), it);
 		}
-
+		
+		public static <E> Mutable<E> into(Mutable<E> coll, Iterator<E> it) {
+			return It.reduce(it, coll, (m, e) -> m.pushLast(e));
+		}
 		
 		@SuppressWarnings({ "unchecked", "rawtypes" })
 		public static Mutable empty (I.Metadata meta) {
@@ -428,9 +430,13 @@ public interface Vector<E> extends Data.VectorType<E>, I.Assoc<Integer, E> {
 		public static <E> Standard<E> from(I.Metadata meta, E... objs) {
 			return Mutable.from(meta, objs).toPersistent();
 		}
-
-		public static <E> Standard<E> from(I.Metadata meta, Iterator<E> it) {
-			return Mutable.from(meta, it).toPersistent();
+		
+		public static <E> Standard<E> into(Iterator<E> it) {
+			return Mutable.into(it).toPersistent();
+		}
+		
+		public static <E> Standard<E> into(Standard<E> coll, Iterator<E> it) {
+			return Mutable.into(coll.toMutable(), it).toPersistent();
 		}
 
 		@Override

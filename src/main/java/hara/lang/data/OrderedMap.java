@@ -39,13 +39,13 @@ public interface OrderedMap<K, V>
 
 	}
 
+	@SuppressWarnings("unchecked")
 	public class Mutable<K, V> extends Data.RefType.MT 
 		implements Base<K, V>, I.ToPersistent {
 		
 		private Vector.Mutable<Entry<K, V>> _order;
 		private Map.Mutable<K, Entry<Integer, V>> _lookup;
 
-		@SuppressWarnings("unchecked")
 		public Mutable(I.Metadata meta) {
 			this(meta, Vector.Mutable.empty(null), Map.Mutable.empty(null));
 		}
@@ -59,14 +59,23 @@ public interface OrderedMap<K, V>
 			_lookup = lookup;
 		}
 		
-		@SuppressWarnings("unchecked")
+		@SuppressWarnings("rawtypes")
 		public static <K, V> Mutable<K, V> from(I.Metadata meta, Object... elements){
+			return into(new Mutable<K, V>(null), (Iterator)It.partitionPair(Arr.toIter(elements)));
+		}
 
-			var map = new Mutable<K, V>(null);
-			return It.reduce(
-					It.partitionPair(Arr.toIter(elements)),
+		public static <K, V> Mutable<K, V> into(Iterator<Entry<K, V>> it) {
+			return into(new Mutable<K, V>(null), it);
+		}
+
+		public static <K, V> Mutable<K, V> into(
+				Mutable<K, V> map,
+				Iterator<Entry<K, V>> it){
+			It.reduce(
+					it,
 					map,
-					(m, e) -> m.assoc((K)e.getKey(), (V)e.getValue()));
+					(m, e) -> m.assoc(e.getKey(), e.getValue()));
+			return map;
 		}
 		
 		@Override
@@ -76,7 +85,7 @@ public interface OrderedMap<K, V>
 			return this;
 		}
 		
-		@SuppressWarnings({ "unchecked", "rawtypes" })
+		@SuppressWarnings("rawtypes")
 		@Override
 		public Mutable<K, V> assoc(K k, V v) {
 			var rec = _lookup.find(k);
@@ -124,6 +133,7 @@ public interface OrderedMap<K, V>
 	}
 	
 
+	@SuppressWarnings("unchecked")
 	public class Standard<K, V> extends Data.RefType.PT 
 		implements Base<K, V>, I.ToMutable {
 		private final Map.Standard<K, Entry<Integer, V>> _lookup;
@@ -132,7 +142,6 @@ public interface OrderedMap<K, V>
 		@SuppressWarnings("rawtypes")
 		public static Standard EMPTY = new Standard(null);
 		
-		@SuppressWarnings("unchecked")
 		public Standard(I.Metadata meta) {
 			this(meta, Vector.Standard.empty(null), Map.Standard.EMPTY);
 		}
@@ -146,12 +155,18 @@ public interface OrderedMap<K, V>
 			_lookup = lookup;
 		}
 		
-		@SuppressWarnings("unchecked")
 		public static <K, V> Standard<K, V> from(I.Metadata meta, Object... elements){
 			return (Standard<K, V>) Mutable.from(meta, elements).toPersistent();
 		}
+		
+		public static <K, V> Standard<K, V> into(Iterator<Entry<K, V>> it) {
+			return Mutable.into(it).toPersistent();
+		}
 
-		@SuppressWarnings("unchecked")
+		public static <K, V> Standard<K, V> into(Standard<K, V> map, Iterator<Entry<K, V>> it){
+			return Mutable.into(map.toMutable(), it).toPersistent();
+		}
+
 		@Override
 		public Standard<K, V> empty() {
 			return (_meta == null) ? EMPTY : EMPTY.withMeta(_meta);
@@ -163,7 +178,7 @@ public interface OrderedMap<K, V>
 		}
 
 
-		@SuppressWarnings({ "rawtypes", "unchecked" })
+		@SuppressWarnings("rawtypes")
 		@Override
 		public Standard<K, V> assoc(K k, V v) {
 			var rec = _lookup.find(k);

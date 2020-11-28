@@ -160,6 +160,14 @@ public interface List<E> extends Data.VectorType<E> {
 			Mutable<E> mut = new Mutable<E>(meta, objs.length);
 			return Arr.reduce((arr, e) -> arr.pushLast(e) , mut, objs);
 		}
+
+		public static <E> Mutable<E> into(Iterator<E> it) {
+			return into(new Mutable<E>(), it);
+		}
+		
+		public static <E> Mutable<E> into(Mutable<E> coll, Iterator<E> it) {
+			return It.reduce(it, coll, (m, e) -> m.conj(e));
+		}
 		
 		@Override
 		public Mutable<E> pushFirst(E e) {
@@ -285,6 +293,14 @@ public interface List<E> extends Data.VectorType<E> {
 		@Override
 		public Standard<E> empty() {
 			return (_meta != null) ? (Standard) EMPTY.withMeta(_meta) : EMPTY;
+		}
+		
+		public static <E> Standard<E> into(Iterator<E> it) {
+			return Mutable.into(it).toPersistent();
+		}
+		
+		public static <E> Standard<E> into(Standard<E> coll, Iterator<E> it) {
+			return Mutable.into(coll.toMutable(), it).toPersistent();
 		}
 
 		@Override
