@@ -1,13 +1,8 @@
 package hara.lang.base;
 
-import java.lang.invoke.MethodHandle;
-import java.util.Iterator;
-import java.util.function.*;
-
-import hara.lang.data.List;
-
 public interface Fn {
 
+	/*
 	public enum UnitType {
 		MAP, FILTER, MAPCAT, COMPLEX
 	}
@@ -744,36 +739,6 @@ public interface Fn {
 		return new H.ReduceIn<E, R>(Fn.toFn(step).getArg2());
 	}
 
-	public static long hashMurmur(Object o) {
-		if (o instanceof I.Hash) {
-			return ((I.Hash) o).hashGet(G.HashType.MURMUR3);
-		} else if (o == null) {
-			return 0;
-		} else {
-			return o.hashCode();
-		}
-	}
-
-	public static long hashSip(Object o) {
-		if (o == null)
-			return 0;
-		return o.hashCode();
-	}
-
-	public static Function<Object, Long> hashFn(G.HashType t) {
-
-		switch (t) {
-		case MURMUR3:
-			return item -> Long.valueOf(hashMurmur(item));
-		case SIP:
-			return item -> Long.valueOf(hashSip(item));
-		case SYSTEM:
-			return item -> Long.valueOf(item.hashCode());
-		default:
-			throw new UnsupportedOperationException("Not Supported");
-		}
-	}
-
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public static I.Fn toFn(I.Metadata meta, Supplier f) {
 		return new T.Fn0(f);
@@ -852,9 +817,10 @@ public interface Fn {
 	public static I.Fn toMulti(I.Metadata meta, Data.MapType<Integer, Object> fns) {
 		return new T.FnMulti(meta, fns);
 	}
-
 	//
 	// Checks
 	//
+	 * 
+	 */
 
 }

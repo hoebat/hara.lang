@@ -35,7 +35,7 @@ public interface Data {
 		@Override
 		default long hashCalc(G.HashType t) {
 			
-			Function<Object, Long> f = Fn.hashFn(t);
+			Function<Object, Long> f = G.hashFn(t);
 			return It.reduce(
 					iterator(), 
 					Long.valueOf(hashSeed().hashCode()),
@@ -47,7 +47,7 @@ public interface Data {
 
 		@Override
 		default long hashCalc(G.HashType t) {
-			Function<Object, Long> f = Fn.hashFn(t);
+			Function<Object, Long> f = G.hashFn(t);
 			
 			return It.reduce(
 					iterator(), 

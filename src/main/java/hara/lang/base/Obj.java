@@ -142,7 +142,7 @@ public interface Obj {
 
 		@Override
 		public long hashCalc(HashType t) {
-			return Fn.hashFn(t).apply(hashSeed()) * 31 + ((I.Hash)_meta).hashCalc(t);
+			return G.hashFn(t).apply(hashSeed()) * 31 + ((I.Hash)_meta).hashCalc(t);
 		}
 
 		@Override

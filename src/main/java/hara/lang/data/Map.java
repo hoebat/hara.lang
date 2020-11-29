@@ -142,7 +142,7 @@ public interface Map<K, V> extends Data.MapType<K, V> {
 					return copyAndSet(edit, ((2 * idx) + 1), val);
 				} else {
 					final Object current_val = _array[((2 * idx) + 1)];
-					final Node<K, V> new_node = mergeTwoKeyValuePairs(edit, (shift + 5), (int)Fn.hashMurmur(current_key),
+					final Node<K, V> new_node = mergeTwoKeyValuePairs(edit, (shift + 5), (int)G.hashMurmur(current_key),
 							current_key, current_val, hash, key, val);
 					added_leaf.inc();
 
@@ -565,7 +565,7 @@ public interface Map<K, V> extends Data.MapType<K, V> {
 
 		@Override
 		default I.Pair<K, V> find(K key) {
-			return _root().find(0, (int)Fn.hashMurmur(key), key);
+			return _root().find(0, (int)G.hashMurmur(key), key);
 		}
 
 		@SuppressWarnings("unchecked")
@@ -641,7 +641,7 @@ public interface Map<K, V> extends Data.MapType<K, V> {
 		public Mutable<K, V> assoc(K key, V val) {_leafFlag.reset(0);
 			
 			var n0 = ((_root == null) ? DataNode.EMPTY : _root);
-			var n1 = n0.assoc(_edit, 0, (int)Fn.hashMurmur(key), key, val, _leafFlag);
+			var n1 = n0.assoc(_edit, 0, (int)G.hashMurmur(key), key, val, _leafFlag);
 			if (n1 != _root) { _root = n1; }
 			_size += _leafFlag.deref();
 			return this;
@@ -651,7 +651,7 @@ public interface Map<K, V> extends Data.MapType<K, V> {
 		public Mutable<K, V>  dissoc(K key) {
 			if (_root == null) return this;
 			_leafFlag.reset(0);
-			var n = _root.without(_edit, 0, (int)Fn.hashMurmur(key), key, _leafFlag);
+			var n = _root.without(_edit, 0, (int)G.hashMurmur(key), key, _leafFlag);
 			if (n != _root) { _root = n; }
 			_size -= _leafFlag.deref();
 			return this;
@@ -715,7 +715,7 @@ public interface Map<K, V> extends Data.MapType<K, V> {
 		public Standard<K, V> assoc(K key, V val) {
 			var added_leaf = new Counter(0);
 			var n0 = _root == null ? DataNode.EMPTY : _root;
-			var n1 = n0.assoc(null, 0, (int)Fn.hashMurmur(key), key, val, added_leaf);
+			var n1 = n0.assoc(null, 0, (int)G.hashMurmur(key), key, val, added_leaf);
 			
 			return (n1 == _root) 
 					? this
@@ -727,7 +727,7 @@ public interface Map<K, V> extends Data.MapType<K, V> {
 			if (_root == null) {
 				return this;
 			}
-			Node<K, V> new_root = _root.without(null, 0, (int)Fn.hashMurmur(key), key, new Counter(0));
+			Node<K, V> new_root = _root.without(null, 0, (int)G.hashMurmur(key), key, new Counter(0));
 			if (new_root == _root) {
 				return this;
 			}

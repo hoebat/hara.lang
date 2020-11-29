@@ -12,6 +12,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 import hara.lang.base.*;
+import hara.lang.base.I.Coll;
 import hara.lang.base.Module;
 import hara.lang.base.Std.T;
 import hara.lang.data.*;
@@ -41,11 +42,11 @@ public interface Builtin {
 
 		@Module.Var(name = "call")
 		@Module.Fn(vargs = true)
-		public static Object call(Object vargs) {
+		public static <R, ARGS> R call(ARGS vargs) {
 			Object[] args = Arr.toArray(vargs);
 			I.Fn f = Fn.toFn(args[1]);
 			Object[] arr = Arr.toArray(It.concat(It.objects(args[0]), Arr.toIter(args, 2, args.length)));
-			return f.apply(arr);
+			return (R) f.apply(arr);
 		}
 
 		@Module.Var(name = "compare")
@@ -73,28 +74,17 @@ public interface Builtin {
 		}
 
 		@Module.Var(name = "deref")
-		public static <V, R> V deref(R ref) {
-			if (ref instanceof I.Deref) {
-				return (V) ((I.Deref) ref).deref();
-			} else if (ref instanceof java.util.concurrent.Future) {
-				try {
-					return (V) ((java.util.concurrent.Future) ref).get();
-				} catch (InterruptedException | ExecutionException t) {
-					throw Ex.Sneaky(t);
-				}
-			} else {
-				throw new Ex.Unsupported();
+		public static <V, R> V deref(I.Deref<V> ref) {
+			return (V) ((I.Deref) ref).deref();
+		}
+
+		@Module.Var(name = "deref")
+		public static <V, R> V deref(java.util.concurrent.Future ref) {
+			try {
+				return (V) ((java.util.concurrent.Future) ref).get();
+			} catch (InterruptedException | ExecutionException t) {
+				throw Ex.Sneaky(t);
 			}
-		}
-
-		@Module.Var(name = "equals")
-		public static boolean equals(Object k1, Object k2) {
-			return (k1 == k2) ? true : (k1 != null && k1.equals(k2));
-		}
-
-		@Module.Var(name = "=")
-		public static boolean equivalent(Object k1, Object k2) {
-			return Eq.eq(k1, k2);
 		}
 
 		@Module.Var(name = "flag")
@@ -105,11 +95,6 @@ public interface Builtin {
 		@Module.Var(name = "flag")
 		public static Ut.Flag flag(Boolean val) {
 			return new Ut.Flag(val);
-		}
-
-		@Module.Var(name = "identical")
-		public static boolean identical(Object k1, Object k2) {
-			return k1 == k2;
 		}
 
 		@Module.Var(name = "keyword")
@@ -127,12 +112,13 @@ public interface Builtin {
 		//
 
 		@Module.Var(name = "meta")
+		public static I.Metadata meta(I.ObjType obj) {
+			return obj.meta();
+		}
+		
+		@Module.Var(name = "meta")
 		public static I.Metadata meta(Object obj) {
-			if (obj instanceof I.ObjType) {
-				return ((I.ObjType) obj).meta();
-			} else {
-				return null;
-			}
+			return null;
 		}
 
 		//
@@ -155,18 +141,37 @@ public interface Builtin {
 		}
 
 		@Module.Var(name = "with-meta")
-		public static Object withMeta(Object obj, I.Metadata meta) {
-			if (obj instanceof I.ObjType) {
-				return ((I.ObjType) obj).withMeta(meta);
-			} else {
-				throw new Ex.Unsupported();
-			}
+		public static I.ObjType withMeta(I.ObjType obj, I.Metadata meta) {
+			return obj.withMeta(meta);
 		}
 	}
 
 	@Module.Ns(name = "builtin", tag = "collection")
 	public interface Collection {
 
+		@Module.Var(name = "conj")
+		public static  <E> I.Coll conj(I.Coll target, E e) {
+			return (I.Coll) target.conj(e);
+		}
+
+		@Module.Var(name = "conj")
+		public static  <E> java.util.List conj(java.util.List target, E e) {
+			((java.util.List) target).add(e);
+			return target;
+		}
+
+		@Module.Var(name = "conj")
+		public static  <E> java.util.Map conj(java.util.Map target, Entry e) {
+			target.put(e.getKey(), e.getValue());
+			return target;
+		}
+
+		@Module.Var(name = "conj")
+		public static  <E> java.util.Set conj(java.util.Set target, Entry e) {
+			target.add(e);
+			return target;
+		}
+		
 		@Module.Var(name = "conj")
 		@Module.Reduce(type = SELF, init = EMPTY_VECTOR)
 		public static <C, E> C conj(C target, E e) {
@@ -227,7 +232,7 @@ public interface Builtin {
 		public static Map.Standard intoMap(Object source) {
 			return Map.Standard.into(It.iter(source));
 		}
-		
+
 		@Module.Var(name = "into:list")
 		public static List.Standard intoList(Object source) {
 			return List.Standard.into(It.iter(source));
@@ -237,7 +242,7 @@ public interface Builtin {
 		public static Vector.Standard intoVec(Object source) {
 			return Vector.Standard.into(It.iter(source));
 		}
-		
+
 		@Module.Var(name = "into:set")
 		public static Set.Standard intoSet(Object source) {
 			return Set.Standard.into(It.iter(source));
@@ -456,21 +461,21 @@ public interface Builtin {
 		}
 
 		@Module.Var(name = "map:vals")
-		public static  Map.Standard mapVals(I.Fn f, Object source) {
+		public static Map.Standard mapVals(I.Fn f, Object source) {
 			Iterator<Entry> it = It.iter(source);
 			return Map.Standard.into(It.map(it, e -> Structure.pair(e.getKey(), f.invoke(e.getValue()))));
 		}
 
 		@Module.Var(name = "map:juxt")
-		public static  Map.Standard mapJuxt(I.Pair<I.Fn, I.Fn> f, Object source) {
+		public static Map.Standard mapJuxt(I.Pair<I.Fn, I.Fn> f, Object source) {
 			var it = It.iter(source);
 			return Map.Standard.into(It.map(it, e -> Structure.pair(f.getKey().invoke(e), f.getValue().invoke(e))));
 		}
 
 		@Module.Var(name = "map:entries")
-		public static  Map.Standard mapEntries(I.Fn f, Object source) {
+		public static Map.Standard mapEntries(I.Fn f, Object source) {
 			Iterator<Entry> it = It.iter(source);
-			return Map.Standard.into(It.map(it, e -> (Entry)f.invoke(e)));
+			return Map.Standard.into(It.map(it, e -> (Entry) f.invoke(e)));
 		}
 
 		@Module.Var(name = "map:apply")
@@ -509,7 +514,7 @@ public interface Builtin {
 
 		@Module.Var(name = "partition:pair")
 		public static I.Fn<Iterator, Iterator, Object> partitionPair() {
-			return Fn.toFn((Function)(source) -> partitionPair(source));
+			return Fn.toFn((Function) (source) -> partitionPair(source));
 		}
 
 		@Module.Var(name = "pipe")
@@ -517,8 +522,7 @@ public interface Builtin {
 		public static I.Fn<Iterator, Iterator, Object> pipe(Object vargs) {
 			var pl = It.iter(vargs);
 			var fns = It.map(pl, Fn::toFn);
-			return Fn.toFn((Function)
-					(it) -> It.reduce(fns, it, (i, f) -> (Iterator) ((I.Fn) f).invoke(i)));
+			return Fn.toFn((Function) (it) -> It.reduce(fns, it, (i, f) -> (Iterator) ((I.Fn) f).invoke(i)));
 		}
 
 		@Module.Var(name = "range")
@@ -627,7 +631,21 @@ public interface Builtin {
 		public static Long bitAnd(Number x, Number y) {
 			return Num.and(x, y);
 		}
-		
+
+		@Module.Var(name = "=")
+		public static boolean equivalent(Object k1, Object k2) {
+			return Eq.eq(k1, k2);
+		}
+
+		@Module.Var(name = "equals")
+		public static boolean equals(Object k1, Object k2) {
+			return (k1 == k2) ? true : (k1 != null && k1.equals(k2));
+		}
+
+		@Module.Var(name = "identical")
+		public static boolean identical(Object k1, Object k2) {
+			return k1 == k2;
+		}
 
 	}
 

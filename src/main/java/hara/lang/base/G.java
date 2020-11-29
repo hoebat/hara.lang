@@ -2,6 +2,7 @@ package hara.lang.base;
 
 import java.util.Iterator;
 import java.util.Map.Entry;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 
 public interface G {
@@ -68,5 +69,35 @@ public interface G {
 	
 	public static void prn(Object... arr) {
 		System.out.println(getLineNumber() + ":\n" + Arr.display(arr));
+	}
+
+	public static long hashMurmur(Object o) {
+		if (o instanceof I.Hash) {
+			return ((I.Hash) o).hashGet(G.HashType.MURMUR3);
+		} else if (o == null) {
+			return 0;
+		} else {
+			return o.hashCode();
+		}
+	}
+
+	public static long hashSip(Object o) {
+		if (o == null)
+			return 0;
+		return o.hashCode();
+	}
+
+	public static Function<Object, Long> hashFn(G.HashType t) {
+	
+		switch (t) {
+		case MURMUR3:
+			return item -> Long.valueOf(hashMurmur(item));
+		case SIP:
+			return item -> Long.valueOf(hashSip(item));
+		case SYSTEM:
+			return item -> Long.valueOf(item.hashCode());
+		default:
+			throw new UnsupportedOperationException("Not Supported");
+		}
 	}
 }
