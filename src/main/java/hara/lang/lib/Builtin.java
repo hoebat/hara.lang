@@ -223,6 +223,26 @@ public interface Builtin {
 			return (C) It.reduceIn(It.iter(other), coll, Collection::conj);
 		}
 
+		@Module.Var(name = "into:map")
+		public static Map.Standard intoMap(Object source) {
+			return Map.Standard.into(It.iter(source));
+		}
+		
+		@Module.Var(name = "into:list")
+		public static List.Standard intoList(Object source) {
+			return List.Standard.into(It.iter(source));
+		}
+
+		@Module.Var(name = "into:vec")
+		public static Vector.Standard intoVec(Object source) {
+			return Vector.Standard.into(It.iter(source));
+		}
+		
+		@Module.Var(name = "into:set")
+		public static Set.Standard intoSet(Object source) {
+			return Set.Standard.into(It.iter(source));
+		}
+
 		@Module.Var(name = "iter")
 		public static Iterator iter(Object obj) {
 			return It.iter(obj);
@@ -367,6 +387,24 @@ public interface Builtin {
 		// Array
 		//
 
+		@Module.Var(name = "T")
+		@Module.Fn(vargs = true)
+		public static Boolean T(Object vargs) {
+			return true;
+		}
+
+		@Module.Var(name = "F")
+		@Module.Fn(vargs = true)
+		public static Boolean F(Object vargs) {
+			return false;
+		}
+
+		@Module.Var(name = "NIL")
+		@Module.Fn(vargs = true)
+		public static Object NIL(Object x) {
+			return null;
+		}
+
 		@Module.Var(name = "apply")
 		@Module.Fn(vargs = true)
 		public static Object apply(Object vargs) {
@@ -382,20 +420,6 @@ public interface Builtin {
 		public static <F> I.OFn comp(Object fns) {
 			return new Fn.H.Comp(Arr.toArray(fns));
 		}
-
-		@Module.Var(name = "F")
-		@Module.Fn(vargs = true)
-		public static Boolean F(Object vargs) {
-			return false;
-		}
-
-		/*
-		 * @Module.Var(name = "stream") public static Iterator stream(Object source,
-		 * Object f) { var it = It.iter(source); return (Iterator)
-		 * Fn.toFn(f).invoke(it); }
-		 * 
-		 * @Module.Var(name = "stream")
-		 */
 
 		@Module.Var(name = "identity")
 		public static Object identity(Object x) {
@@ -425,6 +449,41 @@ public interface Builtin {
 			return It.from(it::hasNext, () -> f.invoke(it.next()));
 		}
 
+		@Module.Var(name = "map:keys")
+		public static Map.Standard mapKeys(I.Fn f, Object source) {
+			Iterator<Entry> it = It.iter(source);
+			return Map.Standard.into(It.map(it, e -> Structure.pair(f.invoke(e.getKey()), e.getValue())));
+		}
+
+		@Module.Var(name = "map:vals")
+		public static  Map.Standard mapVals(I.Fn f, Object source) {
+			Iterator<Entry> it = It.iter(source);
+			return Map.Standard.into(It.map(it, e -> Structure.pair(e.getKey(), f.invoke(e.getValue()))));
+		}
+
+		@Module.Var(name = "map:juxt")
+		public static  Map.Standard mapJuxt(I.Pair<I.Fn, I.Fn> f, Object source) {
+			var it = It.iter(source);
+			return Map.Standard.into(It.map(it, e -> Structure.pair(f.getKey().invoke(e), f.getValue().invoke(e))));
+		}
+
+		@Module.Var(name = "map:entries")
+		public static  Map.Standard mapEntries(I.Fn f, Object source) {
+			Iterator<Entry> it = It.iter(source);
+			return Map.Standard.into(It.map(it, e -> (Entry)f.invoke(e)));
+		}
+
+		@Module.Var(name = "map:apply")
+		public static Iterator mapApply(I.Fn f, Object source) {
+			var it = It.iter(source);
+			return It.from(it::hasNext, () -> f.apply(it.next()));
+		}
+
+		@Module.Var(name = "map:apply")
+		public static I.Fn<Iterator, Iterator, Object> mapApply(I.Fn f) {
+			return Fn.toFn((Function) (source) -> mapApply(f, source));
+		}
+
 		@Module.Var(name = "mapcat")
 		public static I.Fn<Iterator, Iterator, Object> mapcat(I.Fn f) {
 			return Fn.toFn((Function) (source) -> mapcat(f, source));
@@ -433,28 +492,33 @@ public interface Builtin {
 		@Module.Var(name = "mapcat")
 		public static Iterator mapcat(I.Fn f, Object source) {
 			var it = It.iter(source);
-			// I.Fn fn = Fn.toFn(f);
 			return It.mapcat(it, (e) -> (Iterator) f.invoke(e));
-		}
-
-		@Module.Var(name = "NIL")
-		@Module.Fn(vargs = true)
-		public static Object NIL(Object x) {
-			return null;
 		}
 
 		@Module.Var(name = "partial")
 		@Module.Fn(vargs = true)
-		public static <F> I.OFn partial(Object args) {
+		public static <F> I.Fn partial(Object args) {
 			return new Fn.H.Partial(Arr.toArray(args));
+		}
+
+		@Module.Var(name = "partition:pair")
+		public static Iterator partitionPair(Object source) {
+			var it = It.iter(source);
+			return It.partitionPair(it);
+		}
+
+		@Module.Var(name = "partition:pair")
+		public static I.Fn<Iterator, Iterator, Object> partitionPair() {
+			return Fn.toFn((Function)(source) -> partitionPair(source));
 		}
 
 		@Module.Var(name = "pipe")
 		@Module.Fn(vargs = true)
-		public static Function<Iterator, Iterator> pipe(Object vargs) {
+		public static I.Fn<Iterator, Iterator, Object> pipe(Object vargs) {
 			var pl = It.iter(vargs);
 			var fns = It.map(pl, Fn::toFn);
-			return (it) -> It.reduce(fns, it, (i, f) -> (Iterator) ((I.Fn) f).invoke(i));
+			return Fn.toFn((Function)
+					(it) -> It.reduce(fns, it, (i, f) -> (Iterator) ((I.Fn) f).invoke(i)));
 		}
 
 		@Module.Var(name = "range")
@@ -479,28 +543,6 @@ public interface Builtin {
 			return It.reduce(it, init, (acc, e) -> f.invoke(acc, e));
 		}
 
-		//
-		// Merge
-		//
-
-		//
-		// Array
-		//
-
-		//
-		//
-		//
-
-		//
-		// Checks
-		//
-
-		@Module.Var(name = "T")
-		@Module.Fn(vargs = true)
-		public static Boolean T(Object vargs) {
-			return true;
-		}
-
 		@Module.Var(name = "zip")
 		@Module.Fn(vargs = true)
 		public static Iterator zip(Object vargs) {
@@ -514,37 +556,78 @@ public interface Builtin {
 
 		@Module.Var(name = "+")
 		@Module.Reduce(type = INIT, init = ZERO)
-		public static Object add(Object x, Object y) {
+		public static Number add(Number x, Number y) {
 			return Num.add(x, y);
 		}
 
 		@Module.Var(name = "dec")
-		public static Object dec(Object x) {
+		public static Number dec(Number x) {
 			return Num.minus(x, 1);
 		}
 
 		@Module.Var(name = "/")
 		@Module.Reduce(type = ARRAY, init = ONE)
-		public static Object divide(Object x, Object y) {
+		public static Number divide(Number x, Number y) {
 			return Num.divide(x, y);
 		}
 
 		@Module.Var(name = "inc")
-		public static Object inc(Object x) {
+		public static Number inc(Number x) {
 			return Num.add(x, 1);
 		}
 
 		@Module.Var(name = "-")
 		@Module.Reduce(type = ARRAY, init = ZERO)
-		public static Object minus(Object x, Object y) {
+		public static Number minus(Number x, Number y) {
 			return Num.minus(x, y);
 		}
 
 		@Module.Var(name = "*")
 		@Module.Reduce(type = INIT, init = ONE)
-		public static Object multiply(Object x, Object y) {
+		public static Number multiply(Number x, Number y) {
 			return Num.multiply(x, y);
 		}
+
+		@Module.Var(name = "pos?")
+		public static Boolean isPos(Number x) {
+			return Num.gt(x, 0);
+		}
+
+		@Module.Var(name = "neg?")
+		public static Boolean isNeg(Number x) {
+			return Num.lt(x, 0);
+		}
+
+		@Module.Var(name = "zero?")
+		public static Boolean isZero(Number x) {
+			return Num.eq(x, 0);
+		}
+
+		@Module.Var(name = "<")
+		public static Boolean lt(Number x, Number y) {
+			return Num.lt(x, y);
+		}
+
+		@Module.Var(name = "<=")
+		public static Boolean lte(Number x, Number y) {
+			return Num.lte(x, y);
+		}
+
+		@Module.Var(name = ">")
+		public static Boolean gt(Number x, Number y) {
+			return Num.gt(x, y);
+		}
+
+		@Module.Var(name = ">=")
+		public static Boolean gte(Number x, Number y) {
+			return Num.gte(x, y);
+		}
+
+		@Module.Var(name = "b&")
+		public static Long bitAnd(Number x, Number y) {
+			return Num.and(x, y);
+		}
+		
 
 	}
 

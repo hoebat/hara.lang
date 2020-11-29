@@ -164,7 +164,7 @@ public interface Factory {
 		}
 	}
 
-	public static Session.Var createSingle(String ns, Method m) {
+	public static Session.Var createSingleStatic(String ns, Method m) {
 		var mVar = (Module.Var) getAnnotation(m, Module.Var.class);
 		var mFn = (Module.Fn) getAnnotation(m, Module.Fn.class);
 		var mReduce = (Module.Reduce) getAnnotation(m, Module.Reduce.class);
@@ -175,7 +175,7 @@ public interface Factory {
 	}
 	
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public static Session.Var createMulti(String ns, ArrayList<Method> l) {
+	public static Session.Var createMultiStatic(String ns, ArrayList<Method> l) {
 		var mVar = (Module.Var) getAnnotation(l.get(0), Module.Var.class);
 		var mName = (mVar.name() == "") ? l.get(0).getName() : mVar.name();
 
@@ -201,17 +201,28 @@ public interface Factory {
 	}
 
 	@SuppressWarnings({ "unchecked" })
-	public static Session.Var createVar(String ns, Object entry) {
+	public static Session.Var createVarStatic(String ns, Object entry) {
 		var e = (Entry<String, ArrayList<Method>>) entry;
 		var l = e.getValue();
 		switch (l.size()) {
 		case 0:
 			throw new Ex.Runtime("Not Allowed");
 		case 1:
-			return createSingle(ns, l.get(0));
+			return createSingleStatic(ns, l.get(0));
 		default:
-			return createMulti(ns, l);
+			return createMultiStatic(ns, l);
 		}
+	}
+
+	public static BiFunction<String, Object, Session.Var> createVarFn(Session.RT rt) {
+		return (s, entry) -> {
+			var v = createVarStatic(s, entry);
+			var f = new Fn.H.Partial(new Object[] {
+				v.deref(), rt
+			});
+			v.reset(f);
+			return v;
+		};
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
@@ -244,7 +255,7 @@ public interface Factory {
 
 	@SuppressWarnings("rawtypes")
 	public static Map.Standard<Symbol, Session.Var> loadModule(Class cls) {
-		return loadModule(cls, Factory::createVar);
+		return loadModule(cls, Factory::createVarStatic);
 	}
 	
 

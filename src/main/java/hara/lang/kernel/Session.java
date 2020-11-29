@@ -93,12 +93,12 @@ public interface Session {
 		
 		final Data.EnvType _parent;
 		final RT _rt;
+		final Map.Standard<Symbol, Var> _methods;
 		
-
-
 		public RTEnv(Data.EnvType parent, RT rt) {
 			_parent = parent;
 			_rt = rt;
+			_methods = Factory.loadModule(rt, Methods.class);
 		}
 		
 		@Override
@@ -106,10 +106,9 @@ public interface Session {
 			return _parent;
 		}
 
-		@SuppressWarnings("unchecked")
 		@Override
 		public Map.Standard<Symbol, Var> getMap() {
-			return Map.Standard.EMPTY;
+			return _methods;
 		}		
 	}
 	
@@ -118,16 +117,16 @@ public interface Session {
 		public final Foundation _F;
 		public final String _key;
 		public final Loader _loader;
-		public final Data.EnvType _global;
-		public final Data.EnvType _env;
+		public final StaticEnv _static;
+		public final RTEnv _env;
 		public Ut.RefCache<String, Class> REGISTRY;
 		
 		public RT(Foundation F, String key) {
 			_F = F;
 			_key = key;
 			_loader = new Loader();
-			_global = new StaticEnv();
-			_env = new RTEnv(_global, this);
+			_static = new StaticEnv();
+			_env = new RTEnv(_static, this);
 		}
 
 		@Override
@@ -195,7 +194,7 @@ public interface Session {
 		}
 		
 		public Object evalString(String input) {
-			return evalString(readString(input));
+			return eval(readString(input));
 		}
 		
 		public Object invokeStaticMethodVariadic(String className, String methodName, Object... args) {
@@ -430,14 +429,14 @@ public interface Session {
 		}
 		
 		@Module.Var(name = "sys:add-paths")
-		@Module.Fn(rt = true, vargs = true)
+		@Module.Fn(rt = true)
 		public static ArrayList<String> sysAddPath(RT rt, String[] paths) {
 			return rt.addClasspath(paths);
 		}
 		
 		@Module.Var(name = "sys:list-paths")
 		@Module.Fn(rt = true)
-		public static ArrayList<String> sysAddPath(RT rt) {
+		public static ArrayList<String> sysListPath(RT rt) {
 			return rt.getClasspath();
 		}
 		

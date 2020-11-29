@@ -175,16 +175,17 @@ public interface Fn {
 				_num = num;
 			}
 
+			@SuppressWarnings("unchecked")
 			@Override
 			public Function<Object, R> getArgN() {
 				return (args) -> {
-					Object[] arr = Arr.toArray(args);
+					java.util.List arr = It.toArrayList(It.iter(args));
 
-					if (arr.length != _num) {
-						throw new Ex.Arity(arr.length, "Only " + _num + " Args supported");
+					if (arr.size() != _num) {
+						throw new Ex.Arity(arr.size(), "Only " + _num + " Args supported");
 					}
 					try {
-						return (R) _mh.invoke(arr);
+						return (R) _mh.invokeWithArguments(arr);
 					} catch (Throwable t) {
 						throw Ex.Sneaky(t);
 					}
