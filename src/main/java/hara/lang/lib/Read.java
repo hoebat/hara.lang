@@ -15,7 +15,7 @@ import hara.lang.base.*;
 import hara.lang.data.*;
 import static hara.lang.lib.Builtin.Basic.*;
 import static hara.lang.lib.Builtin.Collection.*;
-import static hara.lang.lib.Builtin.Structure.*;
+import static hara.lang.lib.Builtin.Struct.*;
 
 public interface Read {
 
@@ -385,19 +385,8 @@ public interface Read {
 		}
 
 		private static Object matchSymbol(String s) {
-			Matcher m = symbolPat.matcher(s);
-			if (m.matches()) {
-				// int gc = m.groupCount();
-				String ns = m.group(1);
-				String name = m.group(2);
-				if (ns != null && ns.endsWith(":/") || name.endsWith(":"))
-					return null;
-
-				boolean isKeyword = s.charAt(0) == ':';
-
-				return isKeyword ? Keyword.create(ns, name) : Symbol.create(ns, name);
-			}
-			return null;
+			boolean isKeyword = s.charAt(0) == ':';
+			return isKeyword ? Keyword.create(s.substring(1)) : Symbol.create(s);
 		}
 
 		private static Number matchNumber(String s) {
@@ -708,7 +697,7 @@ public interface Read {
 				if(list.size() > 5) {
 					return vector(list);
 				} else {
-					return tup(list.toArray());
+					return tuple(list.toArray());
 				}
 			}
 		}
@@ -743,5 +732,9 @@ public interface Read {
 				return queue(list);
 			}
 		}
+	}
+	
+	public static void main(String[] args) {
+		G.prn(LispReader.readString("a/b", null));
 	}
 }

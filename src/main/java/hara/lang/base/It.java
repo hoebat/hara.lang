@@ -239,7 +239,6 @@ public interface It {
 	}
 
 	@SuppressWarnings("rawtypes")
-	@Module.Var(name = "iter")
 	public static Iterator iter(Object obj) {
 		if(obj == null) {
 			return Nil.ITERATOR;
@@ -249,7 +248,10 @@ public interface It {
 			return ((Iterable)obj).iterator();
 		} else if(obj instanceof java.util.Map) {
 			return ((java.util.Map)obj).entrySet().iterator();
-		}  else if (obj.getClass().isArray()) {
+		} else if(obj instanceof java.util.Map.Entry) {
+			Entry e = (Entry)obj;
+			return It.objects(e.getKey(), e.getValue());
+		} else if (obj.getClass().isArray()) {
 			return Arr.toIter(obj);
 		} else {
 			throw new Ex.Unsupported();
@@ -375,15 +377,6 @@ public interface It {
 		}
 		return _acc;
 	}
-
-	public static <E> E reduce(Iterator<E> it, BiFunction<E, E, E> f, Supplier<Boolean> end) {
-		var _acc = it.next();
-		while (it.hasNext()) {
-			if(end.get()) { return _acc; }
-			_acc = f.apply(_acc, it.next());
-		}
-		return _acc;
-	}
 	
 	public static <E, R> R reduce(Iterator<E> it, R init, BiFunction<R, E, R> f) {
 		var _acc = init;
@@ -393,10 +386,10 @@ public interface It {
 		return _acc;
 	}
 	
-	public static <E, R> R reduce(Iterator<E> it, R init, BiFunction<R, E, R> f, Supplier<Boolean> end) {
+	public static <E, R> R reduce(Iterator<E> it, R init, BiFunction<R, E, R> f, Function<R, Boolean> end) {
 		var _acc = init;
 		while (it.hasNext()) {
-			if(end.get()) { return _acc; }
+			if(end.apply(_acc)) { return _acc; }
 			_acc = f.apply(_acc, it.next());
 		}
 		return _acc;
@@ -419,23 +412,10 @@ public interface It {
 			return out;
 		}
 	}
-	
-	@SuppressWarnings("unchecked")
-	public static <E, R> R reduceIn(Iterator<E> it, R init, BiFunction<R, E, R> f, Supplier<Boolean> end) {
-		R _init;
-		boolean _change = false;
-		if(init instanceof I.ToMutable) {
-			_init = (R)((I.ToMutable)init).toMutable();
-			_change = true;
-		} else {
-			_init = init;
-		}
-		R out = reduce(it, _init, f, end);
-		if(out instanceof I.ToPersistent && _change == true) {
-			return (R)((I.ToPersistent)out).toPersistent();
-		} else {
-			return out;
-		}
+
+	@SuppressWarnings({ "unchecked", "rawtypes" })
+	public static <E, R> long count(Iterator it) {
+		return (long) reduce(it, 0, (acc, i) -> acc + 1);
 	}
 
 	//
@@ -592,8 +572,8 @@ public interface It {
 	
 
 	public static <K, E, R> HashMap<K, ArrayList<R>> 
-		groupBy(Iterator<E> it, Function<E, K> f, Function<E, R> p) {
-		return reduce(it, new HashMap<K, ArrayList<R>>(), (m, e) -> {
+		groupBy(Iterator<E> it, Function<E, K> f, Function<E, R> p, HashMap<K, ArrayList<R>> map) {
+		return reduce(it, map, (m, e) -> {
 			K key = f.apply(e);
 			ArrayList<R> l = m.get(key);
 			if(l == null) {
@@ -603,6 +583,11 @@ public interface It {
 			l.add(p.apply(e));
 			return m;
 		});
+	}
+	
+	public static <K, E, R> HashMap<K, ArrayList<R>> 
+		groupBy(Iterator<E> it, Function<E, K> f, Function<E, R> p) {
+		return groupBy(it, f, p, new HashMap<K, ArrayList<R>>());
 	}
 
 	public static <K, E> Function<Iterator<E>, HashMap<K, ArrayList<E>>> groupBy(Function<E, K> f) {
@@ -724,6 +709,7 @@ public interface It {
 		return list;
 	}
 	
+	@SafeVarargs
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public static <E> ArrayList<E> toArrayList(Object input, Function<Iterator, Iterator>... pl) {
 		Iterator it = iter(input);

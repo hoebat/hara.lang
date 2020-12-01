@@ -1,4 +1,4 @@
-package hara.lang.kernel;
+package hara.lang.xtra;
 
 import java.lang.reflect.Method;
 import java.lang.annotation.Annotation;
@@ -20,12 +20,13 @@ import hara.lang.data.Map;
 import hara.lang.data.Queue;
 import hara.lang.data.Symbol;
 import hara.lang.data.Vector;
-import hara.lang.lib.*;
+import hara.lang.lib.Builtin;
+import hara.lang.lib.Builtin.Struct;
 
 import static hara.lang.lib.Builtin.Basic.*;
-import static hara.lang.lib.Builtin.Structure.*;
+import static hara.lang.lib.Builtin.Struct.*;
 
-public interface Factory {
+public interface Factory2 {
 
 	public interface To {
 
@@ -98,7 +99,26 @@ public interface Factory {
 				 symbol("params"), list(m.getParameters())
 		});
 	}
+	
 
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	public static HashMap<String, ArrayList<Method>> getMethods(Class cls) {
+		
+		Function pairs 
+			= It.keep((m) -> {
+				Module.Var v = (Module.Var) getAnnotation((Method) m, Module.Var.class);
+				return (v != null) ? Builtin.Struct.pair(v.name(), m) : null; });
+		
+		Function groups 
+			= It.groupBy(
+					p -> ((I.Pair) p).getKey(),
+					p -> ((I.Pair) p).getValue());
+		
+		return (HashMap<String, ArrayList<Method>>) 
+				It.collect(groups, cls.getDeclaredMethods(), pairs);
+	}
+
+	/*
 	@SuppressWarnings("rawtypes")
 	public static I.Fn fnSupplier(Method m) {
 		return Fn.toFn(methodMeta(m), To.supplier(m));
@@ -136,6 +156,7 @@ public interface Factory {
 	public static I.Fn fnExact(Method m, int count) {
 		return Fn.toExact(methodMeta(m), To.handle(m), count);
 	}
+	*/
 	
 	@SuppressWarnings("rawtypes")
 	public static Object getAnnotation(Annotation[] ann, Class c) {
@@ -194,7 +215,7 @@ public interface Factory {
 					case 2: f = To.bifunction(m); break;
 					default: f = To.handle(m); break;
 					}
-					return Builtin.Structure.pair(cnt, f);
+					return Builtin.Struct.pair(cnt, f);
 				}));
 		v.reset(Fn.toMulti(methodMeta(l.get(0)), (Data.MapType<Integer, Object>) map));
 		return v;
@@ -214,7 +235,7 @@ public interface Factory {
 		}
 	}
 
-	public static BiFunction<String, Object, Session.Var> createVarFn(Session.RT rt) {
+	public static BiFunction<String, Object, Session.Var> createVarFn(Session.Instance rt) {
 		return (s, entry) -> {
 			var v = createVarStatic(s, entry);
 			var f = new Fn.H.Partial(new Object[] {
@@ -234,7 +255,7 @@ public interface Factory {
 						cls.getDeclaredMethods(), 
 						(Function) It.keep((m) -> {
 							Module.Var v = (Module.Var) getAnnotation((Method) m, Module.Var.class);
-							return (v != null) ? Builtin.Structure.pair(v.name(), m) : null;
+							return (v != null) ? Builtin.Struct.pair(v.name(), m) : null;
 						}));
 	}
 
@@ -246,7 +267,7 @@ public interface Factory {
 		var m = It.collect(Map.Standard::into, methods.entrySet(), (Function) It.keep(entry -> {
 			var v = create.apply(ns.name(), entry);
 			var str = (String) ((Entry) entry).getKey();
-			return (v != null && v.deref() != null) ? Builtin.Structure.pair(Symbol.create(str), v) : null;
+			return (v != null && v.deref() != null) ? Builtin.Struct.pair(Symbol.create(str), v) : null;
 		}));
 		return (Map.Standard<Symbol, Session.Var>) m;
 	}
@@ -255,13 +276,13 @@ public interface Factory {
 
 	@SuppressWarnings("rawtypes")
 	public static Map.Standard<Symbol, Session.Var> loadModule(Class cls) {
-		return loadModule(cls, Factory::createVarStatic);
+		return loadModule(cls, Factory2::createVarStatic);
 	}
 	
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public static Map.Standard<Symbol, Session.Var> loadModule(Session.RT rt, Class cls) {
-		return loadModule(cls, Factory.createVarFn(rt));
+	public static Map.Standard<Symbol, Session.Var> loadModule(Session.Instance rt, Class cls) {
+		return loadModule(cls, Factory2.createVarFn(rt));
 	}
 
 	public static void main(String[] args) {

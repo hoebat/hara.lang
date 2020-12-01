@@ -3,6 +3,7 @@ package hara.lang.base;
 import java.util.Iterator;
 
 import hara.lang.base.G.HashType;
+import hara.lang.data.Keyword;
 
 public interface Obj {
 
@@ -147,7 +148,8 @@ public interface Obj {
 
 		@Override
 		public String display() {
-			 return "#fn " + _meta + "";
+			var name = Keyword.create("name").invoke(_meta);
+			 return "#<" + name + ">";
 		}
 		
 	}

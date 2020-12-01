@@ -8,8 +8,6 @@ import java.util.function.Function;
 
 import hara.lang.base.I.PopFirst;
 import hara.lang.base.I.PushFirst;
-import hara.lang.data.Symbol;
-
 
 public interface Data {
 	
@@ -574,26 +572,7 @@ public interface Data {
 	
 	public interface VarType extends I.Deref<Object> {
 		Boolean isDynamic();
-
 		Boolean isMacro();
+		Boolean isControl();
 	}
-
-	public interface EnvType extends I.Find<Symbol, VarType> {
-		EnvType getParent();
-
-		MapType<Symbol, ? extends VarType> getMap();
-		
-		@Override
-		default VarType find(Symbol s) {
-			VarType v = getMap().lookup(s);
-			if(v == null) {
-				EnvType env = getParent();
-				if(env != null) {
-					return env.find(s);
-				}
-			}
-			return v;
-		}
-	}
-
 }

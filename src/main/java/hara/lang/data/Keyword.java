@@ -88,6 +88,8 @@ public final class Keyword
 				return ((java.util.Map) obj).get(this);
 			} else if (obj instanceof I.Context) {
 				return ((I.Context) obj).call(this);
+			} else if (obj == null) {
+				return null;
 			} else {
 				throw new Ex.Unsupported();
 			}
@@ -104,6 +106,8 @@ public final class Keyword
 				return ((java.util.Map) obj).getOrDefault(this, arg);
 			} else if (obj instanceof I.Context) {
 				return ((I.Context) obj).call(this, arg);
+			} else if (obj == null) {
+				return arg;
 			} else {
 				throw new Ex.Unsupported();
 			}

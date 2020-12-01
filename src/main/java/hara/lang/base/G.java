@@ -19,12 +19,12 @@ public interface G {
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public static String displayList(java.util.List l) {
-		return "#j " + It.display(l.iterator());
+		return "#j" + It.display(l.iterator());
 	}
 	
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public static String displayMap(java.util.Map m) {
-		return "#j " + It.toString(m.entrySet().iterator(), "{", "}", ",", 
+		return "#j" + It.toString(m.entrySet().iterator(), "{", "}", ",", 
 					(entry) -> display(((Entry)entry).getKey()) + " " + display(((Entry)entry).getValue()));
 	}
 	
@@ -54,9 +54,9 @@ public interface G {
 		} else if (e instanceof Entry) {
 			return displayMapEntry((Entry)e);
 		} else if (e instanceof Iterator){
-			return "#i " + It.display((Iterator)e);
+			return "#i" + It.display((Iterator)e);
 		} else if (e.getClass().isArray()){
-			return "#arr " + It.display(Arr.toIter(e));
+			return "#arr" + It.display(Arr.toIter(e));
 		} else {
 			return e.toString();
 		}

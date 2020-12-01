@@ -3,6 +3,7 @@ package hara.lang.kernel;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -10,16 +11,16 @@ import hara.lang.base.Arr;
 import hara.lang.base.Ex;
 import hara.lang.base.I;
 import hara.lang.base.It;
-import hara.lang.base.Ut;
+import hara.lang.lib.*;
+import hara.lang.lib.RT.Instance;
 
 @SuppressWarnings("rawtypes")
 public class Foundation implements I.Context {
 
 	static final int DEFAULT_PORT = 4164;
 	
-	public final Ut.RefCache<String, Server> SERVERS = new Ut.RefCache<>();
-	
-	public final Ut.RefCache<String, Session.RT> SESSIONS = new Ut.RefCache<>();
+	public final ConcurrentHashMap<String,Server> SERVERS = new ConcurrentHashMap<String,Server>();
+	public final ConcurrentHashMap<String,I.Runtime> RTS = new ConcurrentHashMap<String,I.Runtime>();
 
 	public enum COMMAND {
 		HELP, SHUTDOWN, DIR, PING, ECHO, OS, JVM, SERVER, SESSION
@@ -86,8 +87,8 @@ public class Foundation implements I.Context {
 		}
 
 		public static List runDIR(Foundation F) {
-			return Arrays.asList("SERVERS", It.toArrayList(F.SERVERS.keys()), "SESSIONS",
-					It.toArrayList(F.SESSIONS.keys()));
+			return Arrays.asList("SERVERS", It.toArrayList(F.SERVERS.keys()), "RTS",
+					It.toArrayList(F.RTS.keys()));
 		}
 
 		public static String runProcess(List<String> args) {
@@ -158,43 +159,46 @@ public class Foundation implements I.Context {
 			throw new Ex.Unsupported();
 		}
 		
-		public static Object runSessionFor(Foundation F, String key, Function<Session.RT, Object> f) {
-			Session.RT s = F.SESSIONS.get(key);
-			return (s != null) ? f.apply(s) : null;
+		public static Object runSessionFor(Foundation F, String key, Function<RT.Instance, Object> f) {
+			RT.Instance s = (Instance) F.RTS.get(key);
+			
+			if (s != null) return f.apply(s);
+			throw new Ex.Runtime("No Session: " + key);
 		}
 		
 		public static Object runSessionCreate(Foundation F, List<String> args) {
 			var key = args.get(0);
-			var s = F.SESSIONS.get(key);
+			var s = F.RTS.get(key);
 			if (s != null) {
 				throw new Ex.Runtime("Session already exists: " + key);
 			} else {
-				F.SESSIONS.register(key, new Session.RT(F, key));
+				F.RTS.put(key, new RT.Instance(F, key));
 				return key;
 			}
 		}
 
-		public static Object runSessionClasspath(Session.RT rt, List<String> args) {
+		public static Object runSessionClasspath(RT.Instance rt, List<String> args) {
 			CLASSPATH cmd = (args.size() == 1) 
 								? CLASSPATH.LIST
 								: CLASSPATH.valueOf(args.get(1));
 			if(cmd == CLASSPATH.LIST) {
 				System.out.println("LIST");
-				return rt.getClasspath();
+				return rt.listPaths();
 			}
 		
 			
 			args.remove(0);
 			args.remove(0); 
 			switch(cmd) {
-			case ADD:    return rt.addClasspath(args.toArray(new String[] {}));
-			case FIND:   return rt.findClasspath(args.toArray(new String[] {}));
+			case ADD:    return rt.addPaths(args.toArray(new String[] {}));
+			//case FIND:   return rt.(args.toArray(new String[] {}));
 			//case LOAD:   return rt.loadClasspath(args);
 			}
 			throw new Ex.Unsupported();
 		}
 		
 
+		@SuppressWarnings("unchecked")
 		public static Object runSession(Foundation F, List<String> args) {
 			SESSION cmd = SESSION.valueOf(args.get(0));
 			args.remove(0);
@@ -203,13 +207,14 @@ public class Foundation implements I.Context {
 			case HELP:  return Fn.runHELP(F, SESSION.values());
 			case EXISTS: return runSessionFor(F, args.get(0), (rt) -> rt != null);
 			case EVAL: 
-				return runSessionFor(F, args.get(0), rt -> rt.evalString(args.get(1)));
+				return runSessionFor(F, args.get(0), 
+						rt -> rt.eval(rt.readString(args.get(1))));
 			case NEW: return runSessionCreate(F, args);
 			case CP:
 			case CLASSPATH: return runSessionFor(F, args.get(0), 
 					(rt) -> runSessionClasspath(rt, args));
 			//case INFO:  return runSessionFor(F, args.get(0), (rt) -> rt.getInfo());
-			case LIST:  return It.toArrayList(F.SESSIONS.keys());
+			case LIST:  return It.toArrayList(F.RTS.keys());
 			//case LOAD:  return runSessionFor(F, args.get(0), (rt) -> rt.load(args));
 			//case STOP:  return runSessionFor(F, args.get(0), (rt) -> rt.stop());
 			case CLASSLOADER: break;

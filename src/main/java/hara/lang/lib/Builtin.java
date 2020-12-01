@@ -3,53 +3,46 @@ package hara.lang.lib;
 import static hara.lang.base.Module.ReduceInit.*;
 import static hara.lang.base.Module.ReduceType.*;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.math.BigInteger;
-import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
-import java.util.function.Supplier;
 
 import hara.lang.base.*;
-import hara.lang.base.I.Coll;
+import hara.lang.base.Std.T.*;
 import hara.lang.base.Module;
-import hara.lang.base.Std.T;
 import hara.lang.data.*;
+import hara.lang.data.Map.Standard;
 
 @SuppressWarnings({ "unchecked", "rawtypes" })
 
-@Module.Ns(name = "builtin")
 public interface Builtin {
 
-	@Module.Ns(name = "builtin", tag = "basic")
+	@Module.Ns(name = "global", tag = "basic")
 	public interface Basic {
 
-		@Module.Var(name = "atom")
+		@Module.Fn(name = "atom", complete = true)
 		public static <V> Atom.Standard<V> atom(V val) {
 			return new Atom.Standard<V>(val);
 		}
 
-		@Module.Var(name = "atom:basic")
+		@Module.Fn(name = "atom:basic", complete = true)
 		public static <V> Atom.Basic<V> atomBasic(V val) {
 			return new Atom.Basic<V>(val);
 		}
 
-		@Module.Var(name = "volatile")
+		@Module.Fn(name = "volatile", complete = true)
 		public static <V> Ut.Volatile<V> atomVolatile(V val) {
 			return new Ut.Volatile<V>(val);
 		}
 
-		@Module.Var(name = "call")
-		@Module.Fn(vargs = true)
-		public static <R, ARGS> R call(ARGS vargs) {
-			Object[] args = Arr.toArray(vargs);
-			I.Fn f = Fn.toFn(args[1]);
-			Object[] arr = Arr.toArray(It.concat(It.objects(args[0]), Arr.toIter(args, 2, args.length)));
-			return (R) f.apply(arr);
-		}
-
-		@Module.Var(name = "compare")
+		@Module.Fn(name = "compare", complete = true)
 		public static int compare(Object k1, Object k2) {
 			if (k1 == k2)
 				return 0;
@@ -63,46 +56,72 @@ public interface Builtin {
 			return -1;
 		}
 
-		@Module.Var(name = "counter")
+		@Module.Fn(name = "counter", complete = true)
 		public static Ut.Counter counter() {
 			return new Ut.Counter(-1);
 		}
 
-		@Module.Var(name = "counter")
+		@Module.Fn(name = "counter", complete = true)
 		public static Ut.Counter counter(Integer start) {
 			return new Ut.Counter(start);
 		}
 
-		@Module.Var(name = "deref")
-		public static <V, R> V deref(I.Deref<V> ref) {
-			return (V) ((I.Deref) ref).deref();
+		@Module.Fn(name = "deref", protocol = true)
+		public static <V> V deref(I.Deref<V> ref) {
+			return ref.deref();
 		}
 
-		@Module.Var(name = "deref")
-		public static <V, R> V deref(java.util.concurrent.Future ref) {
+		@Module.Fn(name = "deref", protocol = true, method = "derefTimeout")
+		public static <V> V deref(I.DerefTimeout<V> ref, long ms, V timeoutVal) {
+			return ref.derefTimeout(ms, timeoutVal);
+		}
+
+		@Module.Fn(name = "deref", option = true)
+		public static <V> V deref(java.util.concurrent.Future<V> ref) {
 			try {
-				return (V) ((java.util.concurrent.Future) ref).get();
+				return ref.get();
 			} catch (InterruptedException | ExecutionException t) {
 				throw Ex.Sneaky(t);
 			}
 		}
 
-		@Module.Var(name = "flag")
+		@Module.Fn(name = "deref", option = true)
+		public static <V> V deref(java.util.concurrent.Future<V> ref, long ms, V timeoutVal) {
+			try {
+				return ref.get(ms, java.util.concurrent.TimeUnit.MILLISECONDS);
+			} catch (InterruptedException | ExecutionException t) {
+				throw Ex.Sneaky(t);
+			} catch (TimeoutException e) {
+				return timeoutVal;
+			}
+		}
+
+		@Module.Fn(name = "flag", complete = true)
 		public static Ut.Flag flag() {
 			return new Ut.Flag(false);
 		}
 
-		@Module.Var(name = "flag")
+		@Module.Fn(name = "flag", complete = true)
 		public static Ut.Flag flag(Boolean val) {
 			return new Ut.Flag(val);
 		}
 
-		@Module.Var(name = "keyword")
+		@Module.Fn(name = "hash", protocol = true)
+		public static long hash(I.Hash obj) {
+			return obj.hashGet();
+		}
+
+		@Module.Fn(name = "hash", fallback = true)
+		public static long hash(Object obj) {
+			return obj.hashCode();
+		}
+
+		@Module.Fn(name = "keyword", complete = true)
 		public static Keyword keyword(String nsname) {
 			return Keyword.create(nsname);
 		}
 
-		@Module.Var(name = "keyword")
+		@Module.Fn(name = "keyword", complete = true)
 		public static Keyword keyword(String ns, String name) {
 			return Keyword.create(ns, name);
 		}
@@ -111,757 +130,1159 @@ public interface Builtin {
 		//
 		//
 
-		@Module.Var(name = "meta")
+		@Module.Fn(name = "meta", protocol = true)
 		public static I.Metadata meta(I.ObjType obj) {
 			return obj.meta();
 		}
-		
-		@Module.Var(name = "meta")
+
+		@Module.Fn(name = "meta", fallback = true)
 		public static I.Metadata meta(Object obj) {
 			return null;
+		}
+
+		@Module.Fn(name = "realize", protocol = true)
+		public static <V> V realize(I.Realize<V> obj) {
+			return obj.realize();
+		}
+
+		@Module.Fn(name = "realized?", protocol = true)
+		public static <V> boolean realized(I.Realize<V> obj) {
+			return obj.isRealized();
+		}
+
+		@Module.Fn(name = "reset!", protocol = true)
+		public static <V> V reset(I.Reset<V> obj, V val) {
+			return obj.reset(val);
 		}
 
 		//
 		// Checks
 		//
 
-		@Module.Var(name = "symbol")
+		@Module.Fn(name = "symbol", complete = true)
 		public static Symbol symbol(String nsname) {
 			return Symbol.create(nsname);
 		}
 
-		@Module.Var(name = "symbol")
+		@Module.Fn(name = "symbol", complete = true)
 		public static Symbol symbol(String ns, String name) {
 			return Symbol.create(ns, name);
 		}
 
-		@Module.Var(name = "type")
+		@Module.Fn(name = "type", complete = true)
 		public static Class<? extends Object> type(Object x) {
 			return (x != null) ? x.getClass() : null;
 		}
 
-		@Module.Var(name = "with-meta")
+		@Module.Fn(name = "with-meta", protocol = true)
 		public static I.ObjType withMeta(I.ObjType obj, I.Metadata meta) {
 			return obj.withMeta(meta);
 		}
 	}
 
-	@Module.Ns(name = "builtin", tag = "collection")
-	public interface Collection {
+	@Module.Ns(name = "global", tag = "check")
+	public interface Check {
 
-		@Module.Var(name = "conj")
-		public static  <E> I.Coll conj(I.Coll target, E e) {
-			return (I.Coll) target.conj(e);
-		}
-
-		@Module.Var(name = "conj")
-		public static  <E> java.util.List conj(java.util.List target, E e) {
-			((java.util.List) target).add(e);
-			return target;
-		}
-
-		@Module.Var(name = "conj")
-		public static  <E> java.util.Map conj(java.util.Map target, Entry e) {
-			target.put(e.getKey(), e.getValue());
-			return target;
-		}
-
-		@Module.Var(name = "conj")
-		public static  <E> java.util.Set conj(java.util.Set target, Entry e) {
-			target.add(e);
-			return target;
+		@Module.Fn(name = "class?", complete = true)
+		public static <TYPE> boolean isClass(TYPE x) {
+			return (x instanceof Class);
 		}
 		
-		@Module.Var(name = "conj")
-		@Module.Reduce(type = SELF, init = EMPTY_VECTOR)
-		public static <C, E> C conj(C target, E e) {
-			if (target instanceof I.Coll) {
-				return (C) ((I.Coll) target).conj(e);
-			} else if (target instanceof java.util.List) {
-				((java.util.List) target).add(e);
-				return target;
-			} else if (target instanceof java.util.Map) {
-				var entry = (Entry) e;
-				((java.util.Map) target).put(entry.getKey(), entry.getValue());
-				return target;
-			} else if (target instanceof java.util.Set) {
-				((java.util.Set) target).add(e);
-				return target;
+		@Module.Fn(name = "falsey?", complete = true)
+		public static <TYPE> boolean isFalsey(TYPE x){
+			if(x == null) {
+				return true;
+			} else if(x instanceof Boolean) {
+				return !((Boolean)x).booleanValue();
 			} else {
-				throw new Ex.Unsupported();
+				return false;
 			}
 		}
-
-		@Module.Var(name = "cons")
-		@Module.Reduce(type = SELF, init = EMPTY_LIST)
-		public static <C, E> C cons(C target, E e) {
-			if (target instanceof I.Cons) {
-				return (C) ((I.Cons) target).cons(e);
-			} else if (target instanceof java.util.List) {
-				((java.util.List) target).add(0, e);
-				return target;
-			} else {
-				throw new Ex.Unsupported();
-			}
-		}
-
-		@Module.Var(name = "find")
-		public static <C, K, V> V find(C lu, K key) {
-			if (lu instanceof I.Find) {
-				return (V) ((I.Find) lu).find(key);
-			} else {
-				throw new Ex.Unsupported();
-			}
-		}
-
-		@Module.Var(name = "has?")
-		public static <C, K> Boolean has(C lu, K key) {
-			if (lu instanceof I.Find) {
-				return ((I.Find) lu).has(key);
-			} else {
-				throw new Ex.Unsupported();
-			}
-		}
-
-		@Module.Var(name = "into")
-		public static <C, E> C into(C coll, Object other) {
-			return (C) It.reduceIn(It.iter(other), coll, Collection::conj);
-		}
-
-		@Module.Var(name = "into:map")
-		public static Map.Standard intoMap(Object source) {
-			return Map.Standard.into(It.iter(source));
-		}
-
-		@Module.Var(name = "into:list")
-		public static List.Standard intoList(Object source) {
-			return List.Standard.into(It.iter(source));
-		}
-
-		@Module.Var(name = "into:vec")
-		public static Vector.Standard intoVec(Object source) {
-			return Vector.Standard.into(It.iter(source));
-		}
-
-		@Module.Var(name = "into:set")
-		public static Set.Standard intoSet(Object source) {
-			return Set.Standard.into(It.iter(source));
-		}
-
-		@Module.Var(name = "iter")
-		public static Iterator iter(Object obj) {
-			return It.iter(obj);
-		}
-
-		@Module.Var(name = "keys")
-		public static <C, K> Iterator<K> keys(C m) {
-			if (m instanceof I.Lookup) {
-				return ((I.Lookup) m).keys();
-			} else if (m instanceof java.util.Map) {
-				return ((java.util.Map) m).keySet().iterator();
-			} else {
-				throw new Ex.Unsupported();
-			}
-		}
-
-		@Module.Var(name = "get")
-		public static <C, K, V> V lookup(C lu, K key) {
-			if (lu instanceof I.Lookup) {
-				return (V) ((I.Lookup) lu).lookup(key);
-			} else {
-				throw new Ex.Unsupported();
-			}
-		}
-
-		@Module.Var(name = "get")
-		public static <C, K, V> V lookup(C lu, K key, V notFound) {
-			if (lu instanceof I.Lookup) {
-				return (V) ((I.Lookup) lu).lookup(key, notFound);
-			} else {
-				throw new Ex.Unsupported();
-			}
-		}
-
-		@Module.Var(name = "get-in")
-		public static <C, KS, V> V lookupIn(C lu, KS ks) {
-			return (V) lookupIn(lu, ks, (V) null);
-		}
-
-		@Module.Var(name = "get-in")
-		public static <C, KS, V> V lookupIn(C lu, KS ks, V notFound) {
-			var it = It.iter(ks);
-			var entry = (Entry) find(lu, it.next());
-			var out = new Ut.Volatile(entry);
-			Entry ret = It.reduce(it, entry, (e, k) -> {
-				Entry v = (Entry) find(e.getValue(), k);
-				out.reset(v);
-				return v;
-			}, () -> out.deref() == null);
-			return (out.deref() != null) ? (V) ret.getValue() : notFound;
-		}
-
-		@Module.Var(name = "merge")
-		@Module.Reduce(type = ARRAY, init = EMPTY_MAP)
-		public static <C> C merge(C target, C other) {
-			if (target == null) {
-				return other;
-			} else if (target instanceof java.util.Map) {
-				return (C) merge((java.util.Map) target, It.iter(other));
-			} else if (target instanceof Data.MapType) {
-				return (C) merge((Data.MapType) target, It.iter(other));
-			} else {
-				throw new Ex.Unsupported();
-			}
-		}
-
-		public static Data.MapType merge(Data.MapType target, Iterator<Entry> it) {
-			return It.reduce(it, target, (m, e) -> {
-				return (Data.MapType) m.assoc(e.getKey(), e.getValue());
-			});
-		}
-
-		public static java.util.Map merge(java.util.Map target, Iterator<Entry> it) {
-			return It.reduce(it, target, (m, e) -> {
-				m.put(e.getKey(), e.getValue());
-				return m;
-			});
-		}
-
-		@Module.Var(name = "vals")
-		public static <C, V> Iterator<V> vals(C m) {
-			if (m instanceof I.Lookup) {
-				return ((I.Lookup) m).vals();
-			} else if (m instanceof java.util.Map) {
-				return ((java.util.Map) m).values().iterator();
-			} else {
-				throw new Ex.Unsupported();
-			}
-		}
-
-	}
-
-	@Module.Ns(name = "builtin", tag = "java")
-	public interface Java {
-
-		@Module.Var(name = "integer?")
-		public static boolean isInteger(Object x) {
+		
+		@Module.Fn(name = "integer?", complete = true)
+		public static <TYPE> boolean isInteger(TYPE x) {
 			return (x instanceof Integer) || (x instanceof Long) || (x instanceof BigInteger);
 		}
 
-		@Module.Var(name = "class:primitive?")
-		public static boolean isPrimitive(Class<?> c) {
-			return (c != null) && c.isPrimitive() && !(c == Void.TYPE);
+		@Module.Fn(name = "truthy?", complete = true)
+		public static <TYPE> boolean isTruthy(TYPE x){
+			if(x == null) {
+				return false;
+			} else if(x instanceof Boolean) {
+				return ((Boolean)x).booleanValue();
+			} else {
+				return true;
+			}
 		}
 
 		//
 		// Checks
 		//
 
-		@Module.Var(name = "j:arr")
-		@Module.Fn(vargs = true)
-		public static Object[] jArr(Object vargs) {
-			return Arr.toArray(vargs);
-		}
-
-		@Module.Var(name = "j:hash-map")
-		@Module.Fn(vargs = true)
-		public static java.util.HashMap jHashMap(Object vargs) {
-			var m = new java.util.HashMap();
-			It.each(It.partitionPair(It.iter(vargs)), (p) -> m.put(((Entry) p).getKey(), ((Entry) p).getValue()));
-			return m;
-		}
-
-		@Module.Var(name = "j:list")
-		@Module.Fn(vargs = true)
-		public static java.util.ArrayList jlist(Object vargs) {
-			var l = new java.util.ArrayList();
-			It.each(It.iter(vargs), (e) -> l.add(e));
-			return l;
-		}
-
 	}
 
-	@Module.Ns(name = "builtin", tag = "lambda")
-	public interface Lambda {
+	@Module.Ns(name = "global", tag = "collection")
+	public interface Collection {
 
-		//
-		// Merge
-		//
-
-		//
-		// Array
-		//
-
-		@Module.Var(name = "T")
-		@Module.Fn(vargs = true)
-		public static Boolean T(Object vargs) {
-			return true;
+		@Module.Fn(name = "assoc", protocol = true)
+		public static <K, V> I.Assoc assoc(I.Assoc coll, K key, V val) {
+			return coll.assoc(key, val);
 		}
 
-		@Module.Var(name = "F")
-		@Module.Fn(vargs = true)
-		public static Boolean F(Object vargs) {
-			return false;
+		@Module.Fn(name = "assoc", option = true)
+		public static <K, V> java.util.Map assoc(java.util.Map coll, K key, V val) {
+			coll.put(key, val);
+			return coll;
 		}
 
-		@Module.Var(name = "NIL")
-		@Module.Fn(vargs = true)
-		public static Object NIL(Object x) {
-			return null;
+		@Module.Fn(name = "conj", protocol = true)
+		@Module.Reduce(type = ARRAY, init = EMPTY_VECTOR)
+		public static <E> I.Conj conj(I.Conj coll, E e) {
+			return coll.conj(e);
 		}
 
-		@Module.Var(name = "apply")
-		@Module.Fn(vargs = true)
-		public static Object apply(Object vargs) {
-			Object[] args = Arr.toArray(vargs);
-			I.Fn f = Fn.toFn(args[0]);
-			var lit = It.iter(args[args.length - 1]);
-			var it = It.concat(Arr.toIter(args, 1, args.length - 1), lit);
-			return f.apply(it);
+		@Module.Fn(name = "conj", option = true)
+		public static <E> java.util.List conj(java.util.List coll, E e) {
+			coll.add(e);
+			return coll;
 		}
 
-		@Module.Var(name = "comp")
-		@Module.Fn(vargs = true)
-		public static <F> I.OFn comp(Object fns) {
-			return new Fn.H.Comp(Arr.toArray(fns));
+		@Module.Fn(name = "conj", option = true)
+		public static <K, V> java.util.Map conj(java.util.Map coll, Entry<K, V> e) {
+			coll.put(e.getKey(), e.getValue());
+			return coll;
 		}
 
-		@Module.Var(name = "identity")
-		public static Object identity(Object x) {
-			return x;
+		@Module.Fn(name = "conj", option = true)
+		public static <E> java.util.Set conj(java.util.Set coll, E e) {
+			coll.add(e);
+			return coll;
 		}
 
-		@Module.Var(name = "keep")
-		public static I.Fn<Iterator, Iterator, Object> keep(Object f) {
-			return Fn.toFn((Function) (source) -> keep(f, source));
+		@Module.Fn(name = "cons", protocol = true)
+		@Module.Reduce(type = ARRAY, init = EMPTY_LIST)
+		public static <E> I.Cons cons(I.Cons coll, E e) {
+			return coll.cons(e);
 		}
 
-		@Module.Var(name = "keep")
-		public static Iterator keep(Object f, Object source) {
-			var it = It.iter(source);
-			I.Fn fn = Fn.toFn(f);
-			return It.keep(it, (e) -> fn.invoke(e));
+		@Module.Fn(name = "cons", option = true)
+		public static <E> java.util.List cons(java.util.List coll, E e) {
+			coll.add(0, e);
+			return coll;
 		}
 
-		@Module.Var(name = "map")
-		public static I.Fn<Iterator, Iterator, Object> map(I.Fn f) {
-			return Fn.toFn((Function) (source) -> map(f, source));
+		@Module.Fn(name = "count", option = true)
+		public static <E> long count(E[] e) {
+			return e.length;
 		}
 
-		@Module.Var(name = "map")
-		public static Iterator map(I.Fn f, Object source) {
-			var it = It.iter(source);
-			return It.from(it::hasNext, () -> f.invoke(it.next()));
+		@Module.Fn(name = "count", protocol = true)
+		public static long count(I.Count coll) {
+			return coll.count();
 		}
 
-		@Module.Var(name = "map:keys")
-		public static Map.Standard mapKeys(I.Fn f, Object source) {
-			Iterator<Entry> it = It.iter(source);
-			return Map.Standard.into(It.map(it, e -> Structure.pair(f.invoke(e.getKey()), e.getValue())));
+		@Module.Fn(name = "count", option = true)
+		public static long count(Iterable coll) {
+			return It.count(It.iter(coll));
 		}
 
-		@Module.Var(name = "map:vals")
-		public static Map.Standard mapVals(I.Fn f, Object source) {
-			Iterator<Entry> it = It.iter(source);
-			return Map.Standard.into(It.map(it, e -> Structure.pair(e.getKey(), f.invoke(e.getValue()))));
+		@Module.Fn(name = "count", option = true)
+		public static long count(java.util.Collection coll) {
+			return coll.size();
 		}
 
-		@Module.Var(name = "map:juxt")
-		public static Map.Standard mapJuxt(I.Pair<I.Fn, I.Fn> f, Object source) {
-			var it = It.iter(source);
-			return Map.Standard.into(It.map(it, e -> Structure.pair(f.getKey().invoke(e), f.getValue().invoke(e))));
+		@Module.Fn(name = "count", option = true)
+		public static long count(String s) {
+			return s.length();
 		}
 
-		@Module.Var(name = "map:entries")
-		public static Map.Standard mapEntries(I.Fn f, Object source) {
-			Iterator<Entry> it = It.iter(source);
-			return Map.Standard.into(It.map(it, e -> (Entry) f.invoke(e)));
+		@Module.Fn(name = "dissoc", protocol = true)
+		@Module.Reduce(type = SELF, init = NIL)
+		public static <K, V> I.Dissoc<K> dissoc(I.Dissoc coll, K key) {
+			return coll.dissoc(key);
 		}
 
-		@Module.Var(name = "map:apply")
-		public static Iterator mapApply(I.Fn f, Object source) {
-			var it = It.iter(source);
-			return It.from(it::hasNext, () -> f.apply(it.next()));
+		@Module.Fn(name = "dissoc", option = true)
+		public static <K, V> java.util.Map dissoc(java.util.Map coll, K key) {
+			coll.remove(key);
+			return coll;
 		}
 
-		@Module.Var(name = "map:apply")
-		public static I.Fn<Iterator, Iterator, Object> mapApply(I.Fn f) {
-			return Fn.toFn((Function) (source) -> mapApply(f, source));
+		@Module.Fn(name = "dissoc", option = true)
+		public static <K, V> java.util.Set dissoc(java.util.Set coll, K key) {
+			coll.remove(key);
+			return coll;
 		}
 
-		@Module.Var(name = "mapcat")
-		public static I.Fn<Iterator, Iterator, Object> mapcat(I.Fn f) {
-			return Fn.toFn((Function) (source) -> mapcat(f, source));
+		@Module.Fn(name = "empty", protocol = true)
+		public static I.Empty empty(I.Empty coll) {
+			return coll.empty();
 		}
 
-		@Module.Var(name = "mapcat")
-		public static Iterator mapcat(I.Fn f, Object source) {
-			var it = It.iter(source);
-			return It.mapcat(it, (e) -> (Iterator) f.invoke(e));
+		@Module.Fn(name = "empty", option = true)
+		public static java.util.Collection empty(java.util.Collection coll) {
+			coll.clear();
+			return coll;
 		}
 
-		@Module.Var(name = "partial")
-		@Module.Fn(vargs = true)
-		public static <F> I.Fn partial(Object args) {
-			return new Fn.H.Partial(Arr.toArray(args));
+		@Module.Fn(name = "find", protocol = true)
+		public static <K, V> V find(I.Find lu, K key) {
+			return (V) lu.find(key);
 		}
 
-		@Module.Var(name = "partition:pair")
-		public static Iterator partitionPair(Object source) {
-			var it = It.iter(source);
-			return It.partitionPair(it);
+		@Module.Fn(name = "find", option = true)
+		public static <K, V> Entry<K, V> find(java.util.Map lu, K key) {
+			return lu.containsKey(key) ? Struct.pair(key, (V) lu.get(key)) : null;
 		}
 
-		@Module.Var(name = "partition:pair")
-		public static I.Fn<Iterator, Iterator, Object> partitionPair() {
-			return Fn.toFn((Function) (source) -> partitionPair(source));
+		@Module.Fn(name = "find", option = true)
+		public static <K, V> V find(java.util.Set lu, V key) {
+			return lu.contains(key) ? key : null;
 		}
 
-		@Module.Var(name = "pipe")
-		@Module.Fn(vargs = true)
-		public static I.Fn<Iterator, Iterator, Object> pipe(Object vargs) {
-			var pl = It.iter(vargs);
-			var fns = It.map(pl, Fn::toFn);
-			return Fn.toFn((Function) (it) -> It.reduce(fns, it, (i, f) -> (Iterator) ((I.Fn) f).invoke(i)));
+		@Module.Fn(name = "get", protocol = true, method = "lookup")
+		public static <K, V> V get(I.Lookup<K, V> lu, K key) {
+			return lu.lookup(key);
 		}
 
-		@Module.Var(name = "range")
+		@Module.Fn(name = "get", protocol = true, method = "lookup")
+		public static <K, V> V get(I.Lookup<K, V> lu, K key, V notFound) {
+			return lu.lookup(key, notFound);
+		}
+
+		@Module.Fn(name = "get", option = true)
+		public static <K, V> V get(java.util.Map<K, V> lu, K key) {
+			return lu.get(key);
+		}
+
+		@Module.Fn(name = "get", option = true)
+		public static <K, V> V get(java.util.Map<K, V> lu, K key, V notFound) {
+			return lu.getOrDefault(key, notFound);
+		}
+
+		@Module.Fn(name = "get", option = true)
+		public static <E> E get(java.util.Set<E> lu, E key) {
+			return lu.contains(key) ? key : null;
+		}
+
+		@Module.Fn(name = "get", option = true)
+		public static <E> E get(java.util.Set<E> lu, E key, E notFound) {
+			return lu.contains(key) ? key : notFound;
+		}
+
+		@Module.Fn(name = "has?", protocol = true, method = "has")
+		public static <K> boolean has(I.Find lu, K key) {
+			return lu.has(key);
+		}
+
+		@Module.Fn(name = "has?", option = true)
+		public static <K> boolean has(java.util.Map lu, K key) {
+			return lu.containsKey(key);
+		}
+
+		@Module.Fn(name = "has?", option = true)
+		public static <K> boolean has(java.util.Set lu, K key) {
+			return lu.contains(key);
+		}
+
+		@Module.Fn(name = "index:of", protocol = true, method = "indexOf")
+		public static <K, V> K indexOf(I.Indexed<K, V> lu, V val) {
+			return lu.indexOf(val);
+		}
+
+		@Module.Fn(name = "index:key", protocol = true, method = "indexOfKey")
+		public static <K, V> long indexOfKey(I.IndexedKV<K, V> lu, K key) {
+			return lu.indexOfKey(key);
+		}
+
+		@Module.Fn(name = "index:val", protocol = true, method = "indexOfVal")
+		public static <K, V> long indexOfVal(I.IndexedKV<K, V> lu, V val) {
+			return lu.indexOfVal(val);
+		}
+
+		@Module.Fn(name = "into", protocol = true)
+		public static <ITR> I.Conj into(I.Conj coll, ITR source) {
+			return It.reduceIn(It.iter(source), coll, Collection::conj);
+		}
+
+		@Module.Fn(name = "into", option = true)
+		public static <ITR> java.util.List into(java.util.List coll, ITR source) {
+			return It.reduceIn(It.iter(source), coll, Collection::conj);
+		}
+
+		@Module.Fn(name = "into", option = true)
+		public static <ITR> java.util.Map into(java.util.Map coll, ITR source) {
+			return It.reduceIn((Iterator<Entry>) It.iter(source), coll, Collection::conj);
+		}
+
+		@Module.Fn(name = "into", option = true)
+		public static <ITR> java.util.Set into(java.util.Set coll, ITR source) {
+			return It.reduceIn(It.iter(source), coll, Collection::conj);
+		}
+
+		@Module.Fn(name = "iter", complete = true)
+		public static <ITR> Iterator iter(ITR obj) {
+			return It.iter(obj);
+		}
+
+		@Module.Fn(name = "keys", protocol = true)
+		public static <K, V> Iterator<K> keys(I.Lookup<K, V> m) {
+			return m.keys();
+		}
+
+		@Module.Fn(name = "keys", option = true)
+		public static <K, V> Iterator<K> keys(java.util.Map<K, V> m) {
+			return m.keySet().iterator();
+		}
+
+		@Module.Fn(name = "merge", protocol = true)
+		@Module.Reduce(type = SELF, init = EMPTY_MAP)
+		public static <ITR> I.Assoc merge(I.Assoc coll, ITR other) {
+			Iterator<Entry> it = It.iter(other);
+			return It.reduce(it, coll, (m, e) -> {
+				return m.assoc(e.getKey(), e.getValue());
+			});
+		}
+
+		@Module.Fn(name = "merge", option = true)
+		public static <ITR> java.util.Map merge(java.util.Map coll, ITR other) {
+			Iterator<Entry> it = It.iter(other);
+			return It.reduce(it, coll, (m, e) -> {
+				m.put(e.getKey(), e.getValue());
+				return m;
+			});
+		}
+
+		@Module.Fn(name = "nth", option = true)
+		public static <E> E nth(E[] coll, long idx) {
+			return coll[((int) idx)];
+		}
+
+		@Module.Fn(name = "nth", protocol = true)
+		public static <E> E nth(I.Nth<E> coll, long idx) {
+			return coll.nth(idx);
+		}
+
+		@Module.Fn(name = "nth", option = true)
+		public static <E> E nth(Iterable<E> coll, long idx) {
+			return (E) It.nth(It.iter(coll), idx);
+		}
+
+		@Module.Fn(name = "nth", option = true)
+		public static <E> E nth(java.util.List<E> coll, long idx) {
+			return coll.get((int) idx);
+		}
+
+		@Module.Fn(name = "nth", option = true)
+		public static Character nth(String s, long idx) {
+			return (Character)s.charAt((int)idx);
+		}
+
+		@Module.Fn(name = "range", complete = true)
 		public static Iterator<Long> range(Long max) {
 			return It.range(max);
 		}
 
-		@Module.Var(name = "range")
+		@Module.Fn(name = "range", complete = true)
 		public static Iterator<Long> range(Long min, Long max) {
 			return It.range(min, max);
 		}
 
-		@Module.Var(name = "reduce")
-		public static Object reduce(I.Fn f, Object source) {
-			var it = It.iter(source);
-			return It.reduce(it, (acc, e) -> f.invoke(acc, e));
+		@Module.Fn(name = "to:list", complete = true)
+		public static <ITR> List.Standard toList(ITR source) {
+			return List.Standard.into(It.iter(source));
 		}
 
-		@Module.Var(name = "reduce")
-		public static Object reduce(I.Fn f, Object init, Object source) {
-			var it = It.iter(source);
-			return It.reduce(it, init, (acc, e) -> f.invoke(acc, e));
+		@Module.Fn(name = "to:map", complete = true)
+		public static <ITR> Map.Standard toMap(ITR source) {
+			return Map.Standard.into(It.iter(source));
 		}
 
-		@Module.Var(name = "zip")
-		@Module.Fn(vargs = true)
-		public static Iterator zip(Object vargs) {
-			return It.zip(It.iter(vargs));
+		@Module.Fn(name = "to:mutable", complete = true)
+		public static I.Mutable toMutable(I.ToMutable coll) {
+			return coll.toMutable();
+		}
+
+		@Module.Fn(name = "to:persistent", complete = true)
+		public static I.Persistent toPersistent(I.ToPersistent coll) {
+			return coll.toPersistent();
+		}
+
+		@Module.Fn(name = "to:seq", complete = true)
+		public static <ITR> Std.T.Seq toSeq(ITR source) {
+			return new Std.T.Seq(It.iter(source));
+		}
+
+		@Module.Fn(name = "to:set", complete = true)
+		public static <ITR> Set.Standard toSet(ITR source) {
+			return Set.Standard.into(It.iter(source));
+		}
+
+		@Module.Fn(name = "to:vec", complete = true)
+		public static <ITR> Vector.Standard toVec(ITR source) {
+			return Vector.Standard.into(It.iter(source));
+		}
+
+		@Module.Fn(name = "vals", protocol = true)
+		public static <K, V> Iterator<V> vals(I.Lookup<K, V> m) {
+			return m.vals();
+		}
+
+		@Module.Fn(name = "vals", option = true)
+		public static <K, V> Iterator<V> vals(java.util.Map<K, V> m) {
+			return m.values().iterator();
+		}
+
+		@Module.Fn(name = "zip", vargs = true, complete = true)
+		public static <ITR> Iterator zip(ITR elements) {
+			return It.zip(It.iter(elements));
+		}
+
+		@Module.Fn(name = "zipmap", complete = true)
+		public static <ITR> Map.Standard zipmap(ITR keys, ITR vals) {
+			return toMap(It.zipPair(It.iter(keys), It.iter(vals)));
 		}
 
 	}
 
-	@Module.Ns(name = "builtin", tag = "ops")
+	public interface Interop {
+
+		@Module.Fn(name = "class:constructors") 		
+		public static Constructor[] classConstructors(Class cls) {
+			return cls.getDeclaredConstructors();
+		}
+		
+		@Module.Fn(name = "class:fields") 		
+		public static Field[] classFields(Class cls) {
+			return cls.getDeclaredFields();
+		}
+		
+		@Module.Fn(name = "class", rt = true)
+		public static Class classFor(I.Runtime rt, String name) {
+			return rt.classFor(name);
+		}
+		
+		@Module.Fn(name = "class:methods") 		
+		public static Method[] classMethods(Class cls) {
+			return cls.getDeclaredMethods();
+		}
+
+		@Module.Fn(name = "class:inner") 		
+		public static Class[] classInner(Class cls) {
+			return cls.getDeclaredClasses();
+		}
+
+		@Module.Fn(name = "invoke:static-methods") 		
+		public static Set<String> classStaticMethods(Class cls) {
+			Iterator<Method> methods = It.iter(cls.getMethods());
+			return Collection.toSet(					
+					It.map(
+					It.filter(
+					methods, 
+					(m) -> Modifier.isStatic(m.getModifiers())),
+					(m) -> m.getName()));
+		}
+
+		@Module.Fn(name = "invoke:static-fields") 		
+		public static Iterator<String> classStaticFields(Class cls) {
+			Iterator<Field> fields = It.iter(cls.getFields());
+			return It.map(
+					It.filter(
+					fields, 
+					(m) -> Modifier.isStatic(m.getModifiers())),
+					(m) -> m.getName());
+		}
+
+		@Module.Fn(name = "invoke:new", vargs = true) 		
+		public static <R, ITR> Object invokeNew(Class c, ITR args) {
+			return (R) Reflect.invokeConstructor(c, It.toArray(args));
+		}
+
+		@Module.Fn(name = "invoke", vargs = true) 		
+		public static <R, ITR> Object invokeObj(Object o, String method, ITR args) {
+			return (R) Reflect.invokeInstanceMethod(o, method, It.toArray(args));
+		}
+
+		@Module.Fn(name = "invoke:get") 		
+		public static <R> Object invokeGet(Object o, String name) {
+			return (R) Reflect.getInstanceField(o, name);
+		}
+
+		@Module.Fn(name = "invoke:set") 		
+		public static <R> Object invokeSet(Object o, String name, Object val) {
+			return (R) Reflect.setInstanceField(o, name, val);
+		}
+
+		@Module.Fn(name = "invoke:static", vargs = true) 		
+		public static <R, ITR> Object invokeStatic(Class c, String method, ITR args) {
+			return (R) Reflect.invokeStaticMethod(c, method, It.toArray(args));
+		}
+
+		@Module.Fn(name = "invoke:fn") 		
+		public static <R, ITR> I.Fn invokeFn(Class c, String method) {
+			var lu = classStaticMethods(c);
+			if(lu.has(method)) {
+				return Fn.toFnVargs(
+						Struct.hashMap(Arr.objects(Basic.keyword("name"), c.getName() + "/" + method)),
+						(Function)args -> 
+							(R) Reflect.invokeStaticMethod(c, method, It.toArray(args)));	
+			} else {
+				throw new Ex.Info("Method not found: " + method, Struct.hashMap(
+						Arr.objects(Basic.keyword("options"), lu)));
+			}
+		}
+
+		@Module.Fn(name = "invoke:get-static", vargs = true) 		
+		public static <R> Object invokeGetStatic(Class c, String name) {
+			return (R) Reflect.getStaticField(c, name);
+		}
+
+		@Module.Fn(name = "invoke:set-static", vargs = true) 		
+		public static <R> Object invokeSetStatic(Class c, String name, Object val) {
+			return (R) Reflect.setStaticField(c, name, val);
+		}
+	}
+
+	@Module.Ns(name = "global", tag = "lambda")
+	public interface Lambda {
+
+		@Module.Fn(name = "apply", vargs = true, complete = true)
+		public static <R, FN, ITR> R apply(FN f, ITR vargs) {
+			return apply(Fn.toFn(f), vargs);
+		}
+
+		@Module.Fn(name = "apply", vargs = true, helper = true)
+		public static <R, ITR> R apply(I.Fn f, ITR vargs) {
+			Object[] args = Arr.toArray(vargs);
+			var lit = It.iter(args[args.length - 1]);
+			var it = It.concat(Arr.toIter(args, 1, args.length - 1), lit);
+			return (R) f.apply(it);
+		}
+
+		@Module.Fn(name = "call", vargs = true, complete = true)
+		public static <R, ANY, FN, ITR> R call(ANY o, FN f, ITR vargs) {
+			return call(o, Fn.toFn(f), vargs);
+		}
+
+		@Module.Fn(name = "call", vargs = true, helper = true)
+		public static <R, ANY, ITR> R call(ANY o, I.Fn f, ITR vargs) {
+			Object[] arr = Arr.toArray(It.concat(It.objects(o), It.iter(vargs)));
+			return (R) f.apply(arr);
+		}
+
+		@Module.Fn(name = "comp", vargs = true, complete = true)
+		public static <FN, ITR> I.Fn comp(ITR fns) {
+			return new Fn.T.Comp(fns);
+		}
+
+		@Module.Fn(name = "F", vargs = true, complete = true)
+		public static <ITR> Boolean F(ITR vargs) {
+			return false;
+		}
+
+		@Module.Fn(name = "group-by", complete = true)
+		public static <FN, ITR> Map.Standard groupBy(FN f, ITR source) {
+			return groupBy(Fn.toFn(f), Fn.toFn((Function) Lambda::identity), source);
+		}
+
+		@Module.Fn(name = "group-by", helper = true)
+		public static <ITR, K> Map.Standard<K, List> groupBy(I.Fn fk, I.Fn fv, ITR source) {
+			return (Standard<K, List>) 
+					It.reduceIn(It.iter(source), (Map<K, List>) Map.Standard.EMPTY, (m, e) -> {
+				K key = (K) fk.invoke(e);
+				List v = m.lookup(key);
+				if (v == null) {
+					v = List.Standard.EMPTY;
+				}
+				return (Map<K, List>) m.assoc(key, (List) v.conj(fv.invoke(e)));
+			});
+		}
+
+		@Module.Fn(name = "group-by", complete = true)
+		public static <FN, ITR> Map.Standard groupBy(I.Pair<FN, FN> f, ITR source) {
+			return groupBy(Fn.toFn(f.getKey()), Fn.toFn(f.getValue()), source);
+		}
+
+		@Module.Fn(name = "identity", complete = true)
+		public static <ANY> ANY identity(ANY x) {
+			return x;
+		}
+
+		@Module.Fn(name = "juxt", vargs = true, complete = true)
+		public static <FN, ITR> I.Fn<Iterator, Iterator, Object> juxt(ITR fns) {
+			var jl = It.toArray(It.map(It.iter(fns), Fn::toFn));
+			return Fn.toFn((Function) (e) -> Struct.vector(It.map(It.iter(jl), (f) -> ((I.Fn) f).invoke(e))));
+		}
+
+		@Module.Fn(name = "keep", complete = true)
+		public static <FN> I.Fn<Iterator, Iterator, Object> keep(FN f) {
+			return keep(Fn.toFn(f));
+		}
+
+		@Module.Fn(name = "keep", complete = true)
+		public static <FN, ITR> Iterator keep(FN f, ITR source) {
+			return keep(Fn.toFn(f), source);
+		}
+
+		@Module.Fn(name = "keep", helper = true)
+		public static I.Fn<Iterator, Iterator, Object> keep(I.Fn f) {
+			return Fn.toFn((Function) (source) -> keep(f, source));
+		}
+
+		@Module.Fn(name = "keep", helper = true)
+		public static <ITR> Iterator keep(I.Fn f, ITR source) {
+			var it = It.iter(source);
+			return It.from(it::hasNext, () -> f.invoke(it.next()));
+		}
+
+		@Module.Fn(name = "map", complete = true)
+		public static <FN> I.Fn<Iterator, Iterator, Object> map(FN f) {
+			return map(Fn.toFn(f));
+		}
+
+		@Module.Fn(name = "map", complete = true)
+		public static <FN, ITR> Iterator map(FN f, ITR source) {
+			return map(Fn.toFn(f), source);
+		}
+
+		@Module.Fn(name = "map", helper = true)
+		public static I.Fn<Iterator, Iterator, Object> map(I.Fn f) {
+			return Fn.toFn((Function) (source) -> map(f, source));
+		}
+
+		@Module.Fn(name = "map", helper = true)
+		public static <ITR> Iterator map(I.Fn f, ITR source) {
+			var it = It.iter(source);
+			return It.from(it::hasNext, () -> f.invoke(it.next()));
+		}
+
+		@Module.Fn(name = "map:apply", complete = true)
+		public static <FN> I.Fn<Iterator, Iterator, Object> mapApply(FN f) {
+			return mapApply(Fn.toFn(f));
+		}
+
+		@Module.Fn(name = "map:apply", complete = true)
+		public static <FN, ITR> Iterator mapApply(FN f, ITR source) {
+			return mapApply(Fn.toFn(f), source);
+		}
+
+		@Module.Fn(name = "map:apply", helper = true)
+		public static I.Fn<Iterator, Iterator, Object> mapApply(I.Fn f) {
+			return Fn.toFn((Function) (source) -> mapApply(f, source));
+		}
+
+		@Module.Fn(name = "map:apply", helper = true)
+		public static <ITR> Iterator mapApply(I.Fn f, ITR source) {
+			var it = It.iter(source);
+			return It.from(it::hasNext, () -> f.apply(it.next()));
+		}
+
+		@Module.Fn(name = "mapcat", complete = true)
+		public static <FN> I.Fn<Iterator, Iterator, Object> mapcat(FN f) {
+			return mapcat(Fn.toFn(f));
+		}
+
+		@Module.Fn(name = "mapcat", complete = true)
+		public static <FN, ITR> Iterator mapcat(FN f, ITR source) {
+			return mapcat(Fn.toFn(f), source);
+		}
+
+		@Module.Fn(name = "mapcat", helper = true)
+		public static I.Fn<Iterator, Iterator, Object> mapcat(I.Fn f) {
+			return Fn.toFn((Function) (source) -> mapcat(f, source));
+		}
+
+		@Module.Fn(name = "mapcat", helper = true)
+		public static <ITR> Iterator mapcat(I.Fn f, ITR source) {
+			var it = It.iter(source);
+			return It.mapcat(it, (e) -> (Iterator) f.invoke(e));
+		}
+
+		@Module.Fn(name = "map:entries", complete = true)
+		public static <FN, ITR> Map.Standard mapEntries(FN f, ITR source) {
+			return mapEntries(Fn.toFn(f), source);
+		}
+
+		@Module.Fn(name = "map:entries", helper = true)
+		public static <ITR> Map.Standard mapEntries(I.Fn f, ITR source) {
+			Iterator<Entry> it = It.iter(source);
+			return Map.Standard.into(It.map(it, e -> (Entry) f.invoke(e)));
+		}
+
+		@Module.Fn(name = "map:juxt", helper = true)
+		public static <ITR> Map.Standard mapJuxt(I.Fn fk, I.Fn fv, ITR source) {
+			var it = It.iter(source);
+			return Map.Standard.into(It.map(it, e -> Struct.pair(fk.invoke(e), fv.invoke(e))));
+		}
+
+		@Module.Fn(name = "map:juxt", complete = true)
+		public static <FN, ITR> Map.Standard mapJuxt(I.Pair<FN, FN> f, ITR source) {
+			return mapJuxt(Fn.toFn(f.getKey()), Fn.toFn(f.getValue()), source);
+		}
+
+		@Module.Fn(name = "map:keys", complete = true)
+		public static <FN, ITR> Map.Standard mapKeys(FN f, ITR source) {
+			return mapKeys(Fn.toFn(f), source);
+		}
+
+		@Module.Fn(name = "map:keys", helper = true)
+		public static <ITR> Map.Standard mapKeys(I.Fn f, ITR source) {
+			Iterator<Entry> it = It.iter(source);
+			return Map.Standard.into(It.map(it, e -> Struct.pair(f.invoke(e.getKey()), e.getValue())));
+		}
+
+		@Module.Fn(name = "map:vals", complete = true)
+		public static <FN, ITR> Map.Standard mapVals(FN f, ITR source) {
+			return mapVals(Fn.toFn(f), source);
+		}
+
+		@Module.Fn(name = "map:vals", helper = true)
+		public static <ITR> Map.Standard mapVals(I.Fn f, ITR source) {
+			Iterator<Entry> it = It.iter(source);
+			return Map.Standard.into(It.map(it, e -> Struct.pair(e.getKey(), f.invoke(e.getValue()))));
+		}
+
+		@Module.Fn(name = "NIL", vargs = true, complete = true)
+		public static <ITR> Object NIL(ITR x) {
+			return null;
+		}
+
+		@Module.Fn(name = "partial", vargs = true, complete = true)
+		public static <FN, ITR> I.Fn partial(FN f, ITR vargs) {
+			return new Fn.T.Partial(f, vargs);
+		}
+
+		@Module.Fn(name = "partition:pair", helper = true)
+		public static I.Fn<Iterator, Iterator, Object> partitionPair() {
+			return Fn.toFn((Function) (s) -> partitionPair(s));
+		}
+
+		@Module.Fn(name = "partition:pair", complete = true)
+		public static <ITR> Iterator partitionPair(ITR source) {
+			var it = It.iter(source);
+			return It.partitionPair(it);
+		}
+
+		@Module.Fn(name = "pipe", vargs = true, complete = true)
+		public static <FN, ITR> I.Fn<Iterator, Iterator, Object> pipe(ITR fns) {
+			var pl = It.toArray(It.map(It.iter(fns), Fn::toFn));
+			return Fn.toFn((Function) (it) -> Arr.reduce((i, f) -> (Iterator) ((I.Fn) f).invoke(i), it, pl));
+		}
+
+		@Module.Fn(name = "reduce", complete = true)
+		public static <ITR, FN, R> R reduce(FN f, FN end, R init, ITR source) {
+			return reduce(Fn.toFn(f), Fn.toFn(end), init, source);
+		}
+
+		@Module.Fn(name = "reduce", complete = true)
+		public static <ITR, FN, R> R reduce(FN f, ITR source) {
+			return reduce(Fn.toFn(f), source);
+		}
+
+		@Module.Fn(name = "reduce", complete = true)
+		public static <ITR, FN, R> R reduce(FN f, R init, ITR source) {
+			return reduce(Fn.toFn(f), init, source);
+		}
+
+		@Module.Fn(name = "reduce", helper = true)
+		public static <ITR, R> R reduce(I.Fn f, I.Fn end, R init, ITR source) {
+			var it = It.iter(source);
+			return (R) It.reduce(
+					it, 
+					init, 
+					(acc, e) -> (R)f.invoke(acc, e), 
+					(acc) -> (Boolean)end.invoke(acc));
+		}
+
+		@Module.Fn(name = "reduce", helper = true)
+		public static <ITR, R> R reduce(I.Fn f, ITR source) {
+			var it = It.iter(source);
+			return (R) It.reduce(it, (acc, e) -> f.invoke(acc, e));
+		}
+
+		@Module.Fn(name = "reduce", helper = true)
+		public static <ITR, R> R reduce(I.Fn f, R init, ITR source) {
+			var it = It.iter(source);
+			return (R) It.reduce(it, init, (acc, e) -> (R)f.invoke(acc, e));
+		}
+
+		@Module.Fn(name = "reduce-in", complete = true)
+		public static <ITR, FN, R> R reduceIn(R init, FN f, ITR source) {
+			return reduceIn(init, Fn.toFn(f), source);
+		}
+
+		@Module.Fn(name = "reduce-in", helper = true)
+		public static <ITR, R> R reduceIn(R init, I.Fn f, ITR source) {
+			var it = It.iter(source);
+			return (R) It.reduceIn(it, init, (acc, e) -> (R)f.invoke(acc, e));
+		}
+		
+		@Module.Fn(name = "T", vargs = true, complete = true)
+		public static <ITR> Boolean T(ITR vargs) {
+			return true;
+		}
+
+	}
+	
+	@Module.Ns(name = "global", tag = "ops")
 	public interface Ops {
 
-		@Module.Var(name = "+")
+		@Module.Fn(name = "+")
 		@Module.Reduce(type = INIT, init = ZERO)
 		public static Number add(Number x, Number y) {
 			return Num.add(x, y);
 		}
 
-		@Module.Var(name = "dec")
+		@Module.Fn(name = "b&")
+		@Module.Reduce(type = INIT, init = NEG_ONE)
+		public static Long bitAnd(Number x, Number y) {
+			return Num.and(x, y);
+		}
+
+		@Module.Fn(name = "b|")
+		@Module.Reduce(type = INIT, init = ZERO)
+		public static Long bitOr(Number x, Number y) {
+			return Num.or(x, y);
+		}
+
+		@Module.Fn(name = "dec")
 		public static Number dec(Number x) {
 			return Num.minus(x, 1);
 		}
 
-		@Module.Var(name = "/")
+		@Module.Fn(name = "/")
 		@Module.Reduce(type = ARRAY, init = ONE)
 		public static Number divide(Number x, Number y) {
 			return Num.divide(x, y);
 		}
 
-		@Module.Var(name = "inc")
+		@Module.Fn(name = "equals")
+		@Module.Reduce(type = COMPARE, init = TRUE)
+		public static boolean equals(Object k1, Object k2) {
+			return (k1 == k2) ? true : (k1 != null && k1.equals(k2));
+		}
+
+		@Module.Fn(name = "=")
+		@Module.Reduce(type = COMPARE, init = TRUE)
+		public static Boolean equivalent(Object k1, Object k2) {
+			return Eq.eq(k1, k2);
+		}
+
+		@Module.Fn(name = ">")
+		@Module.Reduce(type = COMPARE, init = TRUE)
+		public static Boolean gt(Number x, Number y) {
+			return Num.gt(x, y);
+		}
+
+		@Module.Fn(name = ">=")
+		@Module.Reduce(type = COMPARE, init = TRUE)
+		public static Boolean gte(Number x, Number y) {
+			return Num.gte(x, y);
+		}
+
+		@Module.Fn(name = "identical")
+		@Module.Reduce(type = COMPARE, init = TRUE)
+		public static boolean identical(Object k1, Object k2) {
+			return k1 == k2;
+		}
+
+		@Module.Fn(name = "inc")
 		public static Number inc(Number x) {
 			return Num.add(x, 1);
 		}
 
-		@Module.Var(name = "-")
+		@Module.Fn(name = "neg?")
+		public static Boolean isNeg(Number x) {
+			return Num.lt(x, 0);
+		}
+
+		@Module.Fn(name = "pos?")
+		public static Boolean isPos(Number x) {
+			return Num.gt(x, 0);
+		}
+
+		@Module.Fn(name = "zero?")
+		public static Boolean isZero(Number x) {
+			return Num.eq(x, 0);
+		}
+
+		@Module.Fn(name = "<")
+		@Module.Reduce(type = COMPARE, init = TRUE)
+		public static Boolean lt(Number x, Number y) {
+			return Num.lt(x, y);
+		}
+
+		@Module.Fn(name = "<=")
+		@Module.Reduce(type = COMPARE, init = TRUE)
+		public static Boolean lte(Number x, Number y) {
+			return Num.lte(x, y);
+		}
+
+		@Module.Fn(name = "-")
 		@Module.Reduce(type = ARRAY, init = ZERO)
 		public static Number minus(Number x, Number y) {
 			return Num.minus(x, y);
 		}
 
-		@Module.Var(name = "*")
+		@Module.Fn(name = "*")
 		@Module.Reduce(type = INIT, init = ONE)
 		public static Number multiply(Number x, Number y) {
 			return Num.multiply(x, y);
 		}
 
-		@Module.Var(name = "pos?")
-		public static Boolean isPos(Number x) {
-			return Num.gt(x, 0);
+		@Module.Fn(name = "not=")
+		@Module.Reduce(type = COMPARE, init = FALSE)
+		public static Boolean notEquivalent(Object k1, Object k2) {
+			return !Eq.eq(k1, k2);
+		}
+	}
+	
+
+	public interface Runtime {
+
+		@Module.Fn(name = "eval", rt = true)
+		public static <AST> Object eval(I.Runtime rt, AST input) {
+			return rt.eval(input);
+		}
+		
+		@Module.Fn(name = "read-string", rt = true)
+		public static <AST> AST readString(I.Runtime<AST, ?, ?> rt, String input) {
+			return rt.readString(input);
+		}
+		
+		@Module.Fn(name = "sys:add-paths", rt = true)
+		public static String[] sysAddPath(I.Runtime rt, String[] paths) {
+			return rt.addPaths(paths);
+		}
+		
+		@Module.Fn(name = "sys:globals", rt = true)
+		public static I.Find sysGlobals(I.Runtime rt) {
+			return rt.getEnv().getMap();
 		}
 
-		@Module.Var(name = "neg?")
-		public static Boolean isNeg(Number x) {
-			return Num.lt(x, 0);
+		@Module.Fn(name = "sys:list-paths", rt = true)
+		public static String[] sysListPath(I.Runtime rt) {
+			return rt.listPaths();
 		}
-
-		@Module.Var(name = "zero?")
-		public static Boolean isZero(Number x) {
-			return Num.eq(x, 0);
+		
+		@Module.Fn(name = "sys:loader", rt = true)
+		public static ClassLoader sysloader(I.Runtime rt) {
+			return rt.classLoader();
 		}
-
-		@Module.Var(name = "<")
-		public static Boolean lt(Number x, Number y) {
-			return Num.lt(x, y);
+		
+		@Module.Fn(name = "sys:root", rt = true)
+		public static I.Context sysRoot(I.Runtime rt) {
+			return rt.getRoot();
 		}
-
-		@Module.Var(name = "<=")
-		public static Boolean lte(Number x, Number y) {
-			return Num.lte(x, y);
+		
+		@Module.Fn(name = "sys:add-alias", rt = true)
+		public static Class sysAddAlias(I.Runtime rt, Symbol sym, Class c) {
+			return rt.addAlias(sym, c);
 		}
-
-		@Module.Var(name = ">")
-		public static Boolean gt(Number x, Number y) {
-			return Num.gt(x, y);
+		
+		@Module.Fn(name = "sys:remove-alias", rt = true)
+		public static Class sysRemoveAlias(I.Runtime rt, Symbol sym) {
+			return rt.removeAlias(sym);
 		}
-
-		@Module.Var(name = ">=")
-		public static Boolean gte(Number x, Number y) {
-			return Num.gte(x, y);
+		
+		@Module.Fn(name = "sys:list-alias", rt = true)
+		public static I.Lookup sysListAlias(I.Runtime rt) {
+			return rt.listAlias();
 		}
-
-		@Module.Var(name = "b&")
-		public static Long bitAnd(Number x, Number y) {
-			return Num.and(x, y);
-		}
-
-		@Module.Var(name = "=")
-		public static boolean equivalent(Object k1, Object k2) {
-			return Eq.eq(k1, k2);
-		}
-
-		@Module.Var(name = "equals")
-		public static boolean equals(Object k1, Object k2) {
-			return (k1 == k2) ? true : (k1 != null && k1.equals(k2));
-		}
-
-		@Module.Var(name = "identical")
-		public static boolean identical(Object k1, Object k2) {
-			return k1 == k2;
-		}
-
 	}
 
-	@Module.Ns(name = "builtin", tag = "structure")
-	public interface Structure {
+	@Module.Ns(name = "global", tag = "structure")
+	public interface Struct {
 
 		//
 		// Coll
 		//
 
-		@Module.Var(name = "hash-map")
-		@Module.Fn(vargs = true)
-		public static <E, K, V> Map.Standard<K, V> hashMap(Object elements) {
+		@Module.Fn(name = "hash-map", vargs = true, complete = true)
+		public static <ITR, K, V> Map.Standard<K, V> hashMap(ITR elements) {
 			return Map.Standard.into(It.partitionPair(It.iter(elements)));
 		}
 
-		@Module.Var(name = "hash-set")
-		@Module.Fn(vargs = true)
-		public static Set.Standard hashSet(Object elements) {
+		@Module.Fn(name = "hash-set", vargs = true, complete = true)
+		public static <ITR, E> Set.Standard<E> hashSet(ITR elements) {
 			return Set.Standard.into(It.iter(elements));
 		}
+		
+		@Module.Fn(name = "j:arr", vargs = true, complete = true)
+		public static <ITR> Object[] jArr(ITR vargs) {
+			return Arr.toArray(vargs);
+		}
+		
+		@Module.Fn(name = "j:hash-map", vargs = true, complete = true)
+		public static <ITR> java.util.HashMap jHashMap(ITR vargs) {
+			var m = new java.util.HashMap();
+			It.each(It.partitionPair(It.iter(vargs)), (p) -> m.put(((Entry) p).getKey(), ((Entry) p).getValue()));
+			return m;
+		}
+		
+		@Module.Fn(name = "j:hash-set", vargs = true, complete = true)
+		public static <ITR> java.util.HashSet jHashSet(ITR vargs) {
+			var s = new java.util.HashSet();
+			It.each(It.iter(vargs), (e) -> s.add(e));
+			return s;
+		}
 
-		@Module.Var(name = "list")
-		@Module.Fn(vargs = true)
-		public static List.Standard list(Object elements) {
+		//
+		// Checks
+		//
+
+		@Module.Fn(name = "j:list", vargs = true, complete = true)
+		public static <ITR> java.util.ArrayList jList(ITR vargs) {
+			var l = new java.util.ArrayList();
+			It.each(It.iter(vargs), (e) -> l.add(e));
+			return l;
+		}
+
+		@Module.Fn(name = "list", vargs = true, complete = true)
+		public static <ITR, E> List.Standard<E> list(ITR elements) {
 			return List.Standard.into(It.iter(elements));
 		}
 
-		@Module.Var(name = "mut:hash-map")
-		@Module.Fn(vargs = true)
-		public static <E, K, V> Map.Mutable<K, V> mutHashMap(Object elements) {
+		@Module.Fn(name = "mut:hash-map", vargs = true, complete = true)
+		public static <ITR, K, V> Map.Mutable<K, V> mutHashMap(ITR elements) {
 			return Map.Mutable.into(It.partitionPair(It.iter(elements)));
 		}
 
-		@Module.Var(name = "mut:hash-set")
-		@Module.Fn(vargs = true)
-		public static Set.Mutable mutHashSet(Object elements) {
+		@Module.Fn(name = "mut:hash-set", vargs = true, complete = true)
+		public static <ITR, E> Set.Mutable<E> mutHashSet(ITR elements) {
 			return Set.Mutable.into(It.iter(elements));
 		}
 
-		@Module.Var(name = "mut:list")
-		@Module.Fn(vargs = true)
-		public static List.Mutable mutList(Object elements) {
+		@Module.Fn(name = "mut:list", vargs = true, complete = true)
+		public static <ITR, E> List.Mutable<E> mutList(ITR elements) {
 			return List.Mutable.into(It.iter(elements));
 		}
 
-		@Module.Var(name = "mut:ordered-map")
-		@Module.Fn(vargs = true)
-		public static <E, K, V> OrderedMap.Mutable<K, V> mutOrderedMap(Object elements) {
+		@Module.Fn(name = "mut:ordered-map", vargs = true, complete = true)
+		public static <ITR, K, V> OrderedMap.Mutable<K, V> mutOrderedMap(ITR elements) {
 			return OrderedMap.Mutable.into(It.partitionPair(It.iter(elements)));
 		}
 
-		@Module.Var(name = "mut:ordered-set")
-		@Module.Fn(vargs = true)
-		public static OrderedSet.Mutable mutOrderedSet(Object elements) {
+		@Module.Fn(name = "mut:ordered-set", vargs = true, complete = true)
+		public static <ITR, E> OrderedSet.Mutable<E> mutOrderedSet(ITR elements) {
 			return OrderedSet.Mutable.into(It.iter(elements));
 		}
 
-		@Module.Var(name = "mut:queue")
-		@Module.Fn(vargs = true)
-		public static Queue.Mutable mutQueue(Object elements) {
+		@Module.Fn(name = "mut:queue", vargs = true, complete = true)
+		public static <ITR, E> Queue.Mutable<E> mutQueue(ITR elements) {
 			return Queue.Mutable.into(It.iter(elements));
 		}
 
-		@Module.Var(name = "mut:sorted-map")
-		@Module.Fn(vargs = true)
-		public static <E, K, V> SortedMap.Mutable<K, V> mutSortedMap(Object elements) {
+		@Module.Fn(name = "mut:sorted-map", vargs = true, complete = true)
+		public static <ITR, K, V> SortedMap.Mutable<K, V> mutSortedMap(ITR elements) {
 			return SortedMap.Mutable.into(It.partitionPair(It.iter(elements)));
 		}
 
-		@Module.Var(name = "mut:sorted-set")
-		@Module.Fn(vargs = true)
-		public static SortedSet.Mutable mutSortedSet(Object elements) {
+		@Module.Fn(name = "mut:sorted-set", vargs = true, complete = true)
+		public static <ITR, E> SortedSet.Mutable<E> mutSortedSet(ITR elements) {
 			return SortedSet.Mutable.into(It.iter(elements));
 		}
 
-		@Module.Var(name = "mut:vector")
-		@Module.Fn(vargs = true)
-		public static Vector.Mutable mutVector(Object elements) {
+		@Module.Fn(name = "mut:vector", vargs = true, complete = true)
+		public static <ITR, E> Vector.Mutable<E> mutVector(ITR elements) {
 			return Vector.Mutable.into(It.iter(elements));
 		}
 
-		@Module.Var(name = "ordered-map")
-		@Module.Fn(vargs = true)
-		public static <E, K, V> OrderedMap.Standard<K, V> orderedMap(Object elements) {
+		@Module.Fn(name = "ordered-map", vargs = true, complete = true)
+		public static <ITR, K, V> OrderedMap.Standard<K, V> orderedMap(ITR elements) {
 			return OrderedMap.Standard.into(It.partitionPair(It.iter(elements)));
 		}
 
-		@Module.Var(name = "ordered-set")
-		@Module.Fn(vargs = true)
-		public static OrderedSet.Standard orderedSet(Object elements) {
+		@Module.Fn(name = "ordered-set", vargs = true, complete = true)
+		public static <ITR, E> OrderedSet.Standard<E> orderedSet(ITR elements) {
 			return OrderedSet.Standard.into(It.iter(elements));
 		}
 
-		@Module.Var(name = "pair")
-		public static T.Tup2.L<Object, Object> pair(Object key, Object val) {
-			return new T.Tup2.L(null, key, val);
+		@Module.Fn(name = "pair", complete = true)
+		public static <K, V> I.Pair<K, V> pair(K key, V val) {
+			return new Std.T.Tup2.L(null, key, val);
 		}
 
-		@Module.Var(name = "queue")
-		@Module.Fn(vargs = true)
-		public static Queue.Standard queue(Object elements) {
+		@Module.Fn(name = "queue", vargs = true, complete = true)
+		public static <ITR, E> Queue.Standard<E> queue(ITR elements) {
 			return Queue.Standard.into(It.iter(elements));
 		}
 
-		@Module.Var(name = "set")
-		public static Set.Standard set(Object arr) {
-			return Set.Standard.into(It.iter(arr));
-		}
-
-		@Module.Var(name = "sorted-map")
-		@Module.Fn(vargs = true)
-		public static <E, K, V> SortedMap.Standard<K, V> sortedMap(Object elements) {
+		@Module.Fn(name = "sorted-map", vargs = true, complete = true)
+		public static <ITR, K, V> SortedMap.Standard<K, V> sortedMap(ITR elements) {
 			return SortedMap.Standard.into(It.partitionPair(It.iter(elements)));
 		}
 
-		@Module.Var(name = "sorted-set")
-		@Module.Fn(vargs = true)
-		public static SortedSet.Standard sortedSet(Object elements) {
+		@Module.Fn(name = "sorted-set", vargs = true, complete = true)
+		public static <ITR, E> SortedSet.Standard<E> sortedSet(ITR elements) {
 			return SortedSet.Standard.into(It.iter(elements));
 		}
 
-		@Module.Var(name = "tup")
-		public static T.Tup0 tup() {
-			return T.Tup0.EMPTY;
+		@Module.Fn(name = "to:facade", complete = true)
+		public static <E> Data.LinearType<E> toFacade(java.util.List<E> l) {
+			return new Ut.ListFacade<E>(l);
 		}
 
-		@Module.Var(name = "tup")
-		public static T.Tup1.L tup(Object a) {
-			return new T.Tup1.L(null, a);
+		@Module.Fn(name = "to:facade", complete = true)
+		public static <K, V> Data.MapType<K, V> toFacade(java.util.Map<K, V> m) {
+			return new Ut.MapFacade<K, V>(m);
 		}
 
-		@Module.Var(name = "tup")
-		public static T.Tup2.L tup(Object a, Object b) {
-			return new T.Tup2.L(null, a, b);
+		@Module.Fn(name = "tup", complete = true)
+		public static Tup0 tup() {
+			return Tup0.EMPTY;
 		}
 
-		@Module.Var(name = "tup")
-		public static T.Tup3.L tup(Object a, Object b, Object c) {
-			return new T.Tup3.L(null, a, b, c);
+		@Module.Fn(name = "tup", complete = true)
+		public static Tup1.L tup(Object a) {
+			return new Tup1.L(null, a);
 		}
 
-		@Module.Var(name = "tup")
-		public static T.Tup4.L tup(Object a, Object b, Object c, Object d) {
-			return new T.Tup4.L(null, a, b, c, d);
+		@Module.Fn(name = "tup", complete = true)
+		public static Tup2.L tup(Object a, Object b) {
+			return new Tup2.L(null, a, b);
 		}
 
-		@Module.Var(name = "tup")
-		public static T.Tup5.L tup(Object a, Object b, Object c, Object d, Object e) {
-			return new T.Tup5.L(null, a, b, c, d, e);
+		@Module.Fn(name = "tup", complete = true)
+		public static Tup3.L tup(Object a, Object b, Object c) {
+			return new Tup3.L(null, a, b, c);
 		}
 
-		public static Data.LinearType tup(Object[] xs) {
-			switch (xs.length) {
-			case 0:
-				return T.Tup0.EMPTY;
-			case 1:
-				return new T.Tup1.L(null, xs[0]);
-			case 2:
-				return new T.Tup2.L(null, xs[0], xs[1]);
-			case 3:
-				return new T.Tup3.L(null, xs[0], xs[1], xs[2]);
-			case 4:
-				return new T.Tup4.L(null, xs[0], xs[1], xs[2], xs[3]);
-			case 5:
-				return new T.Tup5.L(null, xs[0], xs[1], xs[2], xs[3], xs[4]);
-			default:
-				throw new Ex.Arity(xs.length, "");
+		@Module.Fn(name = "tup", complete = true)
+		public static Tup4.L tup(Object a, Object b, Object c, Object d) {
+			return new Tup4.L(null, a, b, c, d);
+		}
+
+		@Module.Fn(name = "tup", complete = true)
+		public static Tup5.L tup(Object a, Object b, Object c, Object d, Object e) {
+			return new Tup5.L(null, a, b, c, d, e);
+		}
+
+		public static Data.LinearType tuple(Object[] xs) {
+			switch(xs.length) {
+			case 0: return Tup0.EMPTY;
+			case 1: return new Tup1.L(null, xs[0]);
+			case 2: return new Tup2.L(null, xs[0], xs[1]);
+			case 3: return new Tup3.L(null, xs[0], xs[1], xs[2]);
+			case 4: return new Tup4.L(null, xs[0], xs[1], xs[2], xs[3]); 
+			case 5: return new Tup5.L(null, xs[0], xs[1], xs[2], xs[3], xs[4]);
+			default: throw new Ex.Arity(xs.length, "");
 			}
 		}
 
-		@Module.Var(name = "vec")
-		public static Data.LinearType vec(Object elements) {
-			return vector(elements);
+		@Module.Fn(name = "vector", vargs = true, complete = true)
+		public static <ITR, E> Vector.Standard<E> vector(ITR elements) {
+			return Vector.Standard.into(It.iter(elements));
 		}
-
-		@Module.Var(name = "vector")
-		@Module.Fn(vargs = true)
-		public static Data.LinearType vector(Object elements) {
-			if (elements instanceof Iterator) {
-				return Vector.Standard.into((Iterator) elements);
-			} else if (elements instanceof java.util.Collection) {
-				java.util.Collection l = (java.util.List) elements;
-				if (l.size() > 5) {
-					return Vector.Standard.into(It.iter(l));
-				} else {
-					return tup(l.toArray());
-				}
-			} else if (elements instanceof I.Coll) {
-				I.Coll l = (I.Coll) elements;
-				if (l.count() > 5) {
-					return Vector.Standard.into(It.iter(l));
-				} else {
-					return tup(It.toArray(l.iterator()));
-				}
-			} else if (elements.getClass().isArray()) {
-				Object[] l = (Object[]) elements;
-				if (l.length > 5) {
-					return Vector.Standard.into(It.iter(l));
-				} else {
-					return tup(l);
-				}
-			} else {
-				throw new Ex.Unsupported();
-			}
-		}
-
 	}
-
-	@Module.Ns(name = "builtin", tag = "time")
+	
+	@Module.Ns(name = "global", tag = "time")
 	public interface Time {
 
-		@Module.Var(name = "bench:fn")
-		public static long bench(Supplier f) {
+		@Module.Fn(name = "bench:fn", complete = true)
+		public static long bench(I.Fn f) {
 			long start = Ut.Clock.currentTimeNanos();
-			f.get();
+			f.invoke();
 			long end = Ut.Clock.currentTimeNanos();
 			return end - start;
 		}
@@ -870,49 +1291,24 @@ public interface Builtin {
 		//
 		//
 
-		@Module.Var(name = "now")
+		@Module.Fn(name = "now", complete = true)
 		public static long now() {
 			return Ut.Clock.currentTimeNanos();
 		}
 
 	}
 
-	@Module.Ns(name = "builtin", tag = "lambda")
+	@Module.Ns(name = "global", tag = "lambda")
 	public interface Util {
 
 		//
 		// Print
 		//
 
-		@Module.Var(name = "pr-str")
+		@Module.Fn(name = "pr-str", complete = true)
 		public static String prStr(Object e) {
 			return G.display(e);
 		}
 
 	}
-
-	//
-	// Merge
-	//
-
-	//
-	// Array
-	//
-
-	//
-	//
-	//
-
-	//
-	// Checks
-	//
-
-	/*
-	 * @Module.Var(name = "stream") public static Iterator stream(Object source,
-	 * Object f) { var it = It.iter(source); return (Iterator)
-	 * Fn.toFn(f).invoke(it); }
-	 * 
-	 * @Module.Var(name = "stream")
-	 */
-
 }

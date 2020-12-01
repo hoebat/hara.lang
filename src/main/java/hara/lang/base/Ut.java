@@ -8,6 +8,7 @@ import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
+
 public interface Ut {
 
 	public class Clock {
@@ -572,5 +573,131 @@ public interface Ut {
 		public static long rotateLeft(long value, int shift) {
 			return (value << shift) | value >>> (64 - shift);
 		}
+	}
+
+	public class ListFacade<E> extends Obj.MT implements Data.LinearType<E>, Data.SequentialType<E>{
+		
+		final java.util.List<E> _l;
+	
+		public ListFacade(java.util.List<E> l) {
+			_l = l;
+		}
+	
+		@Override
+		public Iterator<E> iterator() {
+			return _l.iterator();
+		}
+	
+		@Override
+		public ListFacade<E> empty() {
+			_l.clear();
+			return this;
+		}
+	
+		@Override
+		public long count() {
+			return _l.size();
+		}
+	
+		@Override
+		public ListFacade<E> pushLast(E e) {
+			_l.add(e);
+			return this;
+		}
+	
+		@Override
+		public ListFacade<E> pushFirst(E e) {
+			_l.add(0, e);
+			return this;
+		}
+	
+		@Override
+		public ListFacade<E> popFirst() {
+			_l.remove(0);
+			return this;
+		}
+	
+		@Override
+		public ListFacade<E> popLast() {
+			_l.remove(_l.size() - 1);
+			return this;
+		}
+	
+		@Override
+		public E peekFirst() {
+			return _l.get(0);
+		}
+	
+		@Override
+		public E peekLast() {
+			return _l.get(_l.size() - 1);
+		}
+	
+		@Override
+		public E nth(long i) {
+			return _l.get((int)i);
+		}
+		
+	}
+
+	@SuppressWarnings("unchecked")
+	public class MapFacade<K, V> extends Obj.MT implements Data.MapType<K, V> {
+		
+		final java.util.Map<K, V> _m;
+		
+		public MapFacade(java.util.Map<K, V> m) {
+			_m = m;
+		}
+	
+		@Override
+		public Iterator<Entry<K, V>> iterator() {
+			return _m.entrySet().iterator();
+		}
+	
+		@Override
+		public MapFacade<K, V> empty() {
+			 _m.clear();
+			return this;
+		}
+	
+		@Override
+		public long count() {
+			return _m.size();
+		}
+		
+		@Override
+		public Entry<K, V> find(K key) {
+			return (_m.containsKey(key))
+					? new Std.T.Tup2.L<K, V>(null,key,_m.get(key))
+					: null;
+		}
+		
+		@Override
+		public boolean has(K key) {
+			return _m.containsKey(key);
+		}
+		
+		@Override
+		public V lookup(K key) {
+			return _m.get(key);
+		}
+		
+		@Override
+		public V lookup(K key, V notFound) {
+			return _m.getOrDefault(key, notFound);
+		}
+	
+		@Override
+		public MapFacade<K, V> assoc(K k, V v) {
+			_m.put(k, v);
+			return this;
+		}
+	
+		@Override
+		public MapFacade<K, V> dissoc(K k) {
+			_m.remove(k);
+			return this;
+		}
+		
 	}
 }

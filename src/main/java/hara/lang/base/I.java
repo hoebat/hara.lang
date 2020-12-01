@@ -2,11 +2,8 @@ package hara.lang.base;
 
 import java.util.Iterator;
 import java.util.Map;
-import java.util.function.BiFunction;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
+import java.util.Map.Entry;
+import java.util.function.*;
 
 public interface I {
 
@@ -83,6 +80,34 @@ public interface I {
 		Empty empty();
 	}
 
+	public interface Env<K, V> extends I.Lookup<K, V> {
+		Env<K, V> getParent();
+
+		I.Lookup<K, V> getMap();
+		
+		@Override
+		default Entry<K, V> find(K k) {
+			Entry<K, V> e = getMap().find(k);
+			if(e == null) {
+				Env<K, V> env = getParent();
+				if(env != null) {
+					return env.find(k);
+				}
+			}
+			return e;
+		}
+
+		@Override
+		default Iterator<K> keys() {
+			throw new Ex.Unsupported();
+		}
+
+		@Override
+		default Iterator<V> vals() {
+			throw new Ex.Unsupported();
+		}
+	}
+	
 	public interface Equality {
 		boolean equality(Object other);
 	}
@@ -145,7 +170,6 @@ public interface I {
 			} else {
 				throw new Ex.Unsupported();
 			}
-
 		}
 
 		default Supplier<R> getArg0() {
@@ -246,8 +270,10 @@ public interface I {
 	public interface Lookup<K, V> extends Find<K, Map.Entry<K, V>> {
 
 		Iterator<K> keys();
-
-		V lookup(K key);
+		
+		default V lookup(K key) {
+			return lookup(key, null);
+		}
 
 		default V lookup(K key, V notFound) {
 			Map.Entry<K, V> ret = find(key);
@@ -337,6 +363,26 @@ public interface I {
 
 	public interface Reset<V> {
 		V reset(V v);
+	}
+
+	@SuppressWarnings("rawtypes")
+	public interface Runtime<AST, K, V> extends Context {
+		Fn           findFn(Class cls, String name);
+		Fn           findFn(Class cls, String name, int args);
+		Object       eval(AST ast);
+		Object       eval(AST ast, Env env);
+		Env<K, V>    getEnv();
+		V            getObj(K key);
+		V            setObj(K key, V value);
+		AST          readString(String input);
+		Class        classFor(String name);
+		ClassLoader  classLoader();
+		Context      getRoot();
+		String[]     addPaths(String[] paths);
+		String[]     listPaths();
+		Class        addAlias(K key, Class v);
+		Class        removeAlias(K key);
+		Lookup<String, Class>  listAlias();
 	}
 
 	public interface ToMutable extends Persistent {
