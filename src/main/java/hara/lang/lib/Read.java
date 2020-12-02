@@ -386,6 +386,10 @@ public interface Read {
 
 		private static Object matchSymbol(String s) {
 			boolean isKeyword = s.charAt(0) == ':';
+			if(s.equals(":/")) {
+				throw new Ex.Unsupported("Keyword not allowed: \":/\"");
+			}
+			
 			return isKeyword ? Keyword.create(s.substring(1)) : Symbol.create(s);
 		}
 

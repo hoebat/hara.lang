@@ -1,5 +1,6 @@
 package hara.lang.base;
 
+import java.net.URL;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -377,12 +378,14 @@ public interface I {
 		AST          readString(String input);
 		Class        classFor(String name);
 		ClassLoader  classLoader();
+		Coll<Entry<String, Class>> classCache();
 		Context      getRoot();
-		String[]     addPaths(String[] paths);
-		String[]     listPaths();
-		Class        addAlias(K key, Class v);
-		Class        removeAlias(K key);
-		Lookup<String, Class>  listAlias();
+		Coll<URL>    pathCache();
+		Coll<URL>    pathAdd(String[] paths);
+		Coll<URL>    pathRemove(String[] paths);
+		Class        aliasAdd(K key, Class v);
+		Class        aliasRemove(K key);
+		Coll<Entry<String, Class>>  aliasCache();
 	}
 
 	public interface ToMutable extends Persistent {

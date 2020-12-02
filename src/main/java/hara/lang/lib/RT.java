@@ -3,13 +3,12 @@ package hara.lang.lib;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.HashSet;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 import hara.lang.base.*;
-import hara.lang.base.I.Env;
-import hara.lang.base.I.Lookup;
 import hara.lang.data.*;
 
 import static hara.lang.lib.Builtin.Struct.*;
@@ -19,62 +18,98 @@ import static hara.lang.lib.Builtin.Lambda.*;
 public interface RT {
 
 	@SuppressWarnings("rawtypes")
-	public class Loader extends URLClassLoader implements I.Watch<Loader, Class> {
-
-		public static URL[] EMPTY_URLS = new URL[] {};
+	public class SubLoader extends URLClassLoader {
 		
-		final Ut.RefCache<String, Class> CACHE = new Ut.RefCache<>();
+		final ConcurrentHashMap<String, Class> _cache;
+		
+		public SubLoader(URL[] urls, ConcurrentHashMap<String, Class> cache) {
+			super(urls, ClassLoader.getSystemClassLoader());
+			_cache = cache;
+		}
+
+		@Override
+		public void addURL(URL url) {
+			throw new Ex.Unsupported();
+		}
+		
+		@Override
+		public synchronized Class<?> findClass(String name) throws ClassNotFoundException {
+			try {
+				Class c = super.findClass(name);
+				_cache.put(name, c);
+				return c;
+				
+			} catch (Throwable t) {
+				return null;
+			}
+		}
+	}
+
+	@SuppressWarnings("rawtypes")
+	public class Loader extends URLClassLoader implements I.Watch<Loader, Class> {
+		
+		final static URL[] EMPTY_URLS = new URL[] {};
+		
+		final HashSet<URL> _urls = new HashSet();
+		final Ut.AsSet<URL> _urls_facade = new Ut.AsSet<>(_urls);
+		final ConcurrentHashMap<String, Class> _cache = new ConcurrentHashMap();
+		final Ut.AsMap<String, Class> _cache_facade = new Ut.AsMap(_cache);
+		final ClassLoader _parent;
 
 		public Loader() {
-			super(EMPTY_URLS, ClassLoader.getSystemClassLoader());
+			this(ClassLoader.getSystemClassLoader());
 		}
 
 		public Loader(ClassLoader parent) {
 			super(EMPTY_URLS, parent);
+			_parent = parent;
 		}
 
-		@Override
-		protected Class<?> findClass(String name) throws ClassNotFoundException {
-			Class c = lookupClass(name);
-			return (c != null) ? c : super.findClass(name);
-		}
-
+		@SuppressWarnings("resource")
 		@Override
 		protected synchronized Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-			Class c = findLoadedClass(name);
+			Class c = null; 
+
 			if (c == null) {
-				c = lookupClass(name);
-				if (c == null)
-					c = super.loadClass(name, false);
+				c = _cache.get(name);
+				//if(c != null) G.prn("CACHE", c);
 			}
-			if (resolve)
-				resolveClass(c);
+			
+			if (c == null) {
+			   try {
+				 c = findLoadedClass(name);
+				 //if(c != null) G.prn("LOADER", c);
+			   } catch (Throwable t) {}
+			}
+			
+			if (c == null) {
+				c = new SubLoader(getURLs(), _cache).findClass(name);
+				//if(c != null) G.prn("PATH", c);
+			}
+			
+			if (c == null) {
+				c = super.loadClass(name, true);
+			}
+			if (resolve) resolveClass(c);
 			return c;
 		}
 
 		@Override
 		public void addURL(URL url) {
-			super.addURL(url);
+			_urls.add(url);
 		}
 		
-		public Class defineClass(String name, byte[] bytes, Object srcForm) {
-			Class c = defineClass(name, bytes, 0, bytes.length);
-			CACHE.register(name, c);
-			return c;
-		}
-
-		public Class<?> lookupClass(String name) {
-			var cr = CACHE.getLookup().get(name);
-			return (cr != null) ? cr.get() : null;
+		@Override
+		public URL[] getURLs() {
+			return _urls.toArray(EMPTY_URLS);
 		}
 		
-		public Class getClass(String name, boolean load) {
-
-			try {
-				return Class.forName(name, load, this);
-			} catch (ClassNotFoundException e) {
-				throw Ex.Sneaky(e);
-			}
+		public Ut.AsMap<String, Class> getCache() {
+			return _cache_facade;
+		}
+		
+		public Ut.AsSet<URL> getPaths() {
+			return _urls_facade;
 		}
 	}
 
@@ -100,7 +135,7 @@ public interface RT {
 						} 
 						return v;
 					},
-					Directory.loadStatic());
+					Env.loadStatic());
 		}
 		
 		@Override
@@ -118,7 +153,8 @@ public interface RT {
 	public class ClassEnv implements I.Env<Symbol, Object> {
 
 		final I.Runtime _rt;
-		final ConcurrentHashMap<String, Class> _map = new ConcurrentHashMap();
+		final ConcurrentHashMap<String, Class> _alias = new ConcurrentHashMap();
+		public final Ut.AsMap<String, Class> _alias_facade = new Ut.AsMap<>(_alias);
 
 		public ClassEnv(I.Runtime rt) {
 			_rt = rt;
@@ -128,42 +164,53 @@ public interface RT {
 		public Entry<Symbol, Object> find(Symbol sym) {
 			if(sym.getNamespace() == null) {
 				var s = sym.getName();
-				Class c = _map.getOrDefault(s, null);
+				Class c = _alias.getOrDefault(s, null);
 				if(c == null) { c = _rt.classFor(s);}
 				return (c != null) 
 						? pair(sym, c)
 						: null;
 			} else {
 				var s = sym.getNamespace();
-				Class c = _map.getOrDefault(s, null);
+				Class c = _alias.getOrDefault(s, null);
 				if(c == null) { c = _rt.classFor(s);}
-				return (c != null) 
-						? pair(sym, Builtin.Interop.invokeFn(c, sym.getName()))
-						: null;
+
+				if (c != null) {
+					
+					try {
+						return pair(sym, Builtin.Interop.invokeGetStatic(c, sym.getName()));
+					} catch (Throwable t) {}
+					
+					try {
+						return pair(sym, Builtin.Interop.invokeFn(c, sym.getName()));
+					} catch (Throwable t) {}
+					
+					throw new Ex.Runtime("No method or field found: " + sym.getName());	
+				}
+				return null;
 			}
 		}
 
 		@Override
-		public Env getParent() {
+		public I.Env getParent() {
 			return null;
 		}
 
 		@Override
-		public Lookup getMap() {
+		public I.Lookup getMap() {
 			throw new Ex.Unsupported();
 		}
 		
 		public Class addAlias(Symbol sym, Class c) {
 			var s = sym.getName();
-			var p = _map.getOrDefault(s, null);
-			_map.put(sym.getName(), c);
+			var p = _alias.getOrDefault(s, null);
+			_alias.put(sym.getName(), c);
 			return p;
 		}
 		
 		public Class removeAlias(Symbol sym) {
 			var s = sym.getName();
-			var c = _map.getOrDefault(s, null);
-			_map.remove(s);
+			var c = _alias.getOrDefault(s, null);
+			_alias.remove(s);
 			return c;
 		}
 	}
@@ -172,14 +219,14 @@ public interface RT {
 		
 		final I.Env<Symbol, Var> _parent;
 		final ConcurrentHashMap<Symbol, Var> _methods;
-		final I.Lookup<Symbol, Var> _facade;
 		public final ClassEnv _class;
+		public final I.Lookup<Symbol, Var> _facade;
 		
 		@SuppressWarnings("rawtypes")
 		public UserEnv(I.Env<Symbol, Var> parent, I.Runtime rt) {
 			_parent = parent;
 			_methods = new ConcurrentHashMap<Symbol, Var>();
-			_facade = new Ut.MapFacade<>(_methods);
+			_facade = new Ut.AsMap<Symbol, Var>(_methods);
 			_class = new ClassEnv(rt);
 		}
 		
@@ -236,8 +283,7 @@ public interface RT {
 
 		@Override
 		public Object call(Object... args) {
-			System.out.println("CALLED: " + args);
-			return null;
+			return _root.call(args);
 		}
 
 		@Override
@@ -251,7 +297,13 @@ public interface RT {
 		}
 		
 		@Override
+		public Data.MapType<String, Class> classCache() {
+			return _loader.getCache();
+		}
+		
+		@Override
 		public Object eval(AST input) {
+			Thread.currentThread().setContextClassLoader(_loader);
 			return Eval.eval(input, _stack.get().peekFirst());
 		}
 		
@@ -303,40 +355,51 @@ public interface RT {
 				return null;
 			}
 		}
-
+		
 		@Override
-		public String[] addPaths(String[] paths) {
+		public I.Coll<URL> pathAdd(String[] paths) {
 			Arr.toIter(paths).forEachRemaining(
 					(path) -> {
 						try {
-							_loader.addURL(new URL(path));
-						} catch (MalformedURLException e) {
-							e.printStackTrace();
+							_loader.getPaths().conj(new URL(path));
+						} catch (MalformedURLException t) {
+							throw Ex.Sneaky(t);
 						}
 					});
-				return listPaths();
+			return _loader.getPaths();
+		}
+		
+		@Override
+		public I.Coll<URL> pathRemove(String[] paths) {
+			Arr.toIter(paths).forEachRemaining(
+					(path) -> {
+						try {
+							_loader.getPaths().dissoc(new URL(path));
+						} catch (MalformedURLException t) {
+							throw Ex.Sneaky(t);
+						}
+					});
+			return _loader.getPaths();
 		}
 
 		@Override
-		public String[] listPaths() {
-			return It.toArray(
-					It.map(It.iter(_loader.getURLs()), url -> url.toString()),
-					String.class);
-		}
-
-		@Override
-		public Class addAlias(Symbol key, Class v) {
+		public Class aliasAdd(Symbol key, Class v) {
 			return _userEnv._class.addAlias(key, v);
 		}
 
 		@Override
-		public Class removeAlias(Symbol key) {
+		public Class aliasRemove(Symbol key) {
 			return _userEnv._class.removeAlias(key);
 		}
 
 		@Override
-		public I.Lookup listAlias() {
-			return new Ut.MapFacade(_userEnv._class._map);
+		public Ut.AsMap<String, Class> aliasCache() {
+			return _userEnv._class._alias_facade;
+		}
+
+		@Override
+		public I.Coll<URL> pathCache() {
+			return _loader.getPaths();
 		}
 	}
 }

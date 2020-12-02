@@ -82,7 +82,12 @@ public interface Eval {
 		return apply(it.next(), It.toArray(it));
 	}
 	
+	/*
+	public static String PATHS = "(do (sys:add-paths [\"file:///Users/chris/.m2/repository/org/codehaus/janino/janino/3.1.2/janino-3.1.2.jar\" \"file:///Users/chris/.m2/repository/org/codehaus/janino/commons-compiler/3.1.2/commons-compiler-3.1.2.jar\"]) (class \"org.codehaus.janino.ExpressionEvaluator\"))";
+	
 	public static void main(String [] args) {
-		G.prn(eval(Read.LispReader.readString("((fn [a] (inc a)) 1)", null), new RT.RootEnv(null, new RT.Instance(null, "test"))));
+		G.prn(eval(Read.LispReader.readString("(class \"java.nio.file.Path\")", null), 
+				new RT.RootEnv(null, new RT.Instance(null, "test"))));
 	}
+	*/
 }

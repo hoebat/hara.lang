@@ -11,6 +11,174 @@ import java.util.function.Supplier;
 
 public interface Ut {
 
+	public class AsList<E> extends Obj.MT implements Data.LinearType<E>, Data.SequentialType<E>{
+		
+		final java.util.List<E> _l;
+	
+		public AsList(java.util.List<E> l) {
+			_l = l;
+		}
+	
+		@Override
+		public long count() {
+			return _l.size();
+		}
+	
+		@Override
+		public AsList<E> empty() {
+			_l.clear();
+			return this;
+		}
+	
+		@Override
+		public Iterator<E> iterator() {
+			return _l.iterator();
+		}
+	
+		@Override
+		public E nth(long i) {
+			return _l.get((int)i);
+		}
+	
+		@Override
+		public E peekFirst() {
+			return _l.get(0);
+		}
+	
+		@Override
+		public E peekLast() {
+			return _l.get(_l.size() - 1);
+		}
+	
+		@Override
+		public AsList<E> popFirst() {
+			_l.remove(0);
+			return this;
+		}
+	
+		@Override
+		public AsList<E> popLast() {
+			_l.remove(_l.size() - 1);
+			return this;
+		}
+	
+		@Override
+		public AsList<E> pushFirst(E e) {
+			_l.add(0, e);
+			return this;
+		}
+	
+		@Override
+		public AsList<E> pushLast(E e) {
+			_l.add(e);
+			return this;
+		}
+		
+	}
+	
+	@SuppressWarnings("unchecked")
+	public class AsMap<K, V> extends Obj.MT implements Data.MapType<K, V> {
+		
+		final java.util.Map<K, V> _m;
+		
+		public AsMap(java.util.Map<K, V> m) {
+			_m = m;
+		}
+	
+		@Override
+		public AsMap<K, V> assoc(K k, V v) {
+			_m.put(k, v);
+			return this;
+		}
+	
+		@Override
+		public long count() {
+			return _m.size();
+		}
+	
+		@Override
+		public AsMap<K, V> dissoc(K k) {
+			_m.remove(k);
+			return this;
+		}
+		
+		@Override
+		public AsMap<K, V> empty() {
+			 _m.clear();
+			return this;
+		}
+		
+		@Override
+		public Entry<K, V> find(K key) {
+			return (_m.containsKey(key))
+					? new Std.T.Tup2.L<K, V>(null,key,_m.get(key))
+					: null;
+		}
+		
+		@Override
+		public boolean has(K key) {
+			return _m.containsKey(key);
+		}
+		
+		@Override
+		public Iterator<Entry<K, V>> iterator() {
+			return _m.entrySet().iterator();
+		}
+	
+		@Override
+		public V lookup(K key) {
+			return _m.get(key);
+		}
+	
+		@Override
+		public V lookup(K key, V notFound) {
+			return _m.getOrDefault(key, notFound);
+		}
+		
+	}
+
+	public class AsSet<E> extends Obj.MT implements Data.SetType<E> {
+		final java.util.Set<E> _s;
+		
+		public AsSet(java.util.Set<E> s) {
+			_s = s;
+		}
+	
+		@Override
+		public AsSet<E> conj(E e) {
+			_s.add(e);
+			return this;
+		}
+
+		@Override
+		public long count() {
+			return _s.size();
+		}
+
+		@Override
+		public AsSet<E> dissoc(E k) {
+			_s.remove(k);
+			return this;
+		}
+
+		@Override
+		public AsSet<E> empty() {
+			_s.clear();
+			return this;
+		}
+		
+		@Override
+		public E find(E key) {
+			return (_s.contains(key)) ? key : null;
+		}
+
+		@Override
+		public Iterator<E> iterator() {
+			return _s.iterator();
+		}
+		
+	}
+
 	public class Clock {
 
 		private final static Clock _clock;
@@ -19,49 +187,26 @@ public interface Ut {
 			_clock = new Clock();
 		}
 
-		private final long _tsys;
-		private final long _toff;
-
-		private Clock() {
-			_tsys = System.currentTimeMillis() * 1000000;
-
-			// typically 36 ns, between these two lines.
-			_toff = System.nanoTime();
+		public static final long currentTimeMicros() {
+			return currentTimeNanos() / 1000;
+		}
+		public static final long currentTimeMillis() {
+			return currentTimeNanos() / 1000000;
 		}
 
 		public static final long currentTimeNanos() {
 			return _clock._tsys + (System.nanoTime() - _clock._toff);
 		}
 
-		public static final long currentTimeMicros() {
-			return currentTimeNanos() / 1000;
-		}
+		private final long _toff;
 
-		public static final long currentTimeMillis() {
-			return currentTimeNanos() / 1000000;
-		}
-	}
-	
-	public class Flag implements I.Deref<Boolean>, I.Reset<Boolean>, I.Display {
-		private boolean _val;
-		
-		public Flag(boolean val) {
-			_val = val;
-		}
+		private final long _tsys;
 
-		@Override
-		public Boolean reset(Boolean val) {
-			return _val = val;
-		}
+		private Clock() {
+			_tsys = System.currentTimeMillis() * 1000000;
 
-		@Override
-		public Boolean deref() {
-			return _val;
-		}
-		
-		@Override
-		public String display() {
-			return "#flag <" + _val + ">";
+			// typically 36 ns, between these two lines.
+			_toff = System.nanoTime();
 		}
 	}
 
@@ -73,14 +218,6 @@ public interface Ut {
 			_c = count;
 		}
 
-		public int inc() {
-			return _c += 1;
-		}
-
-		public int inc(int n) {
-			return _c += n;
-		}
-
 		public int dec() {
 			return _c -= 1;
 		}
@@ -90,25 +227,33 @@ public interface Ut {
 		}
 
 		@Override
-		public Integer reset(Integer count) {
-			return _c = count;
-		}
-
-		@Override
 		public Integer deref() {
 			return _c;
 		}
-		
+
 		@Override
 		public String display() {
 			return "#counter <" + _c + ">";
 		}
-	}
 
+		public int inc() {
+			return _c += 1;
+		}
+
+		public int inc(int n) {
+			return _c += n;
+		}
+		
+		@Override
+		public Integer reset(Integer count) {
+			return _c = count;
+		}
+	}
+	
 	public class Delay<V> implements I.Deref<V>, I.Realize<V>, I.Display {
-		volatile V _val;
 		volatile Throwable _ex;
 		volatile Supplier<V> _fn;
+		volatile V _val;
 
 		public Delay(Supplier<V> fn) {
 			_fn = fn;
@@ -137,6 +282,11 @@ public interface Ut {
 		}
 
 		@Override
+		public String display() { 
+			return isRealized() ? "#delay <" + G.display(_val) + ">" : "#delay.pending<>";
+		}
+
+		@Override
 		synchronized public boolean isRealized() {
 			return _fn == null;
 		}
@@ -146,128 +296,58 @@ public interface Ut {
 			return deref();
 		}
 
-		@Override
-		public String display() { 
-			return isRealized() ? "#delay <" + G.display(_val) + ">" : "#delay.pending<>";
-		}
-
 	}
 
-	public final class Volatile<V> implements I.Deref<V>, I.Reset<V>, I.Display {
-
-		public volatile V _val;
-
-		public Volatile(V val) {
+	public class Flag implements I.Deref<Boolean>, I.Reset<Boolean>, I.Display {
+		private boolean _val;
+		
+		public Flag(boolean val) {
 			_val = val;
 		}
 
 		@Override
-		public V deref() {
+		public Boolean deref() {
 			return _val;
 		}
 
 		@Override
-		public V reset(V newval) {
-			return _val = newval;
-		}
-
-		@Override
 		public String display() {
-			return "#vol <" + _val + ">";
+			return "#flag <" + _val + ">";
 		}
-
-	}
-	
-	public final class RefCache<K, V> implements I.Lookup<K, Reference<V>>, I.Count {
-
-		final ConcurrentHashMap<K, Reference<V>> _lu;
-		final ReferenceQueue<V> _rq;
 		
-		public RefCache() {
-			 _lu = new ConcurrentHashMap<K, Reference<V>>();
-			 _rq = new ReferenceQueue<V>();
-		}
-
-		@SuppressWarnings({ "unchecked", "rawtypes" })
 		@Override
-		public Entry<K, Reference<V>> find(K key) {
-			var ret = _lu.getOrDefault(key, null);
-			return (ret == null) ? null : new Std.T.Tup2.L(null, key, ret);
-		}
-
-		@Override
-		public Iterator<K> keys() {
-			return _lu.keys().asIterator();
-		}
-
-		@Override
-		public Reference<V> lookup(K key) {
-			return _lu.get(key);
-		}
-
-		@Override
-		public Iterator<Reference<V>> vals() {
-			return _lu.values().iterator();
-		}
-		
-		public ReferenceQueue<V> getQueue() {
-			return _rq;
-		}
-		
-		public ConcurrentHashMap<K, Reference<V>> getLookup() {
-			return _lu;
-		}
-		
-		public void register(K key, V obj) {
-			_lu.put(key, new WeakReference<V>(obj, _rq));
-		}
-		
-		public void deregister(K key) {
-			_lu.remove(key);
-		}
-		
-		public V get(K key) {
-			var ref = _lu.get(key);
-			return (ref != null) ? ref.get() : null;
-		}
-		
-		public V getOrCreate(K key, Supplier<Reference<V>> f) {
-			var ref = _lu.get(key);
-			if (ref != null) {
-				var v = ref.get();
-				if (v != null) {
-					return v;
-				}
-			}
-			
-			ref = f.get();
-			_lu.put(key, ref);
-			return ref.get();
-		}
-
-		public void clearCache() {
-			if (_rq.poll() != null) {
-				while (_rq.poll() != null) {}
-				
-				var it = _lu.entrySet().iterator();
-				It.filter(it, (e) -> (e.getValue() == null) || (e.getValue().get() == null))
-					.forEachRemaining((e) -> _lu.remove(e.getKey()));
-			}
-		}
-
-		@Override
-		public long count() {
-			return _lu.size();
+		public Boolean reset(Boolean val) {
+			return _val = val;
 		}
 	}
 
 	public interface Murmur3 {
 	
-		public static final int seed = 0;
-	
 		public static final int C1 = 0xcc9e2d51;
 	
 		public static final int C2 = 0x1b873593;
+	
+		public static final int seed = 0;
+	
+		public static int hashChars(CharSequence input) {
+			int h1 = seed;
+	
+			// step through the CharSequence 2 chars at a time
+			for (int i = 1; i < input.length(); i += 2) {
+				int k1 = input.charAt(i - 1) | (input.charAt(i) << 16);
+				k1 = mixK1(k1);
+				h1 = mixH1(h1, k1);
+			}
+	
+			// deal with any remaining characters
+			if ((input.length() & 1) == 1) {
+				int k1 = input.charAt(input.length() - 1);
+				k1 = mixK1(k1);
+				h1 ^= k1;
+			}
+	
+			return mixFull(h1, 2 * input.length());
+		}
 	
 		public static int hashInt(int input) {
 			if (input == 0)
@@ -293,24 +373,22 @@ public interface Ut {
 			return mixFull(h1, 8);
 		}
 	
-		public static int hashChars(CharSequence input) {
-			int h1 = seed;
+		// Finalization mix - force all bits of a hash block to avalanche
+		public static int mixFull(int h1, int length) {
+			h1 ^= length;
+			h1 ^= h1 >>> 16;
+			h1 *= 0x85ebca6b;
+			h1 ^= h1 >>> 13;
+			h1 *= 0xc2b2ae35;
+			h1 ^= h1 >>> 16;
+			return h1;
+		}
 	
-			// step through the CharSequence 2 chars at a time
-			for (int i = 1; i < input.length(); i += 2) {
-				int k1 = input.charAt(i - 1) | (input.charAt(i) << 16);
-				k1 = mixK1(k1);
-				h1 = mixH1(h1, k1);
-			}
-	
-			// deal with any remaining characters
-			if ((input.length() & 1) == 1) {
-				int k1 = input.charAt(input.length() - 1);
-				k1 = mixK1(k1);
-				h1 ^= k1;
-			}
-	
-			return mixFull(h1, 2 * input.length());
+		public static int mixH1(int h1, int k1) {
+			h1 ^= k1;
+			h1 = Integer.rotateLeft(h1, 13);
+			h1 = h1 * 5 + 0xe6546b64;
+			return h1;
 		}
 	
 		public static int mixHash(int hash, int count) {
@@ -326,30 +404,92 @@ public interface Ut {
 			k1 *= C2;
 			return k1;
 		}
-	
-		public static int mixH1(int h1, int k1) {
-			h1 ^= k1;
-			h1 = Integer.rotateLeft(h1, 13);
-			h1 = h1 * 5 + 0xe6546b64;
-			return h1;
-		}
-	
-		// Finalization mix - force all bits of a hash block to avalanche
-		public static int mixFull(int h1, int length) {
-			h1 ^= length;
-			h1 ^= h1 >>> 16;
-			h1 *= 0x85ebca6b;
-			h1 ^= h1 >>> 13;
-			h1 *= 0xc2b2ae35;
-			h1 ^= h1 >>> 16;
-			return h1;
-		}
 	}
 
-	public interface SipHash {
+	public final class RefCache<K, V> implements I.Lookup<K, Reference<V>>, I.Count {
+
+		final ConcurrentHashMap<K, Reference<V>> _lu;
+		final ReferenceQueue<V> _rq;
+		
+		public RefCache() {
+			 _lu = new ConcurrentHashMap<K, Reference<V>>();
+			 _rq = new ReferenceQueue<V>();
+		}
+
+		public void clearCache() {
+			if (_rq.poll() != null) {
+				while (_rq.poll() != null) {}
+				
+				var it = _lu.entrySet().iterator();
+				It.filter(it, (e) -> (e.getValue() == null) || (e.getValue().get() == null))
+					.forEachRemaining((e) -> _lu.remove(e.getKey()));
+			}
+		}
+
+		@Override
+		public long count() {
+			return _lu.size();
+		}
+
+		public void deregister(K key) {
+			_lu.remove(key);
+		}
+
+		@SuppressWarnings({ "unchecked", "rawtypes" })
+		@Override
+		public Entry<K, Reference<V>> find(K key) {
+			var ret = _lu.getOrDefault(key, null);
+			return (ret == null) ? null : new Std.T.Tup2.L(null, key, ret);
+		}
+		
+		public V get(K key) {
+			var ref = _lu.get(key);
+			return (ref != null) ? ref.get() : null;
+		}
+		
+		public ConcurrentHashMap<K, Reference<V>> getLookup() {
+			return _lu;
+		}
+		
+		public V getOrCreate(K key, Supplier<Reference<V>> f) {
+			var ref = _lu.get(key);
+			if (ref != null) {
+				var v = ref.get();
+				if (v != null) {
+					return v;
+				}
+			}
+			
+			ref = f.get();
+			_lu.put(key, ref);
+			return ref.get();
+		}
+		
+		public ReferenceQueue<V> getQueue() {
+			return _rq;
+		}
+		
+		@Override
+		public Iterator<K> keys() {
+			return _lu.keys().asIterator();
+		}
+		
+		@Override
+		public Reference<V> lookup(K key) {
+			return _lu.get(key);
+		}
+
+		public void register(K key, V obj) {
+			_lu.put(key, new WeakReference<V>(obj, _rq));
+		}
+
+		@Override
+		public Iterator<Reference<V>> vals() {
+			return _lu.values().iterator();
+		}
+	}
 	
-		public static final byte[] HARA = { 55, 89, -112, -23, 121, 98, -37, 61, 24, 85, 109, -62, 47, -15, 32,
-				17 };
+	public interface SipHash {
 	
 		/**
 		 * Default value for the C rounds of compression.
@@ -360,6 +500,9 @@ public interface Ut {
 		 * Default value for the D rounds of compression.
 		 */
 		public static final int DEFAULT_D = 4;
+	
+		public static final byte[] HARA = { 55, 89, -112, -23, 121, 98, -37, 61, 24, 85, 109, -62, 47, -15, 32,
+				17 };
 	
 		/**
 		 * Initial value for the v0 magic number.
@@ -380,6 +523,23 @@ public interface Ut {
 		 * Initial value for the v3 magic number.
 		 */
 		public static final long INITIAL_V3 = 0x7465646279746573L;
+	
+		/**
+		 * Converts a chunk of 8 bytes to a number in little endian.
+		 *
+		 * Accepts an offset to determine where the chunk begins.
+		 *
+		 * @param bytes  the byte array containing our bytes to convert.
+		 * @param offset the index to start at when chunking bytes.
+		 * @return a long representation, in little endian.
+		 */
+		public static long bytesToLong(byte[] bytes, int offset) {
+			long m = 0;
+			for (int i = 0; i < 8; i++) {
+				m |= ((((long) bytes[i + offset]) & 0xff) << (8 * i));
+			}
+			return m;
+		}
 	
 		/**
 		 * Hashes a data input for a given key.
@@ -413,44 +573,6 @@ public interface Ut {
 			long k1 = bytesToLong(key, 8);
 	
 			return hash(c, d, INITIAL_V0 ^ k0, INITIAL_V1 ^ k1, INITIAL_V2 ^ k0, INITIAL_V3 ^ k1, data);
-		}
-	
-		/**
-		 * Converts a hash to a hexidecimal representation.
-		 *
-		 * @param hash the finalized hash value to convert to hex.
-		 * @return a {@link String} representation of the hash.
-		 */
-		public static String toHexString(long hash) {
-			String hex = Long.toHexString(hash);
-	
-			if (hex.length() == 16) {
-				return hex;
-			}
-	
-			StringBuilder sb = new StringBuilder();
-			for (int i = 0, j = 16 - hex.length(); i < j; i++) {
-				sb.append('0');
-			}
-	
-			return sb.append(hex).toString();
-		}
-	
-		/**
-		 * Converts a chunk of 8 bytes to a number in little endian.
-		 *
-		 * Accepts an offset to determine where the chunk begins.
-		 *
-		 * @param bytes  the byte array containing our bytes to convert.
-		 * @param offset the index to start at when chunking bytes.
-		 * @return a long representation, in little endian.
-		 */
-		public static long bytesToLong(byte[] bytes, int offset) {
-			long m = 0;
-			for (int i = 0; i < 8; i++) {
-				m |= ((((long) bytes[i + offset]) & 0xff) << (8 * i));
-			}
-			return m;
 		}
 	
 		/**
@@ -573,131 +695,51 @@ public interface Ut {
 		public static long rotateLeft(long value, int shift) {
 			return (value << shift) | value >>> (64 - shift);
 		}
+	
+		/**
+		 * Converts a hash to a hexidecimal representation.
+		 *
+		 * @param hash the finalized hash value to convert to hex.
+		 * @return a {@link String} representation of the hash.
+		 */
+		public static String toHexString(long hash) {
+			String hex = Long.toHexString(hash);
+	
+			if (hex.length() == 16) {
+				return hex;
+			}
+	
+			StringBuilder sb = new StringBuilder();
+			for (int i = 0, j = 16 - hex.length(); i < j; i++) {
+				sb.append('0');
+			}
+	
+			return sb.append(hex).toString();
+		}
 	}
 
-	public class ListFacade<E> extends Obj.MT implements Data.LinearType<E>, Data.SequentialType<E>{
-		
-		final java.util.List<E> _l;
-	
-		public ListFacade(java.util.List<E> l) {
-			_l = l;
-		}
-	
-		@Override
-		public Iterator<E> iterator() {
-			return _l.iterator();
-		}
-	
-		@Override
-		public ListFacade<E> empty() {
-			_l.clear();
-			return this;
-		}
-	
-		@Override
-		public long count() {
-			return _l.size();
-		}
-	
-		@Override
-		public ListFacade<E> pushLast(E e) {
-			_l.add(e);
-			return this;
-		}
-	
-		@Override
-		public ListFacade<E> pushFirst(E e) {
-			_l.add(0, e);
-			return this;
-		}
-	
-		@Override
-		public ListFacade<E> popFirst() {
-			_l.remove(0);
-			return this;
-		}
-	
-		@Override
-		public ListFacade<E> popLast() {
-			_l.remove(_l.size() - 1);
-			return this;
-		}
-	
-		@Override
-		public E peekFirst() {
-			return _l.get(0);
-		}
-	
-		@Override
-		public E peekLast() {
-			return _l.get(_l.size() - 1);
-		}
-	
-		@Override
-		public E nth(long i) {
-			return _l.get((int)i);
-		}
-		
-	}
+	public final class Volatile<V> implements I.Deref<V>, I.Reset<V>, I.Display {
 
-	@SuppressWarnings("unchecked")
-	public class MapFacade<K, V> extends Obj.MT implements Data.MapType<K, V> {
-		
-		final java.util.Map<K, V> _m;
-		
-		public MapFacade(java.util.Map<K, V> m) {
-			_m = m;
+		public volatile V _val;
+
+		public Volatile(V val) {
+			_val = val;
 		}
-	
+
 		@Override
-		public Iterator<Entry<K, V>> iterator() {
-			return _m.entrySet().iterator();
+		public V deref() {
+			return _val;
 		}
-	
+
 		@Override
-		public MapFacade<K, V> empty() {
-			 _m.clear();
-			return this;
+		public String display() {
+			return "#vol <" + _val + ">";
 		}
-	
+
 		@Override
-		public long count() {
-			return _m.size();
+		public V reset(V newval) {
+			return _val = newval;
 		}
-		
-		@Override
-		public Entry<K, V> find(K key) {
-			return (_m.containsKey(key))
-					? new Std.T.Tup2.L<K, V>(null,key,_m.get(key))
-					: null;
-		}
-		
-		@Override
-		public boolean has(K key) {
-			return _m.containsKey(key);
-		}
-		
-		@Override
-		public V lookup(K key) {
-			return _m.get(key);
-		}
-		
-		@Override
-		public V lookup(K key, V notFound) {
-			return _m.getOrDefault(key, notFound);
-		}
-	
-		@Override
-		public MapFacade<K, V> assoc(K k, V v) {
-			_m.put(k, v);
-			return this;
-		}
-	
-		@Override
-		public MapFacade<K, V> dissoc(K k) {
-			_m.remove(k);
-			return this;
-		}
-		
+
 	}
 }

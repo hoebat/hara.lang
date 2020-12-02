@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 
 import hara.lang.base.Arr;
 import hara.lang.base.Ex;
+import hara.lang.base.G;
 import hara.lang.base.I;
 import hara.lang.base.It;
 import hara.lang.lib.*;
@@ -23,7 +24,7 @@ public class Foundation implements I.Context {
 	public final ConcurrentHashMap<String,I.Runtime> RTS = new ConcurrentHashMap<String,I.Runtime>();
 
 	public enum COMMAND {
-		HELP, SHUTDOWN, DIR, PING, ECHO, OS, JVM, SERVER, SESSION
+		HELP, SHUTDOWN, DIR, PING, ECHO, OS, JVM, SERVER, SESSION, EVAL
 	}
 	
 	public enum OS {
@@ -40,12 +41,11 @@ public class Foundation implements I.Context {
 	}
 	
 	public enum SESSION {
-		HELP, NEW, EXISTS, LIST, INFO, STOP, LOAD, 
-		CLASSPATH, CP, CLASSLOADER, EVAL,
+		HELP, NEW, GET, EXISTS, LIST, INFO, KILL, PATH
 	}
 	
 	public enum CLASSPATH {
-		ADD, LOAD, LIST, FIND
+		ADD, LIST, REMOVE, PURGE
 	}
 
 	@SuppressWarnings("unchecked")
@@ -166,15 +166,17 @@ public class Foundation implements I.Context {
 			throw new Ex.Runtime("No Session: " + key);
 		}
 		
-		public static Object runSessionCreate(Foundation F, List<String> args) {
+		public static Object runSessionCreate(Foundation F, List<String> args, boolean raise) {
 			var key = args.get(0);
 			var s = F.RTS.get(key);
 			if (s != null) {
-				throw new Ex.Runtime("Session already exists: " + key);
+				if (raise) {
+					throw new Ex.Runtime("Session already exists: " + key);
+				}
 			} else {
 				F.RTS.put(key, new RT.Instance(F, key));
-				return key;
 			}
+			return key;
 		}
 
 		public static Object runSessionClasspath(RT.Instance rt, List<String> args) {
@@ -183,46 +185,41 @@ public class Foundation implements I.Context {
 								: CLASSPATH.valueOf(args.get(1));
 			if(cmd == CLASSPATH.LIST) {
 				System.out.println("LIST");
-				return rt.listPaths();
+				return rt.pathCache();
 			}
 		
 			
 			args.remove(0);
 			args.remove(0); 
 			switch(cmd) {
-			case ADD:    return rt.addPaths(args.toArray(new String[] {}));
-			//case FIND:   return rt.(args.toArray(new String[] {}));
-			//case LOAD:   return rt.loadClasspath(args);
+			case ADD:    return rt.pathAdd(args.toArray(new String[] {}));
+			case REMOVE: return rt.pathRemove(args.toArray(new String[] {}));
+			case PURGE:  return rt.pathCache().empty();
+			case LIST:   return rt.pathCache();
 			}
 			throw new Ex.Unsupported();
 		}
 		
 
-		@SuppressWarnings("unchecked")
 		public static Object runSession(Foundation F, List<String> args) {
 			SESSION cmd = SESSION.valueOf(args.get(0));
 			args.remove(0);
 			
 			switch(cmd) {
-			case HELP:  return Fn.runHELP(F, SESSION.values());
+			case HELP:   return Fn.runHELP(F, SESSION.values());
 			case EXISTS: return runSessionFor(F, args.get(0), (rt) -> rt != null);
-			case EVAL: 
-				return runSessionFor(F, args.get(0), 
-						rt -> rt.eval(rt.readString(args.get(1))));
-			case NEW: return runSessionCreate(F, args);
-			case CP:
-			case CLASSPATH: return runSessionFor(F, args.get(0), 
-					(rt) -> runSessionClasspath(rt, args));
-			//case INFO:  return runSessionFor(F, args.get(0), (rt) -> rt.getInfo());
-			case LIST:  return It.toArrayList(F.RTS.keys());
-			//case LOAD:  return runSessionFor(F, args.get(0), (rt) -> rt.load(args));
-			//case STOP:  return runSessionFor(F, args.get(0), (rt) -> rt.stop());
-			case CLASSLOADER: break;
+			case GET:    return runSessionCreate(F, args, false);
+			case NEW:    return runSessionCreate(F, args, true);
+			case PATH:   return runSessionFor(F, args.get(0), (rt) -> runSessionClasspath(rt, args));
+			case LIST:   return It.toArrayList(F.RTS.keys());
+			case KILL:   return runSessionFor(F, args.get(0), (rt) -> F.RTS.remove(args.get(0)));
+			case INFO:   throw new Ex.TODO();
 			}
 			throw new Ex.Unsupported();
 		}
 	}
 	
+	@SuppressWarnings("unchecked")
 	public static Object runCommand(Foundation F, List<String> args) {
 		var cmd = COMMAND.valueOf(args.get(0));
 		args.remove(0);
@@ -236,18 +233,21 @@ public class Foundation implements I.Context {
 		case OS:   return Fn.runOS(F, args);
 		case SERVER: return Fn.runServer(F, args);
 		case SESSION: return Fn.runSession(F, args);
+		case EVAL: 
+			return Fn.runSessionFor(F, args.get(0), 
+					rt -> G.display(rt.eval(rt.readString(args.get(1)))));
 		case SHUTDOWN: 
 			System.exit(1);
 			return null;
-		default:
-			throw new Ex.Unsupported();
 		}
+		throw new Ex.Unsupported();
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public Object call(Object... args) {
-		// TODO Auto-generated method stub
-		return null;
+		var inputs = It.toArrayList(It.iter(args));
+		return runCommand(this, inputs);
 	}
 
 }

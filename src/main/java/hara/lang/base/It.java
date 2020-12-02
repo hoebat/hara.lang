@@ -991,7 +991,7 @@ public interface It {
 				if (!hasNext()) {
 					throw new Ex.NoSuchElement();
 				}
-				return Arr.map((it) -> ((Iterator)it).next(), Object.class, its);
+				return Arr.map((it) -> it.next(), Object.class, its);
 			}
 		};
 	}

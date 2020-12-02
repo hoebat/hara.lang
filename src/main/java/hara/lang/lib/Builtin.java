@@ -8,6 +8,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.math.BigInteger;
+import java.net.URL;
 import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.concurrent.ExecutionException;
@@ -475,7 +476,7 @@ public interface Builtin {
 
 		@Module.Fn(name = "nth", option = true)
 		public static Character nth(String s, long idx) {
-			return (Character)s.charAt((int)idx);
+			return s.charAt((int)idx);
 		}
 
 		@Module.Fn(name = "range", complete = true)
@@ -572,7 +573,7 @@ public interface Builtin {
 			return cls.getDeclaredClasses();
 		}
 
-		@Module.Fn(name = "invoke:static-methods") 		
+		@Module.Fn(name = "class:static-methods") 		
 		public static Set<String> classStaticMethods(Class cls) {
 			Iterator<Method> methods = It.iter(cls.getMethods());
 			return Collection.toSet(					
@@ -583,7 +584,7 @@ public interface Builtin {
 					(m) -> m.getName()));
 		}
 
-		@Module.Fn(name = "invoke:static-fields") 		
+		@Module.Fn(name = "class:static-fields") 		
 		public static Iterator<String> classStaticFields(Class cls) {
 			Iterator<Field> fields = It.iter(cls.getFields());
 			return It.map(
@@ -595,27 +596,27 @@ public interface Builtin {
 
 		@Module.Fn(name = "invoke:new", vargs = true) 		
 		public static <R, ITR> Object invokeNew(Class c, ITR args) {
-			return (R) Reflect.invokeConstructor(c, It.toArray(args));
+			return Reflect.invokeConstructor(c, It.toArray(args));
 		}
 
 		@Module.Fn(name = "invoke", vargs = true) 		
 		public static <R, ITR> Object invokeObj(Object o, String method, ITR args) {
-			return (R) Reflect.invokeInstanceMethod(o, method, It.toArray(args));
+			return Reflect.invokeInstanceMethod(o, method, It.toArray(args));
 		}
 
 		@Module.Fn(name = "invoke:get") 		
 		public static <R> Object invokeGet(Object o, String name) {
-			return (R) Reflect.getInstanceField(o, name);
+			return Reflect.getInstanceField(o, name);
 		}
 
 		@Module.Fn(name = "invoke:set") 		
 		public static <R> Object invokeSet(Object o, String name, Object val) {
-			return (R) Reflect.setInstanceField(o, name, val);
+			return Reflect.setInstanceField(o, name, val);
 		}
 
 		@Module.Fn(name = "invoke:static", vargs = true) 		
 		public static <R, ITR> Object invokeStatic(Class c, String method, ITR args) {
-			return (R) Reflect.invokeStaticMethod(c, method, It.toArray(args));
+			return Reflect.invokeStaticMethod(c, method, It.toArray(args));
 		}
 
 		@Module.Fn(name = "invoke:fn") 		
@@ -634,12 +635,12 @@ public interface Builtin {
 
 		@Module.Fn(name = "invoke:get-static", vargs = true) 		
 		public static <R> Object invokeGetStatic(Class c, String name) {
-			return (R) Reflect.getStaticField(c, name);
+			return Reflect.getStaticField(c, name);
 		}
 
 		@Module.Fn(name = "invoke:set-static", vargs = true) 		
 		public static <R> Object invokeSetStatic(Class c, String name, Object val) {
-			return (R) Reflect.setStaticField(c, name, val);
+			return Reflect.setStaticField(c, name, val);
 		}
 	}
 
@@ -1049,10 +1050,25 @@ public interface Builtin {
 		public static <AST> AST readString(I.Runtime<AST, ?, ?> rt, String input) {
 			return rt.readString(input);
 		}
+
+		@Module.Fn(name = "sys:path", rt = true)
+		public static I.Coll<URL> sysPath(I.Runtime rt) {
+			return rt.pathCache();
+		}
 		
-		@Module.Fn(name = "sys:add-paths", rt = true)
-		public static String[] sysAddPath(I.Runtime rt, String[] paths) {
-			return rt.addPaths(paths);
+		@Module.Fn(name = "sys:path-add", rt = true)
+		public static <ITR> I.Coll<String> sysPathAdd(I.Runtime rt, ITR paths) {
+			return rt.pathAdd((String[]) It.toArray(It.iter(paths), String.class));
+		}
+		
+		@Module.Fn(name = "sys:path-remove", rt = true)
+		public static <ITR> I.Coll<String> sysPathRemove(I.Runtime rt, ITR paths) {
+			return rt.pathRemove((String[]) It.toArray(It.iter(paths), String.class));
+		}
+		
+		@Module.Fn(name = "sys:path-purge", rt = true)
+		public static I.Coll<String> sysPathPurge(I.Runtime rt) {
+			return (I.Coll)rt.pathCache().empty();
 		}
 		
 		@Module.Fn(name = "sys:globals", rt = true)
@@ -1060,11 +1076,6 @@ public interface Builtin {
 			return rt.getEnv().getMap();
 		}
 
-		@Module.Fn(name = "sys:list-paths", rt = true)
-		public static String[] sysListPath(I.Runtime rt) {
-			return rt.listPaths();
-		}
-		
 		@Module.Fn(name = "sys:loader", rt = true)
 		public static ClassLoader sysloader(I.Runtime rt) {
 			return rt.classLoader();
@@ -1075,19 +1086,60 @@ public interface Builtin {
 			return rt.getRoot();
 		}
 		
-		@Module.Fn(name = "sys:add-alias", rt = true)
+		@Module.Fn(name = "sys:call", vargs = true, rt = true)
+		public static <ITR> Object sysCall(I.Runtime rt, ITR inputs) {
+			return rt.call(Arr.toArray(inputs));
+		}
+		
+		@Module.Fn(name = "sys:alias-add", rt = true)
 		public static Class sysAddAlias(I.Runtime rt, Symbol sym, Class c) {
-			return rt.addAlias(sym, c);
+			return rt.aliasAdd(sym, c);
 		}
 		
-		@Module.Fn(name = "sys:remove-alias", rt = true)
+		@Module.Fn(name = "sys:alias-remove", rt = true)
 		public static Class sysRemoveAlias(I.Runtime rt, Symbol sym) {
-			return rt.removeAlias(sym);
+			return rt.aliasRemove(sym);
 		}
 		
-		@Module.Fn(name = "sys:list-alias", rt = true)
-		public static I.Lookup sysListAlias(I.Runtime rt) {
-			return rt.listAlias();
+		@Module.Fn(name = "sys:alias-purge", rt = true)
+		public static I.Coll sysAliasPurge(I.Runtime rt, Symbol sym) {
+			return (I.Coll) rt.aliasCache().empty();
+		}
+
+		@Module.Fn(name = "sys:alias", rt = true)
+		public static I.Coll sysListAlias(I.Runtime rt) {
+			return rt.aliasCache();
+		}
+		
+		@Module.Fn(name = "sys:import", vargs = true, rt = true)
+		public static <ITR> Class[] sysImport(I.Runtime rt, ITR inputs) {
+			Iterator<Entry> it = It.partitionPair(It.iter(inputs));
+			return (Class[]) It.toArray(
+					(Iterator)It.map(it, (p) -> rt.aliasAdd(p.getKey(), (Class) p.getValue())),
+					Class.class);
+		}
+		
+		@Module.Fn(name = "sys:cache", rt = true)
+		public static I.Coll sysCache(I.Runtime rt) {
+			return rt.classCache();
+		}
+		
+		@Module.Fn(name = "sys:cache-add", rt = true)
+		public static I.Coll sysCacheAdd(I.Runtime rt, String name, Class cls) {
+			return (I.Coll) ((I.Assoc)rt.classCache()).assoc(name, cls);
+		}
+		
+		@Module.Fn(name = "sys:cache-purge", rt = true)
+		public static I.Coll sysCachePurge(I.Runtime rt) {
+			return (I.Coll) rt.classCache().empty();
+		}
+		
+		@Module.Fn(name = "sys:cache-remove", rt = true, vargs = true)
+		public static <ITR> I.Coll sysCacheRemove(I.Runtime rt, ITR names) {
+			return It.reduce(
+					It.iter(names), 
+					rt.classCache(),
+					(m, n) -> (Data.MapType)((Data.MapType)m).dissoc(n));
 		}
 	}
 
@@ -1107,8 +1159,13 @@ public interface Builtin {
 		public static <ITR, E> Set.Standard<E> hashSet(ITR elements) {
 			return Set.Standard.into(It.iter(elements));
 		}
+
+		@Module.Fn(name = "j:arr", complete = true)
+		public static <ITR, E> E[] jArr(Class<E> type, ITR vargs) {
+			return (E[]) It.toArray(It.iter(vargs), type);
+		}
 		
-		@Module.Fn(name = "j:arr", vargs = true, complete = true)
+		@Module.Fn(name = "j:objs", vargs = true, complete = true)
 		public static <ITR> Object[] jArr(ITR vargs) {
 			return Arr.toArray(vargs);
 		}
@@ -1220,12 +1277,12 @@ public interface Builtin {
 
 		@Module.Fn(name = "to:facade", complete = true)
 		public static <E> Data.LinearType<E> toFacade(java.util.List<E> l) {
-			return new Ut.ListFacade<E>(l);
+			return new Ut.AsList<E>(l);
 		}
 
 		@Module.Fn(name = "to:facade", complete = true)
 		public static <K, V> Data.MapType<K, V> toFacade(java.util.Map<K, V> m) {
-			return new Ut.MapFacade<K, V>(m);
+			return new Ut.AsMap<K, V>(m);
 		}
 
 		@Module.Fn(name = "tup", complete = true)
@@ -1308,6 +1365,22 @@ public interface Builtin {
 		@Module.Fn(name = "pr-str", complete = true)
 		public static String prStr(Object e) {
 			return G.display(e);
+		}
+		
+		@Module.Fn(name = "str", vargs = true, complete = true)
+		public static <ITR> String str(ITR args) {
+			return It.toString(It.iter(args), "", "", "", 
+					(e) -> {
+						if(e == null) {
+							return "";
+						} else if(e instanceof String) {
+							return (String)e;
+						} else if (e instanceof I.Display) {
+							return ((I.Display)e).display();
+						} else {
+							return e.toString();
+						}
+					});
 		}
 
 	}

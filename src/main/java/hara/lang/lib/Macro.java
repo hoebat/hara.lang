@@ -48,7 +48,7 @@ public interface Macro {
 		@Module.Fn(name = ".", complete = true, vargs = true, rt = true)
 		@Module.Var(control = true)
 		public static <R, AST, ITR> R dotExpr(I.Runtime rt, AST expr, AST cmd, ITR more) {
-			Object o = (Object) eval(rt, expr);
+			Object o = eval(rt, expr);
 			return (R) It.reduce(
 					It.iter(more),
 					dotExpr(rt, o, cmd),
@@ -93,7 +93,7 @@ public interface Macro {
 		@Module.Fn(name = "fn", complete = true, rt = true, vargs = true)
 		@Module.Var(control = true)
 		public static <ITR> I.Fn fnExpr(I.Runtime rt, Data.LinearType bindings, ITR args) {
-			return new Var.FnEval(null, rt, bindings, list(args).cons(symbol("do")));
+			return new Env.FnEval(null, rt, bindings, list(args).cons(symbol("do")));
 		}
 		
 		@Module.Fn(name = "if", complete = true, rt = true)
@@ -125,7 +125,19 @@ public interface Macro {
 							return list(Arr.objects(e, acc));
 						} else {
 							var l = (List.Standard)e;
-							return l.popFirst().cons(acc).cons(l.peekFirst());
+							var changed = atomVolatile(false);
+							var ret = list(It.map(It.iter(l), (i) -> {
+								if(Eq.eq(i, Symbol.create("%"))) {
+									changed.reset(true);
+									return acc;
+								}
+								return i;
+							}));
+							if(changed.deref()) {
+								return ret;
+							} else {
+								return l.popFirst().cons(acc).cons(l.peekFirst());
+							}
 						}
 					});
 		}

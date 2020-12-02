@@ -153,7 +153,7 @@ public class Server implements I.Component {
 											.map(b -> new String((byte[])b))
 											.collect(Collectors.toList());
 							var ret = Foundation.runCommand(_instance._F, args);
-							writeReturn(_conn, G.display(ret));
+							writeReturn(_conn, ret);
 						} else {
 							_conn.write("NOT PROCESSED: " + obj);
 						}
