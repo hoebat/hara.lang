@@ -1190,9 +1190,7 @@ public interface Builtin {
 
 		@Module.Fn(name = "j:list", vargs = true, complete = true)
 		public static <ITR> java.util.ArrayList jList(ITR vargs) {
-			var l = new java.util.ArrayList();
-			It.each(It.iter(vargs), (e) -> l.add(e));
-			return l;
+			return It.toArrayList(It.iter(vargs));
 		}
 
 		@Module.Fn(name = "list", vargs = true, complete = true)

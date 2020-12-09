@@ -2,9 +2,9 @@ package hara.lang.kernel;
 
 import hara.lang.lib.RT;
 
+@SuppressWarnings("rawtypes")
 public class Main {
 
-	@SuppressWarnings("rawtypes")
 	public static void main(String[] args){
 		var F = new Foundation();
 		var server = new Server(F, "PRIMARY");
