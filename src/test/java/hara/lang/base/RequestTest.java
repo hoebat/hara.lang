@@ -8,7 +8,7 @@ import hara.lang.base.Eq;
 
 public class RequestTest {
 
-    static class MockFn implements I.IClient {
+    static class MockFn implements I.Client {
         @Override
         public Function<Object, Object> getArgN() {
             return (args) -> {
@@ -39,7 +39,7 @@ public class RequestTest {
     @Test
     public void testRequest() {
         Request request = new Request();
-        I.IClient mockClient = new MockFn();
+        I.Client mockClient = new MockFn();
 
         // Test requestSingle
         assertEquals("test", request.requestSingle(mockClient, "test", null));
