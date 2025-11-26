@@ -245,6 +245,10 @@ public interface I {
 		Object produce(Object context, Object opts);
 	}
 
+	public interface IClient extends OFn {
+
+	}
+
 	public interface IRequest
 	{
 		Object requestSingle(Object client, Object command, Object opts);
@@ -752,6 +756,10 @@ public interface I {
 				super(null, key, (R) ref, oldVal, newVal);
 			}
 		}
+	}
+
+	public interface HasRuntime {
+		Object getRuntime();
 	}
 
 }
