@@ -1,12 +1,13 @@
 package hara.lang.lib;
 
-import junit.framework.TestCase;
-
+import org.junit.Test;
+import static org.junit.Assert.*;
 import hara.lang.base.I;
 import hara.lang.data.Symbol;
 
-public class RTTest extends TestCase {
+public class RTTest {
 
+    @Test
     public void testLoader() {
         RT.Loader loader = new RT.Loader();
         try {
@@ -18,17 +19,20 @@ public class RTTest extends TestCase {
         }
     }
 
+    @Test
     public void testInstance() {
         RT.Instance<Object> rt = new RT.Instance<>(null, "test");
         assertNotNull(rt);
     }
 
+    @Test
     public void testEval() {
         RT.Instance<Object> rt = new RT.Instance<>(null, "test");
         Object result = rt.eval(rt.readString("(+ 1 2)"));
         assertEquals(3L, result);
     }
 
+    @Test
     public void testSetAndGetObj() {
         RT.Instance<Object> rt = new RT.Instance<>(null, "test");
         Symbol sym = Symbol.create("a");

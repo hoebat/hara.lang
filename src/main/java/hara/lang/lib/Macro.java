@@ -18,12 +18,7 @@ public interface Macro {
 
 		public static <R, AST> R dotExpr(I.Runtime rt, Object o, AST cmd) {
 			if(cmd instanceof Symbol) {
-				String memberName = G.display(cmd);
-				try {
-					return (R) Reflect.getInstanceField(o, memberName);
-				} catch (Throwable t) {
-					return (R) Reflect.invokeInstanceMethod(o, memberName, G.EMPTY_ARRAY);
-				}
+				return (R) Reflect.getInstanceField(o, G.display(cmd));
 			} else if(cmd instanceof List) {
 				var l = (List)cmd;
 				var method = l.peekFirst();

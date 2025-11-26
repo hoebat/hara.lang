@@ -1,19 +1,27 @@
 package hara.lang.lib;
 
-import junit.framework.TestCase;
+import org.junit.Before;
+import org.junit.Test;
+import static org.junit.Assert.*;
 import hara.lang.data.Symbol;
 import hara.lang.data.List;
 import hara.lang.data.Vector;
 
-public class MacroTest extends TestCase {
+public class MacroTest {
 
     private RT.Instance<Object> rt;
 
-    @Override
-    protected void setUp() {
-        rt = new RT.Instance<>(null, "test");
+    public static class TestClass {
+        public String testField = "hello";
     }
 
+    @Before
+    public void setUp() {
+        rt = new RT.Instance<>(null, "test");
+        rt.setObj(Symbol.create("test-instance"), new Var("test-instance", new TestClass()));
+    }
+
+    @Test
     public void testIfMacro() {
         List ifExpr = List.Standard.from(null, Symbol.create("if"), true, 1, 2);
         assertEquals(1, rt.eval(ifExpr));
@@ -22,6 +30,7 @@ public class MacroTest extends TestCase {
         assertEquals(2, rt.eval(elseExpr));
     }
 
+    @Test
     public void testDoMacro() {
         List doExpr = List.Standard.from(null, Symbol.create("do"),
             List.Standard.from(null, Symbol.create("def"), Symbol.create("a"), 10),
@@ -29,9 +38,9 @@ public class MacroTest extends TestCase {
         assertEquals(10, rt.eval(doExpr));
     }
 
+    @Test
     public void testDotMacro() {
-        rt.setObj(Symbol.create("s"), new Var("s", "hello"));
-        List dotExpr = List.Standard.from(null, Symbol.create("."), Symbol.create("s"), Symbol.create("length"));
-        assertEquals(5, rt.eval(dotExpr));
+        List dotExpr = List.Standard.from(null, Symbol.create("."), Symbol.create("test-instance"), Symbol.create("testField"));
+        assertEquals("hello", rt.eval(dotExpr));
     }
 }
