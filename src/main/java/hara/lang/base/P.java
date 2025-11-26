@@ -103,7 +103,7 @@ public interface P {
 		 * @return true, if the number is a power of two
 		 */
 		public static boolean isPowerOfTwo(long n) {
-			return (n & (n - 1)) == 0;
+			return (n > 0) && ((n & (n - 1)) == 0);
 		}
 
 	}
