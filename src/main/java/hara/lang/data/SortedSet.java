@@ -109,7 +109,11 @@ public interface SortedSet<E> extends Data.SetType<E> {
 
 		@Override
 		public Standard<E> conj(E e) {
-			return new Standard<E>(_meta, _lookup.assoc(e, e));
+			SortedMap.Standard<E, E> newLookup = _lookup.assoc(e, e);
+			if (newLookup == _lookup) {
+				return this;
+			}
+			return new Standard<E>(_meta, newLookup);
 		}
 
 		@SuppressWarnings("unchecked")
@@ -138,7 +142,7 @@ public interface SortedSet<E> extends Data.SetType<E> {
 
 		@Override
 		public Standard<E> dissoc(E k) {
-			var nlookup = _lookup.dissoc(k);
+			SortedMap.Standard<E, E> nlookup = _lookup.dissoc(k);
 			return (nlookup == _lookup) ? this : new Standard<E>(_meta, nlookup);
 		}
 
