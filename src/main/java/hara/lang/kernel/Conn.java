@@ -272,6 +272,16 @@ public class Conn implements Closeable {
 	public final Parser reader;
 
 	/**
+	 * A PrintStream to log incoming data.
+	 */
+	public PrintStream logIn;
+
+	/**
+	 * A PrintStream to log outgoing data.
+	 */
+	public PrintStream logOut;
+
+	/**
 	 * Used for reading responses from the server.
 	 */
   public Socket socket;
@@ -283,7 +293,7 @@ public class Conn implements Closeable {
 	 * @throws IOException If a socket error occurs.
 	 */
 	public Conn(Socket socket) throws IOException {
-		this(socket, 1 << 16, 1 << 16);
+		this(socket, 1 << 16, 1 << 16, null, null);
 	}
 
 	/**
@@ -295,9 +305,16 @@ public class Conn implements Closeable {
 	 * @throws IOException If a socket error occurs.
 	 */
 	public Conn(Socket socket, int inputBufferSize, int outputBufferSize) throws IOException {
+		this(socket, inputBufferSize, outputBufferSize, null, null);
+	}
+
+	public Conn(Socket socket,
+			int inputBufferSize, int outputBufferSize,
+			PrintStream logIn, PrintStream logOut) throws IOException {
 		this(
 			new BufferedInputStream(socket.getInputStream(), inputBufferSize),
-			new BufferedOutputStream(socket.getOutputStream(), outputBufferSize)
+			new BufferedOutputStream(socket.getOutputStream(), outputBufferSize),
+			logIn, logOut
 		);
     this.socket = socket;
 	}
@@ -308,9 +325,12 @@ public class Conn implements Closeable {
 	 * @param inputStream  Read from this stream
 	 * @param outputStream Write to this stream
 	 */
-	private Conn(BufferedInputStream inputStream, BufferedOutputStream outputStream) {
+	private Conn(BufferedInputStream inputStream, BufferedOutputStream outputStream,
+			PrintStream logIn, PrintStream logOut) {
 		this.reader = new Parser(inputStream);
 		this.writer = new Encoder(outputStream);
+		this.logIn = logIn;
+		this.logOut = logOut;
 	}
 
 	/**
@@ -335,36 +355,70 @@ public class Conn implements Closeable {
 	 */
 	@SuppressWarnings("unchecked")
 	public <T> T read() throws IOException {
-		return (T) reader.parse();
+		Object obj = reader.parse();
+		if (this.logIn != null) {
+			this.logIn.println("IN: " + obj);
+			this.logIn.flush();
+		}
+		return (T) obj;
 	}
 
 	@SuppressWarnings("rawtypes")
 	public void write(List args) throws IOException {
+		if (this.logOut != null) {
+			this.logOut.println("OUT: " + args);
+			this.logOut.flush();
+		}
 		writer.write(args);
 		writer.flush();
 	}
 
 	public void write(Object... args) throws IOException {
+		if (this.logOut != null) {
+			this.logOut.println("OUT: " + Arrays.toString(args));
+			this.logOut.flush();
+		}
 		writer.write(Arrays.asList(args));
 		writer.flush();
 	}
 
 	public void write(long val) throws IOException {
+		if (this.logOut != null) {
+			this.logOut.println("OUT: " + val);
+			this.logOut.flush();
+		}
 		writer.write(val);
 		writer.flush();
 	}
 
 	public void write(byte[] val) throws IOException {
+		if (this.logOut != null) {
+			StringBuilder sb = new StringBuilder();
+			for (byte b : val) {
+				sb.append(String.format("%02x", b));
+			}
+			this.logOut.println("OUT: " + sb.toString());
+			this.logOut.flush();
+		}
 		writer.write(val);
 		writer.flush();
 	}
 
 	public void write(Throwable t) throws IOException {
+		if (this.logOut != null) {
+			this.logOut.println("OUT: " + t.getMessage());
+			t.printStackTrace(this.logOut);
+			this.logOut.flush();
+		}
 		writer.write(t);
 		writer.flush();
 	}
 
 	public void writeString(String val) throws IOException {
+		if (this.logOut != null) {
+			this.logOut.println("OUT: " + val);
+			this.logOut.flush();
+		}
 		writer.writeString(val);
 		writer.flush();
 	}

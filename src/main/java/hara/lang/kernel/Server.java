@@ -15,17 +15,47 @@ public class Server implements I.Component {
 	public final Foundation _F;
 	public final String _key;
 	public final int _port;
+	public final PrintStream _logIn;
+	public final PrintStream _logOut;
 	public ServerSocket _socket;
 	public Thread _thread;
 
 	public Server(Foundation F, String key) {
-		this(F, key, Foundation.DEFAULT_PORT);
+		this(F, key, Foundation.DEFAULT_PORT, null, null);
 	}
 
 	public Server(Foundation F, String key, int port) {
+		this(F, key, port, null, null);
+	}
+
+	public Server(Foundation F, String key, int port, String logInPath, String logOutPath) {
 		_F = F;
 		_key = key;
 		_port = port;
+		try {
+			if (logInPath != null) {
+				File logInFile = new File(logInPath);
+				File parentDir = logInFile.getParentFile();
+				if (parentDir != null) {
+					parentDir.mkdirs();
+				}
+				_logIn = new PrintStream(new FileOutputStream(logInFile, true));
+			} else {
+				_logIn = null;
+			}
+			if (logOutPath != null) {
+				File logOutFile = new File(logOutPath);
+				File parentDir = logOutFile.getParentFile();
+				if (parentDir != null) {
+					parentDir.mkdirs();
+				}
+				_logOut = new PrintStream(new FileOutputStream(logOutFile, true));
+			} else {
+				_logOut = null;
+			}
+		} catch (FileNotFoundException e) {
+			throw new RuntimeException(e);
+		}
 	}
 	
 	public long count() {
@@ -56,6 +86,12 @@ public class Server implements I.Component {
 				entry.getKey().interrupt();
 			} catch (IOException e) {
 			}
+		}
+		if (_logIn != null) {
+			_logIn.close();
+		}
+		if (_logOut != null) {
+			_logOut.close();
 		}
 		return this;
 	}
@@ -118,7 +154,7 @@ public class Server implements I.Component {
 		// constructor
 		public Handler(Server instance, Socket s) throws IOException {
 			_instance = instance;
-			_conn = new Conn(s);
+			_conn = new Conn(s, 1 << 16, 1 << 16, _instance._logIn, _instance._logOut);
 		}
 
 		public void setThread(Thread thread) {
