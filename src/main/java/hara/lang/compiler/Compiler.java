@@ -12,6 +12,8 @@ public class Compiler {
 
     @SuppressWarnings("rawtypes")
     public byte[] compile(hara.lang.data.List expression) {
+        hara.lang.data.List body = (hara.lang.data.List) expression.nth(2);
+
         String className = "hara/lang/compiler/CompiledFunction" + CLASS_COUNTER.incrementAndGet();
         ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_FRAMES);
 
@@ -45,16 +47,61 @@ public class Compiler {
         mv = cw.visitMethod(Opcodes.ACC_PUBLIC, "apply", "(Ljava/lang/Long;)Ljava/lang/Long;", null, null);
         mv.visitCode();
 
-        // This is where the (+ x 1) logic goes.
-        // x is the first argument (a Long) at index 1.
-        mv.visitVarInsn(Opcodes.ALOAD, 1); // Load the Long object
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Long", "longValue", "()J", false); // Unbox to long
-        mv.visitInsn(Opcodes.LCONST_1); // Push 1L onto the stack
-        mv.visitInsn(Opcodes.LADD); // Add them
-        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;", false); // Box it back to Long
+        hara.lang.data.Symbol op = (hara.lang.data.Symbol) body.nth(0);
+        if (body.count() == 3) {
+            Object arg1 = body.nth(1);
+            Object arg2 = body.nth(2);
 
-        mv.visitInsn(Opcodes.ARETURN); // Return the Long object
-        mv.visitMaxs(3, 2); // max stack, max locals
+            if (arg1 instanceof hara.lang.data.Symbol && arg2 instanceof Number) {
+                mv.visitVarInsn(Opcodes.ALOAD, 1);
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Long", "longValue", "()J", false);
+                mv.visitLdcInsn(((Number) arg2).longValue());
+            } else if (arg1 instanceof Number && arg2 instanceof hara.lang.data.Symbol) {
+                mv.visitLdcInsn(((Number) arg1).longValue());
+                mv.visitVarInsn(Opcodes.ALOAD, 1);
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Long", "longValue", "()J", false);
+            } else {
+                throw new CompilerException("Unsupported expression format");
+            }
+        } else if (body.count() == 2) {
+            mv.visitVarInsn(Opcodes.ALOAD, 1);
+            mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "java/lang/Long", "longValue", "()J", false);
+        } else {
+            throw new CompilerException("Unsupported expression format");
+        }
+
+        switch (op.getName()) {
+            case "+":
+                mv.visitInsn(Opcodes.LADD);
+                break;
+            case "-":
+                mv.visitInsn(Opcodes.LSUB);
+                break;
+            case "*":
+                mv.visitInsn(Opcodes.LMUL);
+                break;
+            case "/":
+                mv.visitInsn(Opcodes.LDIV);
+                break;
+            case "&":
+                mv.visitInsn(Opcodes.LAND);
+                break;
+            case "|":
+                mv.visitInsn(Opcodes.LOR);
+                break;
+            case "xor":
+                mv.visitInsn(Opcodes.LXOR);
+                break;
+            case "not":
+                mv.visitLdcInsn(-1L);
+                mv.visitInsn(Opcodes.LXOR);
+                break;
+        }
+
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "java/lang/Long", "valueOf", "(J)Ljava/lang/Long;", false);
+
+        mv.visitInsn(Opcodes.ARETURN);
+        mv.visitMaxs(0, 0);
         mv.visitEnd();
 
         cw.visitEnd();
