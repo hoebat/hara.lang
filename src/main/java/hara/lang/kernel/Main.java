@@ -2,6 +2,7 @@ package hara.lang.kernel;
 
 import hara.lang.lib.RT;
 import java.io.FileNotFoundException;
+import hara.lang.kernel.redirect.FileRedirect;
 
 @SuppressWarnings("rawtypes")
 public class Main {

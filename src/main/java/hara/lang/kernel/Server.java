@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 import java.net.*;
 
 import hara.lang.base.*;
+import hara.lang.kernel.io.IRedirect;
 
 @SuppressWarnings("rawtypes")
 public class Server implements I.Component {

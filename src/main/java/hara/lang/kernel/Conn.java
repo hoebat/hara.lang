@@ -5,6 +5,7 @@ import java.net.Socket;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
+import hara.lang.kernel.io.IRedirect;
 
 /**
  * A lightweight implementation of the SocketConnection server protocol at https://redis.io/topics/protocol

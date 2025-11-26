@@ -1,4 +1,4 @@
-package hara.lang.kernel;
+package hara.lang.kernel.redirect;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -9,6 +9,7 @@ import java.util.Arrays;
 import hara.lang.base.I;
 import hara.lang.data.Vector;
 import hara.lang.lib.Builtin;
+import hara.lang.kernel.io.IRedirect;
 
 public class FileRedirect implements IRedirect {
 
@@ -48,7 +49,11 @@ public class FileRedirect implements IRedirect {
 				Vector.Mutable<String> vec = Vector.Mutable.empty(null);
 				for (Object item : list) {
 					if (item instanceof byte[]) {
-						vec.conj(new String((byte[]) item));
+						StringBuilder sb = new StringBuilder();
+						for (byte b : (byte[]) item) {
+							sb.append(String.format("%02x", b));
+						}
+						vec.conj(sb.toString());
 					} else {
 						vec.conj(item.toString());
 					}
@@ -57,7 +62,7 @@ public class FileRedirect implements IRedirect {
 			} else {
 				output = obj.toString();
 			}
-			this.logIn.println("IN: " + output);
+			this.logIn.println("COMMAND," + output);
 			this.logIn.flush();
 		}
 	}
@@ -77,14 +82,14 @@ public class FileRedirect implements IRedirect {
 			} else if (obj instanceof Object[]) {
 				output = Arrays.toString((Object[]) obj);
 			} else if (obj instanceof Throwable) {
-				this.logOut.println("OUT: " + ((Throwable) obj).getMessage());
+				this.logOut.println("RESPONSE," + ((Throwable) obj).getMessage());
 				((Throwable) obj).printStackTrace(this.logOut);
 				this.logOut.flush();
 				return;
 			} else {
 				output = obj.toString();
 			}
-			this.logOut.println("OUT: " + output);
+			this.logOut.println("RESPONSE," + output);
 			this.logOut.flush();
 		}
 	}

@@ -1,4 +1,4 @@
-package hara.lang.kernel;
+package hara.lang.kernel.io;
 
 import java.io.Closeable;
 import java.io.IOException;
