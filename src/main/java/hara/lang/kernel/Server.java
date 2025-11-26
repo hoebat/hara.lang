@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 import java.net.*;
 
 import hara.lang.base.*;
+import hara.lang.kernel.io.IRedirect;
 
 @SuppressWarnings("rawtypes")
 public class Server implements I.Component {
@@ -15,17 +16,23 @@ public class Server implements I.Component {
 	public final Foundation _F;
 	public final String _key;
 	public final int _port;
+	public final IRedirect _redirect;
 	public ServerSocket _socket;
 	public Thread _thread;
 
 	public Server(Foundation F, String key) {
-		this(F, key, Foundation.DEFAULT_PORT);
+		this(F, key, Foundation.DEFAULT_PORT, null);
 	}
 
 	public Server(Foundation F, String key, int port) {
+		this(F, key, port, null);
+	}
+
+	public Server(Foundation F, String key, int port, IRedirect redirect) {
 		_F = F;
 		_key = key;
 		_port = port;
+		_redirect = redirect;
 	}
 	
 	public long count() {
@@ -55,6 +62,13 @@ public class Server implements I.Component {
 				entry.getValue().get().close();
 				entry.getKey().interrupt();
 			} catch (IOException e) {
+			}
+		}
+		if (_redirect != null) {
+			try {
+				_redirect.close();
+			} catch (IOException e) {
+				e.printStackTrace();
 			}
 		}
 		return this;
@@ -118,7 +132,7 @@ public class Server implements I.Component {
 		// constructor
 		public Handler(Server instance, Socket s) throws IOException {
 			_instance = instance;
-			_conn = new Conn(s);
+			_conn = new Conn(s, 1 << 16, 1 << 16, _instance._redirect);
 		}
 
 		public void setThread(Thread thread) {
