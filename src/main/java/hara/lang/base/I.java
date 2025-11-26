@@ -46,7 +46,7 @@ public interface I {
 		  return this.stop();
 		}
     
-		boolean isRemote() {
+		default boolean isRemote() {
 		  return false;
 		}
 	}
