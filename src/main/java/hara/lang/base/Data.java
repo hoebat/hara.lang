@@ -399,6 +399,39 @@ public interface Data {
 		}
 	}
 	
+	public interface DequeType<E>
+		extends 	I.Coll<E>,
+				SequentialType<E>,
+				SequentialLookupType<E>,
+				LinearType<E>,
+				I.Nth<E>,
+				I.PopLast,
+				I.PushLast<E>,
+				I.PopFirst,
+				I.PushFirst<E>,
+				I.Fn <E, Integer, E> {
+
+		@Override
+		default DequeType<E> conj(E v) {
+			return (DequeType<E>) pushLast(v);
+		}
+
+		@Override
+		default String startString() {
+			return "[[";
+		}
+
+		@Override
+		default String endString() {
+			return "]]";
+		}
+
+		@Override
+		default public E invoke(Integer key) {
+			return nth(key);
+		}
+	}
+
 	public interface DepsType<K, E> {
 		E depGet(I.Context ctx, K id);
 		SetType<E> depEntries(I.Context ctx, K id);

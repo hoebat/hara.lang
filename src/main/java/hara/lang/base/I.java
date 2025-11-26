@@ -2,6 +2,7 @@ package hara.lang.base;
 
 import java.net.URL;
 import java.util.Iterator;
+import hara.lang.base.G;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.function.*;
