@@ -31,6 +31,14 @@
 			<groupId>net.java.dev.jna</groupId>
 			<artifactId>jna</artifactId>
 			<version>5.10.0</version>
+			<groupId>org.ow2.asm</groupId>
+			<artifactId>asm</artifactId>
+			<version>9.2</version>
+		</dependency>
+		<dependency>
+			<groupId>org.ow2.asm</groupId>
+			<artifactId>asm-util</artifactId>
+			<version>9.2</version>
 		</dependency>
 	</dependencies>
 	<build>
@@ -86,6 +94,7 @@
 				<configuration>
 					<argLine>-Djava.library.path=${project.build.directory}</argLine>
 				</configuration>
+				<version>3.0.0-M5</version>
 			</plugin>
 		</plugins>
 	</build>

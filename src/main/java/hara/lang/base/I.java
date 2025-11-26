@@ -42,6 +42,326 @@ public interface I {
 		Component stop();
 	}
 
+	public interface IComponent
+	{
+		Component start();
+		Component stop();
+		Component kill();
+	}
+
+	public interface IComponentQuery
+	{
+		boolean started(Component component);
+		boolean stopped(Component component);
+		Object info(Component component, int level);
+		boolean remote(Component component);
+		Object health(Component component);
+	}
+
+	public interface IComponentProps
+	{
+		Object props(Component component);
+	}
+
+	public interface IComponentOptions
+	{
+		Object getOptions(Component component);
+	}
+
+	public interface IComponentTrack
+	{
+		Object getTrackPath(Component component);
+	}
+
+	public interface ISpace
+	{
+		Object contextSet(Object sp, Object ctx, Object key, Object options);
+		Object contextUnset(Object sp, Object ctx);
+		Object contextList(Object sp);
+		Object contextGet(Object sp, Object ctx);
+		Object rtActive(Object sp);
+		Object rtGet(Object sp, Object ctx);
+		Object rtStart(Object sp, Object ctx);
+		boolean rtStarted(Object sp, Object ctx);
+		boolean rtStopped(Object sp, Object ctx);
+		Object rtStop(Object sp, Object ctx);
+	}
+
+	public interface IPointer
+	{
+		Object ptrContext(Object ptr);
+		Object ptrKeys(Object ptr);
+		Object ptrVal(Object ptr, Object key);
+	}
+
+	public interface IContext
+	{
+		Object rawEval(Object rt, String string);
+		Object initPtr(Object rt, Object ptr);
+		Object tagsPtr(Object rt, Object ptr);
+		Object derefPtr(Object rt, Object ptr);
+		Object displayPtr(Object rt, Object ptr);
+		Object invokePtr(Object rt, Object ptr, Object args);
+		Object transformInPtr(Object rt, Object ptr, Object args);
+		Object transformOutPtr(Object rt, Object ptr, Object retrn);
+	}
+
+	public interface IContextLifeCycle
+	{
+		boolean hasModule(Object rt, Object moduleId);
+		Object setupModule(Object rt, Object moduleId);
+		Object teardownModule(Object rt, Object moduleId);
+		boolean hasPtr(Object rt, Object ptr);
+		Object setupPtr(Object rt, Object ptr);
+		Object teardownPtr(Object rt, Object ptr);
+	}
+
+	public interface IReturn
+	{
+		Object getValue(Object obj);
+		Object getError(Object obj);
+		boolean hasError(Object obj);
+		Object getStatus(Object obj);
+		Object getMetadata(Object obj);
+		boolean isContainer(Object obj);
+	}
+
+	public interface IWatch
+	{
+		Object addWatch(Object obj, Object k, Object f, Object opts);
+		boolean hasWatch(Object obj, Object k, Object opts);
+		Object removeWatch(Object obj, Object k, Object opts);
+		Object listWatch(Object obj, Object opts);
+	}
+
+	public interface IDispatch
+	{
+		Object submit(Object dispatch, Object entry);
+		boolean bulk(Object dispatch);
+	}
+
+	public interface ISink
+	{
+		Object collect(Object sink, Object xf, Object supply);
+	}
+
+	public interface ISource
+	{
+		Object produce(Object source);
+	}
+
+	public interface IBlocking
+	{
+		Object takeElement(Object source);
+	}
+
+	public interface IStage
+	{
+		Object stageUnit(Object stage);
+		boolean stageRealized(Object stage);
+		Object stageRealize(Object stage);
+	}
+
+	public interface ITrack
+	{
+		Object trackPath(Object component);
+	}
+
+	public interface IBinary
+	{
+		Object toBitstr(Object x);
+		Object toBitseq(Object x);
+		Object toBitset(Object x);
+		Object toBytes(Object x);
+		Object toNumber(Object x);
+	}
+
+	public interface IByteSource
+	{
+		Object toInputStream(Object obj);
+	}
+
+	public interface IByteSink
+	{
+		Object toOutputStream(Object obj);
+	}
+
+	public interface IByteChannel
+	{
+		Object toChannel(Object obj);
+	}
+
+	public interface IString
+	{
+		String toString(Object x);
+	}
+
+	public interface IArchive
+	{
+		Object url(Object archive);
+		Object path(Object archive, Object entry);
+		Object list(Object archive);
+		boolean has(Object archive, Object entry);
+		Object archive(Object archive, Object root, Object inputs);
+		Object extract(Object archive, Object output, Object entries);
+		Object insert(Object archive, Object entry, Object input);
+		Object remove(Object archive, Object entry);
+		Object write(Object archive, Object entry, Object stream);
+		Object stream(Object archive, Object entry);
+	}
+
+	public interface IDeps
+	{
+		Object getEntry(Object context, Object id);
+		Object getDeps(Object context, Object id);
+		Object listEntries(Object context);
+	}
+
+	public interface IDepsMutate
+	{
+		Object addEntry(Object context, Object id, Object entry, Object deps);
+		Object removeEntry(Object context, Object id);
+		Object refreshEntry(Object context, Object id);
+	}
+
+	public interface IDepsCompile
+	{
+		Object stepConstruct(Object context, Object acc, Object id);
+		Object initConstruct(Object context);
+	}
+
+	public interface IDepsTeardown
+	{
+		Object stepDeconstruct(Object context, Object acc, Object id);
+	}
+
+	public interface IDepsLibrary
+	{
+		Object parseNative(Object context, Object input, Object opts);
+	}
+
+	public interface IDepsProducer
+	{
+		Object produce(Object context, Object opts);
+	}
+
+	public interface IClient extends OFn {
+
+	}
+
+	public interface IRequest
+	{
+		Object requestSingle(Object client, Object command, Object opts);
+		Object processSingle(Object client, Object output, Object opts);
+		Object requestBulk(Object client, Object commands, Object opts);
+		Object processBulk(Object client, Object inputs, Object outputs, Object opts);
+	}
+
+	public interface IRequestTransact
+	{
+		Object transactStart(Object client);
+		Object transactEnd(Object client);
+		Object transactCombine(Object client, Object commands);
+	}
+
+	public interface IApplicable
+	{
+		Object applyIn(Object app, Object rt, Object args);
+		Object applyDefault(Object app);
+		Object transformIn(Object app, Object rt, Object args);
+		Object transformOut(Object app, Object rt, Object args, Object retrn);
+	}
+
+	public interface ITemplate
+	{
+		Object match(Object template, Object obj);
+	}
+
+	public interface IStateGet
+	{
+		Object getState(Object obj, Object opts);
+	}
+
+	public interface IStateSet
+	{
+		Object updateState(Object obj, Object f, Object args, Object opts);
+		Object setState(Object obj, Object v, Object opts);
+		Object emptyState(Object obj, Object opts);
+		Object cloneState(Object obj, Object opts);
+	}
+
+	public interface IBlock
+	{
+		Object type();
+		Object tag();
+		String string();
+		Number length();
+		Number width();
+		Number height();
+		Number prefixed();
+		Number suffixed();
+		boolean verify();
+	}
+
+	public interface IBlockModifier
+	{
+		Object modify(Object accumulator, Object input);
+	}
+
+	public interface IBlockExpression
+	{
+		Object value();
+		String valueString();
+	}
+
+	public interface IBlockContainer
+	{
+		Object children();
+		Object replaceChildren(Object children);
+	}
+
+	public interface ILogger
+	{
+		Object loggerWrite(Object logger, Object entry);
+	}
+
+	public interface ILoggerProcess
+	{
+		Object loggerProcess(Object logger, Object entries);
+	}
+
+	public interface IWire
+	{
+		Object read(Object remote);
+		Object write(Object remote, Object command);
+		Object close(Object remote);
+	}
+
+	public interface IInstant
+	{
+		long toLong(Object t);
+		boolean hasTimezone(Object t);
+		Object getTimezone(Object t);
+		Object withTimezone(Object t, Object tz);
+	}
+
+	public interface IRepresentation
+	{
+		Object millisecond(Object t, Object opts);
+		Object second(Object t, Object opts);
+		Object minute(Object t, Object opts);
+		Object hour(Object t, Object opts);
+		Object day(Object t, Object opts);
+		Object dayOfWeek(Object t, Object opts);
+		Object month(Object t, Object opts);
+		Object year(Object t, Object opts);
+	}
+
+	public interface IDuration
+	{
+		Object toLength(Object d, Object opts);
+	}
+
 	public interface Conj<E> {
 		Conj<E> conj(E e);
 	}
@@ -436,6 +756,10 @@ public interface I {
 				super(null, key, (R) ref, oldVal, newVal);
 			}
 		}
+	}
+
+	public interface HasRuntime {
+		Object getRuntime();
 	}
 
 }

@@ -1,7 +1,6 @@
 package hara.lang.kernel;
 
 import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.function.Function;
@@ -12,8 +11,12 @@ import hara.lang.base.Ex;
 import hara.lang.base.G;
 import hara.lang.base.I;
 import hara.lang.base.It;
+import hara.lang.compiler.Compiler;
+import hara.lang.compiler.DynamicClassLoader;
+import hara.lang.data.List;
 import hara.lang.lib.*;
 import hara.lang.lib.RT.Instance;
+import hara.lang.lib.Read;
 
 @SuppressWarnings("rawtypes")
 public class Foundation implements I.Context {
@@ -24,7 +27,7 @@ public class Foundation implements I.Context {
 	public final ConcurrentHashMap<String,I.Runtime> RTS = new ConcurrentHashMap<String,I.Runtime>();
 
 	public enum COMMAND {
-		HELP, SHUTDOWN, DIR, PING, ECHO, OS, JVM, SERVER, SESSION, EVAL
+		HELP, SHUTDOWN, DIR, PING, ECHO, OS, JVM, SERVER, SESSION, EVAL, COMPILE
 	}
 	
 	public enum OS {
@@ -60,38 +63,38 @@ public class Foundation implements I.Context {
 	}
 
 	@SuppressWarnings("unchecked")
-	public static Object run(Function<List<String>, Object> f, Object... args) {
-		List input = (args.length == 1 && args[0] instanceof List) 
-				? (List) args[0] 
+	public static Object run(Function<java.util.List<String>, Object> f, Object... args) {
+		java.util.List input = (args.length == 1 && args[0] instanceof java.util.List)
+				? (java.util.List) args[0]
 				: Arrays.asList(args);
 		return f.apply(input);
 	}
 
 
 	@SuppressWarnings("unchecked")
-	public static Object runIn(Function<List<String>, Object> f, I.Context c, Object... args) {
-		List input = (args.length == 1 && args[0] instanceof List) 
-				? (List) args[0] 
+	public static Object runIn(Function<java.util.List<String>, Object> f, I.Context c, Object... args) {
+		java.util.List input = (args.length == 1 && args[0] instanceof java.util.List)
+				? (java.util.List) args[0]
 				: Arrays.asList(args);
 		return f.apply(input);
 	}
 
 	public interface Fn {
 
-		public static Object JVM_ENV(List<String> args) {
+		public static Object JVM_ENV(java.util.List<String> args) {
 			return (args.size() == 0) ? mapToList(System.getenv()) : System.getenv(args.get(0));
 		}
 
-		public static Object JVM_PROPS(List<String> args) {
+		public static Object JVM_PROPS(java.util.List<String> args) {
 			return (args.size() == 0) ? mapToList(System.getProperties()) : System.getProperty(args.get(0));
 		}
 
-		public static List runDIR(Foundation F) {
+		public static java.util.List runDIR(Foundation F) {
 			return Arrays.asList("SERVERS", It.toArrayList(F.SERVERS.keys()), "RTS",
 					It.toArrayList(F.RTS.keys()));
 		}
 
-		public static String runProcess(List<String> args) {
+		public static String runProcess(java.util.List<String> args) {
 			try {
 				var p = new ProcessBuilder().command(args).start();
 				return new String(p.getInputStream().readAllBytes());
@@ -102,12 +105,12 @@ public class Foundation implements I.Context {
 
 
 		@SuppressWarnings("unchecked")
-		public static List runHELP(Foundation F, Object enums) {
+		public static java.util.List runHELP(Foundation F, Object enums) {
 			return It.toArrayList(
 					It.map(Arr.toIter(enums), (x) -> x.toString()));
 		}
 
-		public static Object runJVM(Foundation F, List<String> args) {
+		public static Object runJVM(Foundation F, java.util.List<String> args) {
 			JVM cmd = JVM.valueOf(args.get(0));
 			args.remove(0);
 			
@@ -126,7 +129,7 @@ public class Foundation implements I.Context {
 			throw new Ex.Unsupported();
 		}
 		
-		public static Object runServer(Foundation F, List<String> args) {
+		public static Object runServer(Foundation F, java.util.List<String> args) {
 			SERVER cmd = SERVER.valueOf(args.get(0));
 			args.remove(0);
 			switch(cmd) {			
@@ -145,7 +148,7 @@ public class Foundation implements I.Context {
 			throw new Ex.Unsupported();
 		}
 		
-		public static Object runOS(Foundation F, List<String> args) {
+		public static Object runOS(Foundation F, java.util.List<String> args) {
 			OS cmd = OS.valueOf(args.get(0));
 			args.remove(0);
 			switch(cmd) {
@@ -166,7 +169,7 @@ public class Foundation implements I.Context {
 			throw new Ex.Runtime("No Session: " + key);
 		}
 		
-		public static Object runSessionCreate(Foundation F, List<String> args, boolean raise) {
+		public static Object runSessionCreate(Foundation F, java.util.List<String> args, boolean raise) {
 			var key = args.get(0);
 			var s = F.RTS.get(key);
 			if (s != null) {
@@ -179,8 +182,8 @@ public class Foundation implements I.Context {
 			return key;
 		}
 
-		public static Object runSessionClasspath(RT.Instance rt, List<String> args) {
-			CLASSPATH cmd = (args.size() == 1) 
+		public static Object runSessionClasspath(RT.Instance rt, java.util.List<String> args) {
+			CLASSPATH cmd = (args.size() == 1)
 								? CLASSPATH.LIST
 								: CLASSPATH.valueOf(args.get(1));
 			if(cmd == CLASSPATH.LIST) {
@@ -201,7 +204,7 @@ public class Foundation implements I.Context {
 		}
 		
 
-		public static Object runSession(Foundation F, List<String> args) {
+		public static Object runSession(Foundation F, java.util.List<String> args) {
 			SESSION cmd = SESSION.valueOf(args.get(0));
 			args.remove(0);
 			
@@ -220,7 +223,7 @@ public class Foundation implements I.Context {
 	}
 	
 	@SuppressWarnings("unchecked")
-	public static Object runCommand(Foundation F, List<String> args) {
+	public static Object runCommand(Foundation F, java.util.List<String> args) {
 		var cmd = COMMAND.valueOf(args.get(0));
 		args.remove(0);
 		
@@ -236,6 +239,17 @@ public class Foundation implements I.Context {
 		case EVAL: 
 			return Fn.runSessionFor(F, args.get(0), 
 					rt -> G.display(rt.eval(rt.readString(args.get(1)))));
+		case COMPILE:
+			try {
+				hara.lang.data.List expression = (hara.lang.data.List) Read.LispReader.readString(args.get(0), null);
+				Compiler compiler = new Compiler();
+				byte[] bytecode = compiler.compile(expression);
+				DynamicClassLoader loader = new DynamicClassLoader(Foundation.class.getClassLoader());
+				Class<?> clazz = loader.defineClass(null, bytecode);
+				return clazz.getConstructor().newInstance();
+			} catch (Exception e) {
+				throw Ex.Sneaky(e);
+			}
 		case SHUTDOWN: 
 			System.exit(1);
 			return null;
@@ -246,7 +260,7 @@ public class Foundation implements I.Context {
 	@SuppressWarnings("unchecked")
 	@Override
 	public Object call(Object... args) {
-		var inputs = It.toArrayList(It.iter(args));
+		java.util.List<String> inputs = It.toArrayList(It.iter(args));
 		return runCommand(this, inputs);
 	}
 
