@@ -340,9 +340,15 @@ public interface Vector<E> extends Data.VectorType<E>, I.Assoc<Integer, E> {
 		@Override
 		public Mutable<E> assoc(Integer idx, E e) {
 			checkEditable();
-			E[] node = S.getNodeArrayFor(_root, _size, _shift, _tail, idx, true);
-			node[idx & Node.NODE_MASK] = e;
-			return this;
+			if (idx >= 0 && idx < _size) {
+				E[] node = S.getNodeArrayFor(_root, _size, _shift, _tail, idx, true);
+				node[idx & Node.NODE_MASK] = e;
+				return this;
+			}
+			if (idx == _size) {
+				return pushLast(e);
+			}
+			throw new IndexOutOfBoundsException();
 		}
 
 		@Override
