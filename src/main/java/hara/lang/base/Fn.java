@@ -256,7 +256,7 @@ public interface Fn {
 			final I.Fn[] _fns;
 
 			public Comp(ITR fns) {
-				_fns = It.toArray(It.map(It.iter(fns), Fn::toFn), I.Fn.class);
+				_fns = (I.Fn[]) It.toArray(It.map(It.iter(fns), Fn::toFn), I.Fn.class);
 			}
 
 			@Override
