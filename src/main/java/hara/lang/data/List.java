@@ -6,7 +6,7 @@ import hara.lang.base.*;
 
 import static hara.lang.base.P.Bits.log2Ceil;
 
-public interface List<E> extends Data.VectorType<E> {
+public interface List<E> extends Data.DequeType<E> {
 
 	public static int DEFAULT_CAPACITY = 4;
 
@@ -112,12 +112,17 @@ public interface List<E> extends Data.VectorType<E> {
 
 		@Override
 		default String startString() {
-			return "(";
+			return "[[";
 		}
 
 		@Override
 		default String endString() {
-			return ")";
+			return "]]";
+		}
+
+		@Override
+		default G.ObjType getObjType() {
+			return G.ObjType.DEQUE;
 		}
 	}
 
