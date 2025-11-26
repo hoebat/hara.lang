@@ -68,4 +68,16 @@ public class QueueTest {
             expected++;
         }
     }
+
+    @Test
+    public void testEmptyQueuePop() {
+        Queue.Standard<Integer> queue = Queue.Standard.empty(null);
+        assertEquals(0, queue.popFirst().count());
+        assertEquals(0, queue.popLast().count());
+
+        Queue.Mutable<Integer> mutableQueue = Queue.Mutable.empty(null);
+        mutableQueue.popFirst();
+        mutableQueue.popLast();
+        assertEquals(0, mutableQueue.count());
+    }
 }
