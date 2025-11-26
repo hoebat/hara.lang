@@ -27,9 +27,38 @@
 			<version>2.10.0</version>
 			<scope>compile</scope>
 		</dependency>
+		<dependency>
+			<groupId>net.java.dev.jna</groupId>
+			<artifactId>jna</artifactId>
+			<version>5.10.0</version>
+		</dependency>
 	</dependencies>
 	<build>
 		<plugins>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>exec-maven-plugin</artifactId>
+				<version>3.1.0</version>
+				<executions>
+					<execution>
+						<id>compile-native</id>
+						<goals>
+							<goal>exec</goal>
+						</goals>
+						<phase>compile</phase>
+					</execution>
+				</executions>
+				<configuration>
+					<executable>sh</executable>
+					<arguments>
+						<argument>-c</argument>
+						<argument>
+							mkdir -p ${project.build.directory} &amp;&amp;
+							g++ -shared -fPIC -I${java.home}/include -I${java.home}/include/linux -I c/simdjson -o ${project.build.directory}/libjson.so c/simdjson/simdjson.cpp c/simdjson/json.cpp
+						</argument>
+					</arguments>
+				</configuration>
+			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
@@ -48,6 +77,14 @@
 							<mainClass>hara.lang.kernel.Main</mainClass>
 						</manifest>
 					</archive>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<version>3.2.5</version>
+				<configuration>
+					<argLine>-Djava.library.path=${project.build.directory}</argLine>
 				</configuration>
 			</plugin>
 		</plugins>
