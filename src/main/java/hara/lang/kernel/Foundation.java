@@ -12,6 +12,7 @@ import hara.lang.base.G;
 import hara.lang.base.I;
 import hara.lang.base.It;
 import hara.lang.compiler.Compiler;
+import hara.lang.compiler.CompilerException;
 import hara.lang.compiler.DynamicClassLoader;
 import hara.lang.data.List;
 import hara.lang.lib.*;
@@ -247,6 +248,8 @@ public class Foundation implements I.Context {
 				DynamicClassLoader loader = new DynamicClassLoader(Foundation.class.getClassLoader());
 				Class<?> clazz = loader.defineClass(null, bytecode);
 				return clazz.getConstructor().newInstance();
+			} catch (CompilerException e) {
+				throw new RuntimeException(e);
 			} catch (Exception e) {
 				throw Ex.Sneaky(e);
 			}
