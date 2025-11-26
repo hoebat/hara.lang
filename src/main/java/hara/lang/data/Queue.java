@@ -23,7 +23,7 @@ public interface Queue<E> extends
 		@Override
 		default E peekFirst() {
 			if(_size() == 0) { return null; }
-			return _head().peekFirst();
+			return _head().nth(_offset());
 		}
 		
 		@Override
