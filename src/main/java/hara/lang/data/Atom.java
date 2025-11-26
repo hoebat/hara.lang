@@ -97,8 +97,7 @@ public interface Atom<V> {
 			for (;;) {
 				var v = deref();
 				var newVal = f.apply(v);
-				validate(newVal);
-				if (cas(v, newVal)) {
+				if (validate(newVal) && cas(v, newVal)) {
 					notifyWatches(v, newVal);
 					return newVal;
 				}
@@ -109,8 +108,7 @@ public interface Atom<V> {
 			for (;;) {
 				var v = deref();
 				var newVal = f.apply(v, arg);
-				validate(newVal);
-				if (cas(v, newVal)) {
+				if (validate(newVal) && cas(v, newVal)) {
 					notifyWatches(v, newVal);
 					return newVal;
 				}
@@ -121,8 +119,7 @@ public interface Atom<V> {
 			for (;;) {
 				var v = deref();
 				var newVal = f.apply(v, vargs);
-				validate(newVal);
-				if (cas(v, newVal)) {
+				if (validate(newVal) && cas(v, newVal)) {
 					notifyWatches(v, newVal);
 					return newVal;
 				}
