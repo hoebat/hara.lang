@@ -5,7 +5,7 @@ import hara.lang.data.Vector;
 
 public class Request implements I.IRequest, I.IRequestTransact {
 
-    private Object invokeClient(I.OFn fn, Object command) {
+    private Object invokeClient(I.IClient fn, Object command) {
         if (command instanceof Object[]) {
             return fn.invoke((Object[]) command);
         } else if (command instanceof Collection) {
@@ -17,10 +17,10 @@ public class Request implements I.IRequest, I.IRequestTransact {
 
     @Override
     public Object requestSingle(Object client, Object command, Object opts) {
-        if (client instanceof I.OFn) {
-            return invokeClient((I.OFn) client, command);
+        if (!(client instanceof I.IClient)) {
+            throw new Ex.Unsupported("Client does not implement I.IClient.");
         }
-        throw new Ex.Unsupported("Client is not a function.");
+        return invokeClient((I.IClient) client, command);
     }
 
     @Override
@@ -30,17 +30,19 @@ public class Request implements I.IRequest, I.IRequestTransact {
 
     @Override
     public Object requestBulk(Object client, Object commands, Object opts) {
-        if (client instanceof I.OFn) {
-            I.OFn fn = (I.OFn) client;
-            if (commands instanceof Iterable) {
-                Vector.Mutable<Object> results = Vector.Mutable.empty(null);
-                for (Object command : (Iterable<?>) commands) {
-                    results.pushLast(invokeClient(fn, command));
-                }
-                return results.toPersistent();
-            }
+        if (!(client instanceof I.IClient)) {
+            throw new Ex.Unsupported("Client does not implement I.IClient.");
         }
-        throw new Ex.Unsupported("Client is not a function or commands not iterable.");
+        if (!(commands instanceof Iterable)) {
+            throw new Ex.Unsupported("Commands are not iterable.");
+        }
+
+        I.IClient fn = (I.IClient) client;
+        Vector.Mutable<Object> results = Vector.Mutable.empty(null);
+        for (Object command : (Iterable<?>) commands) {
+            results.pushLast(invokeClient(fn, command));
+        }
+        return results.toPersistent();
     }
 
     @Override

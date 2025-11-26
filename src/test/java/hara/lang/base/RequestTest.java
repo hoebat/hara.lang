@@ -8,7 +8,7 @@ import hara.lang.base.Eq;
 
 public class RequestTest {
 
-    static class MockFn implements I.OFn {
+    static class MockFn implements I.IClient {
         @Override
         public Function<Object, Object> getArgN() {
             return (args) -> {
@@ -26,9 +26,9 @@ public class RequestTest {
     }
 
     private void assertVectorEquals(Vector<Object> expected, Object actual) {
-        assertTrue(actual instanceof Vector.Standard);
+        assertTrue(actual instanceof Vector);
         @SuppressWarnings("unchecked")
-        Vector<Object> actualVector = (Vector.Standard<Object>) actual;
+        Vector<Object> actualVector = (Vector<Object>) actual;
         assertEquals(expected.count(), actualVector.count());
         for (int i = 0; i < expected.count(); i++) {
             assertTrue("Elements at index " + i + " are not equal.",
@@ -39,7 +39,7 @@ public class RequestTest {
     @Test
     public void testRequest() {
         Request request = new Request();
-        I.OFn mockClient = new MockFn();
+        I.IClient mockClient = new MockFn();
 
         // Test requestSingle
         assertEquals("test", request.requestSingle(mockClient, "test", null));
