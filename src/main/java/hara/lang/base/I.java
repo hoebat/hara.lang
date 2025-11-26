@@ -415,7 +415,12 @@ public interface I {
 			var f = getValidator();
 			if (f == null)
 				return true;
-			return f.test(newVal);
+
+			boolean result = f.test(newVal);
+			if(!result) {
+				throw new IllegalStateException("Validator rejected value: " + newVal);
+			}
+			return result;
 		}
 	}
 
@@ -440,10 +445,18 @@ public interface I {
 		}
 
 		@SuppressWarnings("unchecked")
-		public class WatchEntry<R, V> extends Std.T.Tup4.L<Object, R, V, V> {
+		public class WatchEntry<R, V> extends Std.T.Tup5.L<Object, R, Object, V, V> {
 
 			WatchEntry(Object key, Watch<R, V> ref, V oldVal, V newVal) {
-				super(null, key, (R) ref, oldVal, newVal);
+				super(null, key, (R) ref, null, oldVal, newVal);
+			}
+
+			public V oldVal() {
+				return this.D();
+			}
+
+			public V newVal() {
+				return this.E();
 			}
 		}
 	}
