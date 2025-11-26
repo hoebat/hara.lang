@@ -35,7 +35,7 @@ public class Apply {
 		if (rt instanceof Fn) {
 			rt = ((Fn) rt).invoke();
 		}
-		if (rt instanceof I.IContext) {
+		if (rt == null || rt instanceof I.IContext) {
 			return applyIn(app, (I.IContext) rt, args);
 		} else {
 			throw new RuntimeException("Runtime is not an instance of I.IContext");
