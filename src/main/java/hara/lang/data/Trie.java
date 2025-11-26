@@ -3,6 +3,7 @@ package hara.lang.data;
 import hara.lang.base.Data;
 import hara.lang.base.G;
 import hara.lang.base.I;
+import hara.lang.base.It;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -10,18 +11,45 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.NoSuchElementException;
 import java.util.Stack;
 import java.util.function.Function;
 import java.util.Objects;
 import java.util.AbstractMap;
 
-public interface Trie<V> extends I.Coll<String>, I.ObjType {
+public interface Trie<V> extends I.Coll<String>, I.ObjType, I.Assoc<String, V>, I.Dissoc<String>, I.Lookup<String, V> {
 
-    I.Pair<String, V> find(String key);
+    @Override
     Trie<V> assoc(String key, V val);
+
+    @Override
     Trie<V> dissoc(String key);
-    boolean contains(String key);
+    
+    @Override
+    default I.Pair<String, V> find(String key) {
+        Node<V> current = rootNode();
+        for (char ch : key.toCharArray()) {
+            Node<V> node = current.getChildren().get(ch);
+            if (node == null) {
+                return null;
+            }
+            current = node;
+        }
+        return current.isEndOfWord() ? new hara.lang.base.Std.T.Tup2.L<>(null, key, current.getValue()) : null;
+    }
+
+    @Override
+    default Iterator<String> keys() {
+        return new TrieIterator<>(rootNode());
+    }
+
+    @Override
+    default Iterator<V> vals() {
+        return It.map(new TrieEntryIterator<>(rootNode()), Entry::getValue);
+    }
+    
+    Node<V> rootNode();
 
     @Override
     default G.ObjType getObjType() {
@@ -36,6 +64,37 @@ public interface Trie<V> extends I.Coll<String>, I.ObjType {
     @Override
     default String endString() {
         return "}";
+    }
+
+    @Override
+    default long hashCalc(G.HashType t) {
+        Function<Object, Long> f = G.hashFn(t);
+        long acc = Long.valueOf(hashSeed().hashCode());
+        Iterator<Entry<String, V>> it = new TrieEntryIterator<>(rootNode());
+        while (it.hasNext()) {
+            Entry<String, V> entry = it.next();
+            acc += f.apply(entry.getKey()) + f.apply(entry.getValue());
+        }
+        return acc;
+    }
+
+    @Override
+    default boolean equality(Object other) {
+        if (other instanceof Trie) {
+            Trie<?> otherTrie = (Trie<?>) other;
+            if (count() != otherTrie.count()) {
+                return false;
+            }
+            Iterator<String> it = iterator();
+            while (it.hasNext()) {
+                String key = it.next();
+                if (!otherTrie.has(key) || !Objects.equals(find(key).getValue(), otherTrie.find(key).getValue())) {
+                    return false;
+                }
+            }
+            return true;
+        }
+        return false;
     }
 
     public static class Node<V> {
@@ -76,11 +135,11 @@ public interface Trie<V> extends I.Coll<String>, I.ObjType {
         }
     }
 
-    public static class TrieIterator<V> implements Iterator<String> {
+    public static class TrieEntryIterator<V> implements Iterator<Entry<String, V>> {
         private final Stack<AbstractMap.SimpleEntry<Node<V>, String>> stack = new Stack<>();
-        private String nextValue;
+        private Entry<String, V> nextValue;
 
-        public TrieIterator(Node<V> root) {
+        public TrieEntryIterator(Node<V> root) {
             if (root != null) {
                 stack.push(new AbstractMap.SimpleEntry<>(root, ""));
             }
@@ -93,11 +152,11 @@ public interface Trie<V> extends I.Coll<String>, I.ObjType {
         }
 
         @Override
-        public String next() {
+        public Entry<String, V> next() {
             if (!hasNext()) {
                 throw new NoSuchElementException();
             }
-            String result = nextValue;
+            Entry<String, V> result = nextValue;
             findNext();
             return result;
         }
@@ -117,10 +176,28 @@ public interface Trie<V> extends I.Coll<String>, I.ObjType {
                 }
 
                 if (node.isEndOfWord()) {
-                    nextValue = prefix;
+                    nextValue = new hara.lang.base.Std.T.Tup2.L<>(null, prefix, node.getValue());
                     return;
                 }
             }
+        }
+    }
+
+    public static class TrieIterator<V> implements Iterator<String> {
+        private final TrieEntryIterator<V> entryIterator;
+
+        public TrieIterator(Node<V> root) {
+            this.entryIterator = new TrieEntryIterator<>(root);
+        }
+
+        @Override
+        public boolean hasNext() {
+            return entryIterator.hasNext();
+        }
+
+        @Override
+        public String next() {
+            return entryIterator.next().getKey();
         }
     }
 
@@ -134,24 +211,16 @@ public interface Trie<V> extends I.Coll<String>, I.ObjType {
             this.root = new Node<>();
             this._size = 0;
         }
+        
+        @Override
+        public Node<V> rootNode() {
+            return root;
+        }
 
         public Mutable(I.Metadata meta) {
             super(meta);
             this.root = new Node<>();
             this._size = 0;
-        }
-
-        @Override
-        public I.Pair<String, V> find(String key) {
-            Node<V> current = root;
-            for (char ch : key.toCharArray()) {
-                Node<V> node = current.getChildren().get(ch);
-                if (node == null) {
-                    return null;
-                }
-                current = node;
-            }
-            return current.isEndOfWord() ? new hara.lang.base.Std.T.Tup2.L<>(null, key, current.getValue()) : null;
         }
 
         @Override
@@ -170,7 +239,7 @@ public interface Trie<V> extends I.Coll<String>, I.ObjType {
 
         @Override
         public Trie<V> dissoc(String key) {
-            if (contains(key)) {
+            if (has(key)) {
                 dissocHelper(root, key, 0);
                 _size--;
             }
@@ -200,19 +269,6 @@ public interface Trie<V> extends I.Coll<String>, I.ObjType {
         }
 
         @Override
-        public boolean contains(String key) {
-            Node<V> current = root;
-            for (char ch : key.toCharArray()) {
-                Node<V> node = current.getChildren().get(ch);
-                if (node == null) {
-                    return false;
-                }
-                current = node;
-            }
-            return current.isEndOfWord();
-        }
-
-        @Override
         public long count() {
             return _size;
         }
@@ -228,38 +284,8 @@ public interface Trie<V> extends I.Coll<String>, I.ObjType {
         }
 
         @Override
-        public I.Conj<String> conj(String s) {
+        public Trie<V> conj(String s) {
             return assoc(s, null);
-        }
-
-        @Override
-        public long hashCalc(G.HashType t) {
-            Function<Object, Long> f = G.hashFn(t);
-            long acc = Long.valueOf(hashSeed().hashCode());
-            Iterator<String> it = iterator();
-            while (it.hasNext()) {
-                acc += f.apply(it.next());
-            }
-            return acc;
-        }
-
-        @Override
-        public boolean equality(Object other) {
-            if (other instanceof Trie) {
-                Trie<?> otherTrie = (Trie<?>) other;
-                if (count() != otherTrie.count()) {
-                    return false;
-                }
-                Iterator<String> it = iterator();
-                while (it.hasNext()) {
-                    String key = it.next();
-                    if (!otherTrie.contains(key) || !Objects.equals(find(key).getValue(), otherTrie.find(key).getValue())) {
-                        return false;
-                    }
-                }
-                return true;
-            }
-            return false;
         }
     }
 
@@ -272,6 +298,11 @@ public interface Trie<V> extends I.Coll<String>, I.ObjType {
             this.root = new Node<>();
             this._size = 0;
         }
+        
+        @Override
+        public Node<V> rootNode() {
+            return root;
+        }
 
         public Standard(I.Metadata meta, Node<V> root, int size) {
             super(meta);
@@ -280,23 +311,10 @@ public interface Trie<V> extends I.Coll<String>, I.ObjType {
         }
 
         @Override
-        public I.Pair<String, V> find(String key) {
-            Node<V> current = root;
-            for (char ch : key.toCharArray()) {
-                Node<V> node = current.getChildren().get(ch);
-                if (node == null) {
-                    return null;
-                }
-                current = node;
-            }
-            return current.isEndOfWord() ? new hara.lang.base.Std.T.Tup2.L<>(null, key, current.getValue()) : null;
-        }
-
-        @Override
         public Trie<V> assoc(String key, V val) {
             Node<V> newRoot = new Node<>(root);
             Node<V> current = newRoot;
-            boolean isNewWord = !contains(key);
+            boolean isNewWord = !has(key);
 
             for (char ch : key.toCharArray()) {
                 Node<V> child = current.getChildren().get(ch);
@@ -311,7 +329,7 @@ public interface Trie<V> extends I.Coll<String>, I.ObjType {
 
         @Override
         public Trie<V> dissoc(String key) {
-            int newSize = contains(key) ? _size - 1 : _size;
+            int newSize = has(key) ? _size - 1 : _size;
             Node<V> newRoot = new Node<>(root);
             dissocHelper(newRoot, key, 0);
             return new Standard<>(_meta, newRoot, newSize);
@@ -342,19 +360,6 @@ public interface Trie<V> extends I.Coll<String>, I.ObjType {
         }
 
         @Override
-        public boolean contains(String key) {
-            Node<V> current = root;
-            for (char ch : key.toCharArray()) {
-                Node<V> node = current.getChildren().get(ch);
-                if (node == null) {
-                    return false;
-                }
-                current = node;
-            }
-            return current.isEndOfWord();
-        }
-
-        @Override
         public long count() {
             return _size;
         }
@@ -375,38 +380,8 @@ public interface Trie<V> extends I.Coll<String>, I.ObjType {
         }
 
         @Override
-        public I.Conj<String> conj(String s) {
+        public Trie<V> conj(String s) {
             return assoc(s, null);
-        }
-
-        @Override
-        public long hashCalc(G.HashType t) {
-            Function<Object, Long> f = G.hashFn(t);
-            long acc = Long.valueOf(hashSeed().hashCode());
-            Iterator<String> it = iterator();
-            while (it.hasNext()) {
-                acc += f.apply(it.next());
-            }
-            return acc;
-        }
-
-        @Override
-        public boolean equality(Object other) {
-            if (other instanceof Trie) {
-                Trie<?> otherTrie = (Trie<?>) other;
-                if (count() != otherTrie.count()) {
-                    return false;
-                }
-                Iterator<String> it = iterator();
-                while (it.hasNext()) {
-                    String key = it.next();
-                    if (!otherTrie.contains(key) || !Objects.equals(find(key).getValue(), otherTrie.find(key).getValue())) {
-                        return false;
-                    }
-                }
-                return true;
-            }
-            return false;
         }
     }
 }
