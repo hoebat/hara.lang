@@ -17,16 +17,16 @@ public class TrieTest {
         trie.assoc("apple", 1);
         trie.assoc("app", 2);
 
-        assertTrue(trie.contains("apple"));
-        assertTrue(trie.contains("app"));
-        assertFalse(trie.contains("ap"));
+        assertTrue(trie.has("apple"));
+        assertTrue(trie.has("app"));
+        assertFalse(trie.has("ap"));
 
         assertEquals(1, (int) trie.find("apple").getValue());
         assertEquals(2, (int) trie.find("app").getValue());
 
         trie.dissoc("apple");
-        assertFalse(trie.contains("apple"));
-        assertTrue(trie.contains("app"));
+        assertFalse(trie.has("apple"));
+        assertTrue(trie.has("app"));
     }
 
     @Test
@@ -35,17 +35,17 @@ public class TrieTest {
         Trie<Integer> trie1 = trie.assoc("apple", 1);
         Trie<Integer> trie2 = trie1.assoc("app", 2);
 
-        assertTrue(trie2.contains("apple"));
-        assertTrue(trie2.contains("app"));
-        assertFalse(trie2.contains("ap"));
+        assertTrue(trie2.has("apple"));
+        assertTrue(trie2.has("app"));
+        assertFalse(trie2.has("ap"));
 
         assertEquals(1, (int) trie2.find("apple").getValue());
         assertEquals(2, (int) trie2.find("app").getValue());
 
         Trie<Integer> trie3 = trie2.dissoc("apple");
-        assertFalse(trie3.contains("apple"));
-        assertTrue(trie3.contains("app"));
-        assertTrue(trie2.contains("apple"));
+        assertFalse(trie3.has("apple"));
+        assertTrue(trie3.has("app"));
+        assertTrue(trie2.has("apple"));
     }
 
     @Test
@@ -105,7 +105,7 @@ public class TrieTest {
     public void testConj() {
         Trie.Mutable<Integer> trie = new Trie.Mutable<>();
         trie.conj("apple");
-        assertTrue(trie.contains("apple"));
+        assertTrue(trie.has("apple"));
         assertNull(trie.find("apple").getValue());
     }
 
@@ -113,10 +113,37 @@ public class TrieTest {
     public void testEdgeCases() {
         Trie.Mutable<Integer> trie = new Trie.Mutable<>();
         trie.assoc("", 1);
-        assertTrue(trie.contains(""));
+        assertTrue(trie.has(""));
         assertEquals(1, (int) trie.find("").getValue());
 
         trie.dissoc("");
-        assertFalse(trie.contains(""));
+        assertFalse(trie.has(""));
+    }
+
+    @Test
+    public void testLookup() {
+        Trie.Mutable<Integer> trie = new Trie.Mutable<>();
+        trie.assoc("apple", 1);
+        assertEquals(1, (int) trie.lookup("apple"));
+        assertNull(trie.lookup("app"));
+        assertEquals(42, (int) trie.lookup("app", 42));
+    }
+
+    @Test
+    public void testKeysAndVals() {
+        Trie.Mutable<Integer> trie = new Trie.Mutable<>();
+        trie.assoc("apple", 1);
+        trie.assoc("app", 2);
+        trie.assoc("banana", 3);
+
+        List<String> keys = new ArrayList<>();
+        trie.keys().forEachRemaining(keys::add);
+        Collections.sort(keys);
+        assertArrayEquals(new String[]{"app", "apple", "banana"}, keys.toArray());
+
+        List<Integer> vals = new ArrayList<>();
+        trie.vals().forEachRemaining(vals::add);
+        Collections.sort(vals);
+        assertArrayEquals(new Integer[]{1, 2, 3}, vals.toArray());
     }
 }
