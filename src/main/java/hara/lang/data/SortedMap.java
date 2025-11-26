@@ -58,7 +58,11 @@ public interface SortedMap<K, V> extends
 		}
 
 		public Node<K, V> remove(K key, Comparator<K> comparator) {
-			return redden()._remove(key, comparator);
+			Node<K, V> result = redden()._remove(key, comparator);
+			if (result.size == this.size) {
+				return this;
+			}
+			return result;
 		}
 
 		@SuppressWarnings("unchecked")
@@ -68,9 +72,17 @@ public interface SortedMap<K, V> extends
 			} else {
 				int cmp = comparator.compare(key, k);
 				if (cmp < 0) {
-					return S.node(c, l._remove(key, comparator), k, v, r).rotate();
+					Node<K, V> newL = l._remove(key, comparator);
+					if (newL == l) {
+						return this;
+					}
+					return S.node(c, newL, k, v, r).rotate();
 				} else if (cmp > 0) {
-					return S.node(c, l, k, v, r._remove(key, comparator)).rotate();
+					Node<K, V> newR = r._remove(key, comparator);
+					if (newR == r) {
+						return this;
+					}
+					return S.node(c, l, k, v, newR).rotate();
 				} else if (size == 1) {
 					return c == BLACK ? DOUBLE_EMPTY_NODE : EMPTY_NODE;
 				} else if (r.size == 0) {
@@ -97,7 +109,11 @@ public interface SortedMap<K, V> extends
 				} else if (cmp > 0) {
 					return S.node(c, l, k, v, r._put(key, value, merge, comparator)).balance();
 				} else {
-					return S.node(c, l, key, merge.apply(v, value), r);
+					V newValue = merge.apply(v, value);
+					if (newValue == v) {
+						return this;
+					}
+					return S.node(c, l, key, newValue, r);
 				}
 			}
 		}
@@ -651,12 +667,18 @@ public interface SortedMap<K, V> extends
 		@Override
 		public Standard<K, V> assoc(K key, V value) {
 			Node<K, V> rootPrime = _root.put(key, value, (o, n) -> n, _comparator);
+			if (rootPrime == _root) {
+				return this;
+			}
 			return new Standard<K, V>(_meta, rootPrime, _comparator);
 		}
 		
 		@Override
 		public Standard<K, V> dissoc(K key) {
 			Node<K, V> rootPrime = _root.remove(key, _comparator);
+			if (rootPrime == _root) {
+				return this;
+			}
 			return new Standard<K, V>(_meta, rootPrime, _comparator);
 		}
 
