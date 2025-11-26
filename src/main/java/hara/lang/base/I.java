@@ -754,4 +754,8 @@ public interface I {
 		}
 	}
 
+	public interface HasRuntime {
+		Object getRuntime();
+	}
+
 }
