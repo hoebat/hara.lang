@@ -51,10 +51,6 @@ public interface I {
 		}
 	}
 
-	public interface Client extends OFn {
-
-	}
-
 	public interface Conj<E> {
 		Conj<E> conj(E e);
 	}
