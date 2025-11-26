@@ -23,3 +23,26 @@
 hs_err_pid*
 
 /target/
+
+
+# Emacs and Lein
+*#
+*cider-error*
+.lein*
+form-init*
+.#*
+.DS_Store
+.hara
+.clj-kondo/.cache
+.calva
+.prompts
+.lsp/.cache
+/.lein-*
+/.nrepl-port
+.hgignore
+.hg/
+.build
+.clj-kondo
+.cpcache
+*_temp
+*.~undo-tree~
