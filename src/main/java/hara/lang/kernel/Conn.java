@@ -5,6 +5,7 @@ import java.net.Socket;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
+import hara.lang.kernel.io.IRedirect;
 
 /**
  * A lightweight implementation of the SocketConnection server protocol at https://redis.io/topics/protocol
@@ -272,6 +273,11 @@ public class Conn implements Closeable {
 	public final Parser reader;
 
 	/**
+	 * An IRedirect to redirect I/O.
+	 */
+	public final IRedirect redirect;
+
+	/**
 	 * Used for reading responses from the server.
 	 */
   public Socket socket;
@@ -283,7 +289,7 @@ public class Conn implements Closeable {
 	 * @throws IOException If a socket error occurs.
 	 */
 	public Conn(Socket socket) throws IOException {
-		this(socket, 1 << 16, 1 << 16);
+		this(socket, 1 << 16, 1 << 16, null);
 	}
 
 	/**
@@ -295,9 +301,16 @@ public class Conn implements Closeable {
 	 * @throws IOException If a socket error occurs.
 	 */
 	public Conn(Socket socket, int inputBufferSize, int outputBufferSize) throws IOException {
+		this(socket, inputBufferSize, outputBufferSize, null);
+	}
+
+	public Conn(Socket socket,
+			int inputBufferSize, int outputBufferSize,
+			IRedirect redirect) throws IOException {
 		this(
 			new BufferedInputStream(socket.getInputStream(), inputBufferSize),
-			new BufferedOutputStream(socket.getOutputStream(), outputBufferSize)
+			new BufferedOutputStream(socket.getOutputStream(), outputBufferSize),
+			redirect
 		);
     this.socket = socket;
 	}
@@ -308,9 +321,11 @@ public class Conn implements Closeable {
 	 * @param inputStream  Read from this stream
 	 * @param outputStream Write to this stream
 	 */
-	private Conn(BufferedInputStream inputStream, BufferedOutputStream outputStream) {
+	private Conn(BufferedInputStream inputStream, BufferedOutputStream outputStream,
+			IRedirect redirect) {
 		this.reader = new Parser(inputStream);
 		this.writer = new Encoder(outputStream);
+		this.redirect = redirect;
 	}
 
 	/**
@@ -335,36 +350,58 @@ public class Conn implements Closeable {
 	 */
 	@SuppressWarnings("unchecked")
 	public <T> T read() throws IOException {
-		return (T) reader.parse();
+		Object obj = reader.parse();
+		if (this.redirect != null) {
+			this.redirect.read(obj);
+		}
+		return (T) obj;
 	}
 
 	@SuppressWarnings("rawtypes")
 	public void write(List args) throws IOException {
+		if (this.redirect != null) {
+			this.redirect.write(args);
+		}
 		writer.write(args);
 		writer.flush();
 	}
 
 	public void write(Object... args) throws IOException {
+		if (this.redirect != null) {
+			this.redirect.write(args);
+		}
 		writer.write(Arrays.asList(args));
 		writer.flush();
 	}
 
 	public void write(long val) throws IOException {
+		if (this.redirect != null) {
+			this.redirect.write(val);
+		}
 		writer.write(val);
 		writer.flush();
 	}
 
 	public void write(byte[] val) throws IOException {
+		if (this.redirect != null) {
+			this.redirect.write(val);
+		}
 		writer.write(val);
 		writer.flush();
 	}
 
 	public void write(Throwable t) throws IOException {
+		if (this.redirect != null) {
+			this.redirect.write(t);
+		}
 		writer.write(t);
 		writer.flush();
 	}
 
 	public void writeString(String val) throws IOException {
+		if (this.redirect != null) {
+			this.redirect.write(val);
+		}
 		writer.writeString(val);
 		writer.flush();
 	}
