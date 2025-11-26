@@ -31,11 +31,25 @@ public final class Keyword
 	}
 
 	public static Keyword create(String nsname) {
+		if (nsname == null || nsname.isEmpty()) {
+			throw new IllegalArgumentException("Keyword name cannot be empty.");
+		}
+		if (nsname.equals("/")) {
+			throw new IllegalArgumentException("Keyword name cannot be a single slash.");
+		}
 		int i = nsname.indexOf('/');
-		if (i == -1 || nsname.equals("/"))
+		int j = nsname.lastIndexOf('/');
+		if (i == -1) { // No slash
 			return create(null, nsname);
-		else
+		} else if (i != j) { // More than one slash
+			throw new IllegalArgumentException("Keyword name can only contain one slash.");
+		} else if (i == 0) { // Starts with slash
+			throw new IllegalArgumentException("Keyword name cannot start with a slash.");
+		} else if (i == nsname.length() - 1) { // Ends with slash
+			throw new IllegalArgumentException("Keyword name cannot end with a slash.");
+		} else { // Exactly one slash, not at the beginning or end
 			return create(nsname.substring(0, i), nsname.substring(i + 1));
+		}
 	}
 
 	@Override
