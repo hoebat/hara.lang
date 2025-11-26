@@ -1,0 +1,42 @@
+# hara.lang
+
+`hara.lang` is a Lisp-like language and runtime environment built on the Java Virtual Machine (JVM). It provides an interactive development experience through a TCP server, allowing developers to connect to a running instance, evaluate code, and inspect the system in real-time.
+
+## Motivation
+
+The primary motivation behind `hara.lang` is to provide a dynamic and interactive development environment on the JVM. Traditional Java development often involves a lengthy compile-run-debug cycle. `hara.lang` aims to shorten this feedback loop by allowing developers to connect to a running application, modify code on the fly, and inspect the state of the system without requiring a restart.
+
+## Architecture
+
+The `hara.lang` runtime is built on a modular, component-based architecture. At its core is a `Foundation` instance that acts as the central coordinator for the entire system.
+
+### Core Components (`hara.lang.kernel`)
+
+The kernel is the heart of the runtime and manages the application's lifecycle and client interactions.
+
+*   **`Foundation`**: This class is the central hub of the runtime. It holds references to all active servers and runtime sessions (`RT` instances). It is also responsible for command processing, parsing incoming commands from clients, and dispatching them to the appropriate handlers for execution (e.g., `JVM`, `OS`, `EVAL`).
+
+*   **`Server`**: The `Server` component listens for incoming TCP connections from clients. When a new client connects, it spawns a dedicated `Handler` thread to manage that connection. This allows multiple clients to interact with the runtime concurrently.
+
+*   **`Main`**: The main entry point of the application. Its primary responsibility is to bootstrap the system by creating a `Foundation` instance, initializing a primary `Server` and a root runtime (`RT.Instance`), and starting the server to listen for connections.
+
+### Language and Runtime (`hara.lang.lib`)
+
+This library provides the Lisp-like language implementation, including the reader, evaluator, and core functions.
+
+*   **`RT` (Runtime)**: An `RT.Instance` represents an isolated runtime session or environment. Each instance has its own state, including a dedicated class loader (`Loader`) and environment (`UserEnv`). This design allows for managing separate classpaths and namespaces for different sessions. The `eval` command is handled by the `RT.Instance`, which reads a string, parses it into an AST, and evaluates it.
+
+*   **Reader & Evaluator**: The runtime uses a Lisp-style reader (`Read.LispReader`) to parse code from text into an Abstract Syntax Tree (AST). The `Eval` component then traverses this tree to execute the code within a given environment.
+
+*   **`Builtin`**: This class provides the core library of functions and macros available in the language, forming the standard library.
+
+### Data Structures (`hara.lang.data`)
+
+`hara.lang` includes a rich set of custom, persistent data structures that are fundamental to the language. These include:
+
+*   Lists
+*   Vectors
+*   Maps (Hash Maps, Ordered Maps, Sorted Maps)
+*   Sets (Hash Sets, Ordered Sets, Sorted Sets)
+
+These data structures are designed to be immutable, which is a core tenet of functional programming and the Lisp heritage of the language.
