@@ -1,8 +1,7 @@
 package hara.lang.base;
 
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
+import hara.lang.data.Vector;
 
 public class Request implements I.IRequest, I.IRequestTransact {
 
@@ -34,11 +33,11 @@ public class Request implements I.IRequest, I.IRequestTransact {
         if (client instanceof I.OFn) {
             I.OFn fn = (I.OFn) client;
             if (commands instanceof Iterable) {
-                List<Object> results = new ArrayList<>();
+                Vector.Mutable<Object> results = Vector.Mutable.empty(null);
                 for (Object command : (Iterable<?>) commands) {
-                    results.add(invokeClient(fn, command));
+                    results.pushLast(invokeClient(fn, command));
                 }
-                return results;
+                return results.toPersistent();
             }
         }
         throw new Ex.Unsupported("Client is not a function or commands not iterable.");

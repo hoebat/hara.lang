@@ -3,8 +3,8 @@ package hara.lang.base;
 import org.junit.Test;
 import static org.junit.Assert.*;
 import java.util.function.Function;
-import java.util.Arrays;
-import java.util.List;
+import hara.lang.data.Vector;
+import hara.lang.base.Eq;
 
 public class RequestTest {
 
@@ -13,7 +13,7 @@ public class RequestTest {
         public Function<Object, Object> getArgN() {
             return (args) -> {
                 if (args instanceof Object[]) {
-                    return Arrays.asList((Object[]) args);
+                    return Vector.Standard.from(null, (Object[]) args);
                 }
                 return args;
             };
@@ -25,6 +25,17 @@ public class RequestTest {
         }
     }
 
+    private void assertVectorEquals(Vector<Object> expected, Object actual) {
+        assertTrue(actual instanceof Vector.Standard);
+        @SuppressWarnings("unchecked")
+        Vector<Object> actualVector = (Vector.Standard<Object>) actual;
+        assertEquals(expected.count(), actualVector.count());
+        for (int i = 0; i < expected.count(); i++) {
+            assertTrue("Elements at index " + i + " are not equal.",
+                       Eq.eq(expected.nth(i), actualVector.nth(i)));
+        }
+    }
+
     @Test
     public void testRequest() {
         Request request = new Request();
@@ -32,18 +43,20 @@ public class RequestTest {
 
         // Test requestSingle
         assertEquals("test", request.requestSingle(mockClient, "test", null));
-        assertEquals(Arrays.asList("a", "b"), request.requestSingle(mockClient, new Object[]{"a", "b"}, null));
+        assertVectorEquals(Vector.Standard.from(null, "a", "b"), request.requestSingle(mockClient, new Object[]{"a", "b"}, null));
 
         // Test processSingle
         assertEquals("output", request.processSingle(mockClient, "output", null));
 
         // Test requestBulk
-        List<Object> commands = Arrays.asList("cmd1", new Object[]{"cmd2", "arg"});
-        List<Object> expectedBulkResult = Arrays.asList("cmd1", Arrays.asList("cmd2", "arg"));
-        assertEquals(expectedBulkResult, request.requestBulk(mockClient, commands, null));
+        @SuppressWarnings("unchecked")
+        Vector<Object> commands = Vector.Standard.from(null, "cmd1", new Object[]{"cmd2", "arg"});
+        @SuppressWarnings("unchecked")
+        Vector<Object> expectedBulkResult = Vector.Standard.from(null, "cmd1", Vector.Standard.from(null, "cmd2", "arg"));
+        assertVectorEquals(expectedBulkResult, request.requestBulk(mockClient, commands, null));
 
         // Test processBulk
-        List<Object> outputs = Arrays.asList("out1", "out2");
+        Vector<Object> outputs = Vector.Standard.from(null, "out1", "out2");
         assertEquals(outputs, request.processBulk(mockClient, null, outputs, null));
 
         // Test transact methods (still returning null)
