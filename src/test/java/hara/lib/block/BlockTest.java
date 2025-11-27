@@ -1,10 +1,8 @@
 package hara.lib.block;
 
+import hara.lang.data.Vector;
 import org.junit.Test;
 import static org.junit.Assert.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
 
 public class BlockTest {
 
@@ -59,21 +57,20 @@ public class BlockTest {
 
     @Test
     public void testContainerImmutability() {
-        List<IBlock> children = new ArrayList<>();
-        children.add(new Block.Token("number", "1", 1, "1", 1, 0));
+        Vector<IBlock> children = Vector.Standard.from(null, new Block.Token("number", "1", 1, "1", 1, 0));
         Block.Container container = new Block.Container("vector", children, new Block.Container.Props("[", "]"));
 
         try {
-            container.children().add(new Block.Token("number", "2", 2, "2", 1, 0));
-            fail("Expected UnsupportedOperationException");
-        } catch (UnsupportedOperationException e) {
+            ((Vector.Mutable<IBlock>)container.children()).pushLast(new Block.Token("number", "2", 2, "2", 1, 0));
+            fail("Expected ClassCastException");
+        } catch (ClassCastException e) {
             // Test passed
         }
     }
 
     @Test
     public void testContainerSingleLineWidth() {
-        List<IBlock> children = Arrays.asList(
+        Vector<IBlock> children = Vector.Standard.from(null,
             new Block.Token("number", "1", 1, "1", 1, 0),
             new Block.Void("linespace", ' ', 1, 0),
             new Block.Token("number", "2", 2, "2", 1, 0)
@@ -84,7 +81,7 @@ public class BlockTest {
 
     @Test
     public void testContainerMultiLineWidth() {
-        List<IBlock> children = Arrays.asList(
+        Vector<IBlock> children = Vector.Standard.from(null,
             new Block.Token("number", "1", 1, "1", 1, 0),
             new Block.Void("linebreak", '\n', 0, 1),
             new Block.Token("number", "2", 2, "2", 1, 0)
@@ -95,7 +92,7 @@ public class BlockTest {
 
     @Test
     public void testContainerHeight() {
-        List<IBlock> children = Arrays.asList(
+        Vector<IBlock> children = Vector.Standard.from(null,
             new Block.Token("number", "1", 1, "1", 1, 0),
             new Block.Void("linebreak", '\n', 0, 1),
             new Block.Token("number", "2", 2, "2", 1, 0),

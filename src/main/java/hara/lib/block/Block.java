@@ -1,10 +1,12 @@
 package hara.lib.block;
 
+import hara.lang.data.Vector;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import java.util.stream.StreamSupport;
 
 public class Block {
 
@@ -153,7 +155,7 @@ public class Block {
 
     public static class Container implements IBlock, IBlock.IBlockExpression, IBlock.IBlockContainer, Comparable<IBlock> {
         public final String tag;
-        public final List<IBlock> children;
+        public final Vector<IBlock> children;
         public final Props props;
 
         public static class Props {
@@ -165,9 +167,9 @@ public class Block {
             }
         }
 
-        public Container(String tag, List<IBlock> children, Props props) {
+        public Container(String tag, Vector<IBlock> children, Props props) {
             this.tag = tag;
-            this.children = Collections.unmodifiableList(new ArrayList<>(children));
+            this.children = children;
             this.props = props;
         }
 
@@ -175,10 +177,10 @@ public class Block {
         @Override public String tag() { return this.tag; }
         @Override public int prefixed() { return this.props.start.length(); }
         @Override public int suffixed() { return this.props.end.length(); }
-        @Override public List<IBlock> children() { return this.children; }
+        @Override public Vector<IBlock> children() { return this.children; }
 
         @Override
-        public IBlock.IBlockContainer replaceChildren(List<IBlock> newChildren) {
+        public IBlock.IBlockContainer replaceChildren(Vector<IBlock> newChildren) {
             return new Container(this.tag, newChildren, this.props);
         }
 
@@ -204,9 +206,9 @@ public class Block {
     private static int containerWidth(Container block) {
         int lastLineWidth = 0;
         boolean onLastLine = true;
-        List<IBlock> children = block.children();
-        for (int i = children.size() - 1; i >= 0; i--) {
-            IBlock child = children.get(i);
+        Vector<IBlock> children = block.children();
+        for (int i = (int) (children.count() - 1); i >= 0; i--) {
+            IBlock child = children.nth(i);
             if (child.height() > 0) {
                 onLastLine = false;
                 lastLineWidth += child.width();
@@ -223,11 +225,11 @@ public class Block {
     }
 
     private static int containerHeight(Container block) {
-        return block.children.stream().mapToInt(IBlock::height).sum();
+        return (int) StreamSupport.stream(block.children.spliterator(), false).mapToInt(IBlock::height).sum();
     }
 
     private static String containerString(Container block) {
-        String childrenStr = block.children.stream()
+        String childrenStr = StreamSupport.stream(block.children.spliterator(), false)
                                           .map(IBlock::string)
                                           .collect(Collectors.joining());
         switch (block.tag) {
@@ -239,7 +241,7 @@ public class Block {
     }
 
     private static String containerValueString(Container block) {
-        String childrenStr = block.children.stream()
+        String childrenStr = StreamSupport.stream(block.children.spliterator(), false)
             .map(child -> {
                 if (child instanceof IBlock.IBlockExpression) {
                     return ((IBlock.IBlockExpression) child).valueString();
