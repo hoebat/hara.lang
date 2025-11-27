@@ -18,6 +18,7 @@ import hara.lang.data.List;
 import hara.lang.lib.*;
 import hara.lang.lib.RT.Instance;
 import hara.lang.lib.Read;
+import hara.lang.service.KV;
 
 @SuppressWarnings("rawtypes")
 public class Foundation implements I.Context {
@@ -27,8 +28,27 @@ public class Foundation implements I.Context {
 	public final ConcurrentHashMap<String,Server> SERVERS = new ConcurrentHashMap<String,Server>();
 	public final ConcurrentHashMap<String,I.Runtime> RTS = new ConcurrentHashMap<String,I.Runtime>();
 
+	public final KV STORE;
+
+	public Foundation() {
+		this("dump.aof");
+	}
+
+	public Foundation(String storeFile) {
+		STORE = new KV(storeFile);
+		try {
+			STORE.load();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
 	public enum COMMAND {
-		HELP, SHUTDOWN, DIR, PING, ECHO, OS, JVM, SERVER, SESSION, EVAL, COMPILE, MAVEN
+		HELP, SHUTDOWN, DIR, PING, ECHO, OS, JVM, SERVER, SESSION, EVAL, COMPILE, MAVEN, STORE
+	}
+
+	public enum STORE_CMD {
+		HELP, SET, GET, DEL, KEYS
 	}
 	
 	public enum OS {
@@ -239,6 +259,20 @@ public class Foundation implements I.Context {
 			}
 			throw new Ex.Unsupported();
 		}
+
+		public static Object runStore(Foundation F, java.util.List<String> args) {
+			STORE_CMD cmd = STORE_CMD.valueOf(args.get(0));
+			args.remove(0);
+
+			switch(cmd) {
+			case HELP: return Fn.runHELP(F, STORE_CMD.values());
+			case SET: return F.STORE.set(args.get(0), args.get(1));
+			case GET: return F.STORE.get(args.get(0));
+			case DEL: return F.STORE.del(args.get(0));
+			case KEYS: return F.STORE.keys();
+			}
+			throw new Ex.Unsupported();
+		}
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -256,6 +290,7 @@ public class Foundation implements I.Context {
 		case SERVER: return Fn.runServer(F, args);
 		case SESSION: return Fn.runSession(F, args);
 		case MAVEN: return Fn.runMaven(F, args);
+		case STORE: return Fn.runStore(F, args);
 		case EVAL: 
 			return Fn.runSessionFor(F, args.get(0), 
 					rt -> G.display(rt.eval(rt.readString(args.get(1)))));
