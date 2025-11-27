@@ -4,6 +4,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
@@ -124,6 +125,11 @@ public interface RT {
 			_rt = rt;
 			_methods = loadMethods(rt);
 		}
+
+		@Override
+		public I.Runtime getRuntime() {
+			return _rt;
+		}
 		
 		@SuppressWarnings("rawtypes")
 		public Map<Symbol, Var> loadMethods(I.Runtime<AST, Symbol, Var> rt) {
@@ -147,6 +153,16 @@ public interface RT {
 		public Map<Symbol, Var> getMap() {
 			return _methods;
 		}
+
+		@Override
+		public Iterator<Symbol> keys() {
+			return It.map(_methods.iterator(), e -> e.getKey());
+		}
+
+		@Override
+		public Iterator<Var> vals() {
+			return It.map(_methods.iterator(), e -> e.getValue());
+		}
 	}
 
 	@SuppressWarnings("rawtypes")
@@ -158,6 +174,11 @@ public interface RT {
 
 		public ClassEnv(I.Runtime rt) {
 			_rt = rt;
+		}
+
+		@Override
+		public I.Runtime getRuntime() {
+			return _rt;
 		}
 		
 		@Override
@@ -229,6 +250,11 @@ public interface RT {
 			_facade = new Ut.AsMap<Symbol, Var>(_methods);
 			_class = new ClassEnv(rt);
 		}
+
+		@Override
+		public I.Runtime getRuntime() {
+			return getParent().getRuntime();
+		}
 		
 		@Override
 		public I.Env<Symbol, Var> getParent() {
@@ -238,6 +264,16 @@ public interface RT {
 		@Override
 		public I.Lookup<Symbol, Var> getMap() {
 			return _facade;
+		}
+
+		@Override
+		public Iterator<Symbol> keys() {
+			return It.concat(It.map(_methods.entrySet().iterator(), e -> e.getKey()), _parent.keys());
+		}
+
+		@Override
+		public Iterator<Var> vals() {
+			return It.concat(It.map(_methods.entrySet().iterator(), e -> e.getValue()), _parent.vals());
 		}
 
 		@Override

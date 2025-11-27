@@ -246,6 +246,10 @@ public interface List<E> extends Data.VectorType<E> {
 			return pushLast(v);
 		}
 
+		public Mutable<E> conjAll(Iterator<E> it) {
+			return It.reduce(it, this, (m, e) -> m.conj(e));
+		}
+
 		@Override
 		public Object[] _elements() {
 			return _elements;
@@ -373,6 +377,10 @@ public interface List<E> extends Data.VectorType<E> {
 		@Override
 		public Standard<E> conj(E v){
 			return pushLast(v);
+		}
+
+		public Standard<E> conjAll(Iterator<E> it) {
+			return Mutable.into(this.toMutable(), it).toPersistent();
 		}
 
 		@Override
