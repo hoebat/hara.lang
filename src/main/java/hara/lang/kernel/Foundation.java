@@ -14,10 +14,12 @@ import hara.lang.base.It;
 import hara.lang.compiler.Compiler;
 import hara.lang.compiler.CompilerException;
 import hara.lang.compiler.DynamicClassLoader;
+import hara.lang.data.Keyword;
 import hara.lang.data.List;
 import hara.lang.lib.*;
 import hara.lang.lib.RT.Instance;
 import hara.lang.lib.Read;
+import hara.lang.service.Http;
 
 @SuppressWarnings("rawtypes")
 public class Foundation implements I.Context {
@@ -27,8 +29,10 @@ public class Foundation implements I.Context {
 	public final ConcurrentHashMap<String,Server> SERVERS = new ConcurrentHashMap<String,Server>();
 	public final ConcurrentHashMap<String,I.Runtime> RTS = new ConcurrentHashMap<String,I.Runtime>();
 
+	public Http _http;
+
 	public enum COMMAND {
-		HELP, SHUTDOWN, DIR, PING, ECHO, OS, JVM, SERVER, SESSION, EVAL, COMPILE, MAVEN
+		HELP, SHUTDOWN, DIR, PING, ECHO, OS, JVM, SERVER, SESSION, EVAL, COMPILE, MAVEN, SERVICE
 	}
 	
 	public enum OS {
@@ -54,6 +58,10 @@ public class Foundation implements I.Context {
 
 	public enum MAVEN {
 		HELP, LOAD
+	}
+
+	public enum SERVICE {
+		HELP, HTTP
 	}
 
 	@SuppressWarnings("unchecked")
@@ -176,13 +184,22 @@ public class Foundation implements I.Context {
 		
 		public static Object runSessionCreate(Foundation F, java.util.List<String> args, boolean raise) {
 			var key = args.get(0);
+			long limit = 0;
+			if (args.size() > 1) {
+				try {
+					limit = Long.parseLong(args.get(1));
+				} catch (NumberFormatException e) {
+					// keep 0
+				}
+			}
+
 			var s = F.RTS.get(key);
 			if (s != null) {
 				if (raise) {
 					throw new Ex.Runtime("Session already exists: " + key);
 				}
 			} else {
-				F.RTS.put(key, new RT.Instance(F, key));
+				F.RTS.put(key, new RT.Instance(F, key, limit));
 			}
 			return key;
 		}
@@ -221,7 +238,12 @@ public class Foundation implements I.Context {
 			case PATH:   return runSessionFor(F, args.get(0), (rt) -> runSessionClasspath(rt, args));
 			case LIST:   return It.toArrayList(F.RTS.keys());
 			case KILL:   return runSessionFor(F, args.get(0), (rt) -> F.RTS.remove(args.get(0)));
-			case INFO:   throw new Ex.TODO();
+			case INFO:   return runSessionFor(F, args.get(0), (rt) -> {
+                return hara.lang.data.Map.Standard.from(null,
+                        Keyword.create("limit"), Long.valueOf(rt._memoryLimit),
+                        Keyword.create("usage"), Long.valueOf(rt.getMemoryUsage())
+                    );
+            });
 			}
 			throw new Ex.Unsupported();
 		}
@@ -236,6 +258,33 @@ public class Foundation implements I.Context {
 				return runSessionFor(F, args.get(0),
 					(rt) -> hara.lang.lib.Maven.load.invoke(rt, args.get(1))
 				);
+			}
+			throw new Ex.Unsupported();
+		}
+
+		public static Object runService(Foundation F, java.util.List<String> args) {
+			SERVICE cmd = SERVICE.valueOf(args.get(0));
+			args.remove(0);
+			switch(cmd) {
+			case HELP: return Fn.runHELP(F, SERVICE.values());
+			case HTTP:
+				String op = args.get(0);
+				if ("START".equals(op)) {
+					int port = args.size() > 1 ? Integer.parseInt(args.get(1)) : 8080;
+					if (F._http == null) {
+						F._http = new Http(F);
+						F._http.start(port);
+						return "HTTP Server Started on " + port;
+					}
+					return "HTTP Server Already Running";
+				} else if ("STOP".equals(op)) {
+					if (F._http != null) {
+						F._http.stop();
+						F._http = null;
+						return "HTTP Server Stopped";
+					}
+					return "HTTP Server Not Running";
+				}
 			}
 			throw new Ex.Unsupported();
 		}
@@ -256,6 +305,7 @@ public class Foundation implements I.Context {
 		case SERVER: return Fn.runServer(F, args);
 		case SESSION: return Fn.runSession(F, args);
 		case MAVEN: return Fn.runMaven(F, args);
+		case SERVICE: return Fn.runService(F, args);
 		case EVAL: 
 			return Fn.runSessionFor(F, args.get(0), 
 					rt -> G.display(rt.eval(rt.readString(args.get(1)))));
