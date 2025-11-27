@@ -45,22 +45,25 @@ public interface Macro {
 		}
 		
 		
-		@Module.Fn(name = ".", complete = true, vargs = true, rt = true)
+		@Module.Fn(name = ".", complete = true, vargs = true, env = true)
 		@Module.Var(control = true)
-		public static <R, AST, ITR> R dotExpr(I.Runtime rt, AST expr, AST cmd, ITR more) {
-			Object o = eval(rt, expr);
+		public static <R, AST, ITR> R dotExpr(I.Env env, AST expr, AST cmd, ITR more) {
+			Object o = Eval.eval(expr, env);
 			return (R) It.reduce(
 					It.iter(more),
-					dotExpr(rt, o, cmd),
-					(acc, c) -> dotExpr(rt, acc, c));
+					dotExpr(env.getRuntime(), o, cmd),
+					(acc, c) -> dotExpr(env.getRuntime(), acc, c));
 			
 		}
 		
-		@Module.Fn(name = "new", complete = true, vargs = true, rt = true)
+		@Module.Fn(name = "new", complete = true, vargs = true, env = true)
 		@Module.Var(control = true)
-		public static <R, ITR> R newExpr(I.Runtime rt, Symbol clsym, ITR args) {
-			Class cls = (Class) eval(rt, clsym);
-			return (R) Reflect.invokeConstructor(cls, It.toArray(args));
+		public static <R, ITR> R newExpr(I.Env env, Symbol clsym, ITR args) {
+			Class cls = (Class) Eval.eval(clsym, env);
+
+			// Evaluate args
+			Object[] evalArgs = It.toArray(It.map(It.iter(args), arg -> Eval.eval(arg, env)));
+			return (R) Reflect.invokeConstructor(cls, evalArgs);
 		}
 	}
 	
@@ -72,46 +75,78 @@ public interface Macro {
 			return expr;
 		}
 
-		@Module.Fn(name = "def", complete = true, rt = true)
+		@Module.Fn(name = "def", complete = true, env = true)
 		@Module.Var(control = true)
-		public static Var defExpr(I.Runtime rt, Symbol sym, Object expr) {
-			var val = rt.eval(expr);
+		public static Var defExpr(I.Env env, Symbol sym, Object expr) {
+			var val = Eval.eval(expr, env);
 			Var v = (Var) new Var(sym.getName(), val).withMeta(sym.meta());
-			rt.setObj(sym, v);
+			env.getRuntime().setObj(sym, v);
 			return v;
 		}
 
-		@Module.Fn(name = "do", complete = true, rt = true, vargs = true)
+		@Module.Fn(name = "do", complete = true, env = true, vargs = true)
 		@Module.Var(control = true)
-		public static <ITR> Object doExpr(I.Runtime rt, ITR exprs) {
+		public static <ITR> Object doExpr(I.Env env, ITR exprs) {
 			return It.reduce(
 					It.iter(exprs),
 					null,
-					(out, expr) -> rt.eval(expr));
+					(out, expr) -> Eval.eval(expr, env));
+		}
+
+		@Module.Fn(name = "fn", complete = true, env = true, vargs = true)
+		@Module.Var(control = true)
+		public static <ITR> I.Fn fnExpr(I.Env env, Data.LinearType bindings, ITR args) {
+			return new Env.FnEval(null, env.getRuntime(), env, bindings, list(args).cons(symbol("do")));
 		}
 		
-		@Module.Fn(name = "fn", complete = true, rt = true, vargs = true)
+		@Module.Fn(name = "let", complete = true, env = true, vargs = true)
 		@Module.Var(control = true)
-		public static <ITR> I.Fn fnExpr(I.Runtime rt, Data.LinearType bindings, ITR args) {
-			return new Env.FnEval(null, rt, rt.getEnv(), bindings, list(args).cons(symbol("do")));
-		}
-		
-		@Module.Fn(name = "if", complete = true, rt = true)
-		@Module.Var(control = true)
-		public static <EXPR> Object ifExpr(I.Runtime rt, EXPR check, EXPR then, EXPR otherwise) {
-			Object val = rt.eval(check);
-			if(isTruthy(val)) {
-				return rt.eval(then);
+		public static <ITR> Object letExpr(I.Env env, Data.LinearType bindings, ITR body) {
+			if (bindings.count() % 2 != 0) {
+				throw new Ex.Runtime("let bindings must have an even number of forms");
 			}
-			return rt.eval(otherwise);
+
+			Eval.LocalEnv localEnv = new Eval.LocalEnv(env);
+			java.util.List<Object> values = new java.util.ArrayList<>();
+			for (int i = 1; i < bindings.count(); i += 2) {
+				values.add(Eval.eval(bindings.nth(i), env));
+			}
+
+			for (int i = 0; i < bindings.count(); i += 2) {
+				Symbol symbol = (Symbol) bindings.nth(i);
+				localEnv.addBinding(symbol, values.get(i / 2));
+			}
+
+			Object result = null;
+			Iterator it = It.iter(body);
+			while(it.hasNext()) {
+				result = Eval.eval(it.next(), localEnv);
+			}
+			return result;
 		}
 		
-		@Module.Fn(name = "cond", complete = true, rt = true, vargs = true)
+		@Module.Fn(name = "if", complete = true, env = true)
 		@Module.Var(control = true)
-		public static <ITR> Object conjExpr(I.Runtime rt, ITR pairs) {
+		public static <EXPR> Object ifExpr(I.Env env, EXPR check, EXPR then, EXPR otherwise) {
+			Object val = Eval.eval(check, env);
+			if(isTruthy(val)) {
+				return Eval.eval(then, env);
+			}
+			return Eval.eval(otherwise, env);
+		}
+
+		@Module.Fn(name = "if", complete = true, env = true)
+		@Module.Var(control = true)
+		public static <EXPR> Object ifExpr(I.Env env, EXPR check, EXPR then) {
+			return ifExpr(env, check, then, null);
+		}
+		
+		@Module.Fn(name = "cond", complete = true, env = true, vargs = true)
+		@Module.Var(control = true)
+		public static <ITR> Object conjExpr(I.Env env, ITR pairs) {
 			Iterator<I.Pair> branches = It.partitionPair(It.iter(pairs));
-			I.Pair p = It.some(branches, (e) -> isTruthy(rt.eval(e.getKey())));
-			return (p != null) ? rt.eval(p.getValue()) : null;
+			I.Pair p = It.some(branches, (e) -> isTruthy(Eval.eval(e.getKey(), env)));
+			return (p != null) ? Eval.eval(p.getValue(), env) : null;
 		}
 		
 		@Module.Fn(name = "->", complete = true, vargs = true)
@@ -156,6 +191,86 @@ public interface Macro {
 							return l.conj(acc);
 						}
 					});
+		}
+
+		@Module.Fn(name = "try", complete = true, env = true, vargs = true)
+		@Module.Var(control = true)
+		public static <ITR> Object tryExpr(I.Env env, ITR body) {
+			Iterator it = It.iter(body);
+			Object res = null;
+			List.Standard catches = List.Standard.EMPTY;
+			List.Standard finallies = List.Standard.EMPTY;
+			List.Standard exprs = List.Standard.EMPTY;
+
+			while(it.hasNext()) {
+				Object elem = it.next();
+				if (elem instanceof List) {
+					List l = (List) elem;
+					Object head = l.peekFirst();
+					if (head instanceof Symbol && ((Symbol)head).getName().equals("catch")) {
+						catches = (List.Standard) catches.conj(l);
+						continue;
+					} else if (head instanceof Symbol && ((Symbol)head).getName().equals("finally")) {
+						finallies = (List.Standard) finallies.conj(l);
+						continue;
+					}
+				}
+				exprs = (List.Standard) exprs.conj(elem);
+			}
+
+			try {
+				Iterator eit = exprs.iterator();
+				while(eit.hasNext()) {
+					res = Eval.eval(eit.next(), env);
+				}
+			} catch (Throwable t) {
+				Throwable cause = (t instanceof Exception) ? Reflect.getCauseOrElse((Exception)t) : t;
+
+				Iterator cit = catches.iterator();
+				boolean caught = false;
+				while(cit.hasNext()) {
+					List clause = (List) cit.next();
+					Symbol typeSym = (Symbol) clause.nth(1);
+					Symbol bindSym = (Symbol) clause.nth(2);
+					Class type = (Class) Eval.eval(typeSym, env);
+
+					if (type.isInstance(cause)) {
+						Eval.LocalEnv localEnv = new Eval.LocalEnv(env);
+						localEnv.addBinding(bindSym, cause);
+
+						Iterator bit = It.drop(clause.iterator(), 3);
+						while(bit.hasNext()) {
+							res = Eval.eval(bit.next(), localEnv);
+						}
+						caught = true;
+						break;
+					}
+				}
+				if (!caught) {
+					throw Ex.Sneaky(cause);
+				}
+			} finally {
+				Iterator fit = finallies.iterator();
+				while(fit.hasNext()) {
+					List clause = (List) fit.next();
+					Iterator bit = It.drop(clause.iterator(), 1);
+					while(bit.hasNext()) {
+						Eval.eval(bit.next(), env);
+					}
+				}
+			}
+			return res;
+		}
+
+		@Module.Fn(name = "throw", complete = true, env = true)
+		@Module.Var(control = true)
+		public static Object throwExpr(I.Env env, Object expr) {
+			Object ex = Eval.eval(expr, env);
+			if (ex instanceof Throwable) {
+				throw Ex.Sneaky((Throwable) ex);
+			} else {
+				throw new Ex.Runtime("Throw requires a Throwable, got: " + ex);
+			}
 		}
 	}
 	

@@ -127,92 +127,6 @@ public interface Eval {
 			return ast;
 
 		var fst = ast.peekFirst();
-		if (fst instanceof Symbol) {
-			String symbolName = ((Symbol) fst).getName();
-			if ("if".equals(symbolName)) {
-				if (ast.count() != 3 && ast.count() != 4) {
-					throw new Ex.Runtime("'if' special form requires 2 or 3 arguments, got " + (ast.count() - 1));
-				}
-				Object testExpr = ast.nth(1);
-				Object testResult = eval(testExpr, env);
-
-				// Clojure's truthiness: false and nil are false, everything else is true.
-				// In Java, we'll represent nil as null.
-				boolean isTruthy = testResult != null && !Boolean.FALSE.equals(testResult);
-
-				if (isTruthy) {
-					return eval(ast.nth(2), env);
-				} else {
-					if (ast.count() == 4) {
-						return eval(ast.nth(3), env);
-					} else {
-						return null; // Return null for the missing else branch
-					}
-				}
-			} else if ("do".equals(symbolName)) {
-				List exprs = (List) ast.popFirst();
-				Object result = null;
-				for (Object expr : exprs) {
-					result = eval(expr, env);
-				}
-				return result;
-			} else if ("def".equals(symbolName)) {
-				if (ast.count() != 3) {
-					throw new Ex.Runtime("'def' special form requires 2 arguments, got " + (ast.count() - 1));
-				}
-				Symbol symbol = (Symbol) ast.nth(1);
-				Object value = eval(ast.nth(2), env);
-				Var v = new Var(symbol.pathString(), value);
-				env.getRuntime().setObj(symbol, v);
-				return v;
-			} else if ("let".equals(symbolName)) {
-				if (ast.count() < 3) {
-					throw new Ex.Runtime("'let' special form requires at least 2 arguments");
-				}
-        
-				Vector bindings = Vector.Standard.into(((Data.LinearType) ast.nth(1)).iterator());
-
-				if (bindings.count() % 2 != 0) {
-					throw new Ex.Runtime("let bindings must have an even number of forms");
-				}
-
-				LocalEnv localEnv = new LocalEnv(env);
-				java.util.List<Object> values = new java.util.ArrayList<>();
-				for (int i = 1; i < bindings.count(); i += 2) {
-					values.add(eval(bindings.nth(i), env));
-				}
-
-				for (int i = 0; i < bindings.count(); i += 2) {
-					Symbol symbol = (Symbol) bindings.nth(i);
-					localEnv.addBinding(symbol, values.get(i / 2));
-				}
-
-				Object result = null;
-				for (int i = 2; i < ast.count(); i++) {
-					result = eval(ast.nth(i), localEnv);
-				}
-				return result;
-			} else if ("fn".equals(symbolName)) {
-				if (ast.count() < 3) {
-					throw new Ex.Runtime("'fn' special form requires at least 2 arguments");
-				}
-				Data.LinearType params = (Data.LinearType) ast.nth(1);
-				Object body;
-				if (ast.count() > 3) {
-					List bodyExprs = (List) ast.popFirst().popFirst();
-					body = List.Standard.from(null, Symbol.create("do")).conjAll(bodyExprs.iterator());
-				} else {
-					body = ast.nth(2);
-				}
-				return new Env.FnEval(null, env.getRuntime(), env, params, body);
-
-			} else if ("quote".equals(symbolName)) {
-				if (ast.count() != 2) {
-					throw new Ex.Runtime("'quote' special form requires 1 argument, got " + (ast.count() - 1));
-				}
-				return ast.nth(1);
-			}
-		}
 
 		Object f;
 		if (fst instanceof Symbol) {
@@ -223,11 +137,31 @@ public interface Eval {
 				var v = (Var) e.getValue();
 				if (v.isMacro()) {
 					f = v.deref();
-					var ret = apply(f, It.iter(ast.popFirst()));
+					var args = It.iter(ast.popFirst());
+					var m = ((I.ObjType)f).meta();
+
+					if (m != null) {
+						if ((Boolean)((I.Lookup)m).lookup(Keyword.create("env"), false)) {
+							args = It.concat(It.objects(env), args);
+						} else if ((Boolean)((I.Lookup)m).lookup(Keyword.create("rt"), false)) {
+							args = It.concat(It.objects(env.getRuntime()), args);
+						}
+					}
+					var ret = apply(f, args);
 					return eval(ret, env);
 				} else if (v.isControl()) {
 					f = v.deref();
-					return apply(f, It.iter(ast.popFirst()));
+					var args = It.iter(ast.popFirst());
+					var m = ((I.ObjType)f).meta();
+
+					if (m != null) {
+						if ((Boolean)((I.Lookup)m).lookup(Keyword.create("env"), false)) {
+							args = It.concat(It.objects(env), args);
+						} else if ((Boolean)((I.Lookup)m).lookup(Keyword.create("rt"), false)) {
+							args = It.concat(It.objects(env.getRuntime()), args);
+						}
+					}
+					return apply(f, args);
 				}
 			} else {
 				f = e.getValue();
