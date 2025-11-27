@@ -14,6 +14,7 @@ import hara.lang.base.It;
 import hara.lang.compiler.Compiler;
 import hara.lang.compiler.CompilerException;
 import hara.lang.compiler.DynamicClassLoader;
+import hara.lang.data.Keyword;
 import hara.lang.data.List;
 import hara.lang.lib.*;
 import hara.lang.lib.RT.Instance;
@@ -176,13 +177,22 @@ public class Foundation implements I.Context {
 		
 		public static Object runSessionCreate(Foundation F, java.util.List<String> args, boolean raise) {
 			var key = args.get(0);
+			long limit = 0;
+			if (args.size() > 1) {
+				try {
+					limit = Long.parseLong(args.get(1));
+				} catch (NumberFormatException e) {
+					// keep 0
+				}
+			}
+
 			var s = F.RTS.get(key);
 			if (s != null) {
 				if (raise) {
 					throw new Ex.Runtime("Session already exists: " + key);
 				}
 			} else {
-				F.RTS.put(key, new RT.Instance(F, key));
+				F.RTS.put(key, new RT.Instance(F, key, limit));
 			}
 			return key;
 		}
@@ -221,7 +231,12 @@ public class Foundation implements I.Context {
 			case PATH:   return runSessionFor(F, args.get(0), (rt) -> runSessionClasspath(rt, args));
 			case LIST:   return It.toArrayList(F.RTS.keys());
 			case KILL:   return runSessionFor(F, args.get(0), (rt) -> F.RTS.remove(args.get(0)));
-			case INFO:   throw new Ex.TODO();
+			case INFO:   return runSessionFor(F, args.get(0), (rt) -> {
+                return hara.lang.data.Map.Standard.from(null,
+                        Keyword.create("limit"), Long.valueOf(rt._memoryLimit),
+                        Keyword.create("usage"), Long.valueOf(rt.getMemoryUsage())
+                    );
+            });
 			}
 			throw new Ex.Unsupported();
 		}

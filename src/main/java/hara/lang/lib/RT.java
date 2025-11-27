@@ -303,8 +303,14 @@ public interface RT {
 		public final RootEnv _rootEnv;
 		public final UserEnv _userEnv;
 		public final ThreadLocal<List<I.Env<Symbol, Var>>> _stack;
+		public long _memoryLimit = 0;
+		public long _memoryUsage = 0;
 		
 		public Instance(I.Context root, String key) {
+			this(root, key, 0);
+		}
+
+		public Instance(I.Context root, String key, long memoryLimit) {
 			_root = root;
 			_key = key;
 			_loader = new Loader();
@@ -315,6 +321,7 @@ public interface RT {
 		                 return list(Arr.objects(_userEnv));
 		             }
 				};
+			_memoryLimit = memoryLimit;
 		}
 
 		@Override
@@ -337,10 +344,29 @@ public interface RT {
 			return _loader.getCache();
 		}
 		
+		public void checkMemoryLimit() {
+			if(_memoryLimit > 0) {
+				_memoryUsage = Graph.sizeOf(this);
+				if(_memoryUsage > _memoryLimit) {
+					throw new Ex.Runtime("Memory Limit Exceeded: " + _memoryUsage + "/" + _memoryLimit);
+				}
+			}
+		}
+
+		public long getMemoryUsage() {
+			return Graph.sizeOf(this);
+		}
+
 		@Override
 		public Object eval(AST input) {
 			Thread.currentThread().setContextClassLoader(_loader);
-			return Eval.eval(input, _stack.get().peekFirst());
+			try {
+				checkMemoryLimit();
+				return Eval.eval(input, _stack.get().peekFirst());
+			} catch (OutOfMemoryError e) {
+				_memoryUsage = _memoryLimit + 1; // Mark as exceeded
+				throw new Ex.Runtime("Memory Limit Exceeded (OOM): " + e.getMessage());
+			}
 		}
 		
 		@Override
