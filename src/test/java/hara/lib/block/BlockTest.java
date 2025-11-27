@@ -57,11 +57,11 @@ public class BlockTest {
 
     @Test
     public void testContainerImmutability() {
-        Vector<IBlock> children = Vector.Standard.from(null, new Block.Token("number", "1", 1, "1", 1, 0));
+        Vector<Block.IBlock> children = Vector.Standard.from(null, new Block.Token("number", "1", 1, "1", 1, 0));
         Block.Container container = new Block.Container("vector", children, new Block.Container.Props("[", "]"));
 
         try {
-            ((Vector.Mutable<IBlock>)container.children()).pushLast(new Block.Token("number", "2", 2, "2", 1, 0));
+            ((Vector.Mutable<Block.IBlock>)container.children()).pushLast(new Block.Token("number", "2", 2, "2", 1, 0));
             fail("Expected ClassCastException");
         } catch (ClassCastException e) {
             // Test passed
@@ -70,7 +70,7 @@ public class BlockTest {
 
     @Test
     public void testContainerSingleLineWidth() {
-        Vector<IBlock> children = Vector.Standard.from(null,
+        Vector<Block.IBlock> children = Vector.Standard.from(null,
             new Block.Token("number", "1", 1, "1", 1, 0),
             new Block.Void("linespace", ' ', 1, 0),
             new Block.Token("number", "2", 2, "2", 1, 0)
@@ -81,7 +81,7 @@ public class BlockTest {
 
     @Test
     public void testContainerMultiLineWidth() {
-        Vector<IBlock> children = Vector.Standard.from(null,
+        Vector<Block.IBlock> children = Vector.Standard.from(null,
             new Block.Token("number", "1", 1, "1", 1, 0),
             new Block.Void("linebreak", '\n', 0, 1),
             new Block.Token("number", "2", 2, "2", 1, 0)
@@ -92,7 +92,7 @@ public class BlockTest {
 
     @Test
     public void testContainerHeight() {
-        Vector<IBlock> children = Vector.Standard.from(null,
+        Vector<Block.IBlock> children = Vector.Standard.from(null,
             new Block.Token("number", "1", 1, "1", 1, 0),
             new Block.Void("linebreak", '\n', 0, 1),
             new Block.Token("number", "2", 2, "2", 1, 0),

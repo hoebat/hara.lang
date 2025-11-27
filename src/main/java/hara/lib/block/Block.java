@@ -1,31 +1,122 @@
 package hara.lib.block;
 
+import hara.lang.base.I;
 import hara.lang.data.Vector;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
-public class Block {
-
-    public static final int TAB_WIDTH = 4;
+public interface Block {
+    int TAB_WIDTH = 4;
 
     // Helper from std.block.check
-    private static boolean isComment(String s) {
+    static boolean isComment(String s) {
         return s != null && s.startsWith(";");
     }
 
     // Helper from std.block.check
-    private static String voidTag(Character c) {
+    static String voidTag(Character c) {
         if (c == null) return "eof";
         if (c == '\n' || c == '\r' || c == '\f') return "linebreak";
         if (c == ' ' || c == '\t') return "linespace";
         return null;
     }
 
-    public static class Void implements IBlock, Comparable<IBlock> {
+    static int compare(Block.IBlock a, Block.IBlock b) {
+        int tagCompare = a.tag().compareTo(b.tag());
+        if (tagCompare != 0) {
+            return tagCompare;
+        }
+        return a.string().compareTo(b.string());
+    }
+
+    static String tokenTag(Object value) {
+        if (value instanceof String) return "string";
+        if (value instanceof Number) return "number";
+        if (value instanceof Boolean) return "boolean";
+        if (value instanceof Character) return "character";
+        return "object";
+    }
+
+    static int containerWidth(Block.Container block) {
+        int lastLineWidth = 0;
+        boolean onLastLine = true;
+        Vector<Block.IBlock> children = block.children();
+        for (int i = (int) (children.count() - 1); i >= 0; i--) {
+            Block.IBlock child = children.nth(i);
+            if (child.height() > 0) {
+                onLastLine = false;
+                lastLineWidth += child.width();
+                break;
+            }
+            lastLineWidth += child.width();
+        }
+
+        if (onLastLine) {
+            return block.prefixed() + lastLineWidth + block.suffixed();
+        } else {
+            return lastLineWidth + block.suffixed();
+        }
+    }
+
+    static int containerHeight(Block.Container block) {
+        return (int) StreamSupport.stream(block.children.spliterator(), false).mapToInt(Block.IBlock::height).sum();
+    }
+
+    static String containerString(Block.Container block) {
+        String childrenStr = StreamSupport.stream(block.children.spliterator(), false)
+                                          .map(Block.IBlock::string)
+                                          .collect(Collectors.joining());
+        switch (block.tag) {
+            case "root":
+                return childrenStr;
+            default:
+                return block.props.start + childrenStr + block.props.end;
+        }
+    }
+
+    static String containerValueString(Block.Container block) {
+        String childrenStr = StreamSupport.stream(block.children.spliterator(), false)
+            .map(child -> {
+                if (child instanceof Block.IExpression) {
+                    return ((Block.IExpression) child).valueString();
+                } else if (child instanceof Block.IModifier) {
+                    return child.string();
+                }
+                return null;
+            })
+            .filter(Objects::nonNull)
+            .collect(Collectors.joining(" "));
+        return block.props.start + childrenStr + block.props.end;
+    }
+
+    interface IBlock extends I.ObjType {
+        String type();
+        String tag();
+        String string();
+        int length();
+        int width();
+        int height();
+        int prefixed();
+        int suffixed();
+        boolean verify();
+    }
+
+    interface IModifier {
+        Object modify(Object accumulator, Object input);
+    }
+
+    interface IExpression {
+        Object value();
+        String valueString();
+    }
+
+    interface IContainer {
+        Vector<Block.IBlock> children();
+        Block.IContainer replaceChildren(Vector<Block.IBlock> children);
+    }
+
+    class Void implements Block.IBlock, Comparable<Block.IBlock> {
         public final String tag;
         public final Character character;
         public final int width;
@@ -51,8 +142,33 @@ public class Block {
         }
 
         @Override
-        public int compareTo(IBlock other) {
+        public int compareTo(Block.IBlock other) {
             return Block.compare(this, other);
+        }
+
+        @Override
+        public I.Metadata meta() {
+          return null;
+        }
+
+        @Override
+        public I.ObjType withMeta(I.Metadata meta) {
+          return this;
+        }
+
+        @Override
+        public hara.lang.base.G.ObjType getObjType() {
+          return hara.lang.base.G.ObjType.BLOCK;
+        }
+
+        @Override
+        public String display() {
+          return string();
+        }
+
+        @Override
+        public long hashCalc(hara.lang.base.G.HashType t) {
+          return 0;
         }
 
         @Override
@@ -64,7 +180,7 @@ public class Block {
         }
     }
 
-    public static class Comment implements IBlock, Comparable<IBlock> {
+    class Comment implements Block.IBlock, Comparable<Block.IBlock> {
         public final String string;
         public final int width;
 
@@ -84,8 +200,33 @@ public class Block {
         @Override public boolean verify() { return isComment(this.string); }
 
         @Override
-        public int compareTo(IBlock other) {
+        public int compareTo(Block.IBlock other) {
             return Block.compare(this, other);
+        }
+
+        @Override
+        public I.Metadata meta() {
+          return null;
+        }
+
+        @Override
+        public I.ObjType withMeta(I.Metadata meta) {
+          return this;
+        }
+
+        @Override
+        public hara.lang.base.G.ObjType getObjType() {
+          return hara.lang.base.G.ObjType.BLOCK;
+        }
+
+        @Override
+        public String display() {
+          return string();
+        }
+
+        @Override
+        public long hashCalc(hara.lang.base.G.HashType t) {
+          return 0;
         }
 
         @Override
@@ -94,23 +235,7 @@ public class Block {
         }
     }
 
-    public static int compare(IBlock a, IBlock b) {
-        int tagCompare = a.tag().compareTo(b.tag());
-        if (tagCompare != 0) {
-            return tagCompare;
-        }
-        return a.string().compareTo(b.string());
-    }
-
-    private static String tokenTag(Object value) {
-        if (value instanceof String) return "string";
-        if (value instanceof Number) return "number";
-        if (value instanceof Boolean) return "boolean";
-        if (value instanceof Character) return "character";
-        return "object";
-    }
-
-    public static class Token implements IBlock, IBlock.IBlockExpression, Comparable<IBlock> {
+    class Token implements Block.IBlock, Block.IExpression, Comparable<Block.IBlock> {
         public final String tag;
         public final String string;
         public final Object value;
@@ -143,8 +268,33 @@ public class Block {
         @Override public String valueString() { return this.valueString; }
 
         @Override
-        public int compareTo(IBlock other) {
+        public int compareTo(Block.IBlock other) {
             return Block.compare(this, other);
+        }
+
+        @Override
+        public I.Metadata meta() {
+          return null;
+        }
+
+        @Override
+        public I.ObjType withMeta(I.Metadata meta) {
+          return this;
+        }
+
+        @Override
+        public hara.lang.base.G.ObjType getObjType() {
+          return hara.lang.base.G.ObjType.BLOCK;
+        }
+
+        @Override
+        public String display() {
+          return string();
+        }
+
+        @Override
+        public long hashCalc(hara.lang.base.G.HashType t) {
+          return 0;
         }
 
         @Override
@@ -153,9 +303,9 @@ public class Block {
         }
     }
 
-    public static class Container implements IBlock, IBlock.IBlockExpression, IBlock.IBlockContainer, Comparable<IBlock> {
+    class Container implements Block.IBlock, Block.IExpression, Block.IContainer, Comparable<Block.IBlock> {
         public final String tag;
-        public final Vector<IBlock> children;
+        public final Vector<Block.IBlock> children;
         public final Props props;
 
         public static class Props {
@@ -167,7 +317,7 @@ public class Block {
             }
         }
 
-        public Container(String tag, Vector<IBlock> children, Props props) {
+        public Container(String tag, Vector<Block.IBlock> children, Props props) {
             this.tag = tag;
             this.children = children;
             this.props = props;
@@ -177,10 +327,10 @@ public class Block {
         @Override public String tag() { return this.tag; }
         @Override public int prefixed() { return this.props.start.length(); }
         @Override public int suffixed() { return this.props.end.length(); }
-        @Override public Vector<IBlock> children() { return this.children; }
+        @Override public Vector<Block.IBlock> children() { return this.children; }
 
         @Override
-        public IBlock.IBlockContainer replaceChildren(Vector<IBlock> newChildren) {
+        public Block.IContainer replaceChildren(Vector<Block.IBlock> newChildren) {
             return new Container(this.tag, newChildren, this.props);
         }
 
@@ -193,8 +343,33 @@ public class Block {
         @Override public int height() { return containerHeight(this); }
 
         @Override
-        public int compareTo(IBlock other) {
+        public int compareTo(Block.IBlock other) {
             return Block.compare(this, other);
+        }
+
+        @Override
+        public I.Metadata meta() {
+          return null;
+        }
+
+        @Override
+        public I.ObjType withMeta(I.Metadata meta) {
+          return this;
+        }
+
+        @Override
+        public hara.lang.base.G.ObjType getObjType() {
+          return hara.lang.base.G.ObjType.BLOCK;
+        }
+
+        @Override
+        public String display() {
+          return string();
+        }
+
+        @Override
+        public long hashCalc(hara.lang.base.G.HashType t) {
+          return 0;
         }
 
         @Override
@@ -203,69 +378,17 @@ public class Block {
         }
     }
 
-    private static int containerWidth(Container block) {
-        int lastLineWidth = 0;
-        boolean onLastLine = true;
-        Vector<IBlock> children = block.children();
-        for (int i = (int) (children.count() - 1); i >= 0; i--) {
-            IBlock child = children.nth(i);
-            if (child.height() > 0) {
-                onLastLine = false;
-                lastLineWidth += child.width();
-                break;
-            }
-            lastLineWidth += child.width();
-        }
-
-        if (onLastLine) {
-            return block.prefixed() + lastLineWidth + block.suffixed();
-        } else {
-            return lastLineWidth + block.suffixed();
-        }
-    }
-
-    private static int containerHeight(Container block) {
-        return (int) StreamSupport.stream(block.children.spliterator(), false).mapToInt(IBlock::height).sum();
-    }
-
-    private static String containerString(Container block) {
-        String childrenStr = StreamSupport.stream(block.children.spliterator(), false)
-                                          .map(IBlock::string)
-                                          .collect(Collectors.joining());
-        switch (block.tag) {
-            case "root":
-                return childrenStr;
-            default:
-                return block.props.start + childrenStr + block.props.end;
-        }
-    }
-
-    private static String containerValueString(Container block) {
-        String childrenStr = StreamSupport.stream(block.children.spliterator(), false)
-            .map(child -> {
-                if (child instanceof IBlock.IBlockExpression) {
-                    return ((IBlock.IBlockExpression) child).valueString();
-                } else if (child instanceof IBlock.IBlockModifier) {
-                    return child.string();
-                }
-                return null;
-            })
-            .filter(Objects::nonNull)
-            .collect(Collectors.joining(" "));
-        return block.props.start + childrenStr + block.props.end;
-    }
-
     @FunctionalInterface
-    public interface ModifierCommand {
+    interface ModifierCommand {
         Object apply(Object accumulator, Object input);
     }
 
-    public static class Modifier implements IBlock, IBlock.IBlockModifier, Comparable<IBlock> {
+    class Modifier implements Block.IBlock, Block.IModifier, Comparable<Block.IBlock> {
         public final String tag;
         public final String string;
-        public final ModifierCommand command;
+        public final Block.ModifierCommand command;
 
-        public Modifier(String tag, String string, ModifierCommand command) {
+        public Modifier(String tag, String string, Block.ModifierCommand command) {
             this.tag = tag;
             this.string = string;
             this.command = command;
@@ -287,8 +410,33 @@ public class Block {
         }
 
         @Override
-        public int compareTo(IBlock other) {
+        public int compareTo(Block.IBlock other) {
             return Block.compare(this, other);
+        }
+
+        @Override
+        public I.Metadata meta() {
+          return null;
+        }
+
+        @Override
+        public I.ObjType withMeta(I.Metadata meta) {
+          return this;
+        }
+
+        @Override
+        public hara.lang.base.G.ObjType getObjType() {
+          return hara.lang.base.G.ObjType.BLOCK;
+        }
+
+        @Override
+        public String display() {
+          return string();
+        }
+
+        @Override
+        public long hashCalc(hara.lang.base.G.HashType t) {
+          return 0;
         }
 
         @Override

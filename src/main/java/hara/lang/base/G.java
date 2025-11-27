@@ -13,7 +13,7 @@ public interface G {
 	
 	public enum MetaType { OBJECT, MAP, STRING }
 	public enum HashType { SYSTEM, MURMUR3, SIP };
-	public enum ObjType { KEYWORD, SYMBOL, POINTER, FUNCTION, MAP, SET, ITERATOR, SEQUENTIAL}
+	public enum ObjType { KEYWORD, SYMBOL, POINTER, FUNCTION, MAP, SET, ITERATOR, SEQUENTIAL, BLOCK}
 
 	public static final HashType DEFAULT_HASH = HashType.MURMUR3;
 

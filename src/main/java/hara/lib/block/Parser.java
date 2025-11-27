@@ -74,7 +74,7 @@ public class Parser {
     return DISPATCH_OPTIONS.getOrDefault(ch, "token");
   }
 
-  public IBlock parse() {
+  public Block.IBlock parse() {
     Character ch = reader.peekChar();
     String dispatch = readDispatch(ch);
 
@@ -116,7 +116,7 @@ public class Parser {
     }
   }
 
-  private IBlock parseVoid() {
+  private Block.IBlock parseVoid() {
     Character c = reader.readChar();
     String tag = c == null
       ? "eof"
@@ -126,24 +126,24 @@ public class Parser {
     return new Block.Void(tag, c, width, height);
   }
 
-  private IBlock parseComment() {
+  private Block.IBlock parseComment() {
     String line = reader.readUntil(ch -> ch == '\n' || ch == '\r');
     return new Block.Comment(line);
   }
 
-  private IBlock parseToken() {
+  private Block.IBlock parseToken() {
     String token = reader.readWhile(ch -> !isBoundary(ch));
     return new Block.Token("token", token, token, token, token.length(), 0);
   }
 
-  private IBlock parseKeyword() {
+  private Block.IBlock parseKeyword() {
       reader.readChar(); // consume leading colon
       String keyword = reader.readWhile(ch -> !isBoundary(ch));
       String string = ":" + keyword;
       return new Block.Token("keyword", string, keyword, string, string.length(), 0);
   }
 
-  private IBlock parseString() {
+  private Block.IBlock parseString() {
     reader.readChar(); // consume leading quote
     StringBuilder sb = new StringBuilder();
     boolean escape = false;
@@ -178,11 +178,11 @@ public class Parser {
     );
   }
 
-  private IBlock parseCollection(String tag) {
+  private Block.IBlock parseCollection(String tag) {
     Block.Container.Props props = CONTAINER_PROPS.get(tag);
     this.endDelimiter = props.end.charAt(0);
     reader.readChar(); // consume start delimiter
-    Vector.Mutable<IBlock> children = Vector.Mutable.empty(null);
+    Vector.Mutable<Block.IBlock> children = Vector.Mutable.empty(null);
     while (true) {
       Character ch = reader.peekChar();
       if (ch == null || ch.equals(this.endDelimiter)) {
@@ -195,15 +195,15 @@ public class Parser {
     return new Block.Container(tag, children.toPersistent(), props);
   }
 
-  private IBlock parseCons(String tag) {
+  private Block.IBlock parseCons(String tag) {
     Block.Container.Props props = CONTAINER_PROPS.get(tag);
     reader.readChar();
-    Vector.Mutable<IBlock> children = Vector.Mutable.empty(null);
+    Vector.Mutable<Block.IBlock> children = Vector.Mutable.empty(null);
     children.pushLast(parse());
     return new Block.Container(tag, children.toPersistent(), props);
   }
 
-  private IBlock parseUnquote() {
+  private Block.IBlock parseUnquote() {
     reader.readChar();
     if (reader.peekChar() == '@') {
       reader.readChar();
@@ -220,7 +220,7 @@ public class Parser {
     );
   }
 
-  private IBlock parseHash() {
+  private Block.IBlock parseHash() {
     reader.readChar();
     Character ch = reader.peekChar();
     switch (ch) {
@@ -237,14 +237,14 @@ public class Parser {
     }
   }
 
-  public static IBlock parseString(String s) {
+  public static Block.IBlock parseString(String s) {
     return new Parser(new Reader(s)).parse();
   }
 
   public static Block.Container parseRoot(String s) {
     Reader reader = new Reader(s);
     Parser parser = new Parser(reader);
-    Vector.Mutable<IBlock> children = Vector.Mutable.empty(null);
+    Vector.Mutable<Block.IBlock> children = Vector.Mutable.empty(null);
     while (reader.peekChar() != null) {
       children.pushLast(parser.parse());
     }

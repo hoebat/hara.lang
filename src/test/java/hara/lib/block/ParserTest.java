@@ -7,21 +7,21 @@ public class ParserTest {
 
     @Test
     public void testParseComment() {
-        IBlock block = Parser.parseString(";this is a comment");
+        Block.IBlock block = Parser.parseString(";this is a comment");
         assertTrue(block instanceof Block.Comment);
         assertEquals(";this is a comment", block.string());
     }
 
     @Test
     public void testParseToken() {
-        IBlock block = Parser.parseString("abc");
+        Block.IBlock block = Parser.parseString("abc");
         assertTrue(block instanceof Block.Token);
         assertEquals("abc", block.string());
     }
 
     @Test
     public void testParseString() {
-        IBlock block = Parser.parseString("\"hello world\"");
+        Block.IBlock block = Parser.parseString("\"hello world\"");
         assertTrue(block instanceof Block.Token);
         assertEquals("\"hello world\"", block.string());
         assertEquals("hello world", ((Block.Token) block).value());
@@ -29,7 +29,7 @@ public class ParserTest {
 
     @Test
     public void testParseList() {
-        IBlock block = Parser.parseString("(1 2 3)");
+        Block.IBlock block = Parser.parseString("(1 2 3)");
         assertTrue(block instanceof Block.Container);
         Block.Container container = (Block.Container) block;
         assertEquals("list", container.tag());
@@ -38,7 +38,7 @@ public class ParserTest {
 
     @Test
     public void testParseVector() {
-        IBlock block = Parser.parseString("[1 2 3]");
+        Block.IBlock block = Parser.parseString("[1 2 3]");
         assertTrue(block instanceof Block.Container);
         Block.Container container = (Block.Container) block;
         assertEquals("vector", container.tag());
@@ -47,7 +47,7 @@ public class ParserTest {
 
     @Test
     public void testParseMap() {
-        IBlock block = Parser.parseString("{:a 1}");
+        Block.IBlock block = Parser.parseString("{:a 1}");
         assertTrue(block instanceof Block.Container);
         Block.Container container = (Block.Container) block;
         assertEquals("map", container.tag());
