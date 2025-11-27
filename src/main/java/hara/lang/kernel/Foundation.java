@@ -24,11 +24,68 @@ public class Foundation implements I.Context {
 
 	static final int DEFAULT_PORT = 4164;
 	
+	public static class Peer {
+		public final String name;
+		public final String host;
+		public final int port;
+
+		public Peer(String name, String host, int port) {
+			this.name = name;
+			this.host = host;
+			this.port = port;
+		}
+
+		@Override
+		public String toString() {
+			return name + "@" + host + ":" + port;
+		}
+	}
+
 	public final ConcurrentHashMap<String,Server> SERVERS = new ConcurrentHashMap<String,Server>();
 	public final ConcurrentHashMap<String,I.Runtime> RTS = new ConcurrentHashMap<String,I.Runtime>();
+	public final ConcurrentHashMap<String,Peer> PEERS = new ConcurrentHashMap<String,Peer>();
+	public final ConcurrentHashMap<String, Cmd> REGISTRY = new ConcurrentHashMap<>();
 
-	public enum COMMAND {
-		HELP, SHUTDOWN, DIR, PING, ECHO, OS, JVM, SERVER, SESSION, EVAL, COMPILE, MAVEN
+	public Foundation() {
+		// Initialize the registry with commands
+		register("HELP", (F, args) -> Fn.runHELP(F, REGISTRY.keySet()));
+		register("SHUTDOWN", (F, args) -> { System.exit(1); return null; });
+		register("PING", (F, args) -> "PONG");
+		register("ECHO", (F, args) -> args);
+		register("DIR", (F, args) -> Fn.runDIR(F));
+
+		// Map existing logic to Cmd
+		register("JVM", (F, args) -> Fn.runJVM(F, toStringList(args)));
+		register("OS", (F, args) -> Fn.runOS(F, toStringList(args)));
+		register("SERVER", (F, args) -> Fn.runServer(F, toStringList(args)));
+		register("SESSION", (F, args) -> Fn.runSession(F, toStringList(args)));
+		register("MAVEN", (F, args) -> Fn.runMaven(F, toStringList(args)));
+
+		register("PEER", (F, args) -> Fn.runPeer(F, toStringList(args)));
+		register("INFO", (F, args) -> Fn.runInfo(F));
+
+		register("EVAL", (F, args) ->
+			Fn.runSessionFor(F, args.get(0).toString(),
+					rt -> G.display(rt.eval(rt.readString(args.get(1).toString())))));
+
+		register("COMPILE", (F, args) -> {
+			try {
+				hara.lang.data.List expression = (hara.lang.data.List) Read.LispReader.readString(args.get(0).toString(), null);
+				Compiler compiler = new Compiler();
+				byte[] bytecode = compiler.compile(expression);
+				DynamicClassLoader loader = new DynamicClassLoader(Foundation.class.getClassLoader());
+				Class<?> clazz = loader.defineClass(null, bytecode);
+				return clazz.getConstructor().newInstance();
+			} catch (CompilerException e) {
+				throw new RuntimeException(e);
+			} catch (Exception e) {
+				throw Ex.Sneaky(e);
+			}
+		});
+	}
+
+	public void register(String name, Cmd cmd) {
+		REGISTRY.put(name, cmd);
 	}
 	
 	public enum OS {
@@ -52,8 +109,17 @@ public class Foundation implements I.Context {
 		ADD, LIST, REMOVE, PURGE
 	}
 
+	public enum PEER {
+		HELP, ADD, LIST, REMOVE, PING
+	}
+
 	public enum MAVEN {
 		HELP, LOAD
+	}
+
+	@SuppressWarnings("unchecked")
+	public static java.util.List<String> toStringList(java.util.List<Object> args) {
+		return args.stream().map(Object::toString).collect(Collectors.toList());
 	}
 
 	@SuppressWarnings("unchecked")
@@ -95,8 +161,20 @@ public class Foundation implements I.Context {
 		}
 
 		public static java.util.List runDIR(Foundation F) {
-			return Arrays.asList("SERVERS", It.toArrayList(F.SERVERS.keys()), "RTS",
-					It.toArrayList(F.RTS.keys()));
+			return Arrays.asList(
+					"SERVERS", It.toArrayList(F.SERVERS.keys()),
+					"RTS", It.toArrayList(F.RTS.keys()),
+					"PEERS", It.toArrayList(F.PEERS.keys()));
+		}
+
+		public static Object runInfo(Foundation F) {
+			return mapToList(Map.of(
+				"java.version", System.getProperty("java.version"),
+				"os.name", System.getProperty("os.name"),
+				"sessions", F.RTS.size(),
+				"servers", F.SERVERS.size(),
+				"peers", F.PEERS.size()
+			));
 		}
 
 		public static String runProcess(java.util.List<String> args) {
@@ -167,6 +245,28 @@ public class Foundation implements I.Context {
 			throw new Ex.Unsupported();
 		}
 		
+		public static Object runPeer(Foundation F, java.util.List<String> args) {
+			PEER cmd = PEER.valueOf(args.get(0));
+			args.remove(0);
+			switch(cmd) {
+			case HELP: return Fn.runHELP(F, PEER.values());
+			case LIST: return mapToList(F.PEERS);
+			case ADD:
+				// PEER ADD name host port
+				String name = args.get(0);
+				String host = args.get(1);
+				int port = Integer.parseInt(args.get(2));
+				F.PEERS.put(name, new Peer(name, host, port));
+				return name;
+			case REMOVE:
+				return F.PEERS.remove(args.get(0)) != null;
+			case PING:
+				// Minimal implementation: check if we have a record
+				return F.PEERS.containsKey(args.get(0));
+			}
+			throw new Ex.Unsupported();
+		}
+
 		public static Object runSessionFor(Foundation F, String key, Function<RT.Instance, Object> f) {
 			RT.Instance s = (Instance) F.RTS.get(key);
 			
@@ -242,47 +342,39 @@ public class Foundation implements I.Context {
 	}
 	
 	@SuppressWarnings("unchecked")
-	public static Object runCommand(Foundation F, java.util.List<String> args) {
-		var cmd = COMMAND.valueOf(args.get(0));
+	public static Object runCommand(Foundation F, java.util.List<Object> args) {
+		if (args.isEmpty()) {
+			throw new Ex.Runtime("No command specified");
+		}
+
+		Object cmdObj = args.get(0);
+		String name;
+
+		if (cmdObj instanceof I.Namespaced) {
+			name = ((I.Namespaced) cmdObj).getName();
+		} else if (cmdObj instanceof I.Display) {
+			String display = ((I.Display) cmdObj).display();
+			name = display.startsWith(":") ? display.substring(1) : display;
+		} else {
+			name = cmdObj.toString();
+		}
+
+		name = name.toUpperCase();
+
 		args.remove(0);
 		
-		switch (cmd) {
-		case HELP: return Fn.runHELP(F, COMMAND.values());
-		case PING: return "PONG";
-		case ECHO: return args;
-		case DIR:  return Fn.runDIR(F);
-		case JVM:  return Fn.runJVM(F, args);
-		case OS:   return Fn.runOS(F, args);
-		case SERVER: return Fn.runServer(F, args);
-		case SESSION: return Fn.runSession(F, args);
-		case MAVEN: return Fn.runMaven(F, args);
-		case EVAL: 
-			return Fn.runSessionFor(F, args.get(0), 
-					rt -> G.display(rt.eval(rt.readString(args.get(1)))));
-		case COMPILE:
-			try {
-				hara.lang.data.List expression = (hara.lang.data.List) Read.LispReader.readString(args.get(0), null);
-				Compiler compiler = new Compiler();
-				byte[] bytecode = compiler.compile(expression);
-				DynamicClassLoader loader = new DynamicClassLoader(Foundation.class.getClassLoader());
-				Class<?> clazz = loader.defineClass(null, bytecode);
-				return clazz.getConstructor().newInstance();
-			} catch (CompilerException e) {
-				throw new RuntimeException(e);
-			} catch (Exception e) {
-				throw Ex.Sneaky(e);
-			}
-		case SHUTDOWN: 
-			System.exit(1);
-			return null;
+		Cmd cmd = F.REGISTRY.get(name);
+		if (cmd != null) {
+			return cmd.apply(F, args);
 		}
-		throw new Ex.Unsupported();
+
+		throw new Ex.Unsupported("Unknown command: " + name);
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public Object call(Object... args) {
-		java.util.List<String> inputs = It.toArrayList(It.iter(args));
+		java.util.List<Object> inputs = It.toArrayList(It.iter(args));
 		return runCommand(this, inputs);
 	}
 
