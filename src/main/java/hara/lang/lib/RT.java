@@ -357,6 +357,12 @@ public interface RT {
 		}
 		
 		@Override
+		public I.Coll<URL> pathAdd(URL url) {
+			_loader.addURL(url);
+			return _loader.getPaths();
+		}
+
+		@Override
 		public I.Coll<URL> pathAdd(String[] paths) {
 			Arr.toIter(paths).forEachRemaining(
 					(path) -> {
