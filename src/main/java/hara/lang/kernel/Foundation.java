@@ -27,8 +27,12 @@ public class Foundation implements I.Context {
 	public final ConcurrentHashMap<String,Server> SERVERS = new ConcurrentHashMap<String,Server>();
 	public final ConcurrentHashMap<String,I.Runtime> RTS = new ConcurrentHashMap<String,I.Runtime>();
 
+    // Services
+    public final ConcurrentHashMap<String, Besu> BESUS = new ConcurrentHashMap<>();
+    public final ConcurrentHashMap<String, Redis> REDISES = new ConcurrentHashMap<>();
+
 	public enum COMMAND {
-		HELP, SHUTDOWN, DIR, PING, ECHO, OS, JVM, SERVER, SESSION, EVAL, COMPILE, MAVEN
+		HELP, SHUTDOWN, DIR, PING, ECHO, OS, JVM, SERVER, SESSION, EVAL, COMPILE, MAVEN, BESU, REDIS
 	}
 	
 	public enum OS {
@@ -55,6 +59,14 @@ public class Foundation implements I.Context {
 	public enum MAVEN {
 		HELP, LOAD
 	}
+
+    public enum BESU {
+        HELP, NEW, RUN
+    }
+
+    public enum REDIS {
+        HELP, NEW, GET, SET, CMD
+    }
 
 	@SuppressWarnings("unchecked")
 	public static Object mapToList(Object m) {
@@ -239,6 +251,55 @@ public class Foundation implements I.Context {
 			}
 			throw new Ex.Unsupported();
 		}
+
+        public static Object runBesu(Foundation F, java.util.List<String> args) {
+            BESU cmd = BESU.valueOf(args.get(0));
+            args.remove(0);
+
+            switch(cmd) {
+            case HELP: return Fn.runHELP(F, BESU.values());
+            case NEW:
+                String key = args.get(0);
+                F.BESUS.put(key, new Besu());
+                return key;
+            case RUN:
+                // Usage: BESU RUN <key> <sender> <receiver> <input> <value>
+                String k = args.get(0);
+                Besu b = F.BESUS.get(k);
+                if (b == null) throw new Ex.Runtime("No Besu instance: " + k);
+                return b.run(args.get(1), args.get(2), args.get(3), args.get(4));
+            }
+            throw new Ex.Unsupported();
+        }
+
+        public static Object runRedis(Foundation F, java.util.List<String> args) {
+            REDIS cmd = REDIS.valueOf(args.get(0));
+            args.remove(0);
+
+            switch(cmd) {
+            case HELP: return Fn.runHELP(F, REDIS.values());
+            case NEW:
+                // Usage: REDIS NEW <key> <port>
+                String key = args.get(0);
+                int port = Integer.parseInt(args.get(1));
+                Redis r = new Redis("localhost", port);
+                r.start();
+                F.REDISES.put(key, r);
+                return key;
+            case GET:
+                // Usage: REDIS GET <key> <dbKey>
+                return F.REDISES.get(args.get(0)).get(args.get(1));
+            case SET:
+                // Usage: REDIS SET <key> <dbKey> <value>
+                F.REDISES.get(args.get(0)).set(args.get(1), args.get(2));
+                return "OK";
+            case CMD:
+                // Usage: REDIS CMD <key> <command> <args...>
+                // TODO: Implement generic command passthrough if needed
+                throw new Ex.TODO();
+            }
+            throw new Ex.Unsupported();
+        }
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -256,6 +317,8 @@ public class Foundation implements I.Context {
 		case SERVER: return Fn.runServer(F, args);
 		case SESSION: return Fn.runSession(F, args);
 		case MAVEN: return Fn.runMaven(F, args);
+        case BESU:  return Fn.runBesu(F, args);
+        case REDIS: return Fn.runRedis(F, args);
 		case EVAL: 
 			return Fn.runSessionFor(F, args.get(0), 
 					rt -> G.display(rt.eval(rt.readString(args.get(1)))));
