@@ -348,7 +348,8 @@ public interface Env {
 		
 		var meta = hashMap(Arr.objects(
 				keyword("name"), p.getKey(),
-				keyword("rt"), single && S.fnOpts(all.get(0)).rt()));
+				keyword("rt"), S.fnOpts(all.get(0)).rt(),
+				keyword("env"), S.fnOpts(all.get(0)).env()));
 		
 		if(!ropts.isEmpty()) {
 			meta = meta.assoc(keyword("reduce"), ropts.get(0));

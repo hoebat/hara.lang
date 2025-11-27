@@ -142,6 +142,7 @@ public interface Read {
 			macros['}'] = new UnmatchedDelimiterReader();
 			macros['\\'] = new CharacterReader();
 			macros['#'] = new DispatchReader();
+			macros['@'] = new DerefReader();
 
 			dispatchMacros['#'] = new SymbolicValueReader();
 			dispatchMacros['^'] = new MetaReader();
@@ -465,6 +466,14 @@ public interface Read {
 			@Override
 			public Void apply(PushbackReader reader, Map opts) {
 				throw new Ex.Runtime("Unmatched delimiter: " + opts.lookup(Keyword.create("delimiter")));
+			}
+		}
+
+		public static class DerefReader implements BiFunction<PushbackReader, Map, Object> {
+			@Override
+			public Object apply(PushbackReader r, Map opts) {
+				Object o = read(r, true, null, true, opts);
+				return List.Standard.from(null, Symbol.create("deref"), o);
 			}
 		}
 

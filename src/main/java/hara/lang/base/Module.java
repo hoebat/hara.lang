@@ -41,6 +41,7 @@ public interface Module {
 	    boolean complete()  default false;
 	    boolean vargs()     default false;
 	    boolean rt()        default false;
+	    boolean env()       default false;
 	}
 
 	@Retention(RUNTIME)
