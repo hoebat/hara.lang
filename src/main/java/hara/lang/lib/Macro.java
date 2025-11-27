@@ -96,7 +96,7 @@ public interface Macro {
 		@Module.Fn(name = "fn", complete = true, env = true, vargs = true)
 		@Module.Var(control = true)
 		public static <ITR> I.Fn fnExpr(I.Env env, Data.LinearType bindings, ITR args) {
-			return new Env.FnEval(null, env.getRuntime(), env, bindings, list(args).cons(symbol("do")));
+			return new hara.lang.compiler.HotspotFn(new Env.FnEval(null, env.getRuntime(), env, bindings, list(args).cons(symbol("do"))));
 		}
 		
 		@Module.Fn(name = "let", complete = true, env = true, vargs = true)

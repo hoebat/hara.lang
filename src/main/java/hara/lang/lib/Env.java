@@ -167,6 +167,18 @@ public interface Env {
 	    	_body = body;
 	    }
 		
+		public AST getBody() {
+			return _body;
+		}
+
+		public Data.LinearType getParams() {
+			return _params;
+		}
+
+		public I.Runtime getRuntime() {
+			return _rt;
+		}
+
 		public void checkArgs(int size) {
 			if (size != _params.count()) {
 				throw new Ex.Arity(size, "Only " + _params.count() + " Args supported");

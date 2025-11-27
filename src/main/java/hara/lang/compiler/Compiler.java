@@ -10,8 +10,14 @@ public class Compiler {
 
     private static final AtomicLong CLASS_COUNTER = new AtomicLong(0);
 
+    public static class Result {
+        public final String className;
+        public final byte[] bytes;
+        public Result(String c, byte[] b) { className = c; bytes = b; }
+    }
+
     @SuppressWarnings("rawtypes")
-    public byte[] compile(hara.lang.data.List expression) {
+    public Result compile(hara.lang.data.List expression) {
         hara.lang.data.List body = (hara.lang.data.List) expression.nth(2);
 
         String className = "hara/lang/compiler/CompiledFunction" + CLASS_COUNTER.incrementAndGet();
@@ -19,8 +25,8 @@ public class Compiler {
 
         // Class signature
         cw.visit(Opcodes.V11, Opcodes.ACC_PUBLIC, className,
-                "Ljava/lang/Object;Ljava/util/function/Function<Ljava/lang/Long;Ljava/lang/Long;>;",
-                "java/lang/Object", new String[]{"java/util/function/Function"});
+                null,
+                "java/lang/Object", new String[]{"hara/lang/base/I$Fn"});
 
         // Default constructor
         MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
@@ -31,16 +37,38 @@ public class Compiler {
         mv.visitMaxs(1, 1);
         mv.visitEnd();
 
-        // apply(Object) method (bridge method for type erasure)
-        mv = cw.visitMethod(Opcodes.ACC_PUBLIC | Opcodes.ACC_BRIDGE | Opcodes.ACC_SYNTHETIC,
-                "apply", "(Ljava/lang/Object;)Ljava/lang/Object;", null, null);
+        // getArg1 method
+        mv = cw.visitMethod(Opcodes.ACC_PUBLIC, "getArg1", "()Ljava/util/function/Function;", null, null);
         mv.visitCode();
         mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitInsn(Opcodes.ARETURN);
+        mv.visitMaxs(1, 1);
+        mv.visitEnd();
+
+        // apply(Object) method
+        mv = cw.visitMethod(Opcodes.ACC_PUBLIC, "apply", "(Ljava/lang/Object;)Ljava/lang/Object;", null, null);
+        mv.visitCode();
+        mv.visitVarInsn(Opcodes.ALOAD, 1);
+        mv.visitTypeInsn(Opcodes.INSTANCEOF, "[Ljava/lang/Object;");
+        org.objectweb.asm.Label l1 = new org.objectweb.asm.Label();
+        mv.visitJumpInsn(Opcodes.IFEQ, l1);
+        mv.visitVarInsn(Opcodes.ALOAD, 1);
+        mv.visitTypeInsn(Opcodes.CHECKCAST, "[Ljava/lang/Object;");
+        mv.visitInsn(Opcodes.ICONST_0);
+        mv.visitInsn(Opcodes.AALOAD);
+        mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Long");
+        org.objectweb.asm.Label l2 = new org.objectweb.asm.Label();
+        mv.visitJumpInsn(Opcodes.GOTO, l2);
+        mv.visitLabel(l1);
         mv.visitVarInsn(Opcodes.ALOAD, 1);
         mv.visitTypeInsn(Opcodes.CHECKCAST, "java/lang/Long");
+        mv.visitLabel(l2);
+        mv.visitVarInsn(Opcodes.ASTORE, 2);
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitVarInsn(Opcodes.ALOAD, 2);
         mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, className, "apply", "(Ljava/lang/Long;)Ljava/lang/Long;", false);
         mv.visitInsn(Opcodes.ARETURN);
-        mv.visitMaxs(2, 2);
+        mv.visitMaxs(3, 3);
         mv.visitEnd();
 
         // apply(Long) method
@@ -85,6 +113,6 @@ public class Compiler {
         mv.visitEnd();
 
         cw.visitEnd();
-        return cw.toByteArray();
+        return new Result(className, cw.toByteArray());
     }
 }

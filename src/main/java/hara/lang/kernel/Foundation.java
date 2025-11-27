@@ -263,9 +263,9 @@ public class Foundation implements I.Context {
 			try {
 				hara.lang.data.List expression = (hara.lang.data.List) Read.LispReader.readString(args.get(0), null);
 				Compiler compiler = new Compiler();
-				byte[] bytecode = compiler.compile(expression);
+				Compiler.Result result = compiler.compile(expression);
 				DynamicClassLoader loader = new DynamicClassLoader(Foundation.class.getClassLoader());
-				Class<?> clazz = loader.defineClass(null, bytecode);
+				Class<?> clazz = loader.defineClass(result.className, result.bytes);
 				return clazz.getConstructor().newInstance();
 			} catch (CompilerException e) {
 				throw new RuntimeException(e);
