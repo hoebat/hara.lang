@@ -128,13 +128,13 @@ public class NumUtils {
         return -x;
     }
 
-    public static long bitOpsCast(Object x) {
+    public static BigInteger bitOpsCast(Object x) {
 		Class<? extends Object> xc = x.getClass();
 
 		if (xc == Long.class || xc == Integer.class || xc == Short.class || xc == Byte.class)
-			return (long) ((Number) x).longValue();
+			return BigInteger.valueOf(((Number) x).longValue());
         else if (x instanceof BigInteger)
-            return ((BigInteger) x).longValue();
+            return (BigInteger) x;
 		// no bignums, no decimals
 		throw new IllegalArgumentException("bit operation not supported for: " + xc);
 	}
