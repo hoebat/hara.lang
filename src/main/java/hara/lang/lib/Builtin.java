@@ -1381,5 +1381,11 @@ public interface Builtin {
 					});
 		}
 
+		@Module.Fn(name = "println", vargs = true, complete = true)
+		public static <ITR> Object println(ITR args) {
+			System.out.println(str(args));
+			return null;
+		}
+
 	}
 }

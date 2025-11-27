@@ -57,6 +57,12 @@ public interface G {
 			return "#i" + It.display((Iterator)e);
 		} else if (e.getClass().isArray()){
 			return "#arr" + It.display(Arr.toIter(e));
+		} else if (e instanceof Throwable) {
+			return "#error \"" + Str.escapeJava(((Throwable)e).getMessage()) + "\"";
+		} else if (e instanceof Number) {
+			return e.toString();
+		} else if (e instanceof Boolean) {
+			return e.toString();
 		} else {
 			return e.toString();
 		}

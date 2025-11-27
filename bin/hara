@@ -1,0 +1,13 @@
+#!/bin/bash
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+# Assuming the script is in bin/ and the jar is in target/ relative to the project root
+# For a distribution, we might expect hara.jar in ../lib/
+JAR_PATH="$DIR/../target/hara.lang-0.0.1-SNAPSHOT.jar"
+
+if [ ! -f "$JAR_PATH" ]; then
+    echo "Error: Jar not found at $JAR_PATH"
+    echo "Run 'mvn package' to build it."
+    exit 1
+fi
+
+java -jar "$JAR_PATH" "$@"

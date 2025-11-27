@@ -1,0 +1,10 @@
+(do
+  (println "Hello, Hara!")
+  (println "Calculating fib(10)...")
+  (def fib (fn [n]
+    (if (< n 2)
+      n
+      (+ (fib (- n 1)) (fib (- n 2))))))
+  (println (fib 10))
+  (println "Executing shell command...")
+  (println (sh "echo" "Shell works!")))
