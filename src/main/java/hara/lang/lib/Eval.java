@@ -169,7 +169,9 @@ public interface Eval {
 				if (ast.count() < 3) {
 					throw new Ex.Runtime("'let' special form requires at least 2 arguments");
 				}
+        
 				Vector bindings = Vector.Standard.into(((Data.LinearType) ast.nth(1)).iterator());
+
 				if (bindings.count() % 2 != 0) {
 					throw new Ex.Runtime("let bindings must have an even number of forms");
 				}
@@ -203,6 +205,7 @@ public interface Eval {
 					body = ast.nth(2);
 				}
 				return new Env.FnEval(null, env.getRuntime(), env, params, body);
+
 			} else if ("quote".equals(symbolName)) {
 				if (ast.count() != 2) {
 					throw new Ex.Runtime("'quote' special form requires 1 argument, got " + (ast.count() - 1));
