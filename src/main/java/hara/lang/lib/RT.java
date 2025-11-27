@@ -11,6 +11,7 @@ import java.util.function.Function;
 
 import hara.lang.base.*;
 import hara.lang.data.*;
+import hara.lang.kernel.Permissions;
 
 import static hara.lang.lib.Builtin.Struct.*;
 import static hara.lang.lib.Builtin.Lambda.*;
@@ -299,14 +300,20 @@ public interface RT {
 	public class Instance<AST> implements I.Runtime<AST, Symbol, Var> {
 		public final I.Context _root;
 		public final String _key;
+		public final Permissions _permissions;
 		public final Loader _loader;
 		public final RootEnv _rootEnv;
 		public final UserEnv _userEnv;
 		public final ThreadLocal<List<I.Env<Symbol, Var>>> _stack;
 		
 		public Instance(I.Context root, String key) {
+			this(root, key, Permissions.ALL);
+		}
+
+		public Instance(I.Context root, String key, Permissions permissions) {
 			_root = root;
 			_key = key;
+			_permissions = permissions;
 			_loader = new Loader();
 			_rootEnv =  new RootEnv(null, this);
 			_userEnv =  new UserEnv(_rootEnv, this);
@@ -319,6 +326,12 @@ public interface RT {
 
 		@Override
 		public Object call(Object... args) {
+			if (args.length > 0 && args[0] instanceof String) {
+				String cmd = (String) args[0];
+				if (!_permissions.check(cmd)) {
+					throw new Ex.Runtime("Permission denied: " + cmd);
+				}
+			}
 			return _root.call(args);
 		}
 

@@ -182,7 +182,9 @@ public class Foundation implements I.Context {
 					throw new Ex.Runtime("Session already exists: " + key);
 				}
 			} else {
-				F.RTS.put(key, new RT.Instance(F, key));
+				// Default behavior for new sessions via SESSION NEW
+				// For now, we allow everything to maintain behavior, but this could be restricted.
+				F.RTS.put(key, new RT.Instance(F, key, Permissions.ALL));
 			}
 			return key;
 		}
