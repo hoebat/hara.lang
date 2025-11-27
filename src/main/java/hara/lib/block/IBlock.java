@@ -1,5 +1,7 @@
 package hara.lib.block;
 
+import hara.lang.data.Vector;
+
 import java.util.List;
 
 public interface IBlock {
@@ -23,7 +25,7 @@ public interface IBlock {
     }
 
     interface IBlockContainer {
-        List<IBlock> children();
-        IBlockContainer replaceChildren(List<IBlock> children);
+        Vector<IBlock> children();
+        IBlockContainer replaceChildren(Vector<IBlock> children);
     }
 }
