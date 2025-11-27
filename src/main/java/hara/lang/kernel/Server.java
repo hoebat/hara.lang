@@ -172,7 +172,7 @@ public class Server implements I.Component {
 							_conn.write("NOT PROCESSED: " + obj);
 						}
 					} catch (Throwable t) {
-						_conn.write("ERR: " + t.getMessage());
+						_conn.write(t);
 						t.printStackTrace();
 					}
 				}

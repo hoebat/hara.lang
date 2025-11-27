@@ -398,6 +398,10 @@ public interface Env {
 		Arr.reduce((map, cls) -> getMethods(cls, map),
 				raw,
 				Macro.class.getDeclaredClasses());
+
+		Arr.reduce((map, cls) -> getMethods(cls, map),
+				raw,
+				IO.class.getDeclaredClasses());
 	
 		Map<Symbol, Var> fns = mapEntries(
 				(Function)(obj) -> {
