@@ -95,6 +95,9 @@ public interface I {
 		Env<K, V> getParent();
 
 		I.Lookup<K, V> getMap();
+
+		@SuppressWarnings("rawtypes")
+		I.Runtime getRuntime();
 		
 		@Override
 		default Entry<K, V> find(K k) {

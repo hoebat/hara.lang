@@ -93,7 +93,7 @@ public interface Macro {
 		@Module.Fn(name = "fn", complete = true, rt = true, vargs = true)
 		@Module.Var(control = true)
 		public static <ITR> I.Fn fnExpr(I.Runtime rt, Data.LinearType bindings, ITR args) {
-			return new Env.FnEval(null, rt, bindings, list(args).cons(symbol("do")));
+			return new Env.FnEval(null, rt, rt.getEnv(), bindings, list(args).cons(symbol("do")));
 		}
 		
 		@Module.Fn(name = "if", complete = true, rt = true)

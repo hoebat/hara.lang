@@ -126,34 +126,43 @@ public interface Env {
 	}
 
 	public static class FnEval<AST> extends Obj.FN implements I.Fn {
-		class FnEnv implements I.Env{
-	    	final I.Lookup _map;
-	    	final I.Env _parent;
-	
-	    	FnEnv(I.Env parent, I.Lookup map) {
-	    		_parent = parent;
-	    		_map = map;
-	    	}
-	    	
+		class FnEnv implements I.Env {
+			final I.Lookup _map;
+			final I.Env _parent;
+			final I.Runtime _rt;
+
+			FnEnv(I.Env parent, I.Lookup map, I.Runtime rt) {
+				_parent = parent;
+				_map = map;
+				_rt = rt;
+			}
+
 			@Override
 			public I.Lookup getMap() {
 				return _map;
 			}
-	
+
 			@Override
 			public I.Env getParent() {
 				return _parent;
 			}
-	    }
+
+			@Override
+			public I.Runtime getRuntime() {
+				return _rt;
+			}
+		}
 		
 		final AST  _body;
 		final Data.LinearType _params;
 	    
 	    final I.Runtime _rt;
+		final I.Env _env;
 	
-		public FnEval(I.Metadata meta, I.Runtime rt, Data.LinearType params, AST body) {
+		public FnEval(I.Metadata meta, I.Runtime rt, I.Env env, Data.LinearType params, AST body) {
 	    	super(meta);
 	    	_rt = rt;
+			_env = env;
 	    	_params = params;
 	    	_body = body;
 	    }
@@ -194,7 +203,7 @@ public interface Env {
 	    public Object invokeEval(java.util.List args) {
 			try {
 				var map = zipmap(_params, args);
-				return _rt.eval(_body, new FnEnv(_rt.getEnv(), map));
+				return _rt.eval(_body, new FnEnv(_env, map, _rt));
 			} catch (Throwable t) {
 				throw Ex.Sneaky(t);
 			}
