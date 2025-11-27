@@ -391,6 +391,7 @@ public interface I {
 		Coll<Entry<String, Class>> classCache();
 		Context      getRoot();
 		Coll<URL>    pathCache();
+		Coll<URL>    pathAdd(URL url);
 		Coll<URL>    pathAdd(String[] paths);
 		Coll<URL>    pathRemove(String[] paths);
 		Class        aliasAdd(K key, Class v);

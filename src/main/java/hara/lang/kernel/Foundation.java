@@ -28,7 +28,7 @@ public class Foundation implements I.Context {
 	public final ConcurrentHashMap<String,I.Runtime> RTS = new ConcurrentHashMap<String,I.Runtime>();
 
 	public enum COMMAND {
-		HELP, SHUTDOWN, DIR, PING, ECHO, OS, JVM, SERVER, SESSION, EVAL, COMPILE
+		HELP, SHUTDOWN, DIR, PING, ECHO, OS, JVM, SERVER, SESSION, EVAL, COMPILE, MAVEN
 	}
 	
 	public enum OS {
@@ -50,6 +50,10 @@ public class Foundation implements I.Context {
 	
 	public enum CLASSPATH {
 		ADD, LIST, REMOVE, PURGE
+	}
+
+	public enum MAVEN {
+		HELP, LOAD
 	}
 
 	@SuppressWarnings("unchecked")
@@ -221,6 +225,20 @@ public class Foundation implements I.Context {
 			}
 			throw new Ex.Unsupported();
 		}
+
+		public static Object runMaven(Foundation F, java.util.List<String> args) {
+			MAVEN cmd = MAVEN.valueOf(args.get(0));
+			args.remove(0);
+
+			switch(cmd) {
+			case HELP:   return Fn.runHELP(F, MAVEN.values());
+			case LOAD:
+				return runSessionFor(F, args.get(0),
+					(rt) -> hara.lang.lib.Maven.load.invoke(rt, args.get(1))
+				);
+			}
+			throw new Ex.Unsupported();
+		}
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -237,6 +255,7 @@ public class Foundation implements I.Context {
 		case OS:   return Fn.runOS(F, args);
 		case SERVER: return Fn.runServer(F, args);
 		case SESSION: return Fn.runSession(F, args);
+		case MAVEN: return Fn.runMaven(F, args);
 		case EVAL: 
 			return Fn.runSessionFor(F, args.get(0), 
 					rt -> G.display(rt.eval(rt.readString(args.get(1)))));
