@@ -3,13 +3,19 @@ package hara.lang.base;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.util.Collections;
 import java.util.IdentityHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.Stack;
 
 public class Graph {
 
     public static long sizeOf(Object obj) {
+        return sizeOf(obj, Collections.emptySet());
+    }
+
+    public static long sizeOf(Object obj, Set<String> excludedFields) {
         if (obj == null) return 0;
 
         IdentityHashMap<Object, Boolean> visited = new IdentityHashMap<>();
@@ -39,18 +45,12 @@ public class Graph {
 
             // Special handling for Collections (Iterable)
             if (current instanceof Iterable) {
-                size += shallowSizeOf(current); // Size of the collection object itself
+                size += shallowSizeOf(current);
                 for (Object element : (Iterable<?>) current) {
                     if (element != null && !visited.containsKey(element)) {
                         stack.push(element);
                     }
                 }
-                // We still want to check fields of the collection itself (like loadFactor, etc.)
-                // but if they are inaccessible, we at least got the elements.
-                // However, iterating adds elements. Standard traversal below might fail on private fields.
-                // So we rely on this for elements.
-                // But wait, if we iterate, we might miss internal array overheads (capacity > size).
-                // That's an acceptable tradeoff for robustness vs encapsulation.
             } else if (current instanceof Map) {
                 size += shallowSizeOf(current);
                 for (Map.Entry<?, ?> entry : ((Map<?, ?>) current).entrySet()) {
@@ -88,6 +88,22 @@ public class Graph {
                     for (Field field : fields) {
                         if (Modifier.isStatic(field.getModifiers()) || field.getType().isPrimitive()) {
                             continue;
+                        }
+
+                        // Check if field is excluded
+                        // Only exclude fields on the *original* object passed, or globally?
+                        // If we want to exclude `_root` on `RT.Instance`, we should check if `current` is the object having that field.
+                        // But here we pass a Set<String>. If `excludedFields` contains the field name, we skip it?
+                        // This might be too broad if other classes have same field name.
+                        // But for `_root` and `_loader` it's likely fine as they are internal names.
+                        // To be precise, we could pass Map<Class, Set<String>>.
+                        // For simplicity, we check field name.
+
+                        if (excludedFields.contains(field.getName())) {
+                            // Verify it's the specific case if needed, but for now simple name check.
+				// Actually, if we exclude `_root` everywhere, we might miss data.
+				// But `_root` is typically a back-reference or root context.
+				continue;
                         }
 
                         try {

@@ -305,6 +305,7 @@ public interface RT {
 		public final ThreadLocal<List<I.Env<Symbol, Var>>> _stack;
 		public long _memoryLimit = 0;
 		public long _memoryUsage = 0;
+		public long _ops = 0;
 		
 		public Instance(I.Context root, String key) {
 			this(root, key, 0);
@@ -346,15 +347,20 @@ public interface RT {
 		
 		public void checkMemoryLimit() {
 			if(_memoryLimit > 0) {
-				_memoryUsage = Graph.sizeOf(this);
-				if(_memoryUsage > _memoryLimit) {
-					throw new Ex.Runtime("Memory Limit Exceeded: " + _memoryUsage + "/" + _memoryLimit);
+				_ops++;
+				// Sample first 10 calls, then every 100
+				if (_ops < 10 || _ops % 100 == 0) {
+					// Isolate memory calculation by excluding _root (Foundation) and _loader (ClassLoaders)
+					_memoryUsage = Graph.sizeOf(this, java.util.Set.of("_root", "_loader"));
+					if(_memoryUsage > _memoryLimit) {
+						throw new Ex.Runtime("Memory Limit Exceeded: " + _memoryUsage + "/" + _memoryLimit);
+					}
 				}
 			}
 		}
 
 		public long getMemoryUsage() {
-			return Graph.sizeOf(this);
+			return Graph.sizeOf(this, java.util.Set.of("_root", "_loader"));
 		}
 
 		@Override
