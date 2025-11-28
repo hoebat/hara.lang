@@ -1,10 +1,10 @@
 package hara.lang.data;
 
+import hara.lang.protocol.*;
 import java.util.Iterator;
 import java.util.Map.Entry;
 
 import hara.lang.base.*;
-import hara.lang.protocol.*;
 
 public interface OrderedMap<K, V> 
 	extends Data.MapType<K, V>, 

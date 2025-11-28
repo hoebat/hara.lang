@@ -1,10 +1,10 @@
 package hara.lang.data;
 
+import hara.lang.protocol.*;
 import java.util.ArrayList;
 import java.util.Iterator;
 
 import hara.lang.base.*;
-import hara.lang.protocol.*;
 
 public interface Queue<E> extends
 	IColl<E>,

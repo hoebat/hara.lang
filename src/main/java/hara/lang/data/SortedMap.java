@@ -1,5 +1,6 @@
 package hara.lang.data;
 
+import hara.lang.protocol.*;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -10,7 +11,6 @@ import java.util.function.BinaryOperator;
 
 import hara.lang.base.*;
 import static hara.lang.data.SortedMap.Color.*;
-import hara.lang.protocol.*;
 
 public interface SortedMap<K, V> extends
 	Data.MapType<K, V>,

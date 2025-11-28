@@ -1,11 +1,11 @@
 package hara.lang.data;
 
+import hara.lang.protocol.*;
 import java.util.*;
 
 import hara.lang.base.*;
 
 import static hara.lang.base.P.Bits.log2Ceil;
-import hara.lang.protocol.*;
 
 public interface List<E> extends Data.VectorType<E> {
 

@@ -1,17 +1,14 @@
 package hara.lang.base;
 
 import hara.lang.protocol.*;
-import hara.lang.protocol.Constant.*;
-
 import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.function.Function;
 import java.util.regex.Pattern;
+import hara.lang.protocol.Constant;
 
 public interface G {
 	
-	
-
 	public static final Constant.HashType DEFAULT_HASH = Constant.HashType.MURMUR3;
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })

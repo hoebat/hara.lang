@@ -1,5 +1,6 @@
 package hara.kernel.base;
 import hara.kernel.protocol.IEnv;
+import hara.lang.protocol.*;
 import hara.kernel.protocol.IRuntime;
 
 import static hara.kernel.base.Module.ReduceInit.*;
@@ -22,7 +23,6 @@ import hara.lang.base.Std.T.*;
 import hara.kernel.base.Module;
 import hara.lang.data.*;
 import hara.lang.data.Map.Standard;
-import hara.lang.protocol.*;
 
 @SuppressWarnings({ "unchecked", "rawtypes" })
 

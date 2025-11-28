@@ -1,5 +1,6 @@
 package hara.lang.base;
 
+import hara.lang.protocol.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -15,7 +16,6 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.concurrent.atomic.AtomicReference;
-import hara.lang.protocol.*;
 
 public interface It {
 

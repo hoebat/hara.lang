@@ -1,5 +1,6 @@
 package hara.kernel.base;
 import hara.kernel.protocol.IEnv;
+import hara.lang.protocol.*;
 import hara.kernel.protocol.IRuntime;
 
 import java.net.MalformedURLException;
@@ -16,7 +17,6 @@ import hara.lang.data.*;
 
 import static hara.kernel.base.Builtin.Struct.*;
 import static hara.kernel.base.Builtin.Lambda.*;
-import hara.lang.protocol.*;
 
 @SuppressWarnings("unchecked")
 public interface RT {

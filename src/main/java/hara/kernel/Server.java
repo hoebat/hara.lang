@@ -1,5 +1,6 @@
 package hara.kernel;
 
+import hara.lang.protocol.*;
 import java.io.*;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -7,7 +8,6 @@ import java.net.*;
 
 import hara.lang.base.*;
 import hara.kernel.protocol.IRedirect;
-import hara.lang.protocol.*;
 
 @SuppressWarnings("rawtypes")
 public class Server implements IComponent {

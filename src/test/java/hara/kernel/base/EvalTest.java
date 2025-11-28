@@ -3,7 +3,7 @@ package hara.kernel.base;
 import org.junit.Before;
 import org.junit.Test;
 import static org.junit.Assert.*;
-import hara.lang.protocol.*;
+import hara.lang.base.I;
 import hara.lang.data.Symbol;
 import hara.lang.data.List;
 import hara.lang.data.Map;

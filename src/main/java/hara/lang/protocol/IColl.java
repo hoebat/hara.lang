@@ -1,31 +1,24 @@
 package hara.lang.protocol;
 
-import java.net.URL;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Map.Entry;
-import java.util.function.*;
-
+import java.util.Map;
 import hara.lang.base.*;
-import hara.lang.base.Ex;
-import hara.lang.base.Std;
-import hara.lang.base.Data;
-import hara.lang.base.Arr;
-import hara.lang.base.It;
-import hara.lang.base.Str;
-import hara.lang.base.G;
+import java.util.function.*;
+import java.util.regex.Pattern;
+
 public interface IColl<E> extends Iterable<E>, IEquality, IConj<E>, IEmpty, ICount, IHash, IDisplay {
 
-		String startString();
+	String startString();
 
-		String endString();
+	String endString();
 
-		default String sepString() {
-			return " ";
-		}
-
-		@Override
-		default String display() {
-			return It.display(iterator(), startString(), endString(), sepString());
-		}
+	default String sepString() {
+		return " ";
 	}
+
+	@Override
+	default String display() {
+		return It.display(iterator(), startString(), endString(), sepString());
+	}
+}

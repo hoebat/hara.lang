@@ -1,8 +1,9 @@
 package hara.kernel.base;
 
+import hara.lang.protocol.*;
 import org.junit.Test;
 import static org.junit.Assert.*;
-import hara.lang.protocol.*;
+import hara.lang.base.I;
 import hara.lang.data.Keyword;
 import hara.lang.data.Symbol;
 import hara.lang.data.Map;

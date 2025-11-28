@@ -1,9 +1,10 @@
 package hara.kernel.protocol;
 
+import hara.lang.protocol.*;
 import java.util.Iterator;
 import java.util.Map.Entry;
 import hara.lang.base.Ex;
-import hara.lang.protocol.*;
+import hara.lang.base.I;
 
 public interface IEnv<K, V> extends ILookup<K, V> {
 	IEnv<K, V> getParent();

@@ -1,5 +1,6 @@
 package hara.lang.data;
 
+import hara.lang.protocol.*;
 import java.util.Iterator;
 
 import java.util.NoSuchElementException;
@@ -10,7 +11,6 @@ import hara.lang.protocol.IMetadata;
 import hara.lang.protocol.IPopFirst;
 import hara.lang.protocol.IPopLast;
 import hara.lang.protocol.IPushFirst;
-import hara.lang.protocol.*;
 
 public interface Vector<E> extends Data.VectorType<E>, IAssoc<Integer, E> {
 

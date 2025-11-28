@@ -1,7 +1,6 @@
 package hara.lang.protocol;
 
-public class Constant {
-
+public interface Constant {
 	public static final Object[] EMPTY_ARRAY = new Object[] {};
 	public static final Boolean F = Boolean.FALSE;
 	public static final Boolean T = Boolean.TRUE;

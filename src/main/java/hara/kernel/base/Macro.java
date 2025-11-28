@@ -1,5 +1,6 @@
 package hara.kernel.base;
 import hara.kernel.protocol.IEnv;
+import hara.lang.protocol.*;
 import hara.kernel.protocol.IRuntime;
 
 import java.util.Iterator;
@@ -11,7 +12,6 @@ import static hara.kernel.base.Builtin.Runtime.*;
 import static hara.kernel.base.Builtin.Struct.*;
 import static hara.kernel.base.Builtin.Basic.*;
 import static hara.kernel.base.Builtin.Check.*;
-import hara.lang.protocol.*;
 
 
 @SuppressWarnings({ "rawtypes", "unchecked" })

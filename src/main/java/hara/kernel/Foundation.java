@@ -1,5 +1,6 @@
 package hara.kernel;
 import hara.kernel.protocol.IRuntime;
+import hara.lang.protocol.*;
 
 import java.util.Arrays;
 import java.util.Map;
@@ -12,7 +13,7 @@ import java.lang.reflect.Method;
 import hara.lang.base.Arr;
 import hara.lang.base.Ex;
 import hara.lang.base.G;
-import hara.lang.protocol.*;
+import hara.lang.base.I;
 import hara.lang.base.It;
 import hara.compiler.Compiler;
 import hara.compiler.CompilerException;

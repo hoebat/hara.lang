@@ -5,7 +5,7 @@ import static org.junit.Assert.*;
 
 import org.junit.Test;
 
-import hara.lang.protocol.*;
+import hara.lang.base.I;
 import hara.kernel.Foundation;
 
 public class MavenTest {

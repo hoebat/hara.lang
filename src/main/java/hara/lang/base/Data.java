@@ -1,15 +1,11 @@
 package hara.lang.base;
 
+import hara.lang.protocol.*;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.function.BiFunction;
 import java.util.function.Function;
-
-import hara.lang.protocol.IPopFirst;
-import hara.lang.protocol.IPushFirst;
-import hara.lang.protocol.Constant;
-import hara.lang.protocol.*;
 
 public interface Data {
 	

@@ -5,7 +5,7 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 import java.util.Arrays;
 import java.util.List;
-import hara.lang.protocol.*;
+import hara.lang.base.I;
 import hara.kernel.base.RT;
 import hara.kernel.base.Builtin;
 

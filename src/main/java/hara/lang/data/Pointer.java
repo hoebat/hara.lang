@@ -1,8 +1,7 @@
 package hara.lang.data;
 
-import hara.lang.base.*;
-import hara.lang.protocol.Constant;
 import hara.lang.protocol.*;
+import hara.lang.base.*;
 
 public class Pointer extends Data.NamespacedType.PT implements Data.StringType {
 

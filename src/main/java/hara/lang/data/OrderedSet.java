@@ -1,9 +1,9 @@
 package hara.lang.data;
 
+import hara.lang.protocol.*;
 import java.util.Iterator;
 
 import hara.lang.base.*;
-import hara.lang.protocol.*;
 
 public interface OrderedSet<E> 
 	extends Data.SetType<E>, 

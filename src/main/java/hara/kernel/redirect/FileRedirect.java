@@ -1,12 +1,13 @@
 package hara.kernel.redirect;
 
+import hara.lang.protocol.*;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.Arrays;
-import hara.lang.protocol.*;
+import hara.lang.base.I;
 import hara.lang.data.Vector;
 import hara.kernel.base.Builtin;
 import hara.kernel.protocol.IRedirect;

@@ -1,11 +1,10 @@
 package hara.lang.base;
 
+import hara.lang.protocol.*;
 import java.util.Iterator;
 
-
+import hara.lang.protocol.Constant.HashType;
 import hara.lang.data.Keyword;
-import hara.lang.protocol.Constant;
-import hara.lang.protocol.*;
 
 public interface Obj {
 
@@ -144,7 +143,7 @@ public interface Obj {
 		}
 
 		@Override
-		public long hashCalc(Constant.HashType t) {
+		public long hashCalc(HashType t) {
 			return G.hashFn(t).apply(hashSeed()) * 31 + ((IHash)_meta).hashCalc(t);
 		}
 

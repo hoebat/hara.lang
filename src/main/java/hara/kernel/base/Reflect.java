@@ -1,13 +1,12 @@
 package hara.kernel.base;
 
+import hara.lang.protocol.*;
 import java.lang.invoke.*;
 import java.lang.reflect.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
 import hara.lang.base.*;
-import hara.lang.protocol.Constant;
-import hara.lang.protocol.*;
 
 @SuppressWarnings({ "rawtypes", "unchecked" })
 public interface Reflect {

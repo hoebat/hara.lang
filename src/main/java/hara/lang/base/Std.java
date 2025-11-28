@@ -1,9 +1,9 @@
 package hara.lang.base;
 
+import hara.lang.protocol.*;
 import java.util.Iterator;
 
 import hara.lang.data.*;
-import hara.lang.protocol.*;
 
 public interface Std {
 	
@@ -619,7 +619,7 @@ public interface Std {
 			}
 		
 			//
-			// I.Seq
+			// ISeq
 			//
 		
 			@Override

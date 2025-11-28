@@ -1,5 +1,6 @@
 package hara.lang.base;
 
+import hara.lang.protocol.*;
 import java.lang.invoke.MethodHandle;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -11,7 +12,6 @@ import java.util.LinkedList;
 import java.util.function.*;
 
 import hara.lang.data.*;
-import hara.lang.protocol.*;
 
 @SuppressWarnings({ "rawtypes", "unchecked" })
 public interface Fn {

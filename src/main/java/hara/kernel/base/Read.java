@@ -1,5 +1,6 @@
 package hara.kernel.base;
 
+import hara.lang.protocol.*;
 import java.io.IOException;
 import java.io.PushbackReader;
 import java.io.Reader;
@@ -16,8 +17,6 @@ import hara.lang.data.*;
 import static hara.kernel.base.Builtin.Basic.*;
 import static hara.kernel.base.Builtin.Collection.*;
 import static hara.kernel.base.Builtin.Struct.*;
-import hara.lang.protocol.Constant;
-import hara.lang.protocol.*;
 
 public interface Read {
 
@@ -701,7 +700,7 @@ public interface Read {
 					ometa = (Data.MapType) merge(ometa, meta);
 					return ((IObjType) o).withMeta(ometa);
 				} else
-					throw new IllegalArgumentException("Metadata can only be applied to I.ObjTypes");
+					throw new IllegalArgumentException("Metadata can only be applied to IObjTypes");
 			}
 		}
 

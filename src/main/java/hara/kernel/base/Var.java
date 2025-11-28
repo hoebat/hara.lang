@@ -1,11 +1,10 @@
 package hara.kernel.base;
 
+import hara.lang.protocol.*;
 import hara.lang.base.*;
 import hara.lang.data.*;
 
 import static hara.kernel.base.Builtin.Basic.*;
-import hara.lang.protocol.Constant;
-import hara.lang.protocol.*;
 
 public class Var extends Data.NamespacedType.MT 
 	implements Data.StringType, Data.VarType, IReset<Object> {
