@@ -96,12 +96,31 @@ public interface OrderedSet<E>
 		@Override
 		public Mutable<E> dissoc(E e) {
 			var rec = _lookup.find(e);
-			if(rec == null) { 
-				return this; 
+			if (rec == null) {
+				return this;
 			} else {
 				var idx = rec.getValue();
 				_order.assoc(idx, null);
 				_lookup.dissoc(e);
+
+				// Amortized compaction
+				if (_order.count() > 32 && _order.count() > 2 * _lookup.count()) {
+					Vector.Mutable<E> newOrder = Vector.Mutable.empty(null);
+					Map.Mutable<E, Integer> newLookup = Map.Mutable.empty(null);
+
+					Iterator<E> it = _order.iterator();
+					int newIdx = 0;
+					while (it.hasNext()) {
+						E entry = it.next();
+						if (entry != null) {
+							newOrder.conj(entry);
+							newLookup.assoc(entry, newIdx);
+							newIdx++;
+						}
+					}
+					_order = newOrder;
+					_lookup = newLookup;
+				}
 				return this;
 			}
 		}
@@ -188,12 +207,30 @@ public interface OrderedSet<E>
 		@Override
 		public Standard<E> dissoc(E e) {
 			var rec = _lookup.find(e);
-			if(rec == null) { 
-				return this; 
+			if (rec == null) {
+				return this;
 			} else {
 				var idx = rec.getValue();
-				var norder = _order.assoc((int)idx, null);
+				var norder = _order.assoc((int) idx, null);
 				var nlookup = _lookup.dissoc(e);
+
+				// Amortized compaction
+				if (norder.count() > 32 && norder.count() > 2 * nlookup.count()) {
+					Vector.Mutable<E> newOrder = Vector.Mutable.empty(null);
+					Map.Mutable<E, Integer> newLookup = Map.Mutable.empty(null);
+
+					Iterator<E> it = norder.iterator();
+					int newIdx = 0;
+					while (it.hasNext()) {
+						E entry = it.next();
+						if (entry != null) {
+							newOrder.conj(entry);
+							newLookup.assoc(entry, newIdx);
+							newIdx++;
+						}
+					}
+					return new Standard<E>(_meta, newOrder.toPersistent(), newLookup.toPersistent());
+				}
 				return new Standard<E>(_meta, norder, nlookup);
 			}
 		}

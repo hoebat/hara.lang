@@ -108,12 +108,31 @@ public interface OrderedMap<K, V>
 		@Override
 		public Mutable<K, V> dissoc(K k) {
 			var rec = _lookup.find(k);
-			if(rec == null) { 
-				return this; 
+			if (rec == null) {
+				return this;
 			} else {
 				var idx = rec.getValue().getKey();
 				_order.assoc(idx, null);
 				_lookup.dissoc(k);
+
+				// Amortized compaction
+				if (_order.count() > 32 && _order.count() > 2 * _lookup.count()) {
+					Vector.Mutable<Entry<K, V>> newOrder = Vector.Mutable.empty(null);
+					Map.Mutable<K, Entry<Integer, V>> newLookup = Map.Mutable.empty(null);
+
+					Iterator<Entry<K, V>> it = _order.iterator();
+					int newIdx = 0;
+					while (it.hasNext()) {
+						Entry<K, V> entry = it.next();
+						if (entry != null) {
+							newOrder.conj(entry);
+							newLookup.assoc(entry.getKey(), new Std.T.Tup2.L(null, newIdx, entry.getValue()));
+							newIdx++;
+						}
+					}
+					_order = newOrder;
+					_lookup = newLookup;
+				}
 				return this;
 			}
 		}
@@ -201,12 +220,30 @@ public interface OrderedMap<K, V>
 		@Override
 		public Standard<K, V> dissoc(K k) {
 			var rec = _lookup.find(k);
-			if(rec == null) { 
-				return this; 
+			if (rec == null) {
+				return this;
 			} else {
 				var idx = rec.getValue().getKey();
 				var norder = _order.assoc(idx, null);
 				var nlookup = _lookup.dissoc(k);
+
+				// Amortized compaction
+				if (norder.count() > 32 && norder.count() > 2 * nlookup.count()) {
+					Vector.Mutable<Entry<K, V>> newOrder = Vector.Mutable.empty(null);
+					Map.Mutable<K, Entry<Integer, V>> newLookup = Map.Mutable.empty(null);
+
+					Iterator<Entry<K, V>> it = norder.iterator();
+					int newIdx = 0;
+					while (it.hasNext()) {
+						Entry<K, V> entry = it.next();
+						if (entry != null) {
+							newOrder.conj(entry);
+							newLookup.assoc(entry.getKey(), new Std.T.Tup2.L(null, newIdx, entry.getValue()));
+							newIdx++;
+						}
+					}
+					return new Standard<K, V>(_meta, newOrder.toPersistent(), newLookup.toPersistent());
+				}
 				return new Standard<K, V>(_meta, norder, nlookup);
 			}
 		}
