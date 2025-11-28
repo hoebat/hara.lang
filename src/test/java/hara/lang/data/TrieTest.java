@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.Assert.*;
 
@@ -31,7 +32,7 @@ public class TrieTest {
 
     @Test
     public void testStandardTrie() {
-        Trie.Standard<Integer> trie = new Trie.Standard<>();
+        Trie.Standard<Integer> trie = Trie.Standard.empty(null);
         Trie<Integer> trie1 = trie.assoc("apple", 1);
         Trie<Integer> trie2 = trie1.assoc("app", 2);
 
@@ -145,5 +146,49 @@ public class TrieTest {
         trie.vals().forEachRemaining(vals::add);
         Collections.sort(vals);
         assertArrayEquals(new Integer[]{1, 2, 3}, vals.toArray());
+    }
+
+    @Test
+    public void testConversions() {
+        // Standard to Mutable
+        Trie.Standard<Integer> s = Trie.Standard.empty(null);
+        s = s.assoc("a", 1);
+        Trie.Mutable<Integer> m = s.toMutable();
+        assertTrue(m.has("a"));
+        assertEquals(1, (int)m.lookup("a"));
+
+        m.assoc("b", 2);
+        assertTrue(m.has("b"));
+        assertFalse(s.has("b")); // s should be independent
+
+        // Mutable to Persistent
+        Trie.Standard<Integer> s2 = m.toPersistent();
+        assertTrue(s2.has("a"));
+        assertTrue(s2.has("b"));
+
+        // Check independence
+        m.dissoc("a");
+        assertFalse(m.has("a"));
+        assertTrue(s2.has("a"));
+    }
+
+    @Test
+    public void testFromAndInto() {
+        // From (pairs of String, V)
+        Trie.Mutable<Integer> m = Trie.Mutable.from(null, "a", 1, "b", 2);
+        assertEquals(2, m.count());
+        assertTrue(m.has("a"));
+        assertTrue(m.has("b"));
+
+        Trie.Standard<Integer> s = Trie.Standard.from(null, "a", 1, "b", 2);
+        assertEquals(2, s.count());
+        assertTrue(s.has("a"));
+
+        // Into
+        List<Map.Entry<String, Integer>> entries = new ArrayList<>();
+        entries.add(new java.util.AbstractMap.SimpleEntry<>("x", 10));
+        Trie.Standard<Integer> s3 = Trie.Standard.into(entries.iterator());
+        assertTrue(s3.has("x"));
+        assertEquals(10, (int)s3.lookup("x"));
     }
 }
