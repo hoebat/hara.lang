@@ -1,6 +1,6 @@
 package hara.lib.block;
 
-import hara.lang.base.I;
+import hara.lang.protocol.*;
 import hara.lang.data.Vector;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -90,7 +90,7 @@ public interface Block {
         return block.props.start + childrenStr + block.props.end;
     }
 
-    interface IBlock extends I.ObjType {
+    interface IBlock extends IObjType {
         String type();
         String tag();
         String string();
@@ -147,18 +147,18 @@ public interface Block {
         }
 
         @Override
-        public I.Metadata meta() {
+        public IMetadata meta() {
           return null;
         }
 
         @Override
-        public I.ObjType withMeta(I.Metadata meta) {
+        public IObjType withMeta(IMetadata meta) {
           return this;
         }
 
         @Override
-        public hara.lang.base.G.ObjType getObjType() {
-          return hara.lang.base.G.ObjType.CLASS;
+        public hara.lang.protocol.Constant.ObjType getObjType() {
+          return hara.lang.protocol.Constant.ObjType.CLASS;
         }
 
         @Override
@@ -172,7 +172,7 @@ public interface Block {
         }
 
         @Override
-        public long hashCalc(hara.lang.base.G.HashType t) {
+        public long hashCalc(hara.lang.protocol.Constant.HashType t) {
           return 0;
         }
 
@@ -210,18 +210,18 @@ public interface Block {
         }
 
         @Override
-        public I.Metadata meta() {
+        public IMetadata meta() {
           return null;
         }
 
         @Override
-        public I.ObjType withMeta(I.Metadata meta) {
+        public IObjType withMeta(IMetadata meta) {
           return this;
         }
 
         @Override
-        public hara.lang.base.G.ObjType getObjType() {
-          return hara.lang.base.G.ObjType.CLASS;
+        public hara.lang.protocol.Constant.ObjType getObjType() {
+          return hara.lang.protocol.Constant.ObjType.CLASS;
         }
 
         @Override
@@ -235,7 +235,7 @@ public interface Block {
         }
 
         @Override
-        public long hashCalc(hara.lang.base.G.HashType t) {
+        public long hashCalc(hara.lang.protocol.Constant.HashType t) {
           return 0;
         }
 
@@ -283,18 +283,18 @@ public interface Block {
         }
 
         @Override
-        public I.Metadata meta() {
+        public IMetadata meta() {
           return null;
         }
 
         @Override
-        public I.ObjType withMeta(I.Metadata meta) {
+        public IObjType withMeta(IMetadata meta) {
           return this;
         }
 
         @Override
-        public hara.lang.base.G.ObjType getObjType() {
-          return hara.lang.base.G.ObjType.CLASS;
+        public hara.lang.protocol.Constant.ObjType getObjType() {
+          return hara.lang.protocol.Constant.ObjType.CLASS;
         }
 
         @Override
@@ -308,7 +308,7 @@ public interface Block {
         }
 
         @Override
-        public long hashCalc(hara.lang.base.G.HashType t) {
+        public long hashCalc(hara.lang.protocol.Constant.HashType t) {
           return 0;
         }
 
@@ -363,18 +363,18 @@ public interface Block {
         }
 
         @Override
-        public I.Metadata meta() {
+        public IMetadata meta() {
           return null;
         }
 
         @Override
-        public I.ObjType withMeta(I.Metadata meta) {
+        public IObjType withMeta(IMetadata meta) {
           return this;
         }
 
         @Override
-        public hara.lang.base.G.ObjType getObjType() {
-          return hara.lang.base.G.ObjType.CLASS;
+        public hara.lang.protocol.Constant.ObjType getObjType() {
+          return hara.lang.protocol.Constant.ObjType.CLASS;
         }
 
         @Override
@@ -388,7 +388,7 @@ public interface Block {
         }
 
         @Override
-        public long hashCalc(hara.lang.base.G.HashType t) {
+        public long hashCalc(hara.lang.protocol.Constant.HashType t) {
           return 0;
         }
 
@@ -435,18 +435,18 @@ public interface Block {
         }
 
         @Override
-        public I.Metadata meta() {
+        public IMetadata meta() {
           return null;
         }
 
         @Override
-        public I.ObjType withMeta(I.Metadata meta) {
+        public IObjType withMeta(IMetadata meta) {
           return this;
         }
 
         @Override
-        public hara.lang.base.G.ObjType getObjType() {
-          return hara.lang.base.G.ObjType.CLASS;
+        public hara.lang.protocol.Constant.ObjType getObjType() {
+          return hara.lang.protocol.Constant.ObjType.CLASS;
         }
 
         @Override
@@ -460,7 +460,7 @@ public interface Block {
         }
 
         @Override
-        public long hashCalc(hara.lang.base.G.HashType t) {
+        public long hashCalc(hara.lang.protocol.Constant.HashType t) {
           return 0;
         }
 

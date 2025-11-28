@@ -11,6 +11,7 @@ import static hara.kernel.base.Builtin.Runtime.*;
 import static hara.kernel.base.Builtin.Struct.*;
 import static hara.kernel.base.Builtin.Basic.*;
 import static hara.kernel.base.Builtin.Check.*;
+import hara.lang.protocol.*;
 
 
 @SuppressWarnings({ "rawtypes", "unchecked" })
@@ -40,11 +41,11 @@ public interface Macro {
 										(expr) -> rt.eval(expr))));
 				
 			} else if(cmd instanceof Vector || cmd instanceof Std.T.Tup1) {
-				var idx = rt.eval(((I.Nth)cmd).nth(0));
+				var idx = rt.eval(((INth)cmd).nth(0));
 				if(o.getClass().isArray()) {
 					return (R) ((Object[])o)[(int)idx];
-				} else if(o instanceof I.Lookup){
-					return (R) Builtin.Collection.get((I.Lookup)o, idx);
+				} else if(o instanceof ILookup){
+					return (R) Builtin.Collection.get((ILookup)o, idx);
 				} else if(o instanceof Iterable) {
 					return (R) Builtin.Collection.nth((Iterable)o, (long)idx);
 				} else if(o instanceof String) {
@@ -105,7 +106,7 @@ public interface Macro {
 		
 		@Module.Fn(name = "fn", complete = true, env = true, vargs = true)
 		@Module.Var(control = true)
-		public static <ITR> I.Fn fnExpr(IEnv env, Data.LinearType bindings, ITR args) {
+		public static <ITR> IFn fnExpr(IEnv env, Data.LinearType bindings, ITR args) {
 			return new Env.FnEval(null, env.getRuntime(), env, bindings, list(args).cons(symbol("do")));
 		}
 		
@@ -154,8 +155,8 @@ public interface Macro {
 		@Module.Fn(name = "cond", complete = true, env = true, vargs = true)
 		@Module.Var(control = true)
 		public static <ITR> Object conjExpr(IEnv env, ITR pairs) {
-			Iterator<I.Pair> branches = It.partitionPair(It.iter(pairs));
-			I.Pair p = It.some(branches, (e) -> isTruthy(Eval.eval(e.getKey(), env)));
+			Iterator<IPair> branches = It.partitionPair(It.iter(pairs));
+			IPair p = It.some(branches, (e) -> isTruthy(Eval.eval(e.getKey(), env)));
 			return (p != null) ? Eval.eval(p.getValue(), env) : null;
 		}
 		

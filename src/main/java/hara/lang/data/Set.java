@@ -3,6 +3,7 @@ package hara.lang.data;
 import java.util.Iterator;
 
 import hara.lang.base.*;
+import hara.lang.protocol.*;
 
 public interface Set<E> extends Data.SetType<E> {
 	
@@ -28,17 +29,17 @@ public interface Set<E> extends Data.SetType<E> {
 	}
 
 	public class Mutable<E>  extends Data.RefType.MT 
-		implements Base<E>, I.ToPersistent {
+		implements Base<E>, IToPersistent {
 		
 		private Map.Mutable<E, E> _lookup;
 		
 
-		public Mutable(I.Metadata meta) {
+		public Mutable(IMetadata meta) {
 			super(meta);
 			_lookup = Map.Mutable.empty(meta);
 		}
 
-		public Mutable(I.Metadata meta, Map.Mutable<E, E> lookup) {
+		public Mutable(IMetadata meta, Map.Mutable<E, E> lookup) {
 			super(meta);
 			_lookup = lookup;
 		}
@@ -50,7 +51,7 @@ public interface Set<E> extends Data.SetType<E> {
 		}
 
 		@SuppressWarnings("unchecked")
-		public static <E> Mutable<E> from(I.Metadata meta, E... objs) {
+		public static <E> Mutable<E> from(IMetadata meta, E... objs) {
 			Mutable<E> mut = new Mutable<E>(meta);
 			return Arr.reduce((arr, e) -> arr.conj(e) , mut, objs);
 		}
@@ -88,7 +89,7 @@ public interface Set<E> extends Data.SetType<E> {
 	}
 	
 	public class Standard<E>  extends Data.RefType.PT 
-		implements Base<E>, I.ToMutable {
+		implements Base<E>, IToMutable {
 
 		private final Map.Standard<E, E> _lookup;
 
@@ -96,18 +97,18 @@ public interface Set<E> extends Data.SetType<E> {
 		public static Standard EMPTY = new Standard(null);
 		
 		@SuppressWarnings("unchecked")
-		public Standard(I.Metadata meta) {
+		public Standard(IMetadata meta) {
 			super(meta);
 			_lookup = Map.Standard.EMPTY;
 		}
 		
-		public Standard(I.Metadata meta, Map.Standard<E, E> lookup) {
+		public Standard(IMetadata meta, Map.Standard<E, E> lookup) {
 			super(meta);
 			_lookup = lookup;
 		}
 
 		@SuppressWarnings("unchecked")
-		public static <E> Standard<E> from(I.Metadata meta, E... elements){
+		public static <E> Standard<E> from(IMetadata meta, E... elements){
 			return Mutable.from(meta, elements).toPersistent();
 		}
 
@@ -131,7 +132,7 @@ public interface Set<E> extends Data.SetType<E> {
 		}
 
 		@Override
-		public Standard<E> withMeta(I.Metadata meta) {
+		public Standard<E> withMeta(IMetadata meta) {
 			return (_meta == meta) ? this : new Standard<E>(meta, _lookup);
 		}
 

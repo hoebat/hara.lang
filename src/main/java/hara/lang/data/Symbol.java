@@ -3,6 +3,8 @@ package hara.lang.data;
 import java.lang.ref.WeakReference;
 
 import hara.lang.base.*;
+import hara.lang.protocol.Constant;
+import hara.lang.protocol.*;
 
 public class Symbol extends Data.NamespacedType.PT 
 	implements Data.StringType {
@@ -26,11 +28,11 @@ public class Symbol extends Data.NamespacedType.PT
 			return create(nsname.substring(0, i), nsname.substring(i + 1));
 	}
 	
-	public Symbol(I.Metadata meta, String nsname) {
+	public Symbol(IMetadata meta, String nsname) {
 		super(meta, nsname);
 	}
 
-	public Symbol(I.Metadata meta, String ns, String name) {
+	public Symbol(IMetadata meta, String ns, String name) {
 		super(meta, ns, name);
 	}
 
@@ -42,13 +44,13 @@ public class Symbol extends Data.NamespacedType.PT
 	*/
 	
 	@Override
-	public Symbol withMeta(I.Metadata meta) {
+	public Symbol withMeta(IMetadata meta) {
 		return (_meta == meta) ? this : new Symbol(meta, getNamespace(), getName());
 	}
 	
 	@Override
-	public G.ObjType getObjType() {
-		return G.ObjType.SYMBOL;
+	public Constant.ObjType getObjType() {
+		return Constant.ObjType.SYMBOL;
 	}
 
 	@Override

@@ -3,10 +3,11 @@ package hara.lang.data;
 import java.util.Iterator;
 
 import hara.lang.base.*;
+import hara.lang.protocol.*;
 
 public interface OrderedSet<E> 
 	extends Data.SetType<E>, 
-			I.Nth<E> {
+			INth<E> {
 	
 	public interface Base<E> extends OrderedSet<E> {
 		public Map<E, Integer> _lookup();
@@ -35,14 +36,14 @@ public interface OrderedSet<E>
 	}
 
 	public class Mutable<E> extends Data.RefType.MT 
-		implements Base<E>, I.ToPersistent {
+		implements Base<E>, IToPersistent {
 		
 		private Vector.Mutable<E> _order;
 		
 		private Map.Mutable<E, Integer> _lookup;
 		
 		@SuppressWarnings("unchecked")
-		public Mutable(I.Metadata meta) {
+		public Mutable(IMetadata meta) {
 			this(meta, Vector.Mutable.empty(null), Map.Mutable.empty(null));
 		}
 
@@ -55,7 +56,7 @@ public interface OrderedSet<E>
 		}
 
 		public Mutable(
-				I.Metadata meta,  
+				IMetadata meta,
 				Vector.Mutable<E> order,
 				Map.Mutable<E, Integer> lookup) {
 			super(meta);
@@ -65,7 +66,7 @@ public interface OrderedSet<E>
 
 
 		@SuppressWarnings("unchecked")
-		public static <E> Mutable<E> from(I.Metadata meta, E... objs) {
+		public static <E> Mutable<E> from(IMetadata meta, E... objs) {
 			Mutable<E> mut = new Mutable<E>(meta);
 			return Arr.reduce((arr, e) -> arr.conj(e) , mut, objs);
 		}
@@ -141,7 +142,7 @@ public interface OrderedSet<E>
 	
 
 	public class Standard<E> extends Data.RefType.PT 
-		implements Base<E>, I.ToMutable {
+		implements Base<E>, IToMutable {
 		
 		private final Map.Standard<E, Integer> _lookup;
 		private final Vector.Standard<E> _order;
@@ -150,12 +151,12 @@ public interface OrderedSet<E>
 		public static Standard EMPTY = new Standard(null);
 		
 		@SuppressWarnings("unchecked")
-		public Standard(I.Metadata meta) {
+		public Standard(IMetadata meta) {
 			this(meta, Vector.Standard.empty(null), Map.Standard.EMPTY);
 		}
 
 		public Standard(
-				I.Metadata meta,  
+				IMetadata meta,
 				Vector.Standard<E> order,
 				Map.Standard<E, Integer> lookup) {
 			super(meta);
@@ -164,7 +165,7 @@ public interface OrderedSet<E>
 		}
 
 		@SuppressWarnings("unchecked")
-		public static <E> Standard<E> from(I.Metadata meta, E... elements){
+		public static <E> Standard<E> from(IMetadata meta, E... elements){
 			return Mutable.from(meta, elements).toPersistent();
 		}
 
@@ -183,7 +184,7 @@ public interface OrderedSet<E>
 		}
 
 		@Override
-		public Standard<E> withMeta(I.Metadata meta) {
+		public Standard<E> withMeta(IMetadata meta) {
 			return new Standard<E>(_meta, _order, _lookup);
 		}
 

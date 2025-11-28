@@ -6,12 +6,13 @@ import java.util.NoSuchElementException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import hara.lang.base.*;
-import hara.lang.base.I.Metadata;
-import hara.lang.base.I.PopFirst;
-import hara.lang.base.I.PopLast;
-import hara.lang.base.I.PushFirst;
+import hara.lang.protocol.IMetadata;
+import hara.lang.protocol.IPopFirst;
+import hara.lang.protocol.IPopLast;
+import hara.lang.protocol.IPushFirst;
+import hara.lang.protocol.*;
 
-public interface Vector<E> extends Data.VectorType<E>, I.Assoc<Integer, E> {
+public interface Vector<E> extends Data.VectorType<E>, IAssoc<Integer, E> {
 
 	public interface S {
 
@@ -162,7 +163,7 @@ public interface Vector<E> extends Data.VectorType<E>, I.Assoc<Integer, E> {
 	}  
 	
 	// CONSTANTS
-	public interface Base<E> extends Vector<E>, I.ObjType {
+	public interface Base<E> extends Vector<E>, IObjType {
 
 		public Node _root();
 
@@ -221,17 +222,17 @@ public interface Vector<E> extends Data.VectorType<E>, I.Assoc<Integer, E> {
 		}
 
 		@Override
-		default PushFirst<E> pushFirst(E e) {
+		default IPushFirst<E> pushFirst(E e) {
 			throw new Ex.Unsupported();
 		}
 
 		@Override
-		default PopFirst popFirst() {
+		default IPopFirst popFirst() {
 			throw new Ex.Unsupported();
 		}
 	}
 
-	public class Mutable<E> extends Data.RefType.MT implements Base<E>, I.ToPersistent {
+	public class Mutable<E> extends Data.RefType.MT implements Base<E>, IToPersistent {
 
 		private int _size;
 		private int _shift;
@@ -243,7 +244,7 @@ public interface Vector<E> extends Data.VectorType<E>, I.Assoc<Integer, E> {
 			this(v.meta(), v._size(), v._shift(), S.editableRoot(v._root()), (E[]) S.makeTail(v._tail()));
 		}
 
-		public Mutable(I.Metadata meta, int size, int shift, Node root, E[] tail) {
+		public Mutable(IMetadata meta, int size, int shift, Node root, E[] tail) {
 			super(meta);
 			_size = size;
 			_shift = shift;
@@ -252,7 +253,7 @@ public interface Vector<E> extends Data.VectorType<E>, I.Assoc<Integer, E> {
 		}
 
 		@SuppressWarnings("unchecked")
-		public static <E> Mutable<E> from(I.Metadata meta, E... objs) {
+		public static <E> Mutable<E> from(IMetadata meta, E... objs) {
 			var vec = empty(meta);
 			return Arr.reduce((v, e) -> v.pushLast(e), vec, objs);
 		}
@@ -267,7 +268,7 @@ public interface Vector<E> extends Data.VectorType<E>, I.Assoc<Integer, E> {
 		}
 		
 		@SuppressWarnings({ "unchecked", "rawtypes" })
-		public static Mutable empty (I.Metadata meta) {
+		public static Mutable empty (IMetadata meta) {
 			return new Mutable(meta, 0, Node.NODE_SHIFT, S.editableRoot(Node.EMPTY), S.makeTail(new Object[] {}));
 		}
 
@@ -403,7 +404,7 @@ public interface Vector<E> extends Data.VectorType<E>, I.Assoc<Integer, E> {
 	}
 
 	public class Standard<E> extends Data.RefType.PT
-		implements Base<E>, I.ToMutable, Data.LinearView<E> {
+		implements Base<E>, IToMutable, Data.LinearView<E> {
 
 		// STATIC
 		public final static Standard<Object> EMPTY = new Standard<>(null, 0, Node.NODE_SHIFT, Node.EMPTY, new Object[] {});
@@ -418,7 +419,7 @@ public interface Vector<E> extends Data.VectorType<E>, I.Assoc<Integer, E> {
 			this(v.meta(), v._size(), v._shift(), v._root(), v._tail());
 		}
 
-		protected Standard(I.Metadata meta, int size, int shift, Node root, E[] tail) {
+		protected Standard(IMetadata meta, int size, int shift, Node root, E[] tail) {
 			super(meta);
 			_size = size;
 			_shift = shift;
@@ -427,13 +428,13 @@ public interface Vector<E> extends Data.VectorType<E>, I.Assoc<Integer, E> {
 		}
 		
 		@SuppressWarnings("unchecked")
-		public static <E> Standard<E> empty(I.Metadata meta) {
+		public static <E> Standard<E> empty(IMetadata meta) {
 			Standard<E> ret = (Standard<E>) EMPTY;
 			return (meta == null) ? ret : ret.withMeta(meta);
 		}
 
 		@SuppressWarnings("unchecked")
-		public static <E> Standard<E> from(I.Metadata meta, E... objs) {
+		public static <E> Standard<E> from(IMetadata meta, E... objs) {
 			return Mutable.from(meta, objs).toPersistent();
 		}
 		
@@ -466,7 +467,7 @@ public interface Vector<E> extends Data.VectorType<E>, I.Assoc<Integer, E> {
 		}
 
 		@Override
-		public Standard<E> withMeta(I.Metadata meta) {
+		public Standard<E> withMeta(IMetadata meta) {
 			return (meta() == meta) ? this : new Standard<E>(meta, _size, _shift, _root, _tail);
 		}
 
@@ -557,13 +558,13 @@ public interface Vector<E> extends Data.VectorType<E>, I.Assoc<Integer, E> {
 	}
 
 	public class SubView<E> extends Data.RefType.PT 
-		implements Vector<E>, I.Assoc<Integer, E>, I.ObjType, Data.LinearView<E> {
+		implements Vector<E>, IAssoc<Integer, E>, IObjType, Data.LinearView<E> {
 
 		final Vector<E> _v;
 		final int _start;
 		final int _end;
 		
-		public SubView(Metadata meta, Vector<E> v, int start, int end) {
+		public SubView(IMetadata meta, Vector<E> v, int start, int end) {
 			super(meta);
 			_v = v;
 			_start = start;
@@ -576,7 +577,7 @@ public interface Vector<E> extends Data.VectorType<E>, I.Assoc<Integer, E> {
 		}
 
 		@Override
-		public SubView<E> withMeta(Metadata meta) {
+		public SubView<E> withMeta(IMetadata meta) {
 			return (meta() == meta) ? this : new SubView<E>(meta, _v, _start, _end);
 		}
 
@@ -593,7 +594,7 @@ public interface Vector<E> extends Data.VectorType<E>, I.Assoc<Integer, E> {
 		}
 
 		@Override
-		public PopLast popLast() {
+		public IPopLast popLast() {
 			if(_end - _start== 0) {
 				return this;
 			} else {

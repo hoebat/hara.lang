@@ -10,8 +10,8 @@ import java.util.function.Function;
 import org.eclipse.aether.resolution.DependencyResolutionException;
 
 import hara.lang.base.Ex;
-import hara.lang.base.I;
-import hara.lang.base.I.OFn;
+import hara.lang.protocol.*;
+import hara.lang.protocol.IOFn;
 import hara.kernel.maven.MavenResolver;
 
 public final class Maven {
@@ -30,7 +30,7 @@ public final class Maven {
         }
     }
 
-    public static final OFn load = new OFn() {
+    public static final IOFn load = new IOFn() {
         @Override
         public BiFunction<Object, Object, Object> getArg2() {
             return (rt, coordinate) -> doLoad((IRuntime) rt, (String) coordinate);

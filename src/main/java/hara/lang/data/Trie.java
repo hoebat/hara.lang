@@ -2,7 +2,7 @@ package hara.lang.data;
 
 import hara.lang.base.Data;
 import hara.lang.base.G;
-import hara.lang.base.I;
+import hara.lang.protocol.*;
 import hara.lang.base.It;
 
 import java.util.ArrayList;
@@ -18,7 +18,7 @@ import java.util.function.Function;
 import java.util.Objects;
 import java.util.AbstractMap;
 
-public interface Trie<V> extends I.Coll<String>, I.ObjType, I.Assoc<String, V>, I.Dissoc<String>, I.Lookup<String, V> {
+public interface Trie<V> extends IColl<String>, IObjType, IAssoc<String, V>, IDissoc<String>, ILookup<String, V> {
 
     @Override
     Trie<V> assoc(String key, V val);
@@ -27,7 +27,7 @@ public interface Trie<V> extends I.Coll<String>, I.ObjType, I.Assoc<String, V>, 
     Trie<V> dissoc(String key);
     
     @Override
-    default I.Pair<String, V> find(String key) {
+    default IPair<String, V> find(String key) {
         Node<V> current = rootNode();
         for (char ch : key.toCharArray()) {
             Node<V> node = current.getChildren().get(ch);
@@ -52,8 +52,8 @@ public interface Trie<V> extends I.Coll<String>, I.ObjType, I.Assoc<String, V>, 
     Node<V> rootNode();
 
     @Override
-    default G.ObjType getObjType() {
-        return G.ObjType.MAP;
+    default Constant.ObjType getObjType() {
+        return Constant.ObjType.MAP;
     }
 
     @Override
@@ -67,7 +67,7 @@ public interface Trie<V> extends I.Coll<String>, I.ObjType, I.Assoc<String, V>, 
     }
 
     @Override
-    default long hashCalc(G.HashType t) {
+    default long hashCalc(Constant.HashType t) {
         Function<Object, Long> f = G.hashFn(t);
         long acc = Long.valueOf(hashSeed().hashCode());
         Iterator<Entry<String, V>> it = new TrieEntryIterator<>(rootNode());
@@ -217,7 +217,7 @@ public interface Trie<V> extends I.Coll<String>, I.ObjType, I.Assoc<String, V>, 
             return root;
         }
 
-        public Mutable(I.Metadata meta) {
+        public Mutable(IMetadata meta) {
             super(meta);
             this.root = new Node<>();
             this._size = 0;
@@ -274,7 +274,7 @@ public interface Trie<V> extends I.Coll<String>, I.ObjType, I.Assoc<String, V>, 
         }
 
         @Override
-        public I.Empty empty() {
+        public IEmpty empty() {
             return new Mutable<V>();
         }
 
@@ -304,7 +304,7 @@ public interface Trie<V> extends I.Coll<String>, I.ObjType, I.Assoc<String, V>, 
             return root;
         }
 
-        public Standard(I.Metadata meta, Node<V> root, int size) {
+        public Standard(IMetadata meta, Node<V> root, int size) {
             super(meta);
             this.root = root;
             this._size = size;
@@ -365,7 +365,7 @@ public interface Trie<V> extends I.Coll<String>, I.ObjType, I.Assoc<String, V>, 
         }
 
         @Override
-        public I.Empty empty() {
+        public IEmpty empty() {
             return new Standard<V>();
         }
 
@@ -375,7 +375,7 @@ public interface Trie<V> extends I.Coll<String>, I.ObjType, I.Assoc<String, V>, 
         }
 
         @Override
-        public I.ObjType withMeta(I.Metadata meta) {
+        public IObjType withMeta(IMetadata meta) {
             return new Standard<>(meta, root, _size);
         }
 

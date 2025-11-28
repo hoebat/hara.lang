@@ -1,6 +1,6 @@
 package hara.lib.zip;
 
-import hara.lang.base.I;
+import hara.lang.protocol.*;
 import hara.lang.data.List;
 import hara.lang.data.Vector;
 
@@ -18,13 +18,13 @@ public class ZipContext implements IZipContext {
 
     @Override
     public boolean isContainer(Object element) {
-        return element instanceof I.Coll;
+        return element instanceof IColl;
     }
 
     @Override
     public boolean isEmptyContainer(Object element) {
-        if (element instanceof I.Coll) {
-            return ((I.Coll<?>) element).count() == 0;
+        if (element instanceof IColl) {
+            return ((IColl<?>) element).count() == 0;
         }
         return false;
     }
@@ -37,7 +37,7 @@ public class ZipContext implements IZipContext {
     @Override
     public List listElements(Object container) {
         if (isContainer(container)) {
-            return hara.lang.data.List.Standard.into(((I.Coll) container).iterator());
+            return hara.lang.data.List.Standard.into(((IColl) container).iterator());
         }
         // This should not be reached if isContainer is checked before calling
         throw new IllegalArgumentException("Cannot list elements of a non-container type.");
@@ -61,7 +61,7 @@ public class ZipContext implements IZipContext {
     @Override
     public Object addElement(Object container, Object element) {
         if (isContainer(container)) {
-            return ((I.Coll) container).conj(element);
+            return ((IColl) container).conj(element);
         }
         throw new IllegalArgumentException("Cannot add element to a non-container type.");
     }

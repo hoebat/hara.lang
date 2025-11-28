@@ -2,29 +2,31 @@ package hara.lang.base;
 
 import java.util.Iterator;
 
-import hara.lang.base.G.HashType;
+
 import hara.lang.data.Keyword;
+import hara.lang.protocol.Constant;
+import hara.lang.protocol.*;
 
 public interface Obj {
 
-	abstract class MT implements I.ObjType, I.Mutable, I.Hash {
-		protected I.Metadata _meta;
+	abstract class MT implements IObjType, IMutable, IHash {
+		protected IMetadata _meta;
 
 		public MT() {
 			_meta = null;
 		}
 
-		public MT(I.Metadata meta) {
+		public MT(IMetadata meta) {
 			_meta = meta;
 		}
 
 		@Override
-		public I.Metadata meta() {
+		public IMetadata meta() {
 			return _meta;
 		}
 
 		@Override
-		public MT withMeta(I.Metadata meta) {
+		public MT withMeta(IMetadata meta) {
 			_meta = meta;
 			return this;
 		}
@@ -32,29 +34,29 @@ public interface Obj {
 		@SuppressWarnings({ "unchecked", "rawtypes" })
 		@Override
 		public String toString() {
-			if(this instanceof I.Coll) {
+			if(this instanceof IColl) {
 				return getClass().getName() + "<" + It.display(
-						((I.Coll)this).iterator(), "", "", ",") + ">";
+						((IColl)this).iterator(), "", "", ",") + ">";
 			} else {
 				return getClass().getName() + "<" + display() + ">";
 			}
 		}
 	}
 
-	abstract class PT implements I.ObjType, I.Persistent, I.HashCached {
-		protected final I.Metadata _meta;
+	abstract class PT implements IObjType, IPersistent, IHashCached {
+		protected final IMetadata _meta;
 		private long _hash;
 
 		public PT() {
 			_meta = null;
 		}
 
-		public PT(I.Metadata meta) {
+		public PT(IMetadata meta) {
 			_meta = meta;
 		}
 
 		@Override
-		public final I.Metadata meta() {
+		public final IMetadata meta() {
 			return _meta;
 		}
 
@@ -71,9 +73,9 @@ public interface Obj {
 		@SuppressWarnings({ "unchecked", "rawtypes" })
 		@Override
 		public String toString() {
-			if(this instanceof I.Coll) {
+			if(this instanceof IColl) {
 				return getClass().getName() + "<" + It.display(
-						((I.Coll)this).iterator(), "", "", ",") + ">";
+						((IColl)this).iterator(), "", "", ",") + ">";
 			} else {
 				return getClass().getName() + "<" + display() + ">";
 			}
@@ -82,21 +84,21 @@ public interface Obj {
 	/*
 	abstract class SEQ<V> extends PT 
 		implements 
-		I.Coll<V>, 
-		I.ObjType,
+		IColl<V>,
+		IObjType,
 		Data.SequentialType<V>{
 
 		public SEQ() {
 			super(null);
 		}
 	
-		public SEQ(I.Metadata meta) {
+		public SEQ(IMetadata meta) {
 			super(meta);
 		}
 		
 		@Override 
 		public ObjType getObjType() {
-			return G.ObjType.SEQUENTIAL;
+			return Constant.ObjType.SEQUENTIAL;
 		}
 		
 		@Override
@@ -116,7 +118,7 @@ public interface Obj {
 
 		@SuppressWarnings("rawtypes")
 		@Override
-		public I.Coll empty() {
+		public IColl empty() {
 			return Std.T.Cons.EMPTY.withMeta(_meta);
 		}
 	}*/
@@ -127,23 +129,23 @@ public interface Obj {
 			super(null);
 		}
 
-		public FN(I.Metadata meta) {
+		public FN(IMetadata meta) {
 			super(meta);
 		}
 
 		@Override
-		public G.ObjType getObjType() {
-			return G.ObjType.FUNCTION;
+		public Constant.ObjType getObjType() {
+			return Constant.ObjType.FUNCTION;
 		}
 
 		@Override
-		public FN withMeta(I.Metadata meta) {
+		public FN withMeta(IMetadata meta) {
 			throw new Ex.Unsupported();
 		}
 
 		@Override
-		public long hashCalc(HashType t) {
-			return G.hashFn(t).apply(hashSeed()) * 31 + ((I.Hash)_meta).hashCalc(t);
+		public long hashCalc(Constant.HashType t) {
+			return G.hashFn(t).apply(hashSeed()) * 31 + ((IHash)_meta).hashCalc(t);
 		}
 
 		@Override
@@ -154,13 +156,13 @@ public interface Obj {
 		
 	}
 	
-	abstract class EMPTY<E> extends PT implements I.Coll<E>, I.Nth<E> {
+	abstract class EMPTY<E> extends PT implements IColl<E>, INth<E> {
 	
 		public EMPTY() {
 			super(null);
 		}
 	
-		public EMPTY(I.Metadata meta) {
+		public EMPTY(IMetadata meta) {
 			super(meta);
 		}
 	

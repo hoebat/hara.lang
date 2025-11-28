@@ -10,11 +10,12 @@ import java.util.function.BinaryOperator;
 
 import hara.lang.base.*;
 import static hara.lang.data.SortedMap.Color.*;
+import hara.lang.protocol.*;
 
 public interface SortedMap<K, V> extends
 	Data.MapType<K, V>,
-	I.Nth<Map.Entry<K, V>>, 
-	I.IndexedKV<K, V> {
+	INth<Map.Entry<K, V>>,
+	IIndexedKV<K, V> {
 
 
 	public enum Color {
@@ -545,23 +546,23 @@ public interface SortedMap<K, V> extends
 	@SuppressWarnings("unchecked")
 	public final class Mutable<K, V> extends Data.RefType.MT 
 		implements Base<K, V>,
-				   I.ToPersistent{
+				   IToPersistent{
 
 		private final Comparator<K> _comparator;
 		public Node<K, V> _root;
 
-		public Mutable(I.Metadata meta, Node<K, V> root, Comparator<K> comparator) {
+		public Mutable(IMetadata meta, Node<K, V> root, Comparator<K> comparator) {
 			super(meta);
 			_root = root;
 			_comparator = comparator;
 		}
 
-		public Mutable(I.Metadata meta) {
+		public Mutable(IMetadata meta) {
 			this(meta, Node.EMPTY_NODE, (Comparator<K>) Comparator.naturalOrder());
 		}
 		
 		@SuppressWarnings( "rawtypes" )
-		public static <K, V> Mutable<K, V> from(I.Metadata meta, Object... elements){
+		public static <K, V> Mutable<K, V> from(IMetadata meta, Object... elements){
 			return into(new Mutable<K, V>(null), (Iterator)It.partitionPair(Arr.toIter(elements)));
 		}
 
@@ -598,7 +599,7 @@ public interface SortedMap<K, V> extends
 		}
 
 		@Override
-		public Mutable<K, V> withMeta(I.Metadata meta) {
+		public Mutable<K, V> withMeta(IMetadata meta) {
 			throw new UnsupportedOperationException("Not Supported");
 		}
 
@@ -626,7 +627,7 @@ public interface SortedMap<K, V> extends
 	
 	@SuppressWarnings("unchecked")
 	public final class Standard<K, V> extends Data.RefType.PT 
-		implements Base<K, V>, SortedMap<K, V>, I.ToMutable {
+		implements Base<K, V>, SortedMap<K, V>, IToMutable {
 
 		// STATIC
 		@SuppressWarnings("rawtypes")
@@ -634,13 +635,13 @@ public interface SortedMap<K, V> extends
 		public final Comparator<K> _comparator;
 		public final Node<K, V> _root;
 
-		public Standard(I.Metadata meta, Node<K, V> root, Comparator<K> comparator) {
+		public Standard(IMetadata meta, Node<K, V> root, Comparator<K> comparator) {
 			super(meta);
 			_root = root;
 			_comparator = comparator;
 		}
 		
-		public static <K, V> Standard<K, V> from(I.Metadata meta, Object... elements){
+		public static <K, V> Standard<K, V> from(IMetadata meta, Object... elements){
 			return (Standard<K, V>) Mutable.from(meta, elements).toPersistent();
 		}
 		
@@ -652,7 +653,7 @@ public interface SortedMap<K, V> extends
 			return Mutable.into(map.toMutable(), it).toPersistent();
 		}
 
-		public static <K, V> Standard<K, V> empty(I.Metadata meta) {
+		public static <K, V> Standard<K, V> empty(IMetadata meta) {
 			Standard<K, V> ret = EMPTY;
 			return (meta == null)
 					? ret
@@ -683,7 +684,7 @@ public interface SortedMap<K, V> extends
 		}
 
 		@Override
-		public Standard<K, V> withMeta(I.Metadata meta) {
+		public Standard<K, V> withMeta(IMetadata meta) {
 			return new Standard<K, V>(meta, _root, _comparator);
 		}
 

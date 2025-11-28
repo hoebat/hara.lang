@@ -4,10 +4,11 @@ import java.util.Iterator;
 import java.util.Map.Entry;
 
 import hara.lang.base.*;
+import hara.lang.protocol.*;
 
 public interface OrderedMap<K, V> 
 	extends Data.MapType<K, V>, 
-			I.Nth<Entry<K, V>> {
+			INth<Entry<K, V>> {
 	
 	public interface Base<K, V> extends OrderedMap<K, V> {
 		public Map<K, Entry<Integer, V>> _lookup();
@@ -41,17 +42,17 @@ public interface OrderedMap<K, V>
 
 	@SuppressWarnings("unchecked")
 	public class Mutable<K, V> extends Data.RefType.MT 
-		implements Base<K, V>, I.ToPersistent {
+		implements Base<K, V>, IToPersistent {
 		
 		private Vector.Mutable<Entry<K, V>> _order;
 		private Map.Mutable<K, Entry<Integer, V>> _lookup;
 
-		public Mutable(I.Metadata meta) {
+		public Mutable(IMetadata meta) {
 			this(meta, Vector.Mutable.empty(null), Map.Mutable.empty(null));
 		}
 
 		public Mutable(
-				I.Metadata meta,  
+				IMetadata meta,
 				Vector.Mutable<Entry<K, V>> order,
 				Map.Mutable<K, Entry<Integer, V>> lookup) {
 			super(meta);
@@ -60,7 +61,7 @@ public interface OrderedMap<K, V>
 		}
 		
 		@SuppressWarnings("rawtypes")
-		public static <K, V> Mutable<K, V> from(I.Metadata meta, Object... elements){
+		public static <K, V> Mutable<K, V> from(IMetadata meta, Object... elements){
 			return into(new Mutable<K, V>(null), (Iterator)It.partitionPair(Arr.toIter(elements)));
 		}
 
@@ -154,19 +155,19 @@ public interface OrderedMap<K, V>
 
 	@SuppressWarnings("unchecked")
 	public class Standard<K, V> extends Data.RefType.PT 
-		implements Base<K, V>, I.ToMutable {
+		implements Base<K, V>, IToMutable {
 		private final Map.Standard<K, Entry<Integer, V>> _lookup;
 		private final Vector.Standard<Entry<K, V>> _order;
 		
 		@SuppressWarnings("rawtypes")
 		public static Standard EMPTY = new Standard(null);
 		
-		public Standard(I.Metadata meta) {
+		public Standard(IMetadata meta) {
 			this(meta, Vector.Standard.empty(null), Map.Standard.EMPTY);
 		}
 
 		public Standard(
-				I.Metadata meta,  
+				IMetadata meta,
 				Vector.Standard<Entry<K, V>> order,
 				Map.Standard<K, Entry<Integer, V>> lookup) {
 			super(meta);
@@ -174,7 +175,7 @@ public interface OrderedMap<K, V>
 			_lookup = lookup;
 		}
 		
-		public static <K, V> Standard<K, V> from(I.Metadata meta, Object... elements){
+		public static <K, V> Standard<K, V> from(IMetadata meta, Object... elements){
 			return (Standard<K, V>) Mutable.from(meta, elements).toPersistent();
 		}
 		
@@ -192,7 +193,7 @@ public interface OrderedMap<K, V>
 		}
 
 		@Override
-		public Standard<K, V> withMeta(I.Metadata meta) {
+		public Standard<K, V> withMeta(IMetadata meta) {
 			return new Standard<K, V>(_meta, _order, _lookup);
 		}
 

@@ -11,6 +11,7 @@ import java.util.LinkedList;
 import java.util.function.*;
 
 import hara.lang.data.*;
+import hara.lang.protocol.*;
 
 @SuppressWarnings({ "rawtypes", "unchecked" })
 public interface Fn {
@@ -18,14 +19,14 @@ public interface Fn {
 
 	public interface Reflect {
 		
-		public class InstanceField<R> extends Obj.FN implements I.Fn<R, Object, Object> {
+		public class InstanceField<R> extends Obj.FN implements IFn<R, Object, Object> {
 			final Field _mh;
 
 			InstanceField(Field mh) {
 				this(null, mh);
 			}
 			
-			InstanceField(I.Metadata meta, Field mh) {
+			InstanceField(IMetadata meta, Field mh) {
 				super(meta);
 				_mh = mh;
 			}
@@ -54,10 +55,10 @@ public interface Fn {
 			}
 		}
 
-		public class InstanceMethod<R> extends Obj.FN implements I.Fn<R, Object, Object> {
+		public class InstanceMethod<R> extends Obj.FN implements IFn<R, Object, Object> {
 			final Method _mh;
 		
-			InstanceMethod(I.Metadata meta, Method mh) {
+			InstanceMethod(IMetadata meta, Method mh) {
 				super(meta);
 				_mh = mh;
 			}
@@ -104,14 +105,14 @@ public interface Fn {
 			}
 		}
 
-		public class StaticConstructor<R> extends Obj.FN implements I.Fn<R, Object, Object> {
+		public class StaticConstructor<R> extends Obj.FN implements IFn<R, Object, Object> {
 			final Constructor _mh;
 		
 			StaticConstructor(Constructor mh) {
 				this(null, mh);
 			}
 			
-			StaticConstructor(I.Metadata meta, Constructor mh) {
+			StaticConstructor(IMetadata meta, Constructor mh) {
 				super(meta);
 				_mh = mh;
 			}
@@ -158,14 +159,14 @@ public interface Fn {
 			}
 		}
 
-		public class StaticField<R> extends Obj.FN implements I.Fn<R, Object, Object> {
+		public class StaticField<R> extends Obj.FN implements IFn<R, Object, Object> {
 			final Field _mh;
 		
 			StaticField(Field mh) {
 				this(null, mh);
 			}
 			
-			StaticField(I.Metadata meta, Field mh) {
+			StaticField(IMetadata meta, Field mh) {
 				super(meta);
 				_mh = mh;
 			}
@@ -194,10 +195,10 @@ public interface Fn {
 			}
 		}
 
-		public class StaticMethod<R> extends Obj.FN implements I.Fn<R, Object, Object> {
+		public class StaticMethod<R> extends Obj.FN implements IFn<R, Object, Object> {
 			final Method _mh;
 
-			StaticMethod(I.Metadata meta, Method mh) {
+			StaticMethod(IMetadata meta, Method mh) {
 				super(meta);
 				_mh = mh;
 			}
@@ -251,21 +252,21 @@ public interface Fn {
 
 	public interface T {
 
-		public class Comp<FN, ITR> implements I.OFn {
+		public class Comp<FN, ITR> implements IOFn {
 
-			final I.Fn[] _fns;
+			final IFn[] _fns;
 
 			public Comp(ITR fns) {
-				_fns = (I.Fn[]) It.toArray(It.map(It.iter(fns), Fn::toFn), I.Fn.class);
+				_fns = (IFn[]) It.toArray(It.map(It.iter(fns), Fn::toFn), IFn.class);
 			}
 
 			@Override
 			public Function getArg1() {
-				return (x) -> It.reduce(Arr.toRevIter(_fns), x, (acc, f) -> ((I.Fn) f).invoke(acc));
+				return (x) -> It.reduce(Arr.toRevIter(_fns), x, (acc, f) -> ((IFn) f).invoke(acc));
 			}
 		}
 
-		public class Consume1<T1> extends Obj.FN implements I.Fn<Void, T1, Object> {
+		public class Consume1<T1> extends Obj.FN implements IFn<Void, T1, Object> {
 
 			final Consumer<T1> _c1;
 
@@ -273,7 +274,7 @@ public interface Fn {
 				this(null, p1);
 			}
 			
-			Consume1(I.Metadata meta, Consumer<T1> c1) {
+			Consume1(IMetadata meta, Consumer<T1> c1) {
 				super(meta);
 				_c1 = c1;
 			}
@@ -284,11 +285,11 @@ public interface Fn {
 			}
 		}
 
-		public class Fn0<R> extends Obj.FN implements I.Fn<R, Object, Object> {
+		public class Fn0<R> extends Obj.FN implements IFn<R, Object, Object> {
 
 			final Supplier<R> _f0;
 
-			Fn0(I.Metadata meta, Supplier<R> f0) {
+			Fn0(IMetadata meta, Supplier<R> f0) {
 				super(meta);
 				_f0 = f0;
 			}
@@ -303,7 +304,7 @@ public interface Fn {
 			}
 		}
 
-		public class Fn1<R, T1> extends Obj.FN implements I.Fn<R, T1, Object> {
+		public class Fn1<R, T1> extends Obj.FN implements IFn<R, T1, Object> {
 
 			final Function<T1, R> _f1;
 
@@ -311,7 +312,7 @@ public interface Fn {
 				this(null, f1);
 			}
 
-			Fn1(I.Metadata meta, Function<T1, R> f1) {
+			Fn1(IMetadata meta, Function<T1, R> f1) {
 				super(meta);
 				_f1 = f1;
 			}
@@ -322,7 +323,7 @@ public interface Fn {
 			}
 		}
 
-		public class Fn2<R, T1, T2> extends Obj.FN implements I.Fn<R, T1, T2> {
+		public class Fn2<R, T1, T2> extends Obj.FN implements IFn<R, T1, T2> {
 
 			final BiFunction<T1, T2, R> _f2;
 
@@ -330,7 +331,7 @@ public interface Fn {
 				this(null, f2);
 			}
 			
-			Fn2(I.Metadata meta, BiFunction<T1, T2, R> f2) {
+			Fn2(IMetadata meta, BiFunction<T1, T2, R> f2) {
 				super(meta);
 				_f2 = f2;
 			}
@@ -341,11 +342,11 @@ public interface Fn {
 			}
 		}
 
-		public class FnHandle<R> extends Obj.FN implements I.Fn<R, Object, Object> {
+		public class FnHandle<R> extends Obj.FN implements IFn<R, Object, Object> {
 			final MethodHandle _mh;
 			final int _num;
 
-			FnHandle(I.Metadata meta, MethodHandle mh, int num) {
+			FnHandle(IMetadata meta, MethodHandle mh, int num) {
 				super(meta);
 				_mh = mh;
 				_num = num;
@@ -397,7 +398,7 @@ public interface Fn {
 			}
 		}
 
-		public class FnVargs<R, ITR> extends Obj.FN implements I.Fn<R, Object, Object> {
+		public class FnVargs<R, ITR> extends Obj.FN implements IFn<R, Object, Object> {
 
 			final Function<ITR, R> _f;
 
@@ -405,7 +406,7 @@ public interface Fn {
 				this(null, f);
 			}
 			
-			FnVargs(I.Metadata meta, Function<ITR, R> f) {
+			FnVargs(IMetadata meta, Function<ITR, R> f) {
 				super(meta);
 				_f = f;
 			}
@@ -431,10 +432,10 @@ public interface Fn {
 			}
 		}
 
-		public class Partial<FN, ITR> implements I.OFn {
+		public class Partial<FN, ITR> implements IOFn {
 
 			final List.Standard _args;
-			final I.Fn _f;
+			final IFn _f;
 
 			public Partial(FN f, ITR vars) {
 				_f = Fn.toFn(f);
@@ -462,11 +463,11 @@ public interface Fn {
 			}
 		}
 
-		public class Pred1<T1> extends Obj.FN implements I.Fn<Boolean, T1, Object> {
+		public class Pred1<T1> extends Obj.FN implements IFn<Boolean, T1, Object> {
 
 			final Predicate<T1> _p1;
 
-			Pred1(I.Metadata meta, Predicate<T1> p1) {
+			Pred1(IMetadata meta, Predicate<T1> p1) {
 				super(meta);
 				_p1 = p1;
 			}
@@ -481,7 +482,7 @@ public interface Fn {
 			}
 		}
 		
-		public class Pred2<T1, T2> extends Obj.FN implements I.Fn<Boolean, T1, T2> {
+		public class Pred2<T1, T2> extends Obj.FN implements IFn<Boolean, T1, T2> {
 
 			final BiPredicate<T1, T2> _p2;
 
@@ -489,7 +490,7 @@ public interface Fn {
 				this(null, p2);
 			}
 			
-			Pred2(I.Metadata meta, BiPredicate<T1, T2> p2) {
+			Pred2(IMetadata meta, BiPredicate<T1, T2> p2) {
 				super(meta);
 				_p2 = p2;
 			}
@@ -500,7 +501,7 @@ public interface Fn {
 			}
 		}
 		
-		public class ReduceArray<E, FN> extends Obj.FN implements I.Fn<E, E, E> {
+		public class ReduceArray<E, FN> extends Obj.FN implements IFn<E, E, E> {
 			final BiFunction<E, E, E> _f2;
 			final E _init;
 
@@ -508,7 +509,7 @@ public interface Fn {
 				this(null, init, f);
 			}
 			
-			public ReduceArray(I.Metadata meta, E init, FN f) {
+			public ReduceArray(IMetadata meta, E init, FN f) {
 				super(meta);
 				_init = init;
 				_f2 = Fn.toFn(f).getArg2();
@@ -535,7 +536,7 @@ public interface Fn {
 			}
 		}
 
-		public class ReduceCompare<E, FN> extends Obj.FN implements I.Fn<Boolean, E, E> {
+		public class ReduceCompare<E, FN> extends Obj.FN implements IFn<Boolean, E, E> {
 			final BiFunction<E, E, Boolean> _c2;
 			final boolean _def;
 
@@ -543,7 +544,7 @@ public interface Fn {
 				this(null, def, f);
 			}
 			
-			public ReduceCompare(I.Metadata meta, boolean def, FN f) {
+			public ReduceCompare(IMetadata meta, boolean def, FN f) {
 				super(meta);
 				_def = def;
 				_c2 = Fn.toFn(f).getArg2();
@@ -568,7 +569,7 @@ public interface Fn {
 			}
 		}
 
-		public class ReduceInit<E, FN> extends Obj.FN implements I.Fn<E, E, E> {
+		public class ReduceInit<E, FN> extends Obj.FN implements IFn<E, E, E> {
 			final BiFunction<E, E, E> _f2;
 			final E _init;
 
@@ -576,7 +577,7 @@ public interface Fn {
 				this(null, init, f);
 			}
 			
-			public ReduceInit(I.Metadata meta, E init, FN f) {
+			public ReduceInit(IMetadata meta, E init, FN f) {
 				super(meta);
 				_init = init;
 				_f2 = Fn.toFn(f).getArg2();
@@ -603,11 +604,11 @@ public interface Fn {
 			}
 		}
 		
-		public class ReduceSelf<R, E, FN> extends Obj.FN implements I.Fn<R, R, E> {
+		public class ReduceSelf<R, E, FN> extends Obj.FN implements IFn<R, R, E> {
 			final BiFunction<R, E, R> _f2;
 			final R _init;
 
-			public ReduceSelf(I.Metadata meta, R init, FN f) {
+			public ReduceSelf(IMetadata meta, R init, FN f) {
 				super(meta);
 				_init = init;
 				_f2 = Fn.toFn(f).getArg2();
@@ -646,29 +647,29 @@ public interface Fn {
 	}
 
 	
-	public static <FN> I.Fn toFn(FN f) {
+	public static <FN> IFn toFn(FN f) {
 		return toFn(null, f);
 	}
 
 	
-	public static I.Fn toFn(I.Metadata meta, BiFunction f) {
+	public static IFn toFn(IMetadata meta, BiFunction f) {
 		return new T.Fn2(meta, f);
 	}
 
 	
-	public static I.Fn toFn(I.Metadata meta, BiPredicate p) {
+	public static IFn toFn(IMetadata meta, BiPredicate p) {
 		return new T.Pred2(meta, p);
 	}
 
 	
-	public static I.Fn toFn(I.Metadata meta, Consumer c) {
+	public static IFn toFn(IMetadata meta, Consumer c) {
 		return new T.Consume1(meta, c);
 	}
 
 	
-	public static <FN> I.Fn toFn(I.Metadata meta, FN f) {
-		if (f instanceof I.Fn) {
-			return (I.Fn) f;
+	public static <FN> IFn toFn(IMetadata meta, FN f) {
+		if (f instanceof IFn) {
+			return (IFn) f;
 		} else if (f instanceof Supplier) {
 			return toFn(meta, (Supplier) f);
 		} else if (f instanceof Function) {
@@ -690,19 +691,19 @@ public interface Fn {
 		}
 	}
 	
-	public static I.Fn toFn(I.Metadata meta, Function f) {
+	public static IFn toFn(IMetadata meta, Function f) {
 		return new T.Fn1(meta, f);
 	}
 
-	public static I.Fn toFn(I.Metadata meta, Predicate p) {
+	public static IFn toFn(IMetadata meta, Predicate p) {
 		return new T.Pred1(meta, p);
 	}
 	
-	public static I.Fn toFn(I.Metadata meta, Supplier f) {
+	public static IFn toFn(IMetadata meta, Supplier f) {
 		return new T.Fn0(meta, f);
 	}
 	
-	public static I.Fn toFn(I.Metadata meta, Method f) {
+	public static IFn toFn(IMetadata meta, Method f) {
 		if (Modifier.isStatic(f.getModifiers())) {
 			return new Reflect.StaticMethod(meta, f);
 		} else {
@@ -710,7 +711,7 @@ public interface Fn {
 		}
 	}
 	
-	public static I.Fn toFn(I.Metadata meta, Field f) {
+	public static IFn toFn(IMetadata meta, Field f) {
 		if (Modifier.isStatic(f.getModifiers())) {
 			return new Reflect.StaticField(meta, f);
 		} else {
@@ -718,16 +719,16 @@ public interface Fn {
 		}
 	}
 	
-	public static I.Fn toFn(I.Metadata meta, Constructor f) {
+	public static IFn toFn(IMetadata meta, Constructor f) {
 		return new Reflect.StaticConstructor(meta, f);
 	}
 	
 
-	public static <FN> I.Fn toFnVargs(I.Metadata meta, Function f) {
+	public static <FN> IFn toFnVargs(IMetadata meta, Function f) {
 		return new T.FnVargs(meta, f);
 	}
 
-	public static <FN> I.Fn toFnVargs(Function f) {
+	public static <FN> IFn toFnVargs(Function f) {
 		return new T.FnVargs(null, f);
 	}
 	

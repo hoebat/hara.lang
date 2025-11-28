@@ -7,9 +7,10 @@ import java.net.*;
 
 import hara.lang.base.*;
 import hara.kernel.protocol.IRedirect;
+import hara.lang.protocol.*;
 
 @SuppressWarnings("rawtypes")
-public class Server implements I.Component {
+public class Server implements IComponent {
 
 	final Ut.RefCache<Thread, Conn> CLIENTS = new Ut.RefCache<>();
 
@@ -40,7 +41,7 @@ public class Server implements I.Component {
 	}
 
 	@Override
-	public I.Component start() {
+	public IComponent start() {
 		try {
 			_socket = new ServerSocket(_port);
 			System.out.println("PORT OPENED: " + _port);
@@ -54,7 +55,7 @@ public class Server implements I.Component {
 	}
 
 	@Override
-	public I.Component stop() {
+	public IComponent stop() {
 		_thread.interrupt();
 		_thread = null;
 		for (var entry : CLIENTS.getLookup().entrySet()) {
@@ -85,12 +86,12 @@ public class Server implements I.Component {
 	}
 
 	@Override
-	public I.Metadata getStatus() {
+	public IMetadata getStatus() {
 		return null;
 	}
 
 	@Override
-	public I.Metadata getProps() {
+	public IMetadata getProps() {
 		return null;
 	}
 

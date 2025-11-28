@@ -5,9 +5,11 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import hara.lang.base.*;
+import hara.lang.protocol.Constant;
+import hara.lang.protocol.*;
 
 public final class Keyword
-		implements Comparable<Keyword>, Data.StringType, I.Namespaced, I.Display, I.ObjType, I.OFn, I.Metadata {
+		implements Comparable<Keyword>, Data.StringType, INamespaced, IDisplay, IObjType, IOFn, IMetadata {
 	public static Ut.RefCache<String, Keyword> GLOBAL = new Ut.RefCache<String, Keyword>();
 
 	private final String _ns;
@@ -73,35 +75,35 @@ public final class Keyword
 	}
 
 	@Override
-	public G.ObjType getObjType() {
-		return G.ObjType.KEYWORD;
+	public Constant.ObjType getObjType() {
+		return Constant.ObjType.KEYWORD;
 	}
 
 	@Override
-	public I.Metadata meta() {
+	public IMetadata meta() {
 		return null;
 	}
 
 	@Override
-	public Keyword withMeta(I.Metadata meta) {
+	public Keyword withMeta(IMetadata meta) {
 		return this;
 	}
 
 	@Override
-	public G.MetaType getMetatype() {
-		return G.MetaType.STRING;
+	public Constant.MetaType getMetatype() {
+		return Constant.MetaType.STRING;
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	@Override
 	final public Function getArg1() {
 		return (obj) -> {
-			if (obj instanceof I.Lookup) {
-				return ((I.Lookup) obj).lookup(this);
+			if (obj instanceof ILookup) {
+				return ((ILookup) obj).lookup(this);
 			} else if (obj instanceof java.util.Map) {
 				return ((java.util.Map) obj).get(this);
-			} else if (obj instanceof I.Context) {
-				return ((I.Context) obj).call(this);
+			} else if (obj instanceof IContext) {
+				return ((IContext) obj).call(this);
 			} else if (obj == null) {
 				return null;
 			} else {
@@ -114,12 +116,12 @@ public final class Keyword
 	@Override
 	final public BiFunction getArg2() {
 		return (obj, arg) -> {
-			if (obj instanceof I.Lookup) {
-				return ((I.Lookup) obj).lookup(this, arg);
+			if (obj instanceof ILookup) {
+				return ((ILookup) obj).lookup(this, arg);
 			} else if (obj instanceof java.util.Map) {
 				return ((java.util.Map) obj).getOrDefault(this, arg);
-			} else if (obj instanceof I.Context) {
-				return ((I.Context) obj).call(this, arg);
+			} else if (obj instanceof IContext) {
+				return ((IContext) obj).call(this, arg);
 			} else if (obj == null) {
 				return arg;
 			} else {
@@ -134,8 +136,8 @@ public final class Keyword
 		return (vargs) -> {
 			var args = Arr.toArray(vargs);
 			if (args.length > 0) {
-				if (args[0] instanceof I.Context) {
-					I.Context ctx = (I.Context) args[0];
+				if (args[0] instanceof IContext) {
+					IContext ctx = (IContext) args[0];
 					args[0] = this;
 					return ctx.call(args);
 				}

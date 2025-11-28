@@ -22,6 +22,7 @@ import hara.lang.base.Std.T.*;
 import hara.kernel.base.Module;
 import hara.lang.data.*;
 import hara.lang.data.Map.Standard;
+import hara.lang.protocol.*;
 
 @SuppressWarnings({ "unchecked", "rawtypes" })
 
@@ -70,12 +71,12 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "deref", protocol = true)
-		public static <V> V deref(I.Deref<V> ref) {
+		public static <V> V deref(IDeref<V> ref) {
 			return ref.deref();
 		}
 
 		@Module.Fn(name = "deref", protocol = true, method = "derefTimeout")
-		public static <V> V deref(I.DerefTimeout<V> ref, long ms, V timeoutVal) {
+		public static <V> V deref(IDerefTimeout<V> ref, long ms, V timeoutVal) {
 			return ref.derefTimeout(ms, timeoutVal);
 		}
 
@@ -110,7 +111,7 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "hash", protocol = true)
-		public static long hash(I.Hash obj) {
+		public static long hash(IHash obj) {
 			return obj.hashGet();
 		}
 
@@ -134,27 +135,27 @@ public interface Builtin {
 		//
 
 		@Module.Fn(name = "meta", protocol = true)
-		public static I.Metadata meta(I.ObjType obj) {
+		public static IMetadata meta(IObjType obj) {
 			return obj.meta();
 		}
 
 		@Module.Fn(name = "meta", fallback = true)
-		public static I.Metadata meta(Object obj) {
+		public static IMetadata meta(Object obj) {
 			return null;
 		}
 
 		@Module.Fn(name = "realize", protocol = true)
-		public static <V> V realize(I.Realize<V> obj) {
+		public static <V> V realize(IRealize<V> obj) {
 			return obj.realize();
 		}
 
 		@Module.Fn(name = "realized?", protocol = true)
-		public static <V> boolean realized(I.Realize<V> obj) {
+		public static <V> boolean realized(IRealize<V> obj) {
 			return obj.isRealized();
 		}
 
 		@Module.Fn(name = "reset!", protocol = true)
-		public static <V> V reset(I.Reset<V> obj, V val) {
+		public static <V> V reset(IReset<V> obj, V val) {
 			return obj.reset(val);
 		}
 
@@ -178,7 +179,7 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "with-meta", protocol = true)
-		public static I.ObjType withMeta(I.ObjType obj, I.Metadata meta) {
+		public static IObjType withMeta(IObjType obj, IMetadata meta) {
 			return obj.withMeta(meta);
 		}
 	}
@@ -228,7 +229,7 @@ public interface Builtin {
 	public interface Collection {
 
 		@Module.Fn(name = "assoc", protocol = true)
-		public static <K, V> I.Assoc assoc(I.Assoc coll, K key, V val) {
+		public static <K, V> IAssoc assoc(IAssoc coll, K key, V val) {
 			return coll.assoc(key, val);
 		}
 
@@ -240,7 +241,7 @@ public interface Builtin {
 
 		@Module.Fn(name = "conj", protocol = true)
 		@Module.Reduce(type = ARRAY, init = EMPTY_VECTOR)
-		public static <E> I.Conj conj(I.Conj coll, E e) {
+		public static <E> IConj conj(IConj coll, E e) {
 			return coll.conj(e);
 		}
 
@@ -264,7 +265,7 @@ public interface Builtin {
 
 		@Module.Fn(name = "cons", protocol = true)
 		@Module.Reduce(type = ARRAY, init = EMPTY_LIST)
-		public static <E> I.Cons cons(I.Cons coll, E e) {
+		public static <E> ICons cons(ICons coll, E e) {
 			return coll.cons(e);
 		}
 
@@ -280,7 +281,7 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "count", protocol = true)
-		public static long count(I.Count coll) {
+		public static long count(ICount coll) {
 			return coll.count();
 		}
 
@@ -301,7 +302,7 @@ public interface Builtin {
 
 		@Module.Fn(name = "dissoc", protocol = true)
 		@Module.Reduce(type = SELF, init = NIL)
-		public static <K, V> I.Dissoc<K> dissoc(I.Dissoc coll, K key) {
+		public static <K, V> IDissoc<K> dissoc(IDissoc coll, K key) {
 			return coll.dissoc(key);
 		}
 
@@ -318,7 +319,7 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "empty", protocol = true)
-		public static I.Empty empty(I.Empty coll) {
+		public static IEmpty empty(IEmpty coll) {
 			return coll.empty();
 		}
 
@@ -329,7 +330,7 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "find", protocol = true)
-		public static <K, V> V find(I.Find lu, K key) {
+		public static <K, V> V find(IFind lu, K key) {
 			return (V) lu.find(key);
 		}
 
@@ -344,12 +345,12 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "get", protocol = true, method = "lookup")
-		public static <K, V> V get(I.Lookup<K, V> lu, K key) {
+		public static <K, V> V get(ILookup<K, V> lu, K key) {
 			return lu.lookup(key);
 		}
 
 		@Module.Fn(name = "get", protocol = true, method = "lookup")
-		public static <K, V> V get(I.Lookup<K, V> lu, K key, V notFound) {
+		public static <K, V> V get(ILookup<K, V> lu, K key, V notFound) {
 			return lu.lookup(key, notFound);
 		}
 
@@ -374,7 +375,7 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "has?", protocol = true, method = "has")
-		public static <K> boolean has(I.Find lu, K key) {
+		public static <K> boolean has(IFind lu, K key) {
 			return lu.has(key);
 		}
 
@@ -389,22 +390,22 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "index:of", protocol = true, method = "indexOf")
-		public static <K, V> K indexOf(I.Indexed<K, V> lu, V val) {
+		public static <K, V> K indexOf(IIndexed<K, V> lu, V val) {
 			return lu.indexOf(val);
 		}
 
 		@Module.Fn(name = "index:key", protocol = true, method = "indexOfKey")
-		public static <K, V> long indexOfKey(I.IndexedKV<K, V> lu, K key) {
+		public static <K, V> long indexOfKey(IIndexedKV<K, V> lu, K key) {
 			return lu.indexOfKey(key);
 		}
 
 		@Module.Fn(name = "index:val", protocol = true, method = "indexOfVal")
-		public static <K, V> long indexOfVal(I.IndexedKV<K, V> lu, V val) {
+		public static <K, V> long indexOfVal(IIndexedKV<K, V> lu, V val) {
 			return lu.indexOfVal(val);
 		}
 
 		@Module.Fn(name = "into", protocol = true)
-		public static <ITR> I.Conj into(I.Conj coll, ITR source) {
+		public static <ITR> IConj into(IConj coll, ITR source) {
 			return It.reduceIn(It.iter(source), coll, Collection::conj);
 		}
 
@@ -429,7 +430,7 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "keys", protocol = true)
-		public static <K, V> Iterator<K> keys(I.Lookup<K, V> m) {
+		public static <K, V> Iterator<K> keys(ILookup<K, V> m) {
 			return m.keys();
 		}
 
@@ -440,7 +441,7 @@ public interface Builtin {
 
 		@Module.Fn(name = "merge", protocol = true)
 		@Module.Reduce(type = SELF, init = EMPTY_MAP)
-		public static <ITR> I.Assoc merge(I.Assoc coll, ITR other) {
+		public static <ITR> IAssoc merge(IAssoc coll, ITR other) {
 			Iterator<Entry> it = It.iter(other);
 			return It.reduce(it, coll, (m, e) -> {
 				return m.assoc(e.getKey(), e.getValue());
@@ -462,7 +463,7 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "nth", protocol = true)
-		public static <E> E nth(I.Nth<E> coll, long idx) {
+		public static <E> E nth(INth<E> coll, long idx) {
 			return coll.nth(idx);
 		}
 
@@ -502,12 +503,12 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "to:mutable", complete = true)
-		public static I.Mutable toMutable(I.ToMutable coll) {
+		public static IMutable toMutable(IToMutable coll) {
 			return coll.toMutable();
 		}
 
 		@Module.Fn(name = "to:persistent", complete = true)
-		public static I.Persistent toPersistent(I.ToPersistent coll) {
+		public static IPersistent toPersistent(IToPersistent coll) {
 			return coll.toPersistent();
 		}
 
@@ -527,7 +528,7 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "vals", protocol = true)
-		public static <K, V> Iterator<V> vals(I.Lookup<K, V> m) {
+		public static <K, V> Iterator<V> vals(ILookup<K, V> m) {
 			return m.vals();
 		}
 
@@ -622,7 +623,7 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "invoke:fn") 		
-		public static <R, ITR> I.Fn invokeFn(Class c, String method) {
+		public static <R, ITR> IFn invokeFn(Class c, String method) {
 			var lu = classStaticMethods(c);
 			if(lu.has(method)) {
 				return Fn.toFnVargs(
@@ -655,7 +656,7 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "apply", vargs = true, helper = true)
-		public static <R, ITR> R apply(I.Fn f, ITR vargs) {
+		public static <R, ITR> R apply(IFn f, ITR vargs) {
 			Object[] args = Arr.toArray(vargs);
 			var lit = It.iter(args[args.length - 1]);
 			var it = It.concat(Arr.toIter(args, 1, args.length - 1), lit);
@@ -668,13 +669,13 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "call", vargs = true, helper = true)
-		public static <R, ANY, ITR> R call(ANY o, I.Fn f, ITR vargs) {
+		public static <R, ANY, ITR> R call(ANY o, IFn f, ITR vargs) {
 			Object[] arr = Arr.toArray(It.concat(It.objects(o), It.iter(vargs)));
 			return (R) f.apply(arr);
 		}
 
 		@Module.Fn(name = "comp", vargs = true, complete = true)
-		public static <FN, ITR> I.Fn comp(ITR fns) {
+		public static <FN, ITR> IFn comp(ITR fns) {
 			return new Fn.T.Comp(fns);
 		}
 
@@ -689,7 +690,7 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "group-by", helper = true)
-		public static <ITR, K> Map.Standard<K, List> groupBy(I.Fn fk, I.Fn fv, ITR source) {
+		public static <ITR, K> Map.Standard<K, List> groupBy(IFn fk, IFn fv, ITR source) {
 			return (Standard<K, List>) 
 					It.reduceIn(It.iter(source), (Map<K, List>) Map.Standard.EMPTY, (m, e) -> {
 				K key = (K) fk.invoke(e);
@@ -702,7 +703,7 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "group-by", complete = true)
-		public static <FN, ITR> Map.Standard groupBy(I.Pair<FN, FN> f, ITR source) {
+		public static <FN, ITR> Map.Standard groupBy(IPair<FN, FN> f, ITR source) {
 			return groupBy(Fn.toFn(f.getKey()), Fn.toFn(f.getValue()), source);
 		}
 
@@ -712,13 +713,13 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "juxt", vargs = true, complete = true)
-		public static <FN, ITR> I.Fn<Iterator, Iterator, Object> juxt(ITR fns) {
+		public static <FN, ITR> IFn<Iterator, Iterator, Object> juxt(ITR fns) {
 			var jl = It.toArray(It.map(It.iter(fns), Fn::toFn));
-			return Fn.toFn((Function) (e) -> Struct.vector(It.map(It.iter(jl), (f) -> ((I.Fn) f).invoke(e))));
+			return Fn.toFn((Function) (e) -> Struct.vector(It.map(It.iter(jl), (f) -> ((IFn) f).invoke(e))));
 		}
 
 		@Module.Fn(name = "keep", complete = true)
-		public static <FN> I.Fn<Iterator, Iterator, Object> keep(FN f) {
+		public static <FN> IFn<Iterator, Iterator, Object> keep(FN f) {
 			return keep(Fn.toFn(f));
 		}
 
@@ -728,18 +729,18 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "keep", helper = true)
-		public static I.Fn<Iterator, Iterator, Object> keep(I.Fn f) {
+		public static IFn<Iterator, Iterator, Object> keep(IFn f) {
 			return Fn.toFn((Function) (source) -> keep(f, source));
 		}
 
 		@Module.Fn(name = "keep", helper = true)
-		public static <ITR> Iterator keep(I.Fn f, ITR source) {
+		public static <ITR> Iterator keep(IFn f, ITR source) {
 			var it = It.iter(source);
 			return It.from(it::hasNext, () -> f.invoke(it.next()));
 		}
 
 		@Module.Fn(name = "map", complete = true)
-		public static <FN> I.Fn<Iterator, Iterator, Object> map(FN f) {
+		public static <FN> IFn<Iterator, Iterator, Object> map(FN f) {
 			return map(Fn.toFn(f));
 		}
 
@@ -749,18 +750,18 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "map", helper = true)
-		public static I.Fn<Iterator, Iterator, Object> map(I.Fn f) {
+		public static IFn<Iterator, Iterator, Object> map(IFn f) {
 			return Fn.toFn((Function) (source) -> map(f, source));
 		}
 
 		@Module.Fn(name = "map", helper = true)
-		public static <ITR> Iterator map(I.Fn f, ITR source) {
+		public static <ITR> Iterator map(IFn f, ITR source) {
 			var it = It.iter(source);
 			return It.from(it::hasNext, () -> f.invoke(it.next()));
 		}
 
 		@Module.Fn(name = "map:apply", complete = true)
-		public static <FN> I.Fn<Iterator, Iterator, Object> mapApply(FN f) {
+		public static <FN> IFn<Iterator, Iterator, Object> mapApply(FN f) {
 			return mapApply(Fn.toFn(f));
 		}
 
@@ -770,18 +771,18 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "map:apply", helper = true)
-		public static I.Fn<Iterator, Iterator, Object> mapApply(I.Fn f) {
+		public static IFn<Iterator, Iterator, Object> mapApply(IFn f) {
 			return Fn.toFn((Function) (source) -> mapApply(f, source));
 		}
 
 		@Module.Fn(name = "map:apply", helper = true)
-		public static <ITR> Iterator mapApply(I.Fn f, ITR source) {
+		public static <ITR> Iterator mapApply(IFn f, ITR source) {
 			var it = It.iter(source);
 			return It.from(it::hasNext, () -> f.apply(it.next()));
 		}
 
 		@Module.Fn(name = "mapcat", complete = true)
-		public static <FN> I.Fn<Iterator, Iterator, Object> mapcat(FN f) {
+		public static <FN> IFn<Iterator, Iterator, Object> mapcat(FN f) {
 			return mapcat(Fn.toFn(f));
 		}
 
@@ -791,12 +792,12 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "mapcat", helper = true)
-		public static I.Fn<Iterator, Iterator, Object> mapcat(I.Fn f) {
+		public static IFn<Iterator, Iterator, Object> mapcat(IFn f) {
 			return Fn.toFn((Function) (source) -> mapcat(f, source));
 		}
 
 		@Module.Fn(name = "mapcat", helper = true)
-		public static <ITR> Iterator mapcat(I.Fn f, ITR source) {
+		public static <ITR> Iterator mapcat(IFn f, ITR source) {
 			var it = It.iter(source);
 			return It.mapcat(it, (e) -> (Iterator) f.invoke(e));
 		}
@@ -807,19 +808,19 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "map:entries", helper = true)
-		public static <ITR> Map.Standard mapEntries(I.Fn f, ITR source) {
+		public static <ITR> Map.Standard mapEntries(IFn f, ITR source) {
 			Iterator<Entry> it = It.iter(source);
 			return Map.Standard.into(It.map(it, e -> (Entry) f.invoke(e)));
 		}
 
 		@Module.Fn(name = "map:juxt", helper = true)
-		public static <ITR> Map.Standard mapJuxt(I.Fn fk, I.Fn fv, ITR source) {
+		public static <ITR> Map.Standard mapJuxt(IFn fk, IFn fv, ITR source) {
 			var it = It.iter(source);
 			return Map.Standard.into(It.map(it, e -> Struct.pair(fk.invoke(e), fv.invoke(e))));
 		}
 
 		@Module.Fn(name = "map:juxt", complete = true)
-		public static <FN, ITR> Map.Standard mapJuxt(I.Pair<FN, FN> f, ITR source) {
+		public static <FN, ITR> Map.Standard mapJuxt(IPair<FN, FN> f, ITR source) {
 			return mapJuxt(Fn.toFn(f.getKey()), Fn.toFn(f.getValue()), source);
 		}
 
@@ -829,7 +830,7 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "map:keys", helper = true)
-		public static <ITR> Map.Standard mapKeys(I.Fn f, ITR source) {
+		public static <ITR> Map.Standard mapKeys(IFn f, ITR source) {
 			Iterator<Entry> it = It.iter(source);
 			return Map.Standard.into(It.map(it, e -> Struct.pair(f.invoke(e.getKey()), e.getValue())));
 		}
@@ -840,7 +841,7 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "map:vals", helper = true)
-		public static <ITR> Map.Standard mapVals(I.Fn f, ITR source) {
+		public static <ITR> Map.Standard mapVals(IFn f, ITR source) {
 			Iterator<Entry> it = It.iter(source);
 			return Map.Standard.into(It.map(it, e -> Struct.pair(e.getKey(), f.invoke(e.getValue()))));
 		}
@@ -851,12 +852,12 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "partial", vargs = true, complete = true)
-		public static <FN, ITR> I.Fn partial(FN f, ITR vargs) {
+		public static <FN, ITR> IFn partial(FN f, ITR vargs) {
 			return new Fn.T.Partial(f, vargs);
 		}
 
 		@Module.Fn(name = "partition:pair", helper = true)
-		public static I.Fn<Iterator, Iterator, Object> partitionPair() {
+		public static IFn<Iterator, Iterator, Object> partitionPair() {
 			return Fn.toFn((Function) (s) -> partitionPair(s));
 		}
 
@@ -867,9 +868,9 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "pipe", vargs = true, complete = true)
-		public static <FN, ITR> I.Fn<Iterator, Iterator, Object> pipe(ITR fns) {
+		public static <FN, ITR> IFn<Iterator, Iterator, Object> pipe(ITR fns) {
 			var pl = It.toArray(It.map(It.iter(fns), Fn::toFn));
-			return Fn.toFn((Function) (it) -> Arr.reduce((i, f) -> (Iterator) ((I.Fn) f).invoke(i), it, pl));
+			return Fn.toFn((Function) (it) -> Arr.reduce((i, f) -> (Iterator) ((IFn) f).invoke(i), it, pl));
 		}
 
 		@Module.Fn(name = "reduce", complete = true)
@@ -888,7 +889,7 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "reduce", helper = true)
-		public static <ITR, R> R reduce(I.Fn f, I.Fn end, R init, ITR source) {
+		public static <ITR, R> R reduce(IFn f, IFn end, R init, ITR source) {
 			var it = It.iter(source);
 			return (R) It.reduce(
 					it, 
@@ -898,13 +899,13 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "reduce", helper = true)
-		public static <ITR, R> R reduce(I.Fn f, ITR source) {
+		public static <ITR, R> R reduce(IFn f, ITR source) {
 			var it = It.iter(source);
 			return (R) It.reduce(it, (acc, e) -> f.invoke(acc, e));
 		}
 
 		@Module.Fn(name = "reduce", helper = true)
-		public static <ITR, R> R reduce(I.Fn f, R init, ITR source) {
+		public static <ITR, R> R reduce(IFn f, R init, ITR source) {
 			var it = It.iter(source);
 			return (R) It.reduce(it, init, (acc, e) -> (R)f.invoke(acc, e));
 		}
@@ -915,7 +916,7 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "reduce-in", helper = true)
-		public static <ITR, R> R reduceIn(R init, I.Fn f, ITR source) {
+		public static <ITR, R> R reduceIn(R init, IFn f, ITR source) {
 			var it = It.iter(source);
 			return (R) It.reduceIn(it, init, (acc, e) -> (R)f.invoke(acc, e));
 		}
@@ -1059,27 +1060,27 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "sys:path", rt = true)
-		public static I.Coll<URL> sysPath(IRuntime rt) {
+		public static IColl<URL> sysPath(IRuntime rt) {
 			return rt.pathCache();
 		}
 		
 		@Module.Fn(name = "sys:path-add", rt = true)
-		public static <ITR> I.Coll<String> sysPathAdd(IRuntime rt, ITR paths) {
+		public static <ITR> IColl<String> sysPathAdd(IRuntime rt, ITR paths) {
 			return rt.pathAdd((String[]) It.toArray(It.iter(paths), String.class));
 		}
 		
 		@Module.Fn(name = "sys:path-remove", rt = true)
-		public static <ITR> I.Coll<String> sysPathRemove(IRuntime rt, ITR paths) {
+		public static <ITR> IColl<String> sysPathRemove(IRuntime rt, ITR paths) {
 			return rt.pathRemove((String[]) It.toArray(It.iter(paths), String.class));
 		}
 		
 		@Module.Fn(name = "sys:path-purge", rt = true)
-		public static I.Coll<String> sysPathPurge(IRuntime rt) {
-			return (I.Coll)rt.pathCache().empty();
+		public static IColl<String> sysPathPurge(IRuntime rt) {
+			return (IColl)rt.pathCache().empty();
 		}
 		
 		@Module.Fn(name = "sys:globals", rt = true)
-		public static I.Find sysGlobals(IRuntime rt) {
+		public static IFind sysGlobals(IRuntime rt) {
 			return rt.getEnv().getMap();
 		}
 
@@ -1089,7 +1090,7 @@ public interface Builtin {
 		}
 		
 		@Module.Fn(name = "sys:root", rt = true)
-		public static I.Context sysRoot(IRuntime rt) {
+		public static IContext sysRoot(IRuntime rt) {
 			return rt.getRoot();
 		}
 		
@@ -1109,12 +1110,12 @@ public interface Builtin {
 		}
 		
 		@Module.Fn(name = "sys:alias-purge", rt = true)
-		public static I.Coll sysAliasPurge(IRuntime rt, Symbol sym) {
-			return (I.Coll) rt.aliasCache().empty();
+		public static IColl sysAliasPurge(IRuntime rt, Symbol sym) {
+			return (IColl) rt.aliasCache().empty();
 		}
 
 		@Module.Fn(name = "sys:alias", rt = true)
-		public static I.Coll sysListAlias(IRuntime rt) {
+		public static IColl sysListAlias(IRuntime rt) {
 			return rt.aliasCache();
 		}
 		
@@ -1127,22 +1128,22 @@ public interface Builtin {
 		}
 		
 		@Module.Fn(name = "sys:cache", rt = true)
-		public static I.Coll sysCache(IRuntime rt) {
+		public static IColl sysCache(IRuntime rt) {
 			return rt.classCache();
 		}
 		
 		@Module.Fn(name = "sys:cache-add", rt = true)
-		public static I.Coll sysCacheAdd(IRuntime rt, String name, Class cls) {
-			return (I.Coll) ((I.Assoc)rt.classCache()).assoc(name, cls);
+		public static IColl sysCacheAdd(IRuntime rt, String name, Class cls) {
+			return (IColl) ((IAssoc)rt.classCache()).assoc(name, cls);
 		}
 		
 		@Module.Fn(name = "sys:cache-purge", rt = true)
-		public static I.Coll sysCachePurge(IRuntime rt) {
-			return (I.Coll) rt.classCache().empty();
+		public static IColl sysCachePurge(IRuntime rt) {
+			return (IColl) rt.classCache().empty();
 		}
 		
 		@Module.Fn(name = "sys:cache-remove", rt = true, vargs = true)
-		public static <ITR> I.Coll sysCacheRemove(IRuntime rt, ITR names) {
+		public static <ITR> IColl sysCacheRemove(IRuntime rt, ITR names) {
 			return It.reduce(
 					It.iter(names), 
 					rt.classCache(),
@@ -1261,7 +1262,7 @@ public interface Builtin {
 		}
 
 		@Module.Fn(name = "pair", complete = true)
-		public static <K, V> I.Pair<K, V> pair(K key, V val) {
+		public static <K, V> IPair<K, V> pair(K key, V val) {
 			return new Std.T.Tup2.L(null, key, val);
 		}
 
@@ -1342,7 +1343,7 @@ public interface Builtin {
 	public interface Time {
 
 		@Module.Fn(name = "bench:fn", complete = true)
-		public static long bench(I.Fn f) {
+		public static long bench(IFn f) {
 			long start = Ut.Clock.currentTimeNanos();
 			f.invoke();
 			long end = Ut.Clock.currentTimeNanos();
@@ -1380,8 +1381,8 @@ public interface Builtin {
 							return "";
 						} else if(e instanceof String) {
 							return (String)e;
-						} else if (e instanceof I.Display) {
-							return ((I.Display)e).display();
+						} else if (e instanceof IDisplay) {
+							return ((IDisplay)e).display();
 						} else {
 							return e.toString();
 						}

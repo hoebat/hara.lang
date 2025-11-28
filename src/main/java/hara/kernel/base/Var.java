@@ -4,9 +4,11 @@ import hara.lang.base.*;
 import hara.lang.data.*;
 
 import static hara.kernel.base.Builtin.Basic.*;
+import hara.lang.protocol.Constant;
+import hara.lang.protocol.*;
 
 public class Var extends Data.NamespacedType.MT 
-	implements Data.StringType, Data.VarType, I.Reset<Object> {
+	implements Data.StringType, Data.VarType, IReset<Object> {
 
 	Object _val;
 
@@ -26,8 +28,8 @@ public class Var extends Data.NamespacedType.MT
 	}
 
 	@Override
-	public G.ObjType getObjType() {
-		return G.ObjType.POINTER;
+	public Constant.ObjType getObjType() {
+		return Constant.ObjType.POINTER;
 	}
 	
 

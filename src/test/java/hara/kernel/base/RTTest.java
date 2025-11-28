@@ -2,7 +2,7 @@ package hara.kernel.base;
 
 import org.junit.Test;
 import static org.junit.Assert.*;
-import hara.lang.base.I;
+import hara.lang.protocol.*;
 import hara.lang.data.Symbol;
 import java.math.BigInteger;
 

@@ -6,16 +6,18 @@ import java.util.Map.Entry;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
-import hara.lang.base.I.PopFirst;
-import hara.lang.base.I.PushFirst;
+import hara.lang.protocol.IPopFirst;
+import hara.lang.protocol.IPushFirst;
+import hara.lang.protocol.Constant;
+import hara.lang.protocol.*;
 
 public interface Data {
 	
 
-	public interface StringType extends I.Hash {
+	public interface StringType extends IHash {
 
 		@Override
-		default long hashCalc(G.HashType t) {
+		default long hashCalc(Constant.HashType t) {
 			switch(t) {
 			case SYSTEM: return (hashSeed()+"|"+toString()).hashCode();
 			case MURMUR3: return Ut.Murmur3.hashChars(hashSeed()+"|"+toString());
@@ -28,10 +30,10 @@ public interface Data {
 		}
 	}
 	
-	public interface OrderedType<E> extends Iterable<E>, I.Hash{
+	public interface OrderedType<E> extends Iterable<E>, IHash{
 
 		@Override
-		default long hashCalc(G.HashType t) {
+		default long hashCalc(Constant.HashType t) {
 			
 			Function<Object, Long> f = G.hashFn(t);
 			return It.reduce(
@@ -41,10 +43,10 @@ public interface Data {
 		}
 	}
 	
-	public interface UnOrderedType<E> extends Iterable<E>, I.Hash{
+	public interface UnOrderedType<E> extends Iterable<E>, IHash{
 
 		@Override
-		default long hashCalc(G.HashType t) {
+		default long hashCalc(Constant.HashType t) {
 			Function<Object, Long> f = G.hashFn(t);
 			
 			return It.reduce(
@@ -56,20 +58,20 @@ public interface Data {
 	
 	
 	public interface SetType<E>
-			extends I.Coll<E>,
-					I.ObjType, 
-					I.Dissoc<E>, 
-					I.Find<E, E>,
+			extends IColl<E>,
+					IObjType,
+					IDissoc<E>,
+					IFind<E, E>,
 					UnOrderedType<E>,
-					I.Fn<E, E, E> {
+					IFn<E, E, E> {
 
 		default java.util.Set<E> asJavaSet() {
 			return null;
 		}
 		
 		@Override
-		default G.ObjType getObjType() {
-			return G.ObjType.SET;
+		default Constant.ObjType getObjType() {
+			return Constant.ObjType.SET;
 		}
 		
 		@SuppressWarnings({ "unchecked", "rawtypes" })
@@ -115,27 +117,27 @@ public interface Data {
 	}
 
 	public interface MapType<K, V>
-			extends I.Coll<Entry<K, V>>,
-					I.ObjType,
-					I.Metadata,
-					I.Lookup<K, V>, 
-					I.Assoc<K, V>,
-					I.Dissoc<K>, 
-					I.Find<K, Entry<K, V>>,
+			extends IColl<Entry<K, V>>,
+					IObjType,
+					IMetadata,
+					ILookup<K, V>,
+					IAssoc<K, V>,
+					IDissoc<K>,
+					IFind<K, Entry<K, V>>,
 					UnOrderedType<Entry<K, V>>,
-					I.Fn <V, K, V> {
+					IFn <V, K, V> {
 		default java.util.Map<K, V> asJavaMap() {
 			return null;
 		}
 		
 		@Override
-		default G.MetaType getMetatype() {
-			return G.MetaType.MAP;
+		default Constant.MetaType getMetatype() {
+			return Constant.MetaType.MAP;
 		}	
 
 		@Override
-		default G.ObjType getObjType() {
-			return G.ObjType.MAP;
+		default Constant.ObjType getObjType() {
+			return Constant.ObjType.MAP;
 		}
 		
 		@Override
@@ -232,13 +234,13 @@ public interface Data {
 
 	public interface NamespacedType {
 	
-		public abstract class MT extends RefType.MT implements I.Namespaced {
+		public abstract class MT extends RefType.MT implements INamespaced {
 	
 			private final String _name;
 			private final String _ns;
 			private transient String _str;
 	
-			public MT(I.Metadata meta, String nsname) {
+			public MT(IMetadata meta, String nsname) {
 				super(meta);
 	
 				int i = nsname.indexOf('/');
@@ -251,7 +253,7 @@ public interface Data {
 				}
 			}
 	
-			public MT(I.Metadata meta, String ns, String name) {
+			public MT(IMetadata meta, String ns, String name) {
 				super(meta);
 				_ns = ns;
 				_name = name;
@@ -278,13 +280,13 @@ public interface Data {
 			}
 		}
 	
-		public abstract class PT extends RefType.PT implements I.Namespaced {
+		public abstract class PT extends RefType.PT implements INamespaced {
 	
 			private final String _name;
 			private final String _ns;
 			private transient String _str;
 	
-			public PT(I.Metadata meta, String nsname) {
+			public PT(IMetadata meta, String nsname) {
 				super(meta);
 	
 				int i = nsname.indexOf('/');
@@ -297,7 +299,7 @@ public interface Data {
 				}
 			}
 	
-			public PT(I.Metadata meta, String ns, String name) {
+			public PT(IMetadata meta, String ns, String name) {
 				super(meta);
 				_ns = ns;
 				_name = name;
@@ -328,11 +330,11 @@ public interface Data {
 	public interface RefType {
 		
 		abstract class MT extends Obj.MT implements 
-			I.HashCached,
-			I.ObjType {
+			IHashCached,
+			IObjType {
 			private long _hash;
 	
-			public MT(I.Metadata meta) {
+			public MT(IMetadata meta) {
 				super(meta);
 			}
 	
@@ -348,11 +350,11 @@ public interface Data {
 		}
 		
 		abstract class PT extends Obj.PT implements 
-			I.HashCached,
-			I.ObjType  {
+			IHashCached,
+			IObjType  {
 			private long _hash;
 	
-			public PT(I.Metadata meta) {
+			public PT(IMetadata meta) {
 				super(meta);
 			}
 	
@@ -369,14 +371,14 @@ public interface Data {
 	} 
 
 	public interface VectorType<E>
-			extends I.Coll<E>, 
+			extends IColl<E>,
 					SequentialType<E>, 
 					SequentialLookupType<E>, 
 					LinearType<E>,
-					I.Nth<E>, 
-					I.PopLast, 
-					I.PushLast<E>,
-					I.Fn <E, Integer, E> {
+					INth<E>,
+					IPopLast,
+					IPushLast<E>,
+					IFn <E, Integer, E> {
 	
 		@Override
 		default VectorType<E> conj(E v) {
@@ -400,14 +402,14 @@ public interface Data {
 	}
 	
 	public interface DepsType<K, E> {
-		E depGet(I.Context ctx, K id);
-		SetType<E> depEntries(I.Context ctx, K id);
-		Iterator<K> depIds(I.Context ctx);
+		E depGet(IContext ctx, K id);
+		SetType<E> depEntries(IContext ctx, K id);
+		Iterator<K> depIds(IContext ctx);
 	}
 
 
 	public interface SequentialLookupType<E>
-		extends SequentialType<E>, Iterable<E>, I.Count, I.Nth<E>, I.Lookup<Long, E>, I.PeekFirst<E>, I.PeekLast<E> {
+		extends SequentialType<E>, Iterable<E>, ICount, INth<E>, ILookup<Long, E>, IPeekFirst<E>, IPeekLast<E> {
 	
 		@Override
 		default Entry<Long, E> find(Long idx) {
@@ -462,10 +464,10 @@ public interface Data {
 
 	public interface SequentialType<E> extends 
 		Iterable<E>, 
-		I.Count, 
-		I.Equality, 
-		I.Hash,
-		I.ObjType,
+		ICount,
+		IEquality,
+		IHash,
+		IObjType,
 		OrderedType<E> {
 	
 		@SuppressWarnings({ "unchecked", "rawtypes" })
@@ -487,19 +489,19 @@ public interface Data {
 		}
 	
 		@Override
-		default G.ObjType getObjType() {
-			return G.ObjType.SEQUENTIAL;
+		default Constant.ObjType getObjType() {
+			return Constant.ObjType.SEQUENTIAL;
 		}
 	}
 	
 	public interface LinkedType<E>
-		extends I.Coll<E>,
-				I.PushFirst<E>,
-				I.PopFirst,
-				I.PeekFirst<E>,
-				I.Cons<E>,
-				I.Conj<E>,
-				I.Count{
+		extends IColl<E>,
+				IPushFirst<E>,
+				IPopFirst,
+				IPeekFirst<E>,
+				ICons<E>,
+				IConj<E>,
+				ICount{
 		
 		@Override
 		default LinkedType<E> cons(E e) {
@@ -523,17 +525,17 @@ public interface Data {
 	}
 	
 	public interface LinearType<E>
-		extends I.Coll<E>,
-				I.PushFirst<E>,
-				I.PushLast<E>,
-				I.PopFirst,
-				I.PopLast,
-				I.PeekFirst<E>,
-				I.PeekLast<E>,
-				I.Cons<E>,
-				I.Conj<E>,
-				I.Nth<E>,
-				I.Count{
+		extends IColl<E>,
+				IPushFirst<E>,
+				IPushLast<E>,
+				IPopFirst,
+				IPopLast,
+				IPeekFirst<E>,
+				IPeekLast<E>,
+				ICons<E>,
+				IConj<E>,
+				INth<E>,
+				ICount{
 		
 		@Override
 		default LinearType<E> cons(E e) {
@@ -546,12 +548,12 @@ public interface Data {
 		}
 
 		@Override
-		default PushFirst<E> pushFirst(E e) {
+		default IPushFirst<E> pushFirst(E e) {
 			throw new Ex.Unsupported();
 		}
 
 		@Override
-		default PopFirst popFirst() {
+		default IPopFirst popFirst() {
 			throw new Ex.Unsupported();
 		}
 		
@@ -570,7 +572,7 @@ public interface Data {
 		public LinearType<E> subview(int start, int end);
 	}
 	
-	public interface VarType extends I.Deref<Object> {
+	public interface VarType extends IDeref<Object> {
 		Boolean isDynamic();
 		Boolean isMacro();
 		Boolean isControl();
