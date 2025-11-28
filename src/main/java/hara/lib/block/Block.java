@@ -158,7 +158,12 @@ public interface Block {
 
         @Override
         public hara.lang.base.G.ObjType getObjType() {
-          return hara.lang.base.G.ObjType.BLOCK;
+          return hara.lang.base.G.ObjType.CLASS;
+        }
+
+        @Override
+        public String getObjName() {
+            return "BLOCK";
         }
 
         @Override
@@ -216,7 +221,12 @@ public interface Block {
 
         @Override
         public hara.lang.base.G.ObjType getObjType() {
-          return hara.lang.base.G.ObjType.BLOCK;
+          return hara.lang.base.G.ObjType.CLASS;
+        }
+
+        @Override
+        public String getObjName() {
+            return "BLOCK";
         }
 
         @Override
@@ -284,7 +294,12 @@ public interface Block {
 
         @Override
         public hara.lang.base.G.ObjType getObjType() {
-          return hara.lang.base.G.ObjType.BLOCK;
+          return hara.lang.base.G.ObjType.CLASS;
+        }
+
+        @Override
+        public String getObjName() {
+            return "BLOCK";
         }
 
         @Override
@@ -359,7 +374,12 @@ public interface Block {
 
         @Override
         public hara.lang.base.G.ObjType getObjType() {
-          return hara.lang.base.G.ObjType.BLOCK;
+          return hara.lang.base.G.ObjType.CLASS;
+        }
+
+        @Override
+        public String getObjName() {
+            return "BLOCK";
         }
 
         @Override
@@ -426,7 +446,12 @@ public interface Block {
 
         @Override
         public hara.lang.base.G.ObjType getObjType() {
-          return hara.lang.base.G.ObjType.BLOCK;
+          return hara.lang.base.G.ObjType.CLASS;
+        }
+
+        @Override
+        public String getObjName() {
+            return "BLOCK";
         }
 
         @Override
