@@ -12,7 +12,7 @@
 	<url>http://maven.apache.org</url>
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<mainclass>hara.lang.kernel.Main</mainclass>
+		<mainclass>hara.kernel.Main</mainclass>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -86,7 +86,7 @@
 				<artifactId>maven-compiler-plugin</artifactId>
 				<version>3.8.1</version>
 				<configuration>
-					<release>11</release>
+					<release>21</release>
 				</configuration>
 			</plugin>
 			<plugin>
@@ -96,7 +96,7 @@
 				<configuration>
 					<archive>
 						<manifest>
-							<mainClass>hara.lang.kernel.Main</mainClass>
+							<mainClass>hara.kernel.Main</mainClass>
 						</manifest>
 					</archive>
 				</configuration>

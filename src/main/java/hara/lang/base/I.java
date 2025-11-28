@@ -91,37 +91,6 @@ public interface I {
 		Empty empty();
 	}
 
-	public interface Env<K, V> extends I.Lookup<K, V> {
-		Env<K, V> getParent();
-
-		I.Lookup<K, V> getMap();
-
-		@SuppressWarnings("rawtypes")
-		I.Runtime getRuntime();
-		
-		@Override
-		default Entry<K, V> find(K k) {
-			Entry<K, V> e = getMap().find(k);
-			if(e == null) {
-				Env<K, V> env = getParent();
-				if(env != null) {
-					return env.find(k);
-				}
-			}
-			return e;
-		}
-
-		@Override
-		default Iterator<K> keys() {
-			throw new Ex.Unsupported();
-		}
-
-		@Override
-		default Iterator<V> vals() {
-			throw new Ex.Unsupported();
-		}
-	}
-	
 	public interface Equality {
 		boolean equality(Object other);
 	}
@@ -317,11 +286,17 @@ public interface I {
 
 	public interface ObjType extends Hash, Display {
 
-		G.ObjType getObjType();
+		default G.ObjType getObjType() {
+			return G.ObjType.CLASS;
+		}
+
+		default String getObjName() {
+			return getObjType().toString();
+		}
 
 		@Override
 		default String hashSeed() {
-			return "HARA::" + getObjType().toString() + "";
+			return "::" + getObjName() + "";
 		}
 
 		I.Metadata meta();
@@ -377,29 +352,6 @@ public interface I {
 
 	public interface Reset<V> {
 		V reset(V v);
-	}
-
-	@SuppressWarnings("rawtypes")
-	public interface Runtime<AST, K, V> extends Context {
-		Fn           findFn(Class cls, String name);
-		Fn           findFn(Class cls, String name, int args);
-		Object       eval(AST ast);
-		Object       eval(AST ast, Env env);
-		Env<K, V>    getEnv();
-		V            getObj(K key);
-		V            setObj(K key, V value);
-		AST          readString(String input);
-		Class        classFor(String name);
-		ClassLoader  classLoader();
-		Coll<Entry<String, Class>> classCache();
-		Context      getRoot();
-		Coll<URL>    pathCache();
-		Coll<URL>    pathAdd(URL url);
-		Coll<URL>    pathAdd(String[] paths);
-		Coll<URL>    pathRemove(String[] paths);
-		Class        aliasAdd(K key, Class v);
-		Class        aliasRemove(K key);
-		Coll<Entry<String, Class>>  aliasCache();
 	}
 
 	public interface ToMutable extends Persistent {
