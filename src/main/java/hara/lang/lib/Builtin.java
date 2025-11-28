@@ -1051,6 +1051,11 @@ public interface Builtin {
 			return rt.readString(input);
 		}
 
+		@Module.Fn(name = "ctl", vargs = true, rt = true)
+		public static <ITR> Object ctl(I.Runtime rt, ITR args) {
+			return rt.getRoot().call(Arr.toArray(args));
+		}
+
 		@Module.Fn(name = "sys:path", rt = true)
 		public static I.Coll<URL> sysPath(I.Runtime rt) {
 			return rt.pathCache();

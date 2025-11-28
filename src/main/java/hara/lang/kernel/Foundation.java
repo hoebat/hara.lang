@@ -2,9 +2,11 @@ package hara.lang.kernel;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.concurrent.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.lang.reflect.Method;
 
 import hara.lang.base.Arr;
 import hara.lang.base.Ex;
@@ -24,36 +26,111 @@ public class Foundation implements I.Context {
 
 	static final int DEFAULT_PORT = 4164;
 	
+	public static class Peer {
+		public final String name;
+		public final String host;
+		public final int port;
+
+		public Peer(String name, String host, int port) {
+			this.name = name;
+			this.host = host;
+			this.port = port;
+		}
+
+		@Override
+		public String toString() {
+			return name + "@" + host + ":" + port;
+		}
+	}
+
 	public final ConcurrentHashMap<String,Server> SERVERS = new ConcurrentHashMap<String,Server>();
 	public final ConcurrentHashMap<String,I.Runtime> RTS = new ConcurrentHashMap<String,I.Runtime>();
+	public final ConcurrentHashMap<String,Peer> PEERS = new ConcurrentHashMap<String,Peer>();
+	public final ConcurrentHashMap<String, Command.Type> REGISTRY = new ConcurrentHashMap<>();
 
-	public enum COMMAND {
-		HELP, SHUTDOWN, DIR, PING, ECHO, OS, JVM, SERVER, SESSION, EVAL, COMPILE, MAVEN
+	public Foundation() {
+		loadCommands(Arrays.asList(
+			hara.lang.kernel.command.Core.class,
+			hara.lang.kernel.command.Jvm.class,
+			hara.lang.kernel.command.Os.class,
+			hara.lang.kernel.command.Server.class,
+			hara.lang.kernel.command.Session.class,
+			hara.lang.kernel.command.Peer.class,
+			hara.lang.kernel.command.Maven.class
+		));
 	}
-	
-	public enum OS {
-		HELP, PWD, LS, RUN
+
+	public void register(String name, Command.Type cmd) {
+		REGISTRY.put(name, cmd);
 	}
-	
-	public enum JVM {
-		HELP, HOME, PROPS, ENV, VERSION, VENDOR, BOOTPATH, 
-		CLASSPATH, CP, CLASSLOADER,
-	}
-	
-	public enum SERVER {
-		HELP, NEW, EXISTS, LIST, INFO, STOP
-	}
-	
-	public enum SESSION {
-		HELP, NEW, GET, EXISTS, LIST, INFO, KILL, PATH
+
+	public void loadCommands(java.util.List<Class<?>> classes) {
+		for (Class<?> cls : classes) {
+			// Check for Class-level Command.Fn
+			Command.Fn classCmd = cls.getAnnotation(Command.Fn.class);
+			if (classCmd != null) {
+				// Build Dispatcher
+				Map<String, Method> subCommands = new HashMap<>();
+				for (Method method : cls.getDeclaredMethods()) {
+					Command.Sub sub = method.getAnnotation(Command.Sub.class);
+					if (sub != null) {
+						subCommands.put(sub.name(), method);
+					}
+				}
+
+				register(classCmd.name(), (F, args) -> {
+					if (args.isEmpty()) {
+						// Default to HELP if no subcommand
+						java.util.Set<String> keys = new java.util.HashSet<>(subCommands.keySet());
+						keys.add("HELP");
+						return It.toArrayList(Arr.toIter(keys.toArray()));
+					}
+
+					String subName = args.get(0).toString().toUpperCase();
+
+					// Auto-HELP
+					if ("HELP".equals(subName)) {
+						java.util.Set<String> keys = new java.util.HashSet<>(subCommands.keySet());
+						keys.add("HELP");
+						return It.toArrayList(Arr.toIter(keys.toArray()));
+					}
+
+					Method m = subCommands.get(subName);
+					if (m != null) {
+						args.remove(0); // Consume subcommand
+						try {
+							return m.invoke(null, F, args);
+						} catch (Exception e) {
+							throw Ex.Sneaky(e);
+						}
+					}
+					throw new Ex.Unsupported("Unknown subcommand: " + subName);
+				});
+			} else {
+				// Scan for Method-level Command.Fn
+				for (Method method : cls.getDeclaredMethods()) {
+					Command.Fn annotation = method.getAnnotation(Command.Fn.class);
+					if (annotation != null) {
+						register(annotation.name(), (F, args) -> {
+							try {
+								return method.invoke(null, F, args);
+							} catch (Exception e) {
+								throw Ex.Sneaky(e);
+							}
+						});
+					}
+				}
+			}
+		}
 	}
 	
 	public enum CLASSPATH {
 		ADD, LIST, REMOVE, PURGE
 	}
 
-	public enum MAVEN {
-		HELP, LOAD
+	@SuppressWarnings("unchecked")
+	public static java.util.List<String> toStringList(java.util.List<Object> args) {
+		return args.stream().map(Object::toString).collect(Collectors.toList());
 	}
 
 	@SuppressWarnings("unchecked")
@@ -95,8 +172,20 @@ public class Foundation implements I.Context {
 		}
 
 		public static java.util.List runDIR(Foundation F) {
-			return Arrays.asList("SERVERS", It.toArrayList(F.SERVERS.keys()), "RTS",
-					It.toArrayList(F.RTS.keys()));
+			return Arrays.asList(
+					"SERVERS", It.toArrayList(F.SERVERS.keys()),
+					"RTS", It.toArrayList(F.RTS.keys()),
+					"PEERS", It.toArrayList(F.PEERS.keys()));
+		}
+
+		public static Object runInfo(Foundation F) {
+			return mapToList(Map.of(
+				"java.version", System.getProperty("java.version"),
+				"os.name", System.getProperty("os.name"),
+				"sessions", F.RTS.size(),
+				"servers", F.SERVERS.size(),
+				"peers", F.PEERS.size()
+			));
 		}
 
 		public static String runProcess(java.util.List<String> args) {
@@ -113,58 +202,6 @@ public class Foundation implements I.Context {
 		public static java.util.List runHELP(Foundation F, Object enums) {
 			return It.toArrayList(
 					It.map(Arr.toIter(enums), (x) -> x.toString()));
-		}
-
-		public static Object runJVM(Foundation F, java.util.List<String> args) {
-			JVM cmd = JVM.valueOf(args.get(0));
-			args.remove(0);
-			
-			switch(cmd) {
-			case HELP: 			return Fn.runHELP(F, JVM.values());
-			case BOOTPATH:  	return run(Fn::JVM_PROPS, "sun.boot.library.path");
-			case CP:
-			case CLASSPATH: 	return run(Fn::JVM_PROPS, "java.class.path");
-			case CLASSLOADER: 	return ClassLoader.getSystemClassLoader().toString();
-			case ENV:     		return run(Fn::JVM_ENV, args);
-			case HOME:    		return run(Fn::JVM_PROPS, "java.home");
-			case PROPS:   		return run(Fn::JVM_PROPS, args);
-			case VENDOR:  		return run(Fn::JVM_PROPS, "java.vendor");
-			case VERSION: 		return run(Fn::JVM_PROPS, "java.version");
-			}
-			throw new Ex.Unsupported();
-		}
-		
-		public static Object runServer(Foundation F, java.util.List<String> args) {
-			SERVER cmd = SERVER.valueOf(args.get(0));
-			args.remove(0);
-			switch(cmd) {			
-			case HELP: return Fn.runHELP(F, SERVER.values());
-			case INFO:
-				break;
-			case LIST:
-				break;
-			case NEW:
-				break;
-			case STOP:
-				break;
-			case EXISTS:
-				break;
-			}
-			throw new Ex.Unsupported();
-		}
-		
-		public static Object runOS(Foundation F, java.util.List<String> args) {
-			OS cmd = OS.valueOf(args.get(0));
-			args.remove(0);
-			switch(cmd) {
-			case HELP:  return Fn.runHELP(F, OS.values());
-			case LS: 	args.add(0, "ls");
-						return runProcess(args);
-			case PWD: 	return run(Fn::JVM_ENV, "PWD");
-			case RUN: 	return runProcess(args);
-			}
-
-			throw new Ex.Unsupported();
 		}
 		
 		public static Object runSessionFor(Foundation F, String key, Function<RT.Instance, Object> f) {
@@ -207,82 +244,42 @@ public class Foundation implements I.Context {
 			}
 			throw new Ex.Unsupported();
 		}
-		
-
-		public static Object runSession(Foundation F, java.util.List<String> args) {
-			SESSION cmd = SESSION.valueOf(args.get(0));
-			args.remove(0);
-			
-			switch(cmd) {
-			case HELP:   return Fn.runHELP(F, SESSION.values());
-			case EXISTS: return runSessionFor(F, args.get(0), (rt) -> rt != null);
-			case GET:    return runSessionCreate(F, args, false);
-			case NEW:    return runSessionCreate(F, args, true);
-			case PATH:   return runSessionFor(F, args.get(0), (rt) -> runSessionClasspath(rt, args));
-			case LIST:   return It.toArrayList(F.RTS.keys());
-			case KILL:   return runSessionFor(F, args.get(0), (rt) -> F.RTS.remove(args.get(0)));
-			case INFO:   throw new Ex.TODO();
-			}
-			throw new Ex.Unsupported();
-		}
-
-		public static Object runMaven(Foundation F, java.util.List<String> args) {
-			MAVEN cmd = MAVEN.valueOf(args.get(0));
-			args.remove(0);
-
-			switch(cmd) {
-			case HELP:   return Fn.runHELP(F, MAVEN.values());
-			case LOAD:
-				return runSessionFor(F, args.get(0),
-					(rt) -> hara.lang.lib.Maven.load.invoke(rt, args.get(1))
-				);
-			}
-			throw new Ex.Unsupported();
-		}
 	}
-	
+
 	@SuppressWarnings("unchecked")
-	public static Object runCommand(Foundation F, java.util.List<String> args) {
-		var cmd = COMMAND.valueOf(args.get(0));
-		args.remove(0);
-		
-		switch (cmd) {
-		case HELP: return Fn.runHELP(F, COMMAND.values());
-		case PING: return "PONG";
-		case ECHO: return args;
-		case DIR:  return Fn.runDIR(F);
-		case JVM:  return Fn.runJVM(F, args);
-		case OS:   return Fn.runOS(F, args);
-		case SERVER: return Fn.runServer(F, args);
-		case SESSION: return Fn.runSession(F, args);
-		case MAVEN: return Fn.runMaven(F, args);
-		case EVAL: 
-			return Fn.runSessionFor(F, args.get(0), 
-					rt -> G.display(rt.eval(rt.readString(args.get(1)))));
-		case COMPILE:
-			try {
-				hara.lang.data.List expression = (hara.lang.data.List) Read.LispReader.readString(args.get(0), null);
-				Compiler compiler = new Compiler();
-				byte[] bytecode = compiler.compile(expression);
-				DynamicClassLoader loader = new DynamicClassLoader(Foundation.class.getClassLoader());
-				Class<?> clazz = loader.defineClass(null, bytecode);
-				return clazz.getConstructor().newInstance();
-			} catch (CompilerException e) {
-				throw new RuntimeException(e);
-			} catch (Exception e) {
-				throw Ex.Sneaky(e);
-			}
-		case SHUTDOWN: 
-			System.exit(1);
-			return null;
+	public static Object runCommand(Foundation F, java.util.List<Object> args) {
+		if (args.isEmpty()) {
+			throw new Ex.Runtime("No command specified");
 		}
-		throw new Ex.Unsupported();
+
+		Object cmdObj = args.get(0);
+		String name;
+
+		if (cmdObj instanceof I.Namespaced) {
+			name = ((I.Namespaced) cmdObj).getName();
+		} else if (cmdObj instanceof I.Display) {
+			String display = ((I.Display) cmdObj).display();
+			name = display.startsWith(":") ? display.substring(1) : display;
+		} else {
+			name = cmdObj.toString();
+		}
+
+		name = name.toUpperCase();
+
+		args.remove(0);
+
+		Command.Type cmd = F.REGISTRY.get(name);
+		if (cmd != null) {
+			return cmd.apply(F, args);
+		}
+
+		throw new Ex.Unsupported("Unknown command: " + name);
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	public Object call(Object... args) {
-		java.util.List<String> inputs = It.toArrayList(It.iter(args));
+		java.util.List<Object> inputs = It.toArrayList(It.iter(args));
 		return runCommand(this, inputs);
 	}
 
