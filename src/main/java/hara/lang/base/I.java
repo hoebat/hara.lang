@@ -4,6 +4,7 @@ import java.net.URL;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.Callable;
 import java.util.function.*;
 
 public interface I {
@@ -67,8 +68,13 @@ public interface I {
 		long count();
 	}
 
-	public interface Deref<V> {
+	public interface Deref<V> extends Supplier<V> {
 		V deref();
+
+		@Override
+		default V get() {
+			return deref();
+		}
 	}
 
 	public interface DerefTimeout<V> {
@@ -107,7 +113,7 @@ public interface I {
 		}
 	}
 
-	public interface Fn<R, T1, T2> extends Function<Object, R> {
+	public interface Fn<R, T1, T2> extends Function<Object, R>, Callable<R>, Supplier<R>, BiFunction<T1, T2, R>, Runnable {
 
 		@SuppressWarnings("rawtypes")
 		public static <R, T1, T2> R applyAsIterator(Fn<R, T1, T2> f, Iterator vargs) {
@@ -135,7 +141,7 @@ public interface I {
 			}
 		}
 		
-		@SuppressWarnings({"rawtypes" })
+		@SuppressWarnings({"rawtypes", "unchecked" })
 		@Override
 		default R apply(Object vargs) {
 			if (vargs instanceof Iterator) {
@@ -151,7 +157,7 @@ public interface I {
 			} else if (vargs instanceof Iterable) {
 				return applyAsIterator(this, (Iterator)vargs);
 			} else {
-				throw new Ex.Unsupported();
+				return invoke((T1)vargs);
 			}
 		}
 
@@ -185,6 +191,71 @@ public interface I {
 
 		default R invoke(Object... vargs) {
 			return getArgN().apply(vargs);
+		}
+
+		@Override
+		default R call() throws Exception {
+			return invoke();
+		}
+
+		@Override
+		default R get() {
+			return invoke();
+		}
+
+		@Override
+		default R apply(T1 t, T2 u) {
+			return invoke(t, u);
+		}
+
+		@Override
+		default void run() {
+			invoke();
+		}
+
+		@Override
+		default <V> Fn<V, T1, T2> andThen(Function<? super R, ? extends V> after) {
+			return new Fn<V, T1, T2>() {
+				@Override
+				public V invoke() {
+					return after.apply(Fn.this.invoke());
+				}
+
+				@Override
+				public V invoke(T1 a1) {
+					return after.apply(Fn.this.invoke(a1));
+				}
+
+				@Override
+				public V invoke(T1 a1, T2 a2) {
+					return after.apply(Fn.this.invoke(a1, a2));
+				}
+
+				@Override
+				public V invoke(Object... vargs) {
+					return after.apply(Fn.this.invoke(vargs));
+				}
+
+                @Override
+				public Supplier<V> getArg0() {
+					return () -> after.apply(Fn.this.getArg0().get());
+				}
+
+                @Override
+				public Function<T1, V> getArg1() {
+					return (a1) -> after.apply(Fn.this.getArg1().apply(a1));
+				}
+
+                @Override
+				public BiFunction<T1, T2, V> getArg2() {
+					return (a1, a2) -> after.apply(Fn.this.getArg2().apply(a1, a2));
+				}
+
+				@Override
+				public Function<Object, V> getArgN() {
+					return (vargs) -> after.apply(Fn.this.getArgN().apply(vargs));
+				}
+			};
 		}
 	}
 
