@@ -16,11 +16,11 @@ public interface It {
   public interface Nil {
     public static Iterator<Object> ITERATOR = new Iterator<Object>();
 
-    public class Iterator<V> implements T.EmptyIteratorType<V> {}
+    public class Iterator<V> implements EmptyIteratorType<V> {}
 
     public static ListIterator<Object> LIST_ITERATOR = new ListIterator<Object>();
 
-    public class ListIterator<V> implements T.EmptyListIteratorType<V> {}
+    public class ListIterator<V> implements EmptyListIteratorType<V> {}
 
     public static Spliterator<Object> SPLITERATOR = new Spliterator<Object>();
 
