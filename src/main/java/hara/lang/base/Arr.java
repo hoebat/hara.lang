@@ -2,6 +2,16 @@ package hara.lang.base;
 
 import java.lang.reflect.Array;
 import java.util.Arrays;
+import hara.lang.base.iter.ArrayIterator;
+import hara.lang.base.iter.BooleanArrayIterator;
+import hara.lang.base.iter.ByteArrayIterator;
+import hara.lang.base.iter.CharArrayIterator;
+import hara.lang.base.iter.DoubleArrayIterator;
+import hara.lang.base.iter.FloatArrayIterator;
+import hara.lang.base.iter.IntArrayIterator;
+import hara.lang.base.iter.LongArrayIterator;
+import hara.lang.base.iter.ReverseArrayIterator;
+import hara.lang.base.iter.ShortArrayIterator;
 import java.util.Iterator;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -107,277 +117,6 @@ public interface Arr {
     return s;
   }
 
-  public interface T {
-
-    public class ToIter<E> implements Iterator<E> {
-      final E[] _array;
-      int _i;
-      int _end;
-
-      public ToIter(E[] array, int i, int end) {
-        _i = i;
-        _array = array;
-        _end = end;
-      }
-
-      public ToIter(E[] array, int i) {
-        _i = i;
-        _array = array;
-        _end = array.length;
-      }
-
-      @Override
-      public boolean hasNext() {
-        return _array != null && _i < _end;
-      }
-
-      @Override
-      public E next() {
-        if (_array != null && _i < _end) return _array[_i++];
-        throw new java.util.NoSuchElementException();
-      }
-
-      @Override
-      public void remove() {
-        throw new UnsupportedOperationException("remove() not supported");
-      }
-    }
-
-    public static class ToIter_boolean implements Iterator<Boolean> {
-      final boolean[] _array;
-      int _i;
-
-      ToIter_boolean(boolean[] array, int i) {
-        _array = array;
-        _i = i;
-      }
-
-      @Override
-      public boolean hasNext() {
-        return _array != null && _i < _array.length;
-      }
-
-      @Override
-      public Boolean next() {
-        if (_array != null && _i < _array.length) return Boolean.valueOf(_array[_i++]);
-        throw new java.util.NoSuchElementException();
-      }
-
-      @Override
-      public void remove() {
-        throw new UnsupportedOperationException("remove() not supported");
-      }
-    }
-
-    public static class ToIter_byte implements Iterator<Byte> {
-      final byte[] _array;
-      int _i;
-
-      ToIter_byte(byte[] array, int i) {
-        _array = array;
-        _i = i;
-      }
-
-      @Override
-      public boolean hasNext() {
-        return _array != null && _i < _array.length;
-      }
-
-      @Override
-      public Byte next() {
-        if (_array != null && _i < _array.length) return _array[_i++];
-        throw new java.util.NoSuchElementException();
-      }
-
-      @Override
-      public void remove() {
-        throw new UnsupportedOperationException("remove() not supported");
-      }
-    }
-
-    public static class ToIter_char implements Iterator<Character> {
-      final char[] _array;
-      int _i;
-
-      ToIter_char(char[] array, int i) {
-        _array = array;
-        _i = i;
-      }
-
-      @Override
-      public boolean hasNext() {
-        return _array != null && _i < _array.length;
-      }
-
-      @Override
-      public Character next() {
-        if (_array != null && _i < _array.length) return _array[_i++];
-        throw new java.util.NoSuchElementException();
-      }
-
-      @Override
-      public void remove() {
-        throw new UnsupportedOperationException("remove() not supported");
-      }
-    }
-
-    public static class ToIter_double implements Iterator<Double> {
-      final double[] _array;
-      int _i;
-
-      ToIter_double(double[] array, int i) {
-        _array = array;
-        _i = i;
-      }
-
-      @Override
-      public boolean hasNext() {
-        return _array != null && _i < _array.length;
-      }
-
-      @Override
-      public Double next() {
-        if (_array != null && _i < _array.length) return _array[_i++];
-        throw new java.util.NoSuchElementException();
-      }
-
-      @Override
-      public void remove() {
-        throw new UnsupportedOperationException("remove() not supported");
-      }
-    }
-
-    public static class ToIter_float implements Iterator<Float> {
-      final float[] _array;
-      int _i;
-
-      ToIter_float(float[] array, int i) {
-        _array = array;
-        _i = i;
-      }
-
-      @Override
-      public boolean hasNext() {
-        return _array != null && _i < _array.length;
-      }
-
-      @Override
-      public Float next() {
-        if (_array != null && _i < _array.length) return _array[_i++];
-        throw new java.util.NoSuchElementException();
-      }
-
-      @Override
-      public void remove() {
-        throw new UnsupportedOperationException("remove() not supported");
-      }
-    }
-
-    public static class ToIter_int implements Iterator<Integer> {
-      final int[] _array;
-      int _i;
-
-      ToIter_int(int[] array, int i) {
-        _array = array;
-        _i = i;
-      }
-
-      @Override
-      public boolean hasNext() {
-        return _array != null && _i < _array.length;
-      }
-
-      @Override
-      public Integer next() {
-        if (_array != null && _i < _array.length) return _array[_i++];
-        throw new java.util.NoSuchElementException();
-      }
-
-      @Override
-      public void remove() {
-        throw new UnsupportedOperationException("remove() not supported");
-      }
-    }
-
-    public static class ToIter_long implements Iterator<Long> {
-      final long[] _array;
-      int _i;
-
-      ToIter_long(long[] array, int i) {
-        _array = array;
-        _i = i;
-      }
-
-      @Override
-      public boolean hasNext() {
-        return _array != null && _i < _array.length;
-      }
-
-      @Override
-      public Long next() {
-        if (_array != null && _i < _array.length) return Long.valueOf(_array[_i++]);
-        throw new java.util.NoSuchElementException();
-      }
-
-      @Override
-      public void remove() {
-        throw new UnsupportedOperationException("remove() not supported");
-      }
-    }
-
-    public static class ToIter_short implements Iterator<Short> {
-      final short[] _array;
-      int _i;
-
-      ToIter_short(short[] array, int i) {
-        _array = array;
-        _i = i;
-      }
-
-      @Override
-      public boolean hasNext() {
-        return _array != null && _i < _array.length;
-      }
-
-      @Override
-      public Short next() {
-        if (_array != null && _i < _array.length) return _array[_i++];
-        throw new java.util.NoSuchElementException();
-      }
-
-      @Override
-      public void remove() {
-        throw new UnsupportedOperationException("remove() not supported");
-      }
-    }
-
-    public class ToRevIter implements Iterator<Object> {
-      final Object[] _array;
-      int _i;
-
-      ToRevIter(Object array, int offset) {
-        _array = (Object[]) array;
-        _i = _array.length - 1 - offset;
-      }
-
-      @Override
-      public boolean hasNext() {
-        return _array != null && _i >= 0;
-      }
-
-      @Override
-      public Object next() {
-        if (_array != null && _i >= 0) return _array[_i--];
-        throw new java.util.NoSuchElementException();
-      }
-
-      @Override
-      public void remove() {
-        throw new UnsupportedOperationException("remove() not supported");
-      }
-    }
-  }
-
   public static Object[] toArray(Object obj) {
     if (obj instanceof Iterator) {
       return It.toArray((Iterator<?>) obj);
@@ -390,7 +129,7 @@ public interface Arr {
 
   @SuppressWarnings("rawtypes")
   public static Iterator toRevIter(Object[] array) {
-    return new T.ToRevIter(array, 0);
+    return new ReverseArrayIterator(array, 0);
   }
 
   @SuppressWarnings("rawtypes")
@@ -402,15 +141,15 @@ public interface Arr {
   public static Iterator toIter(Object array) {
     if (array == null || java.lang.reflect.Array.getLength(array) == 0) return It.emptyIterator();
     Class aclass = array.getClass();
-    if (aclass == int[].class) return new T.ToIter_int((int[]) array, 0);
-    if (aclass == float[].class) return new T.ToIter_float((float[]) array, 0);
-    if (aclass == double[].class) return new T.ToIter_double((double[]) array, 0);
-    if (aclass == long[].class) return new T.ToIter_long((long[]) array, 0);
-    if (aclass == byte[].class) return new T.ToIter_byte((byte[]) array, 0);
-    if (aclass == char[].class) return new T.ToIter_char((char[]) array, 0);
-    if (aclass == short[].class) return new T.ToIter_short((short[]) array, 0);
-    if (aclass == boolean[].class) return new T.ToIter_boolean((boolean[]) array, 0);
-    return new T.ToIter((Object[]) array, 0);
+    if (aclass == int[].class) return new IntArrayIterator((int[]) array, 0);
+    if (aclass == float[].class) return new FloatArrayIterator((float[]) array, 0);
+    if (aclass == double[].class) return new DoubleArrayIterator((double[]) array, 0);
+    if (aclass == long[].class) return new LongArrayIterator((long[]) array, 0);
+    if (aclass == byte[].class) return new ByteArrayIterator((byte[]) array, 0);
+    if (aclass == char[].class) return new CharArrayIterator((char[]) array, 0);
+    if (aclass == short[].class) return new ShortArrayIterator((short[]) array, 0);
+    if (aclass == boolean[].class) return new BooleanArrayIterator((boolean[]) array, 0);
+    return new ArrayIterator((Object[]) array, 0);
   }
 
   public static <E> E[] concat(E[] first, E[] second, Class<E> type) {
@@ -428,13 +167,13 @@ public interface Arr {
   @SuppressWarnings({"unchecked"})
   public static <E> Iterator<E> toIter(E... array) {
     if (array == null || array.length == 0) return (Iterator<E>) It.emptyIterator();
-    return new T.ToIter<E>(array, 0);
+    return new ArrayIterator<E>(array, 0);
   }
 
   @SuppressWarnings({"unchecked"})
   public static <E> Iterator<E> toIter(E[] array, int start, int end) {
     if (array == null || array.length == 0) return (Iterator<E>) It.emptyIterator();
-    return new T.ToIter<E>(array, start, end);
+    return new ArrayIterator<E>(array, start, end);
   }
 
   public static void checkPosition(int start, int end, int size) {
