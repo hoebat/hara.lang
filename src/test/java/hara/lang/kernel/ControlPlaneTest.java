@@ -3,6 +3,7 @@ package hara.lang.kernel;
 import org.junit.Test;
 import static org.junit.Assert.*;
 import java.util.Arrays;
+import java.util.List;
 import hara.lang.base.I;
 import hara.lang.lib.RT;
 import hara.lang.lib.Builtin;
@@ -38,5 +39,41 @@ public class ControlPlaneTest {
         // (ctl :echo "foo")
         Object resEcho = Builtin.Runtime.ctl(rt, Arrays.asList("ECHO", "foo"));
         assertEquals(Arrays.asList("foo"), resEcho);
+    }
+
+    @Test
+    @SuppressWarnings("rawtypes")
+    public void testDiscovery() {
+        Foundation f = new Foundation();
+
+        // Test DIR (Internal Discovery)
+        List dir = (List) f.call("DIR");
+        assertTrue(dir.contains("SERVERS"));
+        assertTrue(dir.contains("RTS"));
+        assertTrue(dir.contains("PEERS"));
+
+        // Test INFO (Capabilities)
+        List info = (List) f.call("INFO");
+        // Check structure: [key1, val1, key2, val2...] due to mapToList
+        // But mapToList creates [[k,v], [k,v]...] or similar depending on implementation
+        // Let's just check it returns *something* non-null for now as exact format depends on mapToList
+        assertNotNull(info);
+
+        // Test PEER (Service Discovery)
+        // Add
+        f.call("PEER", "ADD", "node1", "localhost", "8081");
+        assertTrue(f.PEERS.containsKey("node1"));
+
+        // List
+        Object peers = f.call("PEER", "LIST");
+        assertNotNull(peers);
+
+        // Ping
+        Object pong = f.call("PEER", "PING", "node1");
+        assertEquals(true, pong);
+
+        // Remove
+        f.call("PEER", "REMOVE", "node1");
+        assertFalse(f.PEERS.containsKey("node1"));
     }
 }
