@@ -1,0 +1,46 @@
+package hara.lang.base.fn;
+
+import hara.lang.base.Fn;
+import hara.lang.base.It;
+import hara.lang.base.Obj;
+import hara.lang.protocol.IFn;
+import hara.lang.protocol.IMetadata;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.function.Supplier;
+
+@SuppressWarnings({"rawtypes", "unchecked"})
+public class ReduceInit<E, FN> extends Obj.FN implements IFn<E, E, E> {
+  final BiFunction<E, E, E> _f2;
+  final E _init;
+
+  public ReduceInit(E init, FN f) {
+    this(null, init, f);
+  }
+
+  public ReduceInit(IMetadata meta, E init, FN f) {
+    super(meta);
+    _init = init;
+    _f2 = Fn.toFn(f).getArg2();
+  }
+
+  @Override
+  public Supplier<E> getArg0() {
+    return () -> _init;
+  }
+
+  @Override
+  public Function<E, E> getArg1() {
+    return (e) -> _f2.apply(_init, e);
+  }
+
+  @Override
+  public BiFunction<E, E, E> getArg2() {
+    return (e0, e1) -> _f2.apply(_f2.apply(_init, e0), e1);
+  }
+
+  @Override
+  public Function getArgN() {
+    return (es) -> It.reduce(It.iter(es), _init, _f2);
+  }
+}

@@ -4,6 +4,7 @@ import hara.data.types.ILinearType;
 import hara.kernel.protocol.IEnv;
 import hara.kernel.protocol.IRuntime;
 import hara.lang.base.*;
+import hara.lang.base.fn.*;
 import hara.lang.data.*;
 import hara.lang.data.List;
 import hara.lang.data.Map;
@@ -114,13 +115,13 @@ public interface Env {
       var init = reduceInit(opts.init());
       switch (opts.type()) {
         case ARRAY:
-          return new Fn.T.ReduceArray(meta, init, f);
+          return new ReduceArray(meta, init, f);
         case INIT:
-          return new Fn.T.ReduceInit(meta, init, f);
+          return new ReduceInit(meta, init, f);
         case SELF:
-          return new Fn.T.ReduceSelf(meta, init, f);
+          return new ReduceSelf(meta, init, f);
         case COMPARE:
-          return new Fn.T.ReduceCompare(meta, (Boolean) init, f);
+          return new ReduceCompare(meta, (Boolean) init, f);
         default:
           throw new Ex.Unsupported();
       }

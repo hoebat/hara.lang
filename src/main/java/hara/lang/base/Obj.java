@@ -84,46 +84,46 @@ public interface Obj {
     }
   }
   /*
-  abstract class SEQ<V> extends PT
-  	implements
-  	IColl<V>,
-  	IObjType,
-	ISequentialType<V>{
+   abstract class SEQ<V> extends PT
+	implements
+	IColl<V>,
+	IObjType,
+  ISequentialType<V>{
 
-  	public SEQ() {
-  		super(null);
-  	}
+	public SEQ() {
+		super(null);
+	}
 
-  	public SEQ(IMetadata meta) {
-  		super(meta);
-  	}
+	public SEQ(IMetadata meta) {
+		super(meta);
+	}
 
-  	@Override
-  	public ObjType getObjType() {
-  		return Constant.ObjType.SEQUENTIAL;
-  	}
+	@Override
+	public ObjType getObjType() {
+		return Constant.ObjType.SEQUENTIAL;
+	}
 
-  	@Override
-  	public SEQ<V> cons(V e) {
-		return new Cons<V>(_meta, e, this);
-  	}
+	@Override
+	public SEQ<V> cons(V e) {
+	return new Cons<V>(_meta, e, this);
+	}
 
-  	@Override
-  	public SEQ<V> conj(V e) {
-		return new Cons<V>(_meta, e, this);
-  	}
+	@Override
+	public SEQ<V> conj(V e) {
+	return new Cons<V>(_meta, e, this);
+	}
 
-  	@Override
-  	public String hashSeed() {
-  		return null;
-  	}
+	@Override
+	public String hashSeed() {
+		return null;
+	}
 
-  	@SuppressWarnings("rawtypes")
-  	@Override
-  	public IColl empty() {
-		return Cons.EMPTY.withMeta(_meta);
-  	}
-  }*/
+	@SuppressWarnings("rawtypes")
+	@Override
+	public IColl empty() {
+	return Cons.EMPTY.withMeta(_meta);
+	}
+   }*/
 
   abstract class FN extends PT {
 
