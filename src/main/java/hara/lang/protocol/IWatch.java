@@ -14,39 +14,41 @@ import hara.lang.base.Arr;
 import hara.lang.base.It;
 import hara.lang.base.Str;
 import hara.lang.base.G;
+
 public interface IWatch<R, V> {
-		default void addWatch(Object key, Consumer<WatchEntry<R, V>> f) {
-			throw new UnsupportedOperationException("Not Supported");
-		}
+  default void addWatch(Object key, Consumer<WatchEntry<R, V>> f) {
+    throw new UnsupportedOperationException("Not Supported");
+  }
 
-		default Iterator<Map.Entry<Object, Consumer<WatchEntry<R, V>>>> getWatches() {
-			return null;
-		}
+  default Iterator<Map.Entry<Object, Consumer<WatchEntry<R, V>>>> getWatches() {
+    return null;
+  }
 
-		default void notifyWatches(V oldVal, V newVal) {
-			Iterator<Map.Entry<Object, Consumer<WatchEntry<R, V>>>> ws = getWatches();
-			if (ws != null) {
-				ws.forEachRemaining(e -> e.getValue().accept(new WatchEntry<R, V>(e.getKey(), this, oldVal, newVal)));
-			}
-		}
+  default void notifyWatches(V oldVal, V newVal) {
+    Iterator<Map.Entry<Object, Consumer<WatchEntry<R, V>>>> ws = getWatches();
+    if (ws != null) {
+      ws.forEachRemaining(
+          e -> e.getValue().accept(new WatchEntry<R, V>(e.getKey(), this, oldVal, newVal)));
+    }
+  }
 
-		default void removeWatch(Object key) {
-			throw new UnsupportedOperationException("Not Supported");
-		}
+  default void removeWatch(Object key) {
+    throw new UnsupportedOperationException("Not Supported");
+  }
 
-		@SuppressWarnings("unchecked")
-		public class WatchEntry<R, V> extends Std.T.Tup5.L<Object, R, Object, V, V> {
+  @SuppressWarnings("unchecked")
+  public class WatchEntry<R, V> extends Std.T.Tup5.L<Object, R, Object, V, V> {
 
-			WatchEntry(Object key, IWatch<R, V> ref, V oldVal, V newVal) {
-				super(null, key, (R) ref, null, oldVal, newVal);
-			}
+    WatchEntry(Object key, IWatch<R, V> ref, V oldVal, V newVal) {
+      super(null, key, (R) ref, null, oldVal, newVal);
+    }
 
-			public V oldVal() {
-				return this.D();
-			}
+    public V oldVal() {
+      return this.D();
+    }
 
-			public V newVal() {
-				return this.E();
-			}
-		}
-	}
+    public V newVal() {
+      return this.E();
+    }
+  }
+}

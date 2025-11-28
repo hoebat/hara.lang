@@ -39,10 +39,7 @@ public class Parser {
     CONTAINER_PROPS.put("deref", new Block.Container.Props("@", ""));
     CONTAINER_PROPS.put("syntax", new Block.Container.Props("`", ""));
     CONTAINER_PROPS.put("unquote", new Block.Container.Props("~", ""));
-    CONTAINER_PROPS.put(
-      "unquote-splice",
-      new Block.Container.Props("~@", "")
-    );
+    CONTAINER_PROPS.put("unquote-splice", new Block.Container.Props("~@", ""));
   }
 
   private final Reader reader;
@@ -53,8 +50,7 @@ public class Parser {
   }
 
   private static boolean isWhitespace(Character ch) {
-    return ch != null &&
-    (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\f');
+    return ch != null && (ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\f');
   }
 
   private static boolean isBoundary(Character ch) {
@@ -89,7 +85,7 @@ public class Parser {
       case "token":
         return parseToken();
       case "keyword":
-          return parseKeyword();
+        return parseKeyword();
       case "string":
         return parseString();
       case "list":
@@ -109,18 +105,15 @@ public class Parser {
         return parseHash();
       default:
         throw new Reader.ReaderException(
-          "Unsupported dispatch type: " + dispatch,
-          reader.getLineNumber(),
-          reader.getColumnNumber()
-        );
+            "Unsupported dispatch type: " + dispatch,
+            reader.getLineNumber(),
+            reader.getColumnNumber());
     }
   }
 
   private Block.IBlock parseVoid() {
     Character c = reader.readChar();
-    String tag = c == null
-      ? "eof"
-      : (c == '\n' || c == '\r' ? "linebreak" : "whitespace");
+    String tag = c == null ? "eof" : (c == '\n' || c == '\r' ? "linebreak" : "whitespace");
     int width = (c != null && c == '\t') ? 4 : 1;
     int height = (c != null && (c == '\n' || c == '\r')) ? 1 : 0;
     return new Block.Void(tag, c, width, height);
@@ -137,10 +130,10 @@ public class Parser {
   }
 
   private Block.IBlock parseKeyword() {
-      reader.readChar(); // consume leading colon
-      String keyword = reader.readWhile(ch -> !isBoundary(ch));
-      String string = ":" + keyword;
-      return new Block.Token("keyword", string, keyword, string, string.length(), 0);
+    reader.readChar(); // consume leading colon
+    String keyword = reader.readWhile(ch -> !isBoundary(ch));
+    String string = ":" + keyword;
+    return new Block.Token("keyword", string, keyword, string, string.length(), 0);
   }
 
   private Block.IBlock parseString() {
@@ -151,10 +144,7 @@ public class Parser {
       Character c = reader.readChar();
       if (c == null) {
         throw new Reader.ReaderException(
-          "EOF while reading string",
-          reader.getLineNumber(),
-          reader.getColumnNumber()
-        );
+            "EOF while reading string", reader.getLineNumber(), reader.getColumnNumber());
       }
       if (escape) {
         sb.append(c);
@@ -168,14 +158,7 @@ public class Parser {
       }
     }
     String s = sb.toString();
-    return new Block.Token(
-      "string",
-      "\"" + s + "\"",
-      s,
-      s,
-      s.length() + 2,
-      0
-    );
+    return new Block.Token("string", "\"" + s + "\"", s, s, s.length() + 2, 0);
   }
 
   private Block.IBlock parseCollection(String tag) {
@@ -208,16 +191,12 @@ public class Parser {
     if (reader.peekChar() == '@') {
       reader.readChar();
       return new Block.Container(
-        "unquote-splice",
-        Vector.Standard.from(null, parse()),
-        CONTAINER_PROPS.get("unquote-splice")
-      );
+          "unquote-splice",
+          Vector.Standard.from(null, parse()),
+          CONTAINER_PROPS.get("unquote-splice"));
     }
     return new Block.Container(
-      "unquote",
-      Vector.Standard.from(null, parse()),
-      CONTAINER_PROPS.get("unquote")
-    );
+        "unquote", Vector.Standard.from(null, parse()), CONTAINER_PROPS.get("unquote"));
   }
 
   private Block.IBlock parseHash() {
@@ -230,10 +209,7 @@ public class Parser {
         return parseCollection("fn");
       default:
         throw new Reader.ReaderException(
-          "Unsupported hash dispatch: " + ch,
-          reader.getLineNumber(),
-          reader.getColumnNumber()
-        );
+            "Unsupported hash dispatch: " + ch, reader.getLineNumber(), reader.getColumnNumber());
     }
   }
 
@@ -248,10 +224,6 @@ public class Parser {
     while (reader.peekChar() != null) {
       children.pushLast(parser.parse());
     }
-    return new Block.Container(
-      "root",
-      children.toPersistent(),
-      new Block.Container.Props("", "")
-    );
+    return new Block.Container("root", children.toPersistent(), new Block.Container.Props("", ""));
   }
 }

@@ -6,405 +6,423 @@ import java.util.Iterator;
 import hara.lang.base.*;
 import hara.lang.protocol.*;
 
-public interface Queue<E> extends
-	IColl<E>,
-	Data.LinearType<E>,
-	Data.SequentialLookupType<E> {
+public interface Queue<E> extends IColl<E>, Data.LinearType<E>, Data.SequentialLookupType<E> {
 
-	public static int MAX_LENGTH = 1024;
-	
-	public interface Base<E> extends Queue<E> {
-		public int _size();
-		public int _offset();
+  public static int MAX_LENGTH = 1024;
 
-		public Vector<E> _head();
-		public Vector<E> _tail();
-		public List<Vector<E>> _buffer();
+  public interface Base<E> extends Queue<E> {
+    public int _size();
 
-		@Override
-		default E peekFirst() {
-			if(_size() == 0) { return null; }
-			return _head().nth(_offset());
-		}
-		
-		@Override
-		default E peekLast() {	
-			if(_size() == 0) { return null; }
-			if(_tail().count() > 0) {
-				return _tail().peekLast();
-			} else if (_buffer().count() == 0) {
-				return _head().peekLast();
-			} else {
-				return _buffer().peekLast().peekLast();
-			}
-		}
+    public int _offset();
 
-		@SuppressWarnings({ "rawtypes", "unchecked" })
-		@Override
-		default Iterator<E> iterator() {
-			if(_size() == 0) { return (Iterator<E>) It.emptyIterator(); };
-			ArrayList<Iterator> all = new ArrayList<Iterator>();
-			all.add(_head().iterator());
-			It.reduce(_buffer().iterator(), all, (arr, v) -> {
-				arr.add(v.iterator());
-				return all;
-			});
-			all.add(_tail().iterator());
-			return It.concat(all.iterator());
-		}
+    public Vector<E> _head();
 
-		@Override
-		default E nth(long i) {
-			if (i >= 0 && i < _size()) {
-				var space = MAX_LENGTH - _offset();
-				if(i < space) {
-					return _head().nth(_offset() + i);
-				} else {
-					int row = (int) ((i - space) % MAX_LENGTH);
-					int col = (int) ((i - space) / MAX_LENGTH);
-					
-					if(row < _buffer().count()) {
-						return _buffer().nth(row).nth(col);
-					} else {
-						return _tail().nth(col);
-					}
-				}
-			} else {
-				throw new Ex.OutOfBounds();
-			}
-		}
+    public Vector<E> _tail();
 
-		@Override
-		default long count() {
-			return _size();
-		}
-		
-		@Override
-		default String startString() {
-			return "[";
-		}
+    public List<Vector<E>> _buffer();
 
-		@Override
-		default String endString() {
-			return "]";
-		}
-	}
-	
-	public class Mutable<E> extends Data.RefType.MT 
-		implements Base<E>, IToPersistent {
-		int _size;
-		int _offset;
+    @Override
+    default E peekFirst() {
+      if (_size() == 0) {
+        return null;
+      }
+      return _head().nth(_offset());
+    }
 
-		Vector<E> _head;
-		Vector<E> _tail;
-		List<Vector<E>> _buffer;
+    @Override
+    default E peekLast() {
+      if (_size() == 0) {
+        return null;
+      }
+      if (_tail().count() > 0) {
+        return _tail().peekLast();
+      } else if (_buffer().count() == 0) {
+        return _head().peekLast();
+      } else {
+        return _buffer().peekLast().peekLast();
+      }
+    }
 
-		@SuppressWarnings("unchecked")
-		public Mutable(IMetadata meta) {
-			super(meta);
-			_size = 0;
-			_offset = 0;
-			_head = Vector.Mutable.empty(null);
-			_tail = Vector.Mutable.empty(null);
-			_buffer = new List.Mutable<Vector<E>>(null, List.DEFAULT_CAPACITY);
-		}
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    @Override
+    default Iterator<E> iterator() {
+      if (_size() == 0) {
+        return (Iterator<E>) It.emptyIterator();
+      }
+      ;
+      ArrayList<Iterator> all = new ArrayList<Iterator>();
+      all.add(_head().iterator());
+      It.reduce(
+          _buffer().iterator(),
+          all,
+          (arr, v) -> {
+            arr.add(v.iterator());
+            return all;
+          });
+      all.add(_tail().iterator());
+      return It.concat(all.iterator());
+    }
 
+    @Override
+    default E nth(long i) {
+      if (i >= 0 && i < _size()) {
+        var space = MAX_LENGTH - _offset();
+        if (i < space) {
+          return _head().nth(_offset() + i);
+        } else {
+          int row = (int) ((i - space) % MAX_LENGTH);
+          int col = (int) ((i - space) / MAX_LENGTH);
 
-		public Mutable(IMetadata meta, int size, int offset, Vector<E> head, Vector<E> tail,
-				List<Vector<E>> buffer) {
-			super(meta);
-			_size = size;
-			_offset = offset;
-			
-			_head = head;
-			_tail = tail;
-			_buffer = buffer;
-		}
+          if (row < _buffer().count()) {
+            return _buffer().nth(row).nth(col);
+          } else {
+            return _tail().nth(col);
+          }
+        }
+      } else {
+        throw new Ex.OutOfBounds();
+      }
+    }
 
-		@SuppressWarnings("unchecked")
-		public static <E> Mutable<E> from(IMetadata meta, E... objs) {
-			var vec = Mutable.empty(meta);
-			return Arr.reduce((v, e) -> v.pushLast(e), vec, objs);
-		}
-		
-		@SuppressWarnings({"rawtypes"})
-		public static Mutable empty (IMetadata meta) {
-			return new Mutable(meta);
-		}
+    @Override
+    default long count() {
+      return _size();
+    }
 
+    @Override
+    default String startString() {
+      return "[";
+    }
 
-		public static <E> Mutable<E> into(Iterator<E> it) {
-			return into(new Mutable<E>(null), it);
-		}
-		
-		public static <E> Mutable<E> into(Mutable<E> coll, Iterator<E> it) {
-			return It.reduce(it, coll, (m, e) -> m.pushLast(e));
-		}
+    @Override
+    default String endString() {
+      return "]";
+    }
+  }
 
-		@SuppressWarnings({ "unchecked"})
-		@Override
-		public Mutable<E> pushLast(E e) {
-			var space = MAX_LENGTH - _offset;
-			if(_size < space) {
-				_head.conj(e);
-			} else {
-				_tail.conj(e);
-				if(_tail.count() < MAX_LENGTH) {
-					
-				} else {
-					_buffer.conj(_tail);
-					_tail = Vector.Mutable.empty(null);
-				}
-			}
-			_size++;
-			return this;
-		}
-		
-		@Override
-		public Mutable<E> popFirst() {
-			if( _size == 0) { return this; }
-			
-			_offset++;
-			_size--;
-			if(_offset < MAX_LENGTH) {
-				return this;
-			} else {
-				_offset = 0;
-				if(_buffer.count() == 0) {
-					_head = _tail;
-				} else {
-					_head = _buffer.peekFirst();
-					_buffer.popFirst();
-				}
-			}
-			return this;
-		}
+  public class Mutable<E> extends Data.RefType.MT implements Base<E>, IToPersistent {
+    int _size;
+    int _offset;
 
-		
-		@SuppressWarnings({ "unchecked", "rawtypes" })
-		@Override
-		public Mutable<E> popLast() {
-			
-			if(_size == 0) { return this; }
-			
-			_size--;
-			if(_tail.count() > 0) {
-				_tail.popLast();
-			} else if (_buffer.count() == 0) {
-				_head.popLast();
-			} else {
-				_tail = _buffer.peekLast();
-				_buffer = (List)_buffer.popLast();
-			}
-			return this;
-		}
-		
+    Vector<E> _head;
+    Vector<E> _tail;
+    List<Vector<E>> _buffer;
 
-		@SuppressWarnings({ "unchecked" })
-		@Override
-		public Mutable<E> empty() {
-			_size = 0;
-			_offset = 0;
-			_head = (Vector<E>) _head.empty();
-			_tail = (Vector<E>) _tail.empty();
-			_buffer = (List<Vector<E>>) _buffer.empty();
-			return this;
-		}
+    @SuppressWarnings("unchecked")
+    public Mutable(IMetadata meta) {
+      super(meta);
+      _size = 0;
+      _offset = 0;
+      _head = Vector.Mutable.empty(null);
+      _tail = Vector.Mutable.empty(null);
+      _buffer = new List.Mutable<Vector<E>>(null, List.DEFAULT_CAPACITY);
+    }
 
-		@Override
-		public int _size() {
-			return _size;
-		}
+    public Mutable(
+        IMetadata meta,
+        int size,
+        int offset,
+        Vector<E> head,
+        Vector<E> tail,
+        List<Vector<E>> buffer) {
+      super(meta);
+      _size = size;
+      _offset = offset;
 
-		@Override
-		public int _offset() {
-			return _offset;
-		}
+      _head = head;
+      _tail = tail;
+      _buffer = buffer;
+    }
 
-		@Override
-		public Vector<E> _head() {
-			return _head;
-		}
+    @SuppressWarnings("unchecked")
+    public static <E> Mutable<E> from(IMetadata meta, E... objs) {
+      var vec = Mutable.empty(meta);
+      return Arr.reduce((v, e) -> v.pushLast(e), vec, objs);
+    }
 
-		@Override
-		public Vector<E> _tail() {
-			return _tail;
-		}
+    @SuppressWarnings({"rawtypes"})
+    public static Mutable empty(IMetadata meta) {
+      return new Mutable(meta);
+    }
 
-		@Override
-		public List<Vector<E>> _buffer() {
-			return _buffer;
-		}
-		@SuppressWarnings({ "unchecked", "rawtypes" })
-		@Override
-		public Standard<E> toPersistent() {
-			var head = ((Vector.Mutable<E>)_head).toPersistent();
-			var tail = ((Vector.Mutable<E>)_tail).toPersistent();
-			var buff = ((List.Mutable)_buffer).toPersistent();
-			return new Standard<E>(_meta, _size, _offset, head, tail, buff);
-		}		
-	}
+    public static <E> Mutable<E> into(Iterator<E> it) {
+      return into(new Mutable<E>(null), it);
+    }
 
-	public class Standard<E> extends Data.RefType.PT 
-		implements Base<E>, IToMutable {
-		final int _size;
-		final int _offset;
+    public static <E> Mutable<E> into(Mutable<E> coll, Iterator<E> it) {
+      return It.reduce(it, coll, (m, e) -> m.pushLast(e));
+    }
 
-		final Vector<E> _head;
-		final Vector<E> _tail;
-		final List<Vector<E>> _buffer;
-		
-		// STATIC
-		public final static Standard<Object> EMPTY = new Standard<>(null);
+    @SuppressWarnings({"unchecked"})
+    @Override
+    public Mutable<E> pushLast(E e) {
+      var space = MAX_LENGTH - _offset;
+      if (_size < space) {
+        _head.conj(e);
+      } else {
+        _tail.conj(e);
+        if (_tail.count() < MAX_LENGTH) {
 
-		@SuppressWarnings("unchecked")
-		public Standard(IMetadata meta) {
-			super(meta);
-			_size = 0;
-			_offset = 0;
-			_head = (Vector<E>) Vector.Standard.EMPTY;
-			_tail = (Vector<E>) Vector.Standard.EMPTY;
-			_buffer = List.Standard.EMPTY;
-					
-		}
+        } else {
+          _buffer.conj(_tail);
+          _tail = Vector.Mutable.empty(null);
+        }
+      }
+      _size++;
+      return this;
+    }
 
-		private Standard(IMetadata meta, int size, int offset, Vector<E> head, Vector<E> tail,
-				List<Vector<E>> buffer) {
-			super(meta);
-			_size = size;
-			_offset = offset;
-			
-			_head = head;
-			_tail = tail;
-			_buffer = buffer;
-		}
-		
-		@SuppressWarnings("unchecked")
-		public static <E> Standard<E> empty(IMetadata meta) {
-			Standard<E> ret = (Standard<E>) EMPTY;
-			return (meta == null) ? ret : ret.withMeta(meta);
-		}
+    @Override
+    public Mutable<E> popFirst() {
+      if (_size == 0) {
+        return this;
+      }
 
-		@SuppressWarnings("unchecked")
-		public static <E> Standard<E> from(IMetadata meta, E... objs) {
-			return Mutable.from(meta, objs).toPersistent();
-		}
-		
-		public static <E> Standard<E> into(Iterator<E> it) {
-			return Mutable.into(it).toPersistent();
-		}
-		
-		@SuppressWarnings("unchecked")
-		public static <E> Standard<E> into(Standard<E> coll, Iterator<E> it) {
-			return Mutable.into(coll.toMutable(), it).toPersistent();
-		}
+      _offset++;
+      _size--;
+      if (_offset < MAX_LENGTH) {
+        return this;
+      } else {
+        _offset = 0;
+        if (_buffer.count() == 0) {
+          _head = _tail;
+        } else {
+          _head = _buffer.peekFirst();
+          _buffer.popFirst();
+        }
+      }
+      return this;
+    }
 
-		@SuppressWarnings({ "unchecked", "rawtypes" })
-		@Override
-		public Standard<E> pushLast(E e) {
-			var space = MAX_LENGTH - _offset;
-			int nsize = _size + 1;
-			if(_size < space) {
-				var nhead = (Vector) _head.conj(e);
-				return new Standard<E>(_meta, nsize, _offset, nhead, _tail, _buffer);
-			} else {
-				var ntail = (Vector<E>) _tail.conj(e);
-				if(ntail.count() < MAX_LENGTH) {
-					return new Standard<E>(_meta, nsize, _offset, _head, ntail, _buffer);
-				} else {
-					return new Standard<E>(_meta, nsize, _offset, _head, 
-							(Vector<E>) Vector.Standard.EMPTY,
-							(List) _buffer.conj(ntail));
-				}
-			}	
-		}
-		
-		@SuppressWarnings({ "unchecked", "rawtypes" })
-		@Override
-		public Standard<E> popFirst() {
-			if( _size == 0) { return this; }
-			var noffset = _offset + 1;
-			if(noffset < MAX_LENGTH) {
-				return new Standard<E>(_meta, _size - 1, noffset, _head, _tail, _buffer);
-			} else {
-				if(_buffer.count() == 0) {
-					return new Standard<E>(_meta, _size - 1, 0, _tail,
-							(Vector<E>) Vector.Standard.EMPTY, _buffer);
-				} else {
-					var nhead = _buffer.peekFirst();
-					return new Standard<E>(_meta, _size - 1, 0, nhead,
-							_tail, (List)_buffer.popFirst());
-				}
-			}
-		}
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    @Override
+    public Mutable<E> popLast() {
 
-		
-		@SuppressWarnings({ "unchecked", "rawtypes" })
-		@Override
-		public Standard<E> popLast() {
-			
-			if(_size == 0) { return this; }
-			var nsize = _size - 1;
-			if(_tail.count() > 0) {
-				return new Standard<E>(_meta, nsize, _offset, 
-						_head,(Vector) _tail.popLast(), _buffer);
-			} else if (_buffer.count() == 0) {
-				return new Standard<E>(_meta, nsize, _offset, 
-						(Vector) _head.popLast(), _tail, _buffer);
-			} else {
-				var ntail = _buffer.peekLast();
-				return new Standard<E>(_meta, _size - 1, _offset, _head,
-						ntail, (List)_buffer.popLast());
-			}
-		}
-		
-		@Override
-		public Standard<E> withMeta(IMetadata meta) {
-			return (meta == _meta) ? this : new Standard<E>(meta, _size, _offset, _head, _tail, _buffer);
-		}
+      if (_size == 0) {
+        return this;
+      }
 
-		@SuppressWarnings({ "rawtypes", "unchecked" })
-		@Override
-		public Standard<E> empty() {
-			return new Standard(_meta, 0, 0, 
-					Vector.Standard.EMPTY,
-					Vector.Standard.EMPTY,
-					List.Standard.EMPTY);
-		}
+      _size--;
+      if (_tail.count() > 0) {
+        _tail.popLast();
+      } else if (_buffer.count() == 0) {
+        _head.popLast();
+      } else {
+        _tail = _buffer.peekLast();
+        _buffer = (List) _buffer.popLast();
+      }
+      return this;
+    }
 
-		@Override
-		public int _size() {
-			return _size;
-		}
+    @SuppressWarnings({"unchecked"})
+    @Override
+    public Mutable<E> empty() {
+      _size = 0;
+      _offset = 0;
+      _head = (Vector<E>) _head.empty();
+      _tail = (Vector<E>) _tail.empty();
+      _buffer = (List<Vector<E>>) _buffer.empty();
+      return this;
+    }
 
-		@Override
-		public int _offset() {
-			return _offset;
-		}
+    @Override
+    public int _size() {
+      return _size;
+    }
 
-		@Override
-		public Vector<E> _head() {
-			return _head;
-		}
+    @Override
+    public int _offset() {
+      return _offset;
+    }
 
-		@Override
-		public Vector<E> _tail() {
-			return _tail;
-		}
+    @Override
+    public Vector<E> _head() {
+      return _head;
+    }
 
-		@Override
-		public List<Vector<E>> _buffer() {
-			return _buffer;
-		}
+    @Override
+    public Vector<E> _tail() {
+      return _tail;
+    }
 
-		@Override
-		@SuppressWarnings({ "rawtypes", "unchecked" })
-		public Mutable toMutable() {
-			var head = ((Vector.Standard<E>)_head).toMutable();
-			var tail = ((Vector.Standard<E>)_tail).toMutable();
-			var buff = ((List.Standard)_buffer).toMutable();
-			return new Mutable<E>(_meta, _size, _offset, head, tail, buff);
-		}
+    @Override
+    public List<Vector<E>> _buffer() {
+      return _buffer;
+    }
 
-	}
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    @Override
+    public Standard<E> toPersistent() {
+      var head = ((Vector.Mutable<E>) _head).toPersistent();
+      var tail = ((Vector.Mutable<E>) _tail).toPersistent();
+      var buff = ((List.Mutable) _buffer).toPersistent();
+      return new Standard<E>(_meta, _size, _offset, head, tail, buff);
+    }
+  }
+
+  public class Standard<E> extends Data.RefType.PT implements Base<E>, IToMutable {
+    final int _size;
+    final int _offset;
+
+    final Vector<E> _head;
+    final Vector<E> _tail;
+    final List<Vector<E>> _buffer;
+
+    // STATIC
+    public static final Standard<Object> EMPTY = new Standard<>(null);
+
+    @SuppressWarnings("unchecked")
+    public Standard(IMetadata meta) {
+      super(meta);
+      _size = 0;
+      _offset = 0;
+      _head = (Vector<E>) Vector.Standard.EMPTY;
+      _tail = (Vector<E>) Vector.Standard.EMPTY;
+      _buffer = List.Standard.EMPTY;
+    }
+
+    private Standard(
+        IMetadata meta,
+        int size,
+        int offset,
+        Vector<E> head,
+        Vector<E> tail,
+        List<Vector<E>> buffer) {
+      super(meta);
+      _size = size;
+      _offset = offset;
+
+      _head = head;
+      _tail = tail;
+      _buffer = buffer;
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <E> Standard<E> empty(IMetadata meta) {
+      Standard<E> ret = (Standard<E>) EMPTY;
+      return (meta == null) ? ret : ret.withMeta(meta);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <E> Standard<E> from(IMetadata meta, E... objs) {
+      return Mutable.from(meta, objs).toPersistent();
+    }
+
+    public static <E> Standard<E> into(Iterator<E> it) {
+      return Mutable.into(it).toPersistent();
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <E> Standard<E> into(Standard<E> coll, Iterator<E> it) {
+      return Mutable.into(coll.toMutable(), it).toPersistent();
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    @Override
+    public Standard<E> pushLast(E e) {
+      var space = MAX_LENGTH - _offset;
+      int nsize = _size + 1;
+      if (_size < space) {
+        var nhead = (Vector) _head.conj(e);
+        return new Standard<E>(_meta, nsize, _offset, nhead, _tail, _buffer);
+      } else {
+        var ntail = (Vector<E>) _tail.conj(e);
+        if (ntail.count() < MAX_LENGTH) {
+          return new Standard<E>(_meta, nsize, _offset, _head, ntail, _buffer);
+        } else {
+          return new Standard<E>(
+              _meta,
+              nsize,
+              _offset,
+              _head,
+              (Vector<E>) Vector.Standard.EMPTY,
+              (List) _buffer.conj(ntail));
+        }
+      }
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    @Override
+    public Standard<E> popFirst() {
+      if (_size == 0) {
+        return this;
+      }
+      var noffset = _offset + 1;
+      if (noffset < MAX_LENGTH) {
+        return new Standard<E>(_meta, _size - 1, noffset, _head, _tail, _buffer);
+      } else {
+        if (_buffer.count() == 0) {
+          return new Standard<E>(
+              _meta, _size - 1, 0, _tail, (Vector<E>) Vector.Standard.EMPTY, _buffer);
+        } else {
+          var nhead = _buffer.peekFirst();
+          return new Standard<E>(_meta, _size - 1, 0, nhead, _tail, (List) _buffer.popFirst());
+        }
+      }
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    @Override
+    public Standard<E> popLast() {
+
+      if (_size == 0) {
+        return this;
+      }
+      var nsize = _size - 1;
+      if (_tail.count() > 0) {
+        return new Standard<E>(_meta, nsize, _offset, _head, (Vector) _tail.popLast(), _buffer);
+      } else if (_buffer.count() == 0) {
+        return new Standard<E>(_meta, nsize, _offset, (Vector) _head.popLast(), _tail, _buffer);
+      } else {
+        var ntail = _buffer.peekLast();
+        return new Standard<E>(_meta, _size - 1, _offset, _head, ntail, (List) _buffer.popLast());
+      }
+    }
+
+    @Override
+    public Standard<E> withMeta(IMetadata meta) {
+      return (meta == _meta) ? this : new Standard<E>(meta, _size, _offset, _head, _tail, _buffer);
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    @Override
+    public Standard<E> empty() {
+      return new Standard(
+          _meta, 0, 0, Vector.Standard.EMPTY, Vector.Standard.EMPTY, List.Standard.EMPTY);
+    }
+
+    @Override
+    public int _size() {
+      return _size;
+    }
+
+    @Override
+    public int _offset() {
+      return _offset;
+    }
+
+    @Override
+    public Vector<E> _head() {
+      return _head;
+    }
+
+    @Override
+    public Vector<E> _tail() {
+      return _tail;
+    }
+
+    @Override
+    public List<Vector<E>> _buffer() {
+      return _buffer;
+    }
+
+    @Override
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    public Mutable toMutable() {
+      var head = ((Vector.Standard<E>) _head).toMutable();
+      var tail = ((Vector.Standard<E>) _tail).toMutable();
+      var buff = ((List.Standard) _buffer).toMutable();
+      return new Mutable<E>(_meta, _size, _offset, head, tail, buff);
+    }
+  }
 }

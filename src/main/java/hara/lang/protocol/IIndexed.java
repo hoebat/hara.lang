@@ -14,6 +14,7 @@ import hara.lang.base.Arr;
 import hara.lang.base.It;
 import hara.lang.base.Str;
 import hara.lang.base.G;
+
 public interface IIndexed<K, V> {
-		K indexOf(V val);
-	}
+  K indexOf(V val);
+}

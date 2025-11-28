@@ -14,18 +14,19 @@ import hara.lang.base.Arr;
 import hara.lang.base.It;
 import hara.lang.base.Str;
 import hara.lang.base.G;
+
 public interface ILookup<K, V> extends IFind<K, Map.Entry<K, V>> {
 
-		Iterator<K> keys();
+  Iterator<K> keys();
 
-		default V lookup(K key) {
-			return lookup(key, null);
-		}
+  default V lookup(K key) {
+    return lookup(key, null);
+  }
 
-		default V lookup(K key, V notFound) {
-			Map.Entry<K, V> ret = find(key);
-			return (ret == null) ? notFound : ret.getValue();
-		}
+  default V lookup(K key, V notFound) {
+    Map.Entry<K, V> ret = find(key);
+    return (ret == null) ? notFound : ret.getValue();
+  }
 
-		Iterator<V> vals();
-	}
+  Iterator<V> vals();
+}

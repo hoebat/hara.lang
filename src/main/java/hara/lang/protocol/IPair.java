@@ -14,9 +14,10 @@ import hara.lang.base.Arr;
 import hara.lang.base.It;
 import hara.lang.base.Str;
 import hara.lang.base.G;
+
 public interface IPair<K, V> extends Map.Entry<K, V> {
-		@Override
-		default V setValue(V value) {
-			throw new Ex.Unsupported();
-		}
-	}
+  @Override
+  default V setValue(V value) {
+    throw new Ex.Unsupported();
+  }
+}

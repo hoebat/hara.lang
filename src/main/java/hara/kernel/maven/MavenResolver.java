@@ -22,34 +22,39 @@ import hara.kernel.maven.RepositorySystemFactory;
 
 public class MavenResolver {
 
-    private final RepositorySystem system;
-    private final DefaultRepositorySystemSession session;
-    private final List<RemoteRepository> repositories;
+  private final RepositorySystem system;
+  private final DefaultRepositorySystemSession session;
+  private final List<RemoteRepository> repositories;
 
-    public MavenResolver() {
-        this.system = RepositorySystemFactory.newRepositorySystem();
-        this.session = MavenRepositorySystemUtils.newSession();
-        LocalRepository localRepo = new LocalRepository(System.getProperty("user.home") + "/.m2/repository");
-        this.session.setLocalRepositoryManager(this.system.newLocalRepositoryManager(this.session, localRepo));
-        this.repositories = List.of(
-            new RemoteRepository.Builder("central", "default", "https://repo.maven.apache.org/maven2/").build()
-        );
-    }
+  public MavenResolver() {
+    this.system = RepositorySystemFactory.newRepositorySystem();
+    this.session = MavenRepositorySystemUtils.newSession();
+    LocalRepository localRepo =
+        new LocalRepository(System.getProperty("user.home") + "/.m2/repository");
+    this.session.setLocalRepositoryManager(
+        this.system.newLocalRepositoryManager(this.session, localRepo));
+    this.repositories =
+        List.of(
+            new RemoteRepository.Builder(
+                    "central", "default", "https://repo.maven.apache.org/maven2/")
+                .build());
+  }
 
-    public List<File> resolve(String coordinate) throws DependencyResolutionException {
-        Artifact artifact = new DefaultArtifact(coordinate);
-        CollectRequest collectRequest = new CollectRequest();
-        collectRequest.setRoot(new Dependency(artifact, ""));
-        collectRequest.setRepositories(this.repositories);
+  public List<File> resolve(String coordinate) throws DependencyResolutionException {
+    Artifact artifact = new DefaultArtifact(coordinate);
+    CollectRequest collectRequest = new CollectRequest();
+    collectRequest.setRoot(new Dependency(artifact, ""));
+    collectRequest.setRepositories(this.repositories);
 
-        DependencyRequest dependencyRequest = new DependencyRequest();
-        dependencyRequest.setCollectRequest(collectRequest);
+    DependencyRequest dependencyRequest = new DependencyRequest();
+    dependencyRequest.setCollectRequest(collectRequest);
 
-        List<ArtifactResult> artifactResults = this.system.resolveDependencies(this.session, dependencyRequest).getArtifactResults();
+    List<ArtifactResult> artifactResults =
+        this.system.resolveDependencies(this.session, dependencyRequest).getArtifactResults();
 
-        return artifactResults.stream()
-            .map(ArtifactResult::getArtifact)
-            .map(Artifact::getFile)
-            .collect(Collectors.toList());
-    }
+    return artifactResults.stream()
+        .map(ArtifactResult::getArtifact)
+        .map(Artifact::getFile)
+        .collect(Collectors.toList());
+  }
 }

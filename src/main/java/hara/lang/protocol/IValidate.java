@@ -14,20 +14,20 @@ import hara.lang.base.Arr;
 import hara.lang.base.It;
 import hara.lang.base.Str;
 import hara.lang.base.G;
+
 public interface IValidate<V> {
-		default Predicate<V> getValidator() {
-			return null;
-		}
+  default Predicate<V> getValidator() {
+    return null;
+  }
 
-		default boolean validate(V newVal) {
-			var f = getValidator();
-			if (f == null)
-				return true;
+  default boolean validate(V newVal) {
+    var f = getValidator();
+    if (f == null) return true;
 
-			boolean result = f.test(newVal);
-			if(!result) {
-				throw new IllegalStateException("Validator rejected value: " + newVal);
-			}
-			return result;
-		}
-	}
+    boolean result = f.test(newVal);
+    if (!result) {
+      throw new IllegalStateException("Validator rejected value: " + newVal);
+    }
+    return result;
+  }
+}

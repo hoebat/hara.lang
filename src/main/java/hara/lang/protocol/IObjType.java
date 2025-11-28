@@ -14,22 +14,23 @@ import hara.lang.base.Arr;
 import hara.lang.base.It;
 import hara.lang.base.Str;
 import hara.lang.base.G;
+
 public interface IObjType extends IHash, IDisplay {
 
-		default Constant.ObjType getObjType() {
-			return Constant.ObjType.CLASS;
-		}
+  default Constant.ObjType getObjType() {
+    return Constant.ObjType.CLASS;
+  }
 
-		default String getObjName() {
-			return getObjType().toString();
-		}
+  default String getObjName() {
+    return getObjType().toString();
+  }
 
-		@Override
-		default String hashSeed() {
-			return "::" + getObjName() + "";
-		}
+  @Override
+  default String hashSeed() {
+    return "::" + getObjName() + "";
+  }
 
-		IMetadata meta();
+  IMetadata meta();
 
-		IObjType withMeta(IMetadata meta);
-	}
+  IObjType withMeta(IMetadata meta);
+}

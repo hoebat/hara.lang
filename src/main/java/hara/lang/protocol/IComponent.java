@@ -14,25 +14,26 @@ import hara.lang.base.Arr;
 import hara.lang.base.It;
 import hara.lang.base.Str;
 import hara.lang.base.G;
+
 public interface IComponent {
 
-		IMetadata getProps();
+  IMetadata getProps();
 
-		IMetadata getStatus();
+  IMetadata getStatus();
 
-		boolean isStarted();
+  boolean isStarted();
 
-		boolean isStopped();
+  boolean isStopped();
 
-		IComponent start();
+  IComponent start();
 
-		IComponent stop();
+  IComponent stop();
 
-		default IComponent kill() {
-		  return this.stop();
-		}
+  default IComponent kill() {
+    return this.stop();
+  }
 
-		default boolean isRemote() {
-		  return false;
-		}
-	}
+  default boolean isRemote() {
+    return false;
+  }
+}

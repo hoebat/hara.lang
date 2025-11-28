@@ -14,8 +14,9 @@ import hara.lang.base.Arr;
 import hara.lang.base.It;
 import hara.lang.base.Str;
 import hara.lang.base.G;
-public interface IRanged {
-		long rangeMax();
 
-		long rangeMin();
-	}
+public interface IRanged {
+  long rangeMax();
+
+  long rangeMin();
+}

@@ -14,5 +14,5 @@ import hara.lang.base.Arr;
 import hara.lang.base.It;
 import hara.lang.base.Str;
 import hara.lang.base.G;
-public interface IOFn extends IFn<Object, Object, Object> {
-	}
+
+public interface IOFn extends IFn<Object, Object, Object> {}

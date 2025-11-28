@@ -6,23 +6,41 @@ import hara.lang.protocol.*;
 
 @SuppressWarnings("rawtypes")
 public interface IRuntime<AST, K, V> extends IContext {
-	IFn         findFn(Class cls, String name);
-	IFn         findFn(Class cls, String name, int args);
-	Object       eval(AST ast);
-	Object       eval(AST ast, IEnv env);
-	IEnv<K, V>    getEnv();
-	V            getObj(K key);
-	V            setObj(K key, V value);
-	AST          readString(String input);
-	Class        classFor(String name);
-	ClassLoader  classLoader();
-	IColl<Entry<String, Class>> classCache();
-	IContext      getRoot();
-	IColl<URL>    pathCache();
-	IColl<URL>    pathAdd(URL url);
-	IColl<URL>    pathAdd(String[] paths);
-	IColl<URL>    pathRemove(String[] paths);
-	Class        aliasAdd(K key, Class v);
-	Class        aliasRemove(K key);
-	IColl<Entry<String, Class>>  aliasCache();
+  IFn findFn(Class cls, String name);
+
+  IFn findFn(Class cls, String name, int args);
+
+  Object eval(AST ast);
+
+  Object eval(AST ast, IEnv env);
+
+  IEnv<K, V> getEnv();
+
+  V getObj(K key);
+
+  V setObj(K key, V value);
+
+  AST readString(String input);
+
+  Class classFor(String name);
+
+  ClassLoader classLoader();
+
+  IColl<Entry<String, Class>> classCache();
+
+  IContext getRoot();
+
+  IColl<URL> pathCache();
+
+  IColl<URL> pathAdd(URL url);
+
+  IColl<URL> pathAdd(String[] paths);
+
+  IColl<URL> pathRemove(String[] paths);
+
+  Class aliasAdd(K key, Class v);
+
+  Class aliasRemove(K key);
+
+  IColl<Entry<String, Class>> aliasCache();
 }

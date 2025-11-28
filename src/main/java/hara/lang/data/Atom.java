@@ -15,117 +15,115 @@ import hara.lang.protocol.*;
 
 public interface Atom<V> {
 
-	public abstract class Struct<R, V> implements Swap<R, V>, IReset<V>, IDisplay {
-		final AtomicReference<V> _state;
+  public abstract class Struct<R, V> implements Swap<R, V>, IReset<V>, IDisplay {
+    final AtomicReference<V> _state;
 
-		public Struct(V init) {
-			_state = new AtomicReference<V>(init);
-		}
+    public Struct(V init) {
+      _state = new AtomicReference<V>(init);
+    }
 
-		@Override
-		public V deref() {
-			return _state.get();
-		}
+    @Override
+    public V deref() {
+      return _state.get();
+    }
 
-		@Override
-		public boolean cas(V oldVal, V newVal) {
-			return _state.compareAndSet(oldVal, newVal);
-		}
+    @Override
+    public boolean cas(V oldVal, V newVal) {
+      return _state.compareAndSet(oldVal, newVal);
+    }
 
-		@Override
-		public V reset(V newVal) {
-			_state.set(newVal);
-			return newVal;
-		}
+    @Override
+    public V reset(V newVal) {
+      _state.set(newVal);
+      return newVal;
+    }
 
-		@Override
-		public String display() {
-			return "#atom <" + G.display(_state.get()) + ">";
-		}
-	}
+    @Override
+    public String display() {
+      return "#atom <" + G.display(_state.get()) + ">";
+    }
+  }
 
-	@SuppressWarnings("rawtypes")
-	public final class Basic<V> extends Struct<Atom, V> {
-		public Basic(V state) {
-			super(state);
-		}
-	}
+  @SuppressWarnings("rawtypes")
+  public final class Basic<V> extends Struct<Atom, V> {
+    public Basic(V state) {
+      super(state);
+    }
+  }
 
-	@SuppressWarnings("rawtypes")
-	public final class Standard<V> extends Struct<Atom, V> implements Swap<Atom, V> {
+  @SuppressWarnings("rawtypes")
+  public final class Standard<V> extends Struct<Atom, V> implements Swap<Atom, V> {
 
-		final Predicate<V> _validator;
-		final ConcurrentHashMap<Object, Consumer<WatchEntry<Atom, V>>> _watches 
-			= new ConcurrentHashMap<Object, Consumer<WatchEntry<Atom, V>>>();
+    final Predicate<V> _validator;
+    final ConcurrentHashMap<Object, Consumer<WatchEntry<Atom, V>>> _watches =
+        new ConcurrentHashMap<Object, Consumer<WatchEntry<Atom, V>>>();
 
-		public Standard(V init) {
-			super(init);
-			_validator = null;
-		}
-		
-		public Standard(V init, Predicate<V> validator) {
-			super(init);
-			_validator = validator;
-		}
+    public Standard(V init) {
+      super(init);
+      _validator = null;
+    }
 
-		@Override
-		public Predicate<V> getValidator() {
-			return _validator;
-		}
+    public Standard(V init, Predicate<V> validator) {
+      super(init);
+      _validator = validator;
+    }
 
-		@Override
-		public void addWatch(Object key, Consumer<WatchEntry<Atom, V>> f) {
-			_watches.put(key, f);
-		}
-		
-		@Override
-		public void removeWatch(Object key) {
-			_watches.remove(key);
-		}
-		
-		@Override
-		public Iterator<Map.Entry<Object, Consumer<WatchEntry<Atom, V>>>> getWatches() {
-			return _watches.entrySet().iterator();
-		}
+    @Override
+    public Predicate<V> getValidator() {
+      return _validator;
+    }
 
-	}
-	
-	public interface Swap<R, V> extends IWatch<R, V>, IValidate<V>, IDeref<V> {
-		
-		boolean cas(V oldVal, V newVal);
+    @Override
+    public void addWatch(Object key, Consumer<WatchEntry<Atom, V>> f) {
+      _watches.put(key, f);
+    }
 
-		default Object swap(Function<V, V> f) {
-			for (;;) {
-				var v = deref();
-				var newVal = f.apply(v);
-				if (validate(newVal) && cas(v, newVal)) {
-					notifyWatches(v, newVal);
-					return newVal;
-				}
-			}
-		}
+    @Override
+    public void removeWatch(Object key) {
+      _watches.remove(key);
+    }
 
-		default Object swap(BiFunction<V, Object, V> f, Object arg) {
-			for (;;) {
-				var v = deref();
-				var newVal = f.apply(v, arg);
-				if (validate(newVal) && cas(v, newVal)) {
-					notifyWatches(v, newVal);
-					return newVal;
-				}
-			}
-		}
+    @Override
+    public Iterator<Map.Entry<Object, Consumer<WatchEntry<Atom, V>>>> getWatches() {
+      return _watches.entrySet().iterator();
+    }
+  }
 
-		default Object swap(BiFunction<V, Object[], V> f, Object... vargs) {
-			for (;;) {
-				var v = deref();
-				var newVal = f.apply(v, vargs);
-				if (validate(newVal) && cas(v, newVal)) {
-					notifyWatches(v, newVal);
-					return newVal;
-				}
-			}
-		}
-	}
+  public interface Swap<R, V> extends IWatch<R, V>, IValidate<V>, IDeref<V> {
+
+    boolean cas(V oldVal, V newVal);
+
+    default Object swap(Function<V, V> f) {
+      for (; ; ) {
+        var v = deref();
+        var newVal = f.apply(v);
+        if (validate(newVal) && cas(v, newVal)) {
+          notifyWatches(v, newVal);
+          return newVal;
+        }
+      }
+    }
+
+    default Object swap(BiFunction<V, Object, V> f, Object arg) {
+      for (; ; ) {
+        var v = deref();
+        var newVal = f.apply(v, arg);
+        if (validate(newVal) && cas(v, newVal)) {
+          notifyWatches(v, newVal);
+          return newVal;
+        }
+      }
+    }
+
+    default Object swap(BiFunction<V, Object[], V> f, Object... vargs) {
+      for (; ; ) {
+        var v = deref();
+        var newVal = f.apply(v, vargs);
+        if (validate(newVal) && cas(v, newVal)) {
+          notifyWatches(v, newVal);
+          return newVal;
+        }
+      }
+    }
+  }
 }
-

@@ -14,25 +14,26 @@ import hara.lang.base.Arr;
 import hara.lang.base.It;
 import hara.lang.base.Str;
 import hara.lang.base.G;
+
 public interface IHash {
 
-		default long hashCalc() {
-			return hashCalc(hashType());
-		}
+  default long hashCalc() {
+    return hashCalc(hashType());
+  }
 
-		long hashCalc(Constant.HashType t);
+  long hashCalc(Constant.HashType t);
 
-		default long hashGet() {
-			return hashCalc(hashType());
-		}
+  default long hashGet() {
+    return hashCalc(hashType());
+  }
 
-		default long hashGet(Constant.HashType t) {
-			return hashCalc(t);
-		}
+  default long hashGet(Constant.HashType t) {
+    return hashCalc(t);
+  }
 
-		String hashSeed();;
+  String hashSeed();;
 
-		default Constant.HashType hashType() {
-			return G.DEFAULT_HASH;
-		}
-	}
+  default Constant.HashType hashType() {
+    return G.DEFAULT_HASH;
+  }
+}

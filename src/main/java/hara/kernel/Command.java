@@ -9,19 +9,18 @@ import java.util.function.BiFunction;
 
 public interface Command {
 
-    @Retention(RetentionPolicy.RUNTIME)
-    @Target({ElementType.METHOD, ElementType.TYPE})
-    public @interface Fn {
-        String name();
-    }
+  @Retention(RetentionPolicy.RUNTIME)
+  @Target({ElementType.METHOD, ElementType.TYPE})
+  public @interface Fn {
+    String name();
+  }
 
-    @Retention(RetentionPolicy.RUNTIME)
-    @Target(ElementType.METHOD)
-    public @interface Sub {
-        String name();
-    }
+  @Retention(RetentionPolicy.RUNTIME)
+  @Target(ElementType.METHOD)
+  public @interface Sub {
+    String name();
+  }
 
-    @FunctionalInterface
-    public interface Type extends BiFunction<Foundation, List<Object>, Object> {
-    }
+  @FunctionalInterface
+  public interface Type extends BiFunction<Foundation, List<Object>, Object> {}
 }

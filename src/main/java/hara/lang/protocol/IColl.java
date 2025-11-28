@@ -14,18 +14,20 @@ import hara.lang.base.Arr;
 import hara.lang.base.It;
 import hara.lang.base.Str;
 import hara.lang.base.G;
-public interface IColl<E> extends Iterable<E>, IEquality, IConj<E>, IEmpty, ICount, IHash, IDisplay {
 
-		String startString();
+public interface IColl<E>
+    extends Iterable<E>, IEquality, IConj<E>, IEmpty, ICount, IHash, IDisplay {
 
-		String endString();
+  String startString();
 
-		default String sepString() {
-			return " ";
-		}
+  String endString();
 
-		@Override
-		default String display() {
-			return It.display(iterator(), startString(), endString(), sepString());
-		}
-	}
+  default String sepString() {
+    return " ";
+  }
+
+  @Override
+  default String display() {
+    return It.display(iterator(), startString(), endString(), sepString());
+  }
+}

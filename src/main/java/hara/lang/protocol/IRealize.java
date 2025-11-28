@@ -14,8 +14,9 @@ import hara.lang.base.Arr;
 import hara.lang.base.It;
 import hara.lang.base.Str;
 import hara.lang.base.G;
-public interface IRealize<V> {
-		boolean isRealized();
 
-		V realize();
-	}
+public interface IRealize<V> {
+  boolean isRealized();
+
+  V realize();
+}

@@ -5,135 +5,139 @@ import hara.lang.protocol.*;
 
 public interface Ex {
 
-	@SuppressWarnings("serial")
-	public class Arity extends IllegalArgumentException {
+  @SuppressWarnings("serial")
+  public class Arity extends IllegalArgumentException {
 
-		final public int actual;
+    public final int actual;
 
-		final public String name;
+    public final String name;
 
-		public Arity(int actual, String name) {
-			this(actual, name, null);
-		}
+    public Arity(int actual, String name) {
+      this(actual, name, null);
+    }
 
-		public Arity(int actual, String name, Throwable cause) {
-			super("Ex.Arity - Wrong number of args (" + actual + ") passed to: " + name, cause);
-			this.actual = actual;
-			this.name = name;
-		}
-	}	
+    public Arity(int actual, String name, Throwable cause) {
+      super("Ex.Arity - Wrong number of args (" + actual + ") passed to: " + name, cause);
+      this.actual = actual;
+      this.name = name;
+    }
+  }
 
-	@SuppressWarnings("serial")
-	public class Unsupported extends UnsupportedOperationException {
-		
-		public Unsupported() {
-			super("Not Supported");
-		}
-		
-		public Unsupported(String message) {
-			super(message);
-		}
-	}
+  @SuppressWarnings("serial")
+  public class Unsupported extends UnsupportedOperationException {
 
-	@SuppressWarnings("serial")
-	public class Info extends RuntimeException implements IExInfo {
-		public final IMetadata data;
+    public Unsupported() {
+      super("Not Supported");
+    }
 
-		public Info(String s, IMetadata data) {
-			this(s, data, null);
-		}
+    public Unsupported(String message) {
+      super(message);
+    }
+  }
 
-		public Info(String s, IMetadata data, Throwable throwable) {
-			super(s, throwable);
-			if (data != null) {
-				this.data = data;
-			} else {
-				throw new IllegalArgumentException("Additional data must be non-nil.");
-			}
-		}
+  @SuppressWarnings("serial")
+  public class Info extends RuntimeException implements IExInfo {
+    public final IMetadata data;
 
-		@Override
-		public IMetadata getData() {
-			return data;
-		}
+    public Info(String s, IMetadata data) {
+      this(s, data, null);
+    }
 
-		@Override
-		public String toString() {
-			return "Ex.Info - " + getMessage() + " " + data.toString();
-		}
-	}
+    public Info(String s, IMetadata data, Throwable throwable) {
+      super(s, throwable);
+      if (data != null) {
+        this.data = data;
+      } else {
+        throw new IllegalArgumentException("Additional data must be non-nil.");
+      }
+    }
 
-	@SuppressWarnings("serial")
-	public class Syntax extends RuntimeException {
-		public Syntax() {
-		}
+    @Override
+    public IMetadata getData() {
+      return data;
+    }
 
-		public Syntax(String message) {
-			super(message);
-		}
+    @Override
+    public String toString() {
+      return "Ex.Info - " + getMessage() + " " + data.toString();
+    }
+  }
 
-		public Syntax(String message, Throwable cause) {
-			super(message, cause);
-		}
+  @SuppressWarnings("serial")
+  public class Syntax extends RuntimeException {
+    public Syntax() {}
 
-		public Syntax(Throwable cause) {
-			super(cause);
-		}
+    public Syntax(String message) {
+      super(message);
+    }
 
-		public Syntax(String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace) {
-			super(message, cause, enableSuppression, writableStackTrace);
-		}
-	}
+    public Syntax(String message, Throwable cause) {
+      super(message, cause);
+    }
 
-	@SuppressWarnings("serial")
-	public class UndefinedSymbol extends RuntimeException {
-		public UndefinedSymbol() {
-		}
+    public Syntax(Throwable cause) {
+      super(cause);
+    }
 
-		public UndefinedSymbol(String message) {
-			super(message);
-		}
+    public Syntax(
+        String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace) {
+      super(message, cause, enableSuppression, writableStackTrace);
+    }
+  }
 
-		public UndefinedSymbol(String message, Throwable cause) {
-			super(message, cause);
-		}
+  @SuppressWarnings("serial")
+  public class UndefinedSymbol extends RuntimeException {
+    public UndefinedSymbol() {}
 
-		public UndefinedSymbol(Throwable cause) {
-			super(cause);
-		}
+    public UndefinedSymbol(String message) {
+      super(message);
+    }
 
-		public UndefinedSymbol(String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace) {
-			super(message, cause, enableSuppression, writableStackTrace);
-		}
-	}
+    public UndefinedSymbol(String message, Throwable cause) {
+      super(message, cause);
+    }
 
-	@SuppressWarnings("serial")
-	public class OutOfBounds extends IndexOutOfBoundsException {}
-	
-	@SuppressWarnings("serial")
-	public class NoSuchElement extends NoSuchElementException {}
+    public UndefinedSymbol(Throwable cause) {
+      super(cause);
+    }
 
-	@SuppressWarnings("serial")
-	public class TODO extends RuntimeException {}
+    public UndefinedSymbol(
+        String message, Throwable cause, boolean enableSuppression, boolean writableStackTrace) {
+      super(message, cause, enableSuppression, writableStackTrace);
+    }
+  }
 
-	@SuppressWarnings("serial")
-	public class Runtime extends RuntimeException {
-		public Runtime(String string) {super(string);}}
+  @SuppressWarnings("serial")
+  public class OutOfBounds extends IndexOutOfBoundsException {}
 
-	@SuppressWarnings("serial")
-	public class NULL extends NullPointerException {
-		public NULL(String string) { super(string);}}
+  @SuppressWarnings("serial")
+  public class NoSuchElement extends NoSuchElementException {}
 
-	@SuppressWarnings({ "unchecked"})
-	private static <T extends Throwable> void sneakyThrow0(Throwable t) throws T {
-		throw (T) t;
-	}
-	
-	public static RuntimeException Sneaky(Throwable t) {
-		if (t == null)
-			throw new NullPointerException();
-		sneakyThrow0(t);
-		return null;
-	}
+  @SuppressWarnings("serial")
+  public class TODO extends RuntimeException {}
 
+  @SuppressWarnings("serial")
+  public class Runtime extends RuntimeException {
+    public Runtime(String string) {
+      super(string);
+    }
+  }
+
+  @SuppressWarnings("serial")
+  public class NULL extends NullPointerException {
+    public NULL(String string) {
+      super(string);
+    }
+  }
+
+  @SuppressWarnings({"unchecked"})
+  private static <T extends Throwable> void sneakyThrow0(Throwable t) throws T {
+    throw (T) t;
+  }
+
+  public static RuntimeException Sneaky(Throwable t) {
+    if (t == null) throw new NullPointerException();
+    sneakyThrow0(t);
+    return null;
+  }
 }

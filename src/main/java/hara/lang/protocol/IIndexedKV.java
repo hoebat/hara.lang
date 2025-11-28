@@ -14,8 +14,9 @@ import hara.lang.base.Arr;
 import hara.lang.base.It;
 import hara.lang.base.Str;
 import hara.lang.base.G;
-public interface IIndexedKV<K, V> {
-		long indexOfKey(K key);
 
-		long indexOfVal(V val);
-	}
+public interface IIndexedKV<K, V> {
+  long indexOfKey(K key);
+
+  long indexOfVal(V val);
+}

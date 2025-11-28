@@ -14,10 +14,11 @@ import hara.lang.base.Arr;
 import hara.lang.base.It;
 import hara.lang.base.Str;
 import hara.lang.base.G;
-public interface IFind<K, V> {
-		V find(K key);
 
-		default boolean has(K key) {
-			return find(key) != null;
-		}
-	}
+public interface IFind<K, V> {
+  V find(K key);
+
+  default boolean has(K key) {
+    return find(key) != null;
+  }
+}

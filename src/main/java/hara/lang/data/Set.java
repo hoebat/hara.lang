@@ -6,151 +6,146 @@ import hara.lang.base.*;
 import hara.lang.protocol.*;
 
 public interface Set<E> extends Data.SetType<E> {
-	
-	public interface Base<E> extends Set<E> {
-		
-		public Map<E, E> _lookup();
-		
-		@Override
-		default Iterator<E> iterator() {
-			return _lookup().keys();
-		}
 
-		@Override
-		default long count() {
-			return _lookup().count();
-		}
+  public interface Base<E> extends Set<E> {
 
-		@Override
-		default E find(E key) {
-			var rec = _lookup().find(key);
-			return (rec == null) ? null : rec.getValue();
-		}
-	}
+    public Map<E, E> _lookup();
 
-	public class Mutable<E>  extends Data.RefType.MT 
-		implements Base<E>, IToPersistent {
-		
-		private Map.Mutable<E, E> _lookup;
-		
+    @Override
+    default Iterator<E> iterator() {
+      return _lookup().keys();
+    }
 
-		public Mutable(IMetadata meta) {
-			super(meta);
-			_lookup = Map.Mutable.empty(meta);
-		}
+    @Override
+    default long count() {
+      return _lookup().count();
+    }
 
-		public Mutable(IMetadata meta, Map.Mutable<E, E> lookup) {
-			super(meta);
-			_lookup = lookup;
-		}
+    @Override
+    default E find(E key) {
+      var rec = _lookup().find(key);
+      return (rec == null) ? null : rec.getValue();
+    }
+  }
 
-		@Override
-		public Mutable<E> conj(E e) {
-			_lookup.assoc(e, e);
-			return this;
-		}
+  public class Mutable<E> extends Data.RefType.MT implements Base<E>, IToPersistent {
 
-		@SuppressWarnings("unchecked")
-		public static <E> Mutable<E> from(IMetadata meta, E... objs) {
-			Mutable<E> mut = new Mutable<E>(meta);
-			return Arr.reduce((arr, e) -> arr.conj(e) , mut, objs);
-		}
+    private Map.Mutable<E, E> _lookup;
 
-		public static <E> Mutable<E> into(Iterator<E> it) {
-			return into(new Mutable<E>(null), it);
-		}
-		
-		public static <E> Mutable<E> into(Mutable<E> coll, Iterator<E> it) {
-			return It.reduce(it, coll, (m, e) -> m.conj(e));
-		}
+    public Mutable(IMetadata meta) {
+      super(meta);
+      _lookup = Map.Mutable.empty(meta);
+    }
 
-		@Override
-		public Mutable<E> empty() {
-			_lookup.empty();
-			return this;
-		}
+    public Mutable(IMetadata meta, Map.Mutable<E, E> lookup) {
+      super(meta);
+      _lookup = lookup;
+    }
 
-		@Override
-		public Mutable<E> dissoc(E k) {
-			_lookup.dissoc(k);
-			return this;
-		}
+    @Override
+    public Mutable<E> conj(E e) {
+      _lookup.assoc(e, e);
+      return this;
+    }
 
-		@Override
-		public Standard<E> toPersistent() {
-			return new Standard<E>(_meta, _lookup.toPersistent());
-		}
+    @SuppressWarnings("unchecked")
+    public static <E> Mutable<E> from(IMetadata meta, E... objs) {
+      Mutable<E> mut = new Mutable<E>(meta);
+      return Arr.reduce((arr, e) -> arr.conj(e), mut, objs);
+    }
 
-		@Override
-		public Map<E, E> _lookup() {
-			return _lookup;
-		}
-		
-	}
-	
-	public class Standard<E>  extends Data.RefType.PT 
-		implements Base<E>, IToMutable {
+    public static <E> Mutable<E> into(Iterator<E> it) {
+      return into(new Mutable<E>(null), it);
+    }
 
-		private final Map.Standard<E, E> _lookup;
+    public static <E> Mutable<E> into(Mutable<E> coll, Iterator<E> it) {
+      return It.reduce(it, coll, (m, e) -> m.conj(e));
+    }
 
-		@SuppressWarnings("rawtypes")
-		public static Standard EMPTY = new Standard(null);
-		
-		@SuppressWarnings("unchecked")
-		public Standard(IMetadata meta) {
-			super(meta);
-			_lookup = Map.Standard.EMPTY;
-		}
-		
-		public Standard(IMetadata meta, Map.Standard<E, E> lookup) {
-			super(meta);
-			_lookup = lookup;
-		}
+    @Override
+    public Mutable<E> empty() {
+      _lookup.empty();
+      return this;
+    }
 
-		@SuppressWarnings("unchecked")
-		public static <E> Standard<E> from(IMetadata meta, E... elements){
-			return Mutable.from(meta, elements).toPersistent();
-		}
+    @Override
+    public Mutable<E> dissoc(E k) {
+      _lookup.dissoc(k);
+      return this;
+    }
 
-		public static <E> Standard<E> into(Iterator<E> it) {
-			return Mutable.into(it).toPersistent();
-		}
-		
-		public static <E> Standard<E> into(Standard<E> coll, Iterator<E> it) {
-			return Mutable.into(coll.toMutable(), it).toPersistent();
-		}
-		
-		@Override
-		public Standard<E> conj(E e) {
-			return new Standard<E>(_meta, _lookup.assoc(e, e));
-		}
+    @Override
+    public Standard<E> toPersistent() {
+      return new Standard<E>(_meta, _lookup.toPersistent());
+    }
 
-		@SuppressWarnings("unchecked")
-		@Override
-		public Standard<E> empty() {
-			return (_meta == null) ? EMPTY : EMPTY.withMeta(_meta);
-		}
+    @Override
+    public Map<E, E> _lookup() {
+      return _lookup;
+    }
+  }
 
-		@Override
-		public Standard<E> withMeta(IMetadata meta) {
-			return (_meta == meta) ? this : new Standard<E>(meta, _lookup);
-		}
+  public class Standard<E> extends Data.RefType.PT implements Base<E>, IToMutable {
 
-		@Override
-		public Standard<E> dissoc(E k) {
-			var nlookup = _lookup.dissoc(k);
-			return (nlookup == _lookup) ? this : new Standard<E>(_meta, nlookup);
-		}
+    private final Map.Standard<E, E> _lookup;
 
-		@Override
-		public Mutable<E> toMutable() {
-			return new Mutable<E>(_meta, _lookup.toMutable());
-		}
-		
-		@Override
-		public Map<E, E> _lookup() {
-			return _lookup;
-		}
-		
-	}
+    @SuppressWarnings("rawtypes")
+    public static Standard EMPTY = new Standard(null);
+
+    @SuppressWarnings("unchecked")
+    public Standard(IMetadata meta) {
+      super(meta);
+      _lookup = Map.Standard.EMPTY;
+    }
+
+    public Standard(IMetadata meta, Map.Standard<E, E> lookup) {
+      super(meta);
+      _lookup = lookup;
+    }
+
+    @SuppressWarnings("unchecked")
+    public static <E> Standard<E> from(IMetadata meta, E... elements) {
+      return Mutable.from(meta, elements).toPersistent();
+    }
+
+    public static <E> Standard<E> into(Iterator<E> it) {
+      return Mutable.into(it).toPersistent();
+    }
+
+    public static <E> Standard<E> into(Standard<E> coll, Iterator<E> it) {
+      return Mutable.into(coll.toMutable(), it).toPersistent();
+    }
+
+    @Override
+    public Standard<E> conj(E e) {
+      return new Standard<E>(_meta, _lookup.assoc(e, e));
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public Standard<E> empty() {
+      return (_meta == null) ? EMPTY : EMPTY.withMeta(_meta);
+    }
+
+    @Override
+    public Standard<E> withMeta(IMetadata meta) {
+      return (_meta == meta) ? this : new Standard<E>(meta, _lookup);
+    }
+
+    @Override
+    public Standard<E> dissoc(E k) {
+      var nlookup = _lookup.dissoc(k);
+      return (nlookup == _lookup) ? this : new Standard<E>(_meta, nlookup);
+    }
+
+    @Override
+    public Mutable<E> toMutable() {
+      return new Mutable<E>(_meta, _lookup.toMutable());
+    }
+
+    @Override
+    public Map<E, E> _lookup() {
+      return _lookup;
+    }
+  }
 }

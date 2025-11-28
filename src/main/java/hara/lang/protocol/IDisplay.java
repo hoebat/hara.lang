@@ -14,10 +14,11 @@ import hara.lang.base.Arr;
 import hara.lang.base.It;
 import hara.lang.base.Str;
 import hara.lang.base.G;
+
 public interface IDisplay {
 
-		String display();
-		/*
-		 * default String display() { return toString(); }
-		 */
-	}
+  String display();
+  /*
+   * default String display() { return toString(); }
+   */
+}
