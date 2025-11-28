@@ -80,9 +80,21 @@ public class Foundation implements I.Context {
 
 				register(classCmd.name(), (F, args) -> {
 					if (args.isEmpty()) {
-						throw new Ex.Runtime("Subcommand required");
+						// Default to HELP if no subcommand
+						java.util.Set<String> keys = new java.util.HashSet<>(subCommands.keySet());
+						keys.add("HELP");
+						return It.toArrayList(Arr.toIter(keys.toArray()));
 					}
+
 					String subName = args.get(0).toString().toUpperCase();
+
+					// Auto-HELP
+					if ("HELP".equals(subName)) {
+						java.util.Set<String> keys = new java.util.HashSet<>(subCommands.keySet());
+						keys.add("HELP");
+						return It.toArrayList(Arr.toIter(keys.toArray()));
+					}
+
 					Method m = subCommands.get(subName);
 					if (m != null) {
 						args.remove(0); // Consume subcommand

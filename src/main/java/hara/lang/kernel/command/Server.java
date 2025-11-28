@@ -9,11 +9,6 @@ import hara.lang.kernel.Foundation;
 @Command.Fn(name = "SERVER")
 public class Server {
 
-    @Command.Sub(name = "HELP")
-    public static Object help(Foundation F, List<Object> args) {
-        return Arrays.asList("HELP", "NEW", "EXISTS", "LIST", "INFO", "STOP");
-    }
-
     @Command.Sub(name = "INFO")
     public static Object info(Foundation F, List<Object> args) {
         return null;

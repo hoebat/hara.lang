@@ -10,11 +10,6 @@ import hara.lang.kernel.Foundation;
 @Command.Fn(name = "SESSION")
 public class Session {
 
-    @Command.Sub(name = "HELP")
-    public static Object help(Foundation F, List<Object> args) {
-        return Arrays.asList("HELP", "NEW", "GET", "EXISTS", "LIST", "INFO", "KILL", "PATH");
-    }
-
     @Command.Sub(name = "EXISTS")
     public static Object exists(Foundation F, List<Object> args) {
         List<String> sArgs = Foundation.toStringList(args);

@@ -9,11 +9,6 @@ import hara.lang.kernel.Foundation;
 @Command.Fn(name = "PEER")
 public class Peer {
 
-    @Command.Sub(name = "HELP")
-    public static Object help(Foundation F, List<Object> args) {
-        return Arrays.asList("HELP", "ADD", "LIST", "REMOVE", "PING");
-    }
-
     @Command.Sub(name = "LIST")
     public static Object list(Foundation F, List<Object> args) {
         return Foundation.mapToList(F.PEERS);

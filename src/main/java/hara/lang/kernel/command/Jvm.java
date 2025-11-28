@@ -9,11 +9,6 @@ import hara.lang.kernel.Foundation;
 @Command.Fn(name = "JVM")
 public class Jvm {
 
-    @Command.Sub(name = "HELP")
-    public static Object help(Foundation F, List<Object> args) {
-        return Arrays.asList("HELP", "HOME", "PROPS", "ENV", "VERSION", "VENDOR", "BOOTPATH", "CLASSPATH", "CP", "CLASSLOADER");
-    }
-
     @Command.Sub(name = "BOOTPATH")
     public static Object bootpath(Foundation F, List<Object> args) {
         return Foundation.run(Foundation.Fn::JVM_PROPS, "sun.boot.library.path");
