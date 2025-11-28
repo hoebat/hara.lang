@@ -6,26 +6,58 @@ import hara.lang.base.Ex;
 import hara.lang.kernel.Command;
 import hara.lang.kernel.Foundation;
 
+@Command.Fn(name = "JVM")
 public class Jvm {
 
-    @Command(name = "JVM")
-    public static Object run(Foundation F, List<Object> argsObj) {
-        List<String> args = Foundation.toStringList(argsObj);
-        String cmd = args.get(0);
-        args.remove(0);
+    @Command.Sub(name = "HELP")
+    public static Object help(Foundation F, List<Object> args) {
+        return Arrays.asList("HELP", "HOME", "PROPS", "ENV", "VERSION", "VENDOR", "BOOTPATH", "CLASSPATH", "CP", "CLASSLOADER");
+    }
 
-        switch(cmd) {
-            case "HELP":        return Arrays.asList("HELP", "HOME", "PROPS", "ENV", "VERSION", "VENDOR", "BOOTPATH", "CLASSPATH", "CP", "CLASSLOADER");
-            case "BOOTPATH":    return Foundation.run(Foundation.Fn::JVM_PROPS, "sun.boot.library.path");
-            case "CP":
-            case "CLASSPATH":   return Foundation.run(Foundation.Fn::JVM_PROPS, "java.class.path");
-            case "CLASSLOADER": return ClassLoader.getSystemClassLoader().toString();
-            case "ENV":         return Foundation.run(Foundation.Fn::JVM_ENV, args);
-            case "HOME":        return Foundation.run(Foundation.Fn::JVM_PROPS, "java.home");
-            case "PROPS":       return Foundation.run(Foundation.Fn::JVM_PROPS, args);
-            case "VENDOR":      return Foundation.run(Foundation.Fn::JVM_PROPS, "java.vendor");
-            case "VERSION":     return Foundation.run(Foundation.Fn::JVM_PROPS, "java.version");
-        }
-        throw new Ex.Unsupported("Unknown JVM command: " + cmd);
+    @Command.Sub(name = "BOOTPATH")
+    public static Object bootpath(Foundation F, List<Object> args) {
+        return Foundation.run(Foundation.Fn::JVM_PROPS, "sun.boot.library.path");
+    }
+
+    @Command.Sub(name = "CP")
+    public static Object cp(Foundation F, List<Object> args) {
+        return Foundation.run(Foundation.Fn::JVM_PROPS, "java.class.path");
+    }
+
+    @Command.Sub(name = "CLASSPATH")
+    public static Object classpath(Foundation F, List<Object> args) {
+        return Foundation.run(Foundation.Fn::JVM_PROPS, "java.class.path");
+    }
+
+    @Command.Sub(name = "CLASSLOADER")
+    public static Object classloader(Foundation F, List<Object> args) {
+        return ClassLoader.getSystemClassLoader().toString();
+    }
+
+    @Command.Sub(name = "ENV")
+    public static Object env(Foundation F, List<Object> args) {
+        List<String> sArgs = Foundation.toStringList(args);
+        return Foundation.run(Foundation.Fn::JVM_ENV, sArgs);
+    }
+
+    @Command.Sub(name = "HOME")
+    public static Object home(Foundation F, List<Object> args) {
+        return Foundation.run(Foundation.Fn::JVM_PROPS, "java.home");
+    }
+
+    @Command.Sub(name = "PROPS")
+    public static Object props(Foundation F, List<Object> args) {
+        List<String> sArgs = Foundation.toStringList(args);
+        return Foundation.run(Foundation.Fn::JVM_PROPS, sArgs);
+    }
+
+    @Command.Sub(name = "VENDOR")
+    public static Object vendor(Foundation F, List<Object> args) {
+        return Foundation.run(Foundation.Fn::JVM_PROPS, "java.vendor");
+    }
+
+    @Command.Sub(name = "VERSION")
+    public static Object version(Foundation F, List<Object> args) {
+        return Foundation.run(Foundation.Fn::JVM_PROPS, "java.version");
     }
 }

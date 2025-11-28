@@ -15,44 +15,44 @@ import hara.lang.compiler.DynamicClassLoader;
 
 public class Core {
 
-    @Command(name = "HELP")
+    @Command.Fn(name = "HELP")
     public static Object cmdHELP(Foundation F, List<Object> args) {
         return Foundation.Fn.runHELP(F, F.REGISTRY.keySet());
     }
 
-    @Command(name = "SHUTDOWN")
+    @Command.Fn(name = "SHUTDOWN")
     public static Object cmdSHUTDOWN(Foundation F, List<Object> args) {
         System.exit(1);
         return null;
     }
 
-    @Command(name = "PING")
+    @Command.Fn(name = "PING")
     public static Object cmdPING(Foundation F, List<Object> args) {
         return "PONG";
     }
 
-    @Command(name = "ECHO")
+    @Command.Fn(name = "ECHO")
     public static Object cmdECHO(Foundation F, List<Object> args) {
         return args;
     }
 
-    @Command(name = "DIR")
+    @Command.Fn(name = "DIR")
     public static Object cmdDIR(Foundation F, List<Object> args) {
         return Foundation.Fn.runDIR(F);
     }
 
-    @Command(name = "INFO")
+    @Command.Fn(name = "INFO")
     public static Object runInfo(Foundation F, List<Object> args) {
         return Foundation.Fn.runInfo(F);
     }
 
-    @Command(name = "EVAL")
+    @Command.Fn(name = "EVAL")
     public static Object runEval(Foundation F, List<Object> args) {
         return Foundation.Fn.runSessionFor(F, args.get(0).toString(),
                 rt -> G.display(rt.eval(rt.readString(args.get(1).toString()))));
     }
 
-    @Command(name = "COMPILE")
+    @Command.Fn(name = "COMPILE")
     public static Object runCompile(Foundation F, List<Object> args) {
         try {
             hara.lang.data.List expression = (hara.lang.data.List) Read.LispReader.readString(args.get(0).toString(), null);

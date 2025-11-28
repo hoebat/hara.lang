@@ -6,22 +6,29 @@ import hara.lang.base.Ex;
 import hara.lang.kernel.Command;
 import hara.lang.kernel.Foundation;
 
+@Command.Fn(name = "OS")
 public class Os {
 
-    @Command(name = "OS")
-    public static Object run(Foundation F, List<Object> argsObj) {
-        List<String> args = Foundation.toStringList(argsObj);
-        String cmd = args.get(0);
-        args.remove(0);
+    @Command.Sub(name = "HELP")
+    public static Object help(Foundation F, List<Object> args) {
+        return Arrays.asList("HELP", "PWD", "LS", "RUN");
+    }
 
-        switch(cmd) {
-            case "HELP": return Arrays.asList("HELP", "PWD", "LS", "RUN");
-            case "LS":   args.add(0, "ls");
-                         return Foundation.Fn.runProcess(args);
-            case "PWD":  return Foundation.run(Foundation.Fn::JVM_ENV, "PWD");
-            case "RUN":  return Foundation.Fn.runProcess(args);
-        }
+    @Command.Sub(name = "LS")
+    public static Object ls(Foundation F, List<Object> args) {
+        List<String> sArgs = Foundation.toStringList(args);
+        sArgs.add(0, "ls");
+        return Foundation.Fn.runProcess(sArgs);
+    }
 
-        throw new Ex.Unsupported("Unknown OS command: " + cmd);
+    @Command.Sub(name = "PWD")
+    public static Object pwd(Foundation F, List<Object> args) {
+        return Foundation.run(Foundation.Fn::JVM_ENV, "PWD");
+    }
+
+    @Command.Sub(name = "RUN")
+    public static Object run(Foundation F, List<Object> args) {
+        List<String> sArgs = Foundation.toStringList(args);
+        return Foundation.Fn.runProcess(sArgs);
     }
 }

@@ -6,27 +6,36 @@ import hara.lang.base.Ex;
 import hara.lang.kernel.Command;
 import hara.lang.kernel.Foundation;
 
+@Command.Fn(name = "SERVER")
 public class Server {
 
-    @Command(name = "SERVER")
-    public static Object run(Foundation F, List<Object> argsObj) {
-        List<String> args = Foundation.toStringList(argsObj);
-        String cmd = args.get(0);
-        args.remove(0);
+    @Command.Sub(name = "HELP")
+    public static Object help(Foundation F, List<Object> args) {
+        return Arrays.asList("HELP", "NEW", "EXISTS", "LIST", "INFO", "STOP");
+    }
 
-        switch(cmd) {
-            case "HELP": return Arrays.asList("HELP", "NEW", "EXISTS", "LIST", "INFO", "STOP");
-            case "INFO":
-                break;
-            case "LIST":
-                break;
-            case "NEW":
-                break;
-            case "STOP":
-                break;
-            case "EXISTS":
-                break;
-        }
-        throw new Ex.Unsupported("Unknown SERVER command: " + cmd);
+    @Command.Sub(name = "INFO")
+    public static Object info(Foundation F, List<Object> args) {
+        return null;
+    }
+
+    @Command.Sub(name = "LIST")
+    public static Object list(Foundation F, List<Object> args) {
+        return null;
+    }
+
+    @Command.Sub(name = "NEW")
+    public static Object newServer(Foundation F, List<Object> args) {
+        return null;
+    }
+
+    @Command.Sub(name = "STOP")
+    public static Object stop(Foundation F, List<Object> args) {
+        return null;
+    }
+
+    @Command.Sub(name = "EXISTS")
+    public static Object exists(Foundation F, List<Object> args) {
+        return null;
     }
 }

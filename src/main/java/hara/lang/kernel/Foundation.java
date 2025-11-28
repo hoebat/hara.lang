@@ -2,6 +2,7 @@ package hara.lang.kernel;
 
 import java.util.Arrays;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.concurrent.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -45,7 +46,7 @@ public class Foundation implements I.Context {
 	public final ConcurrentHashMap<String,Server> SERVERS = new ConcurrentHashMap<String,Server>();
 	public final ConcurrentHashMap<String,I.Runtime> RTS = new ConcurrentHashMap<String,I.Runtime>();
 	public final ConcurrentHashMap<String,Peer> PEERS = new ConcurrentHashMap<String,Peer>();
-	public final ConcurrentHashMap<String, Cmd> REGISTRY = new ConcurrentHashMap<>();
+	public final ConcurrentHashMap<String, Command.Type> REGISTRY = new ConcurrentHashMap<>();
 
 	public Foundation() {
 		loadCommands(Arrays.asList(
@@ -59,22 +60,53 @@ public class Foundation implements I.Context {
 		));
 	}
 
-	public void register(String name, Cmd cmd) {
+	public void register(String name, Command.Type cmd) {
 		REGISTRY.put(name, cmd);
 	}
 
 	public void loadCommands(java.util.List<Class<?>> classes) {
 		for (Class<?> cls : classes) {
-			for (Method method : cls.getDeclaredMethods()) {
-				Command annotation = method.getAnnotation(Command.class);
-				if (annotation != null) {
-					register(annotation.name(), (F, args) -> {
+			// Check for Class-level Command.Fn
+			Command.Fn classCmd = cls.getAnnotation(Command.Fn.class);
+			if (classCmd != null) {
+				// Build Dispatcher
+				Map<String, Method> subCommands = new HashMap<>();
+				for (Method method : cls.getDeclaredMethods()) {
+					Command.Sub sub = method.getAnnotation(Command.Sub.class);
+					if (sub != null) {
+						subCommands.put(sub.name(), method);
+					}
+				}
+
+				register(classCmd.name(), (F, args) -> {
+					if (args.isEmpty()) {
+						throw new Ex.Runtime("Subcommand required");
+					}
+					String subName = args.get(0).toString().toUpperCase();
+					Method m = subCommands.get(subName);
+					if (m != null) {
+						args.remove(0); // Consume subcommand
 						try {
-							return method.invoke(null, F, args);
+							return m.invoke(null, F, args);
 						} catch (Exception e) {
 							throw Ex.Sneaky(e);
 						}
-					});
+					}
+					throw new Ex.Unsupported("Unknown subcommand: " + subName);
+				});
+			} else {
+				// Scan for Method-level Command.Fn
+				for (Method method : cls.getDeclaredMethods()) {
+					Command.Fn annotation = method.getAnnotation(Command.Fn.class);
+					if (annotation != null) {
+						register(annotation.name(), (F, args) -> {
+							try {
+								return method.invoke(null, F, args);
+							} catch (Exception e) {
+								throw Ex.Sneaky(e);
+							}
+						});
+					}
 				}
 			}
 		}
@@ -224,7 +256,7 @@ public class Foundation implements I.Context {
 
 		args.remove(0);
 
-		Cmd cmd = F.REGISTRY.get(name);
+		Command.Type cmd = F.REGISTRY.get(name);
 		if (cmd != null) {
 			return cmd.apply(F, args);
 		}

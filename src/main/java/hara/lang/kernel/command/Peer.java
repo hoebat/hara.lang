@@ -6,29 +6,40 @@ import hara.lang.base.Ex;
 import hara.lang.kernel.Command;
 import hara.lang.kernel.Foundation;
 
+@Command.Fn(name = "PEER")
 public class Peer {
 
-    @Command(name = "PEER")
-    public static Object run(Foundation F, List<Object> argsObj) {
-        List<String> args = Foundation.toStringList(argsObj);
-        String cmd = args.get(0);
-        args.remove(0);
-        switch(cmd) {
-            case "HELP": return Arrays.asList("HELP", "ADD", "LIST", "REMOVE", "PING");
-            case "LIST": return Foundation.mapToList(F.PEERS);
-            case "ADD":
-                // PEER ADD name host port
-                String name = args.get(0);
-                String host = args.get(1);
-                int port = Integer.parseInt(args.get(2));
-                F.PEERS.put(name, new Foundation.Peer(name, host, port));
-                return name;
-            case "REMOVE":
-                return F.PEERS.remove(args.get(0)) != null;
-            case "PING":
-                // Minimal implementation: check if we have a record
-                return F.PEERS.containsKey(args.get(0));
-        }
-        throw new Ex.Unsupported("Unknown PEER command: " + cmd);
+    @Command.Sub(name = "HELP")
+    public static Object help(Foundation F, List<Object> args) {
+        return Arrays.asList("HELP", "ADD", "LIST", "REMOVE", "PING");
+    }
+
+    @Command.Sub(name = "LIST")
+    public static Object list(Foundation F, List<Object> args) {
+        return Foundation.mapToList(F.PEERS);
+    }
+
+    @Command.Sub(name = "ADD")
+    public static Object add(Foundation F, List<Object> args) {
+        List<String> sArgs = Foundation.toStringList(args);
+        // PEER ADD name host port
+        String name = sArgs.get(0);
+        String host = sArgs.get(1);
+        int port = Integer.parseInt(sArgs.get(2));
+        F.PEERS.put(name, new Foundation.Peer(name, host, port));
+        return name;
+    }
+
+    @Command.Sub(name = "REMOVE")
+    public static Object remove(Foundation F, List<Object> args) {
+        List<String> sArgs = Foundation.toStringList(args);
+        return F.PEERS.remove(sArgs.get(0)) != null;
+    }
+
+    @Command.Sub(name = "PING")
+    public static Object ping(Foundation F, List<Object> args) {
+        List<String> sArgs = Foundation.toStringList(args);
+        // Minimal implementation: check if we have a record
+        return F.PEERS.containsKey(sArgs.get(0));
     }
 }
