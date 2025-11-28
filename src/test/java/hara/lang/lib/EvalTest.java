@@ -8,6 +8,7 @@ import hara.lang.data.Symbol;
 import hara.lang.data.List;
 import hara.lang.data.Map;
 import hara.lang.data.Keyword;
+import java.math.BigInteger;
 
 public class EvalTest {
 
@@ -28,7 +29,7 @@ public class EvalTest {
     @Test
     public void testEvalList() {
         List list = List.Standard.from(null, Symbol.create("+"), 1, 2);
-        assertEquals(3L, Eval.eval(list, rt.getEnv()));
+        assertEquals(BigInteger.valueOf(3L), Eval.eval(list, rt.getEnv()));
     }
 
     @Test

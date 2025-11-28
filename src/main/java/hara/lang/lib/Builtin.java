@@ -936,13 +936,13 @@ public interface Builtin {
 
 		@Module.Fn(name = "b&")
 		@Module.Reduce(type = INIT, init = NEG_ONE)
-		public static Long bitAnd(Number x, Number y) {
+		public static Number bitAnd(Number x, Number y) {
 			return Num.and(x, y);
 		}
 
 		@Module.Fn(name = "b|")
 		@Module.Reduce(type = INIT, init = ZERO)
-		public static Long bitOr(Number x, Number y) {
+		public static Number bitOr(Number x, Number y) {
 			return Num.or(x, y);
 		}
 

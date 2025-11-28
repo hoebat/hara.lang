@@ -4,6 +4,7 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 import hara.lang.base.I;
 import hara.lang.data.Symbol;
+import java.math.BigInteger;
 
 public class RTTest {
 
@@ -29,7 +30,7 @@ public class RTTest {
     public void testEval() {
         RT.Instance<Object> rt = new RT.Instance<>(null, "test");
         Object result = rt.eval(rt.readString("(+ 1 2)"));
-        assertEquals(3L, result);
+        assertEquals(BigInteger.valueOf(3L), result);
     }
 
     @Test

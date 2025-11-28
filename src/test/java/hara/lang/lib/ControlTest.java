@@ -5,6 +5,7 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 import hara.lang.data.Symbol;
 import hara.lang.data.List;
+import java.math.BigInteger;
 
 public class ControlTest {
 
@@ -38,13 +39,13 @@ public class ControlTest {
         String code = "(loop [i 0 acc 0] (if (< i 5) (recur (inc i) (+ acc i)) acc))";
         Object ast = rt.readString(code);
         Object result = rt.eval(ast);
-        assertEquals(10L, result);
+        assertEquals(BigInteger.valueOf(10L), result);
     }
 
     @Test
     public void testLet() {
         String code = "(let [a 1 b 2] (+ a b))";
-        assertEquals(3L, rt.eval(rt.readString(code)));
+        assertEquals(BigInteger.valueOf(3L), rt.eval(rt.readString(code)));
     }
 
     @Test

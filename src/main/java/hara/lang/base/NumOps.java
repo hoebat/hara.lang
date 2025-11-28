@@ -1,0 +1,791 @@
+package hara.lang.base;
+
+import hara.lang.base.P.Ratio;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+
+public interface NumOps {
+    public Number add(Number x, Number y);
+
+    public Number addP(Number x, Number y);
+
+    NumOps combine(NumOps y);
+
+    public Number dec(Number x);
+
+    public Number decP(Number x);
+
+    public Number divide(Number x, Number y);
+
+    public boolean eq(Number x, Number y);
+
+    public boolean gte(Number x, Number y);
+
+    public Number inc(Number x);
+
+    public Number incP(Number x);
+
+    public boolean isNeg(Number x);
+
+    public boolean isPos(Number x);
+
+    public boolean isZero(Number x);
+
+    public boolean lt(Number x, Number y);
+
+    public boolean lte(Number x, Number y);
+
+    public Number multiply(Number x, Number y);
+
+    public Number multiplyP(Number x, Number y);
+
+    public Number negate(Number x);
+
+    public Number negateP(Number x);
+
+    NumOps opsWith(BigDecimalOps x);
+
+    NumOps opsWith(BigIntegerOps x);
+
+    NumOps opsWith(DoubleOps x);
+
+    NumOps opsWith(LongOps x);
+
+    NumOps opsWith(RatioOps x);
+
+    public Number quotient(Number x, Number y);
+
+    public Number remainder(Number x, Number y);
+
+    public Number unchecked_add(Number x, Number y);
+
+    public Number unchecked_dec(Number x);
+
+    public Number unchecked_inc(Number x);
+
+    public Number unchecked_multiply(Number x, Number y);
+
+    public Number unchecked_negate(Number x);
+
+    public static abstract class BaseOps implements NumOps {
+        @Override
+        public Number addP(Number x, Number y) {
+            return add(x, y);
+        }
+
+        @Override
+        public Number decP(Number x) {
+            return dec(x);
+        }
+
+        @Override
+        public Number incP(Number x) {
+            return inc(x);
+        }
+
+        @Override
+        public Number multiplyP(Number x, Number y) {
+            return multiply(x, y);
+        }
+
+        @Override
+        public Number negateP(Number x) {
+            return negate(x);
+        }
+
+        @Override
+        public Number unchecked_add(Number x, Number y) {
+            return add(x, y);
+        }
+
+        @Override
+        public Number unchecked_dec(Number x) {
+            return dec(x);
+        }
+
+        @Override
+        public Number unchecked_inc(Number x) {
+            return inc(x);
+        }
+
+        @Override
+        public Number unchecked_multiply(Number x, Number y) {
+            return multiply(x, y);
+        }
+
+        @Override
+        public Number unchecked_negate(Number x) {
+            return negate(x);
+        }
+    }
+
+    public static class BigDecimalOps extends BaseOps {
+
+        // final static Var MATH_CONTEXT = Ut.MATH_CONTEXT;
+
+        @Override
+        final public Number add(Number x, Number y) {
+            return NumUtils.toBigDecimal(x).add(NumUtils.toBigDecimal(y));
+        }
+
+        @Override
+        public NumOps combine(NumOps y) {
+            return y.opsWith(this);
+        }
+
+        @Override
+        public Number dec(Number x) {
+            BigDecimal bx = (BigDecimal) x;
+            return bx.subtract(BigDecimal.ONE);
+        }
+
+        @Override
+        public Number divide(Number x, Number y) {
+            return NumUtils.toBigDecimal(x).divide(NumUtils.toBigDecimal(y));
+        }
+
+        @Override
+        public boolean eq(Number x, Number y) {
+            return NumUtils.toBigDecimal(x).compareTo(NumUtils.toBigDecimal(y)) == 0;
+        }
+
+        @Override
+        public boolean gte(Number x, Number y) {
+            return NumUtils.toBigDecimal(x).compareTo(NumUtils.toBigDecimal(y)) >= 0;
+        }
+
+        @Override
+        public Number inc(Number x) {
+            BigDecimal bx = (BigDecimal) x;
+            return bx.add(BigDecimal.ONE);
+        }
+
+        @Override
+        public boolean isNeg(Number x) {
+            BigDecimal bx = (BigDecimal) x;
+            return bx.signum() < 0;
+        }
+
+        @Override
+        public boolean isPos(Number x) {
+            BigDecimal bx = (BigDecimal) x;
+            return bx.signum() > 0;
+        }
+
+        @Override
+        public boolean isZero(Number x) {
+            BigDecimal bx = (BigDecimal) x;
+            return bx.signum() == 0;
+        }
+
+        @Override
+        public boolean lt(Number x, Number y) {
+            return NumUtils.toBigDecimal(x).compareTo(NumUtils.toBigDecimal(y)) < 0;
+        }
+
+        @Override
+        public boolean lte(Number x, Number y) {
+            return NumUtils.toBigDecimal(x).compareTo(NumUtils.toBigDecimal(y)) <= 0;
+        }
+
+        @Override
+        final public Number multiply(Number x, Number y) {
+            return NumUtils.toBigDecimal(x).multiply(NumUtils.toBigDecimal(y));
+        }
+
+        @Override
+        final public Number negate(Number x) {
+            return ((BigDecimal) x).negate();
+        }
+
+        @Override
+        final public NumOps opsWith(BigDecimalOps x) {
+            return this;
+        }
+
+        @Override
+        final public NumOps opsWith(BigIntegerOps x) {
+            return this;
+        }
+
+        @Override
+        final public NumOps opsWith(DoubleOps x) {
+            return NumUtils.DOUBLE_OPS;
+        }
+
+        @Override
+        final public NumOps opsWith(LongOps x) {
+            return this;
+        }
+
+        @Override
+        final public NumOps opsWith(RatioOps x) {
+            return this;
+        }
+
+        @Override
+        public Number quotient(Number x, Number y) {
+            return NumUtils.toBigDecimal(x).divideToIntegralValue(NumUtils.toBigDecimal(y));
+        }
+
+        @Override
+        public Number remainder(Number x, Number y) {
+            return NumUtils.toBigDecimal(x).remainder(NumUtils.toBigDecimal(y));
+        }
+    }
+
+    public static class BigIntegerOps extends BaseOps {
+        @Override
+        final public Number add(Number x, Number y) {
+            return NumUtils.toBigInteger(x).add(NumUtils.toBigInteger(y));
+        }
+
+        @Override
+        public NumOps combine(NumOps y) {
+            return y.opsWith(this);
+        }
+
+        @Override
+        public Number dec(Number x) {
+            BigInteger bx = NumUtils.toBigInteger(x);
+            return bx.subtract(BigInteger.ONE);
+        }
+
+        @Override
+        public Number divide(Number x, Number y) {
+            return Num.divide(NumUtils.toBigInteger(x), NumUtils.toBigInteger(y));
+        }
+
+        @Override
+        public boolean eq(Number x, Number y) {
+            return NumUtils.toBigInteger(x).equals(NumUtils.toBigInteger(y));
+        }
+
+        @Override
+        public boolean gte(Number x, Number y) {
+            return NumUtils.toBigInteger(x).compareTo(NumUtils.toBigInteger(y)) >= 0;
+        }
+
+        @Override
+        public Number inc(Number x) {
+            BigInteger bx = NumUtils.toBigInteger(x);
+            return bx.add(BigInteger.ONE);
+        }
+
+        @Override
+        public boolean isNeg(Number x) {
+            BigInteger bx = NumUtils.toBigInteger(x);
+            return bx.signum() < 0;
+        }
+
+        @Override
+        public boolean isPos(Number x) {
+            BigInteger bx = NumUtils.toBigInteger(x);
+            return bx.signum() > 0;
+        }
+
+        @Override
+        public boolean isZero(Number x) {
+            BigInteger bx = NumUtils.toBigInteger(x);
+            return bx.signum() == 0;
+        }
+
+        @Override
+        public boolean lt(Number x, Number y) {
+            return NumUtils.toBigInteger(x).compareTo(NumUtils.toBigInteger(y)) == -1;
+        }
+
+        @Override
+        public boolean lte(Number x, Number y) {
+            return NumUtils.toBigInteger(x).compareTo(NumUtils.toBigInteger(y)) <= 0;
+        }
+
+        @Override
+        final public Number multiply(Number x, Number y) {
+            return NumUtils.toBigInteger(x).multiply(NumUtils.toBigInteger(y));
+        }
+
+        @Override
+        final public Number negate(Number x) {
+            return NumUtils.toBigInteger(x).negate();
+        }
+
+        @Override
+        final public NumOps opsWith(BigDecimalOps x) {
+            return NumUtils.BIGDECIMAL_OPS;
+        }
+
+        @Override
+        final public NumOps opsWith(BigIntegerOps x) {
+            return this;
+        }
+
+        @Override
+        final public NumOps opsWith(DoubleOps x) {
+            return NumUtils.DOUBLE_OPS;
+        }
+
+        @Override
+        final public NumOps opsWith(LongOps x) {
+            return this;
+        }
+
+        @Override
+        final public NumOps opsWith(RatioOps x) {
+            return NumUtils.RATIO_OPS;
+        }
+
+        @Override
+        public Number quotient(Number x, Number y) {
+            return NumUtils.toBigInteger(x).divide(NumUtils.toBigInteger(y));
+        }
+
+        @Override
+        public Number remainder(Number x, Number y) {
+            return NumUtils.toBigInteger(x).remainder(NumUtils.toBigInteger(y));
+        }
+    }
+
+    public static class DoubleOps extends BaseOps {
+        @Override
+        final public Number add(Number x, Number y) {
+            return Double.valueOf(x.doubleValue() + y.doubleValue());
+        }
+
+        @Override
+        public NumOps combine(NumOps y) {
+            return y.opsWith(this);
+        }
+
+        @Override
+        public Number dec(Number x) {
+            return Double.valueOf(x.doubleValue() - 1);
+        }
+
+        @Override
+        public Number divide(Number x, Number y) {
+            return Double.valueOf(x.doubleValue() / y.doubleValue());
+        }
+
+        @Override
+        public boolean eq(Number x, Number y) {
+            return x.doubleValue() == y.doubleValue();
+        }
+
+        @Override
+        public boolean gte(Number x, Number y) {
+            return x.doubleValue() >= y.doubleValue();
+        }
+
+        @Override
+        public Number inc(Number x) {
+            return Double.valueOf(x.doubleValue() + 1);
+        }
+
+        @Override
+        public boolean isNeg(Number x) {
+            return x.doubleValue() < 0;
+        }
+
+        @Override
+        public boolean isPos(Number x) {
+            return x.doubleValue() > 0;
+        }
+
+        @Override
+        public boolean isZero(Number x) {
+            return x.doubleValue() == 0;
+        }
+
+        @Override
+        public boolean lt(Number x, Number y) {
+            return x.doubleValue() < y.doubleValue();
+        }
+
+        @Override
+        public boolean lte(Number x, Number y) {
+            return x.doubleValue() <= y.doubleValue();
+        }
+
+        @Override
+        final public Number multiply(Number x, Number y) {
+            return Double.valueOf(x.doubleValue() * y.doubleValue());
+        }
+
+        @Override
+        final public Number negate(Number x) {
+            return Double.valueOf(-x.doubleValue());
+        }
+
+        @Override
+        final public NumOps opsWith(BigDecimalOps x) {
+            return this;
+        }
+
+        @Override
+        final public NumOps opsWith(BigIntegerOps x) {
+            return this;
+        }
+
+        @Override
+        final public NumOps opsWith(DoubleOps x) {
+            return this;
+        }
+
+        @Override
+        final public NumOps opsWith(LongOps x) {
+            return this;
+        }
+
+        @Override
+        final public NumOps opsWith(RatioOps x) {
+            return this;
+        }
+
+        @Override
+        public Number quotient(Number x, Number y) {
+            return Num.quotient(x.doubleValue(), y.doubleValue());
+        }
+
+        @Override
+        public Number remainder(Number x, Number y) {
+            return Num.remainder(x.doubleValue(), y.doubleValue());
+        }
+    }
+
+    public static class LongOps implements NumOps {
+        @Override
+        final public Number add(Number x, Number y) {
+            return Num.num(NumUtils.add(x.longValue(), y.longValue()));
+        }
+
+        @Override
+        final public Number addP(Number x, Number y) {
+            long lx = x.longValue(), ly = y.longValue();
+            long ret = lx + ly;
+            if ((ret ^ lx) < 0 && (ret ^ ly) < 0)
+                return NumUtils.BIGINT_OPS.add(x, y);
+            return Num.num(ret);
+        }
+
+        @Override
+        public NumOps combine(NumOps y) {
+            return y.opsWith(this);
+        }
+
+        @Override
+        public Number dec(Number x) {
+            long val = x.longValue();
+            return Num.num(NumUtils.dec(val));
+        }
+
+        @Override
+        public Number decP(Number x) {
+            long val = x.longValue();
+            if (val > Long.MIN_VALUE)
+                return Num.num(val - 1);
+            return NumUtils.BIGINT_OPS.dec(x);
+        }
+
+        @Override
+        public Number divide(Number x, Number y) {
+            long n = x.longValue();
+            long val = y.longValue();
+            long gcd = NumUtils.gcd(n, val);
+            if (gcd == 0)
+                return Num.num(0);
+
+            n = n / gcd;
+            long d = val / gcd;
+            if (d == 1)
+                return Num.num(n);
+            if (d < 0) {
+                n = -n;
+                d = -d;
+            }
+            return new Ratio(BigInteger.valueOf(n), BigInteger.valueOf(d));
+        }
+
+        @Override
+        public boolean eq(Number x, Number y) {
+            return x.longValue() == y.longValue();
+        }
+
+        @Override
+        public boolean gte(Number x, Number y) {
+            return x.longValue() >= y.longValue();
+        }
+
+        @Override
+        public Number inc(Number x) {
+            long val = x.longValue();
+            return Num.num(NumUtils.inc(val));
+        }
+
+        @Override
+        public Number incP(Number x) {
+            long val = x.longValue();
+            if (val < Long.MAX_VALUE)
+                return Num.num(val + 1);
+            return NumUtils.BIGINT_OPS.inc(x);
+        }
+
+        @Override
+        public boolean isNeg(Number x) {
+            return x.longValue() < 0;
+        }
+
+        @Override
+        public boolean isPos(Number x) {
+            return x.longValue() > 0;
+        }
+
+        @Override
+        public boolean isZero(Number x) {
+            return x.longValue() == 0;
+        }
+
+        @Override
+        public boolean lt(Number x, Number y) {
+            return x.longValue() < y.longValue();
+        }
+
+        @Override
+        public boolean lte(Number x, Number y) {
+            return x.longValue() <= y.longValue();
+        }
+
+        @Override
+        final public Number multiply(Number x, Number y) {
+            return Num.num(NumUtils.multiply(x.longValue(), y.longValue()));
+        }
+
+        @Override
+        final public Number multiplyP(Number x, Number y) {
+            long lx = x.longValue(), ly = y.longValue();
+            if (lx == Long.MIN_VALUE && ly < 0)
+                return NumUtils.BIGINT_OPS.multiply(x, y);
+            long ret = lx * ly;
+            if (ly != 0 && ret / ly != lx)
+                return NumUtils.BIGINT_OPS.multiply(x, y);
+            return Num.num(ret);
+        }
+
+        @Override
+        final public Number negate(Number x) {
+            long val = x.longValue();
+            return Num.num(NumUtils.minus(val));
+        }
+
+        @Override
+        final public Number negateP(Number x) {
+            long val = x.longValue();
+            if (val > Long.MIN_VALUE)
+                return Num.num(-val);
+            return BigInteger.valueOf(val).negate();
+        }
+
+        @Override
+        final public NumOps opsWith(BigDecimalOps x) {
+            return NumUtils.BIGDECIMAL_OPS;
+        }
+
+        @Override
+        final public NumOps opsWith(BigIntegerOps x) {
+            return NumUtils.BIGINT_OPS;
+        }
+
+        @Override
+        final public NumOps opsWith(DoubleOps x) {
+            return NumUtils.DOUBLE_OPS;
+        }
+
+        @Override
+        final public NumOps opsWith(LongOps x) {
+            return this;
+        }
+
+        @Override
+        final public NumOps opsWith(RatioOps x) {
+            return NumUtils.RATIO_OPS;
+        }
+
+        @Override
+        public Number quotient(Number x, Number y) {
+            return Num.num(x.longValue() / y.longValue());
+        }
+
+        @Override
+        public Number remainder(Number x, Number y) {
+            return Num.num(x.longValue() % y.longValue());
+        }
+
+        @Override
+        final public Number unchecked_add(Number x, Number y) {
+            return Num.num(NumUtils.unchecked_add(x.longValue(), y.longValue()));
+        }
+
+        @Override
+        public Number unchecked_dec(Number x) {
+            long val = x.longValue();
+            return Num.num(NumUtils.unchecked_dec(val));
+        }
+
+        @Override
+        public Number unchecked_inc(Number x) {
+            long val = x.longValue();
+            return Num.num(NumUtils.unchecked_inc(val));
+        }
+
+        @Override
+        final public Number unchecked_multiply(Number x, Number y) {
+            return Num.num(NumUtils.unchecked_multiply(x.longValue(), y.longValue()));
+        }
+
+        @Override
+        final public Number unchecked_negate(Number x) {
+            long val = x.longValue();
+            return Num.num(NumUtils.unchecked_minus(val));
+        }
+    }
+
+    public static class RatioOps extends BaseOps {
+        static Number normalizeRet(Number ret, Number x, Number y) {
+            return ret;
+        }
+
+        @Override
+        final public Number add(Number x, Number y) {
+            Ratio rx = NumUtils.toRatio(x);
+            Ratio ry = NumUtils.toRatio(y);
+            Number ret = divide(ry.numerator.multiply(rx.denominator).add(rx.numerator.multiply(ry.denominator)),
+                    ry.denominator.multiply(rx.denominator));
+            return normalizeRet(ret, x, y);
+        }
+
+        @Override
+        public NumOps combine(NumOps y) {
+            return y.opsWith(this);
+        }
+
+        @Override
+        public Number dec(Number x) {
+            return Num.add(x, -1);
+        }
+
+        @Override
+        public Number divide(Number x, Number y) {
+            Ratio rx = NumUtils.toRatio(x);
+            Ratio ry = NumUtils.toRatio(y);
+            Number ret = Num.divide(ry.denominator.multiply(rx.numerator), ry.numerator.multiply(rx.denominator));
+            return normalizeRet(ret, x, y);
+        }
+
+        @Override
+        public boolean eq(Number x, Number y) {
+            Ratio rx = NumUtils.toRatio(x);
+            Ratio ry = NumUtils.toRatio(y);
+            return rx.numerator.equals(ry.numerator) && rx.denominator.equals(ry.denominator);
+        }
+
+        @Override
+        public boolean gte(Number x, Number y) {
+            Ratio rx = NumUtils.toRatio(x);
+            Ratio ry = NumUtils.toRatio(y);
+            return Num.gte(rx.numerator.multiply(ry.denominator), ry.numerator.multiply(rx.denominator));
+        }
+
+        @Override
+        public Number inc(Number x) {
+            return Num.add(x, 1);
+        }
+
+        @Override
+        public boolean isNeg(Number x) {
+            Ratio r = (Ratio) x;
+            return r.numerator.signum() < 0;
+        }
+
+        @Override
+        public boolean isPos(Number x) {
+            Ratio r = (Ratio) x;
+            return r.numerator.signum() > 0;
+        }
+
+        @Override
+        public boolean isZero(Number x) {
+            Ratio r = (Ratio) x;
+            return r.numerator.signum() == 0;
+        }
+
+        @Override
+        public boolean lt(Number x, Number y) {
+            Ratio rx = NumUtils.toRatio(x);
+            Ratio ry = NumUtils.toRatio(y);
+            return Num.lt(rx.numerator.multiply(ry.denominator), ry.numerator.multiply(rx.denominator));
+        }
+
+        @Override
+        public boolean lte(Number x, Number y) {
+            Ratio rx = NumUtils.toRatio(x);
+            Ratio ry = NumUtils.toRatio(y);
+            return Num.lte(rx.numerator.multiply(ry.denominator), ry.numerator.multiply(rx.denominator));
+        }
+
+        @Override
+        final public Number multiply(Number x, Number y) {
+            Ratio rx = NumUtils.toRatio(x);
+            Ratio ry = NumUtils.toRatio(y);
+            Number ret = Num.divide(ry.numerator.multiply(rx.numerator), ry.denominator.multiply(rx.denominator));
+            return normalizeRet(ret, x, y);
+        }
+
+        @Override
+        final public Number negate(Number x) {
+            Ratio r = (Ratio) x;
+            return new Ratio(r.numerator.negate(), r.denominator);
+        }
+
+        @Override
+        final public NumOps opsWith(BigDecimalOps x) {
+            return NumUtils.BIGDECIMAL_OPS;
+        }
+
+        @Override
+        final public NumOps opsWith(BigIntegerOps x) {
+            return this;
+        }
+
+        @Override
+        final public NumOps opsWith(DoubleOps x) {
+            return NumUtils.DOUBLE_OPS;
+        }
+
+        @Override
+        final public NumOps opsWith(LongOps x) {
+            return this;
+        }
+
+        @Override
+        final public NumOps opsWith(RatioOps x) {
+            return this;
+        }
+
+        @Override
+        public Number quotient(Number x, Number y) {
+            Ratio rx = NumUtils.toRatio(x);
+            Ratio ry = NumUtils.toRatio(y);
+            BigInteger q = rx.numerator.multiply(ry.denominator).divide(rx.denominator.multiply(ry.numerator));
+            return normalizeRet(q, x, y);
+        }
+
+        @Override
+        public Number remainder(Number x, Number y) {
+            Ratio rx = NumUtils.toRatio(x);
+            Ratio ry = NumUtils.toRatio(y);
+            BigInteger q = rx.numerator.multiply(ry.denominator).divide(rx.denominator.multiply(ry.numerator));
+            Number ret = Num.minus(x, Num.multiply(q, y));
+            return normalizeRet(ret, x, y);
+        }
+    }
+}
