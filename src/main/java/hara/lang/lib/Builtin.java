@@ -1383,7 +1383,18 @@ public interface Builtin {
 
 		@Module.Fn(name = "println", vargs = true, complete = true)
 		public static <ITR> Object println(ITR args) {
-			System.out.println(str(args));
+			System.out.println(It.toString(It.iter(args), "", "", " ",
+					(e) -> {
+						if(e == null) {
+							return "";
+						} else if(e instanceof String) {
+							return (String)e;
+						} else if (e instanceof I.Display) {
+							return ((I.Display)e).display();
+						} else {
+							return e.toString();
+						}
+					}));
 			return null;
 		}
 

@@ -9,7 +9,9 @@ import hara.lang.kernel.io.IRedirect;
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -29,10 +31,10 @@ public class Main {
             if ("--server".equals(command)) {
                 startServer(F, rt);
             } else {
-                runFile(rt, command);
+                runFile(rt, command, System.err);
             }
         } else {
-            runRepl(rt);
+            runRepl(rt, System.in, System.out);
         }
     }
 
@@ -43,28 +45,28 @@ public class Main {
         server.start();
     }
 
-    private static void runFile(RT.Instance rt, String filepath) {
+    public static void runFile(RT.Instance rt, String filepath, PrintStream err) {
         try {
             String content = Files.readString(Path.of(filepath));
             Object ast = rt.readString(content);
             rt.eval(ast);
         } catch (IOException e) {
-            System.err.println("Error reading file: " + e.getMessage());
-            System.exit(1);
+            err.println("Error reading file: " + e.getMessage());
+            // System.exit(1); // Removed for testability, or catch in wrapper
         } catch (Throwable t) {
-            t.printStackTrace();
-            System.exit(1);
+            t.printStackTrace(err);
+            // System.exit(1);
         }
     }
 
-    private static void runRepl(RT.Instance rt) {
-        System.out.println("Hara REPL (type 'exit' to quit)");
-        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+    public static void runRepl(RT.Instance rt, InputStream in, PrintStream out) {
+        out.println("Hara REPL (type 'exit' to quit)");
+        BufferedReader reader = new BufferedReader(new InputStreamReader(in));
 
         while (true) {
             try {
-                System.out.print("> ");
-                System.out.flush();
+                out.print("> ");
+                out.flush();
                 String line = reader.readLine();
 
                 if (line == null) break; // EOF
@@ -73,12 +75,12 @@ public class Main {
 
                 Object ast = rt.readString(line);
                 Object result = rt.eval(ast);
-                System.out.println(G.display(result));
+                out.println(G.display(result));
 
             } catch (IOException e) {
                 break;
             } catch (Throwable t) {
-                System.out.println(G.display(t));
+                out.println(G.display(t));
             }
         }
     }
