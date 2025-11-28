@@ -1,12 +1,14 @@
 package hara.lang.data;
 
+import hara.data.types.*;
+
 import java.lang.ref.WeakReference;
 
 import hara.lang.base.*;
 import hara.lang.protocol.Constant;
 import hara.lang.protocol.*;
 
-public class Symbol extends Data.NamespacedType.PT implements Data.StringType {
+public class Symbol extends INamespacedType.PT implements IStringType {
 
   public static Ut.RefCache<String, Symbol> GLOBAL = new Ut.RefCache<String, Symbol>();
 

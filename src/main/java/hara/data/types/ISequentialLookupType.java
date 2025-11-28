@@ -1,0 +1,69 @@
+package hara.data.types;
+
+import hara.lang.data.*;
+
+import hara.data.types.*;
+
+import java.util.Iterator;
+import java.util.Map.Entry;
+import hara.lang.base.It;
+import hara.lang.protocol.*;
+
+public interface ISequentialLookupType<E>
+    extends ISequentialType<E>,
+        Iterable<E>,
+        ICount,
+        INth<E>,
+        ILookup<Long, E>,
+        IPeekFirst<E>,
+        IPeekLast<E> {
+
+  @Override
+  default Entry<Long, E> find(Long idx) {
+    if (idx >= 0 && idx < count()) {
+      E out = nth(idx);
+      return new Entry<Long, E>() {
+        @Override
+        public Long getKey() {
+          return idx;
+        }
+
+        @Override
+        public E getValue() {
+          return out;
+        }
+
+        @Override
+        public E setValue(E value) {
+          throw new UnsupportedOperationException("Not Supported");
+        }
+      };
+    }
+    throw new IndexOutOfBoundsException();
+  }
+
+  @Override
+  default Iterator<Long> keys() {
+    return It.range(0, count());
+  }
+
+  @Override
+  default E lookup(Long idx) {
+    return nth(idx);
+  }
+
+  @Override
+  default E peekFirst() {
+    return nth(0);
+  }
+
+  @Override
+  default E peekLast() {
+    return nth(count() - 1);
+  }
+
+  @Override
+  default Iterator<E> vals() {
+    return this.iterator();
+  }
+}

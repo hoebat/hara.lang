@@ -1,10 +1,12 @@
 package hara.lang.data;
 
+import hara.data.types.*;
+
 import hara.lang.base.*;
 import hara.lang.protocol.Constant;
 import hara.lang.protocol.*;
 
-public class Pointer extends Data.NamespacedType.PT implements Data.StringType {
+public class Pointer extends INamespacedType.PT implements IStringType {
 
   public Pointer(IMetadata meta, String ns, String name) {
     super(meta, ns, name);

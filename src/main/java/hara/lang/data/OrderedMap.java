@@ -1,12 +1,14 @@
 package hara.lang.data;
 
+import hara.data.types.*;
+
 import java.util.Iterator;
 import java.util.Map.Entry;
 
 import hara.lang.base.*;
 import hara.lang.protocol.*;
 
-public interface OrderedMap<K, V> extends Data.MapType<K, V>, INth<Entry<K, V>> {
+public interface OrderedMap<K, V> extends IMapType<K, V>, INth<Entry<K, V>> {
 
   public interface Base<K, V> extends OrderedMap<K, V> {
     public Map<K, Entry<Integer, V>> _lookup();
@@ -22,7 +24,7 @@ public interface OrderedMap<K, V> extends Data.MapType<K, V>, INth<Entry<K, V>> 
     @Override
     default Entry<K, V> find(K key) {
       var rec = _lookup().find(key);
-      return (rec != null) ? new Std.T.Tup2.L(null, key, rec.getValue().getValue()) : null;
+      return (rec != null) ? new Tuple.Tup2.L(null, key, rec.getValue().getValue()) : null;
     }
 
     @Override
@@ -37,7 +39,7 @@ public interface OrderedMap<K, V> extends Data.MapType<K, V>, INth<Entry<K, V>> 
   }
 
   @SuppressWarnings("unchecked")
-  public class Mutable<K, V> extends Data.RefType.MT implements Base<K, V>, IToPersistent {
+  public class Mutable<K, V> extends IRefType.MT implements Base<K, V>, IToPersistent {
 
     private Vector.Mutable<Entry<K, V>> _order;
     private Map.Mutable<K, Entry<Integer, V>> _lookup;
@@ -81,16 +83,16 @@ public interface OrderedMap<K, V> extends Data.MapType<K, V>, INth<Entry<K, V>> 
     public Mutable<K, V> assoc(K k, V v) {
       var rec = _lookup.find(k);
       if (rec == null) {
-        _order.conj(new Std.T.Tup2.L(null, k, v));
-        _lookup.assoc(k, new Std.T.Tup2.L(null, (int) _order.count() - 1, v));
+        _order.conj(new Tuple.Tup2.L(null, k, v));
+        _lookup.assoc(k, new Tuple.Tup2.L(null, (int) _order.count() - 1, v));
         return this;
       } else {
         if (v == rec.getValue().getValue()) {
           return this;
         } else {
           var idx = rec.getValue().getKey();
-          _order.assoc(idx, new Std.T.Tup2.L(null, k, v));
-          _lookup.assoc(k, new Std.T.Tup2.L(null, idx, v));
+          _order.assoc(idx, new Tuple.Tup2.L(null, k, v));
+          _lookup.assoc(k, new Tuple.Tup2.L(null, idx, v));
           return this;
         }
       }
@@ -117,7 +119,7 @@ public interface OrderedMap<K, V> extends Data.MapType<K, V>, INth<Entry<K, V>> 
             Entry<K, V> entry = it.next();
             if (entry != null) {
               newOrder.conj(entry);
-              newLookup.assoc(entry.getKey(), new Std.T.Tup2.L(null, newIdx, entry.getValue()));
+              newLookup.assoc(entry.getKey(), new Tuple.Tup2.L(null, newIdx, entry.getValue()));
               newIdx++;
             }
           }
@@ -145,7 +147,7 @@ public interface OrderedMap<K, V> extends Data.MapType<K, V>, INth<Entry<K, V>> 
   }
 
   @SuppressWarnings("unchecked")
-  public class Standard<K, V> extends Data.RefType.PT implements Base<K, V>, IToMutable {
+  public class Standard<K, V> extends IRefType.PT implements Base<K, V>, IToMutable {
     private final Map.Standard<K, Entry<Integer, V>> _lookup;
     private final Vector.Standard<Entry<K, V>> _order;
 
@@ -192,16 +194,16 @@ public interface OrderedMap<K, V> extends Data.MapType<K, V>, INth<Entry<K, V>> 
     public Standard<K, V> assoc(K k, V v) {
       var rec = _lookup.find(k);
       if (rec == null) {
-        var norder = (Vector.Standard) _order.conj(new Std.T.Tup2.L(null, k, v));
-        var nlookup = _lookup.assoc(k, new Std.T.Tup2.L(null, (int) norder.count() - 1, v));
+        var norder = (Vector.Standard) _order.conj(new Tuple.Tup2.L(null, k, v));
+        var nlookup = _lookup.assoc(k, new Tuple.Tup2.L(null, (int) norder.count() - 1, v));
         return new Standard<K, V>(_meta, norder, nlookup);
       } else {
         if (v == rec.getValue().getValue()) {
           return this;
         } else {
           var idx = rec.getValue().getKey();
-          var norder = _order.assoc(idx, new Std.T.Tup2.L(null, k, v));
-          var nlookup = _lookup.assoc(k, new Std.T.Tup2.L(null, idx, v));
+          var norder = _order.assoc(idx, new Tuple.Tup2.L(null, k, v));
+          var nlookup = _lookup.assoc(k, new Tuple.Tup2.L(null, idx, v));
           return new Standard<K, V>(_meta, norder, nlookup);
         }
       }
@@ -228,7 +230,7 @@ public interface OrderedMap<K, V> extends Data.MapType<K, V>, INth<Entry<K, V>> 
             Entry<K, V> entry = it.next();
             if (entry != null) {
               newOrder.conj(entry);
-              newLookup.assoc(entry.getKey(), new Std.T.Tup2.L(null, newIdx, entry.getValue()));
+              newLookup.assoc(entry.getKey(), new Tuple.Tup2.L(null, newIdx, entry.getValue()));
               newIdx++;
             }
           }

@@ -1,11 +1,13 @@
 package hara.lang.data;
 
+import hara.data.types.*;
+
 import java.util.Iterator;
 
 import hara.lang.base.*;
 import hara.lang.protocol.*;
 
-public interface SortedSet<E> extends Data.SetType<E> {
+public interface SortedSet<E> extends ISetType<E> {
 
   public interface Base<E> extends SortedSet<E> {
 
@@ -28,7 +30,7 @@ public interface SortedSet<E> extends Data.SetType<E> {
     }
   }
 
-  public class Mutable<E> extends Data.RefType.MT implements Base<E>, IToPersistent {
+  public class Mutable<E> extends IRefType.MT implements Base<E>, IToPersistent {
 
     private SortedMap.Mutable<E, E> _lookup;
 
@@ -85,7 +87,7 @@ public interface SortedSet<E> extends Data.SetType<E> {
     }
   }
 
-  public class Standard<E> extends Data.RefType.PT implements Base<E>, IToMutable {
+  public class Standard<E> extends IRefType.PT implements Base<E>, IToMutable {
 
     private final SortedMap.Standard<E, E> _lookup;
 

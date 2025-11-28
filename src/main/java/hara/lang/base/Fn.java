@@ -561,11 +561,11 @@ public interface Fn {
       public Function getArgN() {
         return (es) -> {
           Iterator<E> it = It.iter(es);
-          Std.T.Tup2.L<Boolean, E> init = new Std.T.Tup2.L(null, _def, it.next());
+          Tuple.Tup2.L<Boolean, E> init = new Tuple.Tup2.L(null, _def, it.next());
           return It.reduce(
                   it,
                   init,
-                  (p, e) -> new Std.T.Tup2.L(null, _c2.apply(p.B(), e), e),
+                  (p, e) -> new Tuple.Tup2.L(null, _c2.apply(p.B(), e), e),
                   (p) -> p.A() != _def)
               .A();
         };

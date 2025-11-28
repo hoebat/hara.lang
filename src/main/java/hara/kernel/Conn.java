@@ -1,5 +1,7 @@
 package hara.kernel;
 
+import hara.lang.data.*;
+
 import java.io.*;
 import java.net.Socket;
 import java.util.Arrays;

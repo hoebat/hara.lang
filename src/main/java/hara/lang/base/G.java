@@ -1,5 +1,7 @@
 package hara.lang.base;
 
+import hara.lang.data.*;
+
 import hara.lang.protocol.*;
 import hara.lang.protocol.Constant.*;
 

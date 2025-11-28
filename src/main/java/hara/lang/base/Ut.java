@@ -1,5 +1,9 @@
 package hara.lang.base;
 
+import hara.data.types.*;
+
+import hara.lang.data.*;
+
 import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
@@ -11,7 +15,7 @@ import hara.lang.protocol.*;
 
 public interface Ut {
 
-  public class AsList<E> extends Obj.MT implements Data.LinearType<E>, Data.SequentialType<E> {
+  public class AsList<E> extends Obj.MT implements ILinearType<E>, ISequentialType<E> {
 
     final java.util.List<E> _l;
 
@@ -76,7 +80,7 @@ public interface Ut {
   }
 
   @SuppressWarnings("unchecked")
-  public class AsMap<K, V> extends Obj.MT implements Data.MapType<K, V> {
+  public class AsMap<K, V> extends Obj.MT implements IMapType<K, V> {
 
     final java.util.Map<K, V> _m;
 
@@ -109,7 +113,7 @@ public interface Ut {
 
     @Override
     public Entry<K, V> find(K key) {
-      return (_m.containsKey(key)) ? new Std.T.Tup2.L<K, V>(null, key, _m.get(key)) : null;
+      return (_m.containsKey(key)) ? new Tuple.Tup2.L<K, V>(null, key, _m.get(key)) : null;
     }
 
     @Override
@@ -133,7 +137,7 @@ public interface Ut {
     }
   }
 
-  public class AsSet<E> extends Obj.MT implements Data.SetType<E> {
+  public class AsSet<E> extends Obj.MT implements ISetType<E> {
     final java.util.Set<E> _s;
 
     public AsSet(java.util.Set<E> s) {
@@ -431,7 +435,7 @@ public interface Ut {
     @Override
     public Entry<K, Reference<V>> find(K key) {
       var ret = _lu.getOrDefault(key, null);
-      return (ret == null) ? null : new Std.T.Tup2.L(null, key, ret);
+      return (ret == null) ? null : new Tuple.Tup2.L(null, key, ret);
     }
 
     public V get(K key) {

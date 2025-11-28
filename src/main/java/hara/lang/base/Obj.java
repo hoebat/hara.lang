@@ -1,5 +1,9 @@
 package hara.lang.base;
 
+import hara.data.types.*;
+
+import hara.lang.data.*;
+
 import java.util.Iterator;
 
 import hara.lang.data.Keyword;
@@ -89,7 +93,7 @@ public interface Obj {
   	implements
   	IColl<V>,
   	IObjType,
-  	Data.SequentialType<V>{
+	ISequentialType<V>{
 
   	public SEQ() {
   		super(null);
@@ -106,12 +110,12 @@ public interface Obj {
 
   	@Override
   	public SEQ<V> cons(V e) {
-  		return new Std.T.Cons<V>(_meta, e, this);
+		return new Cons<V>(_meta, e, this);
   	}
 
   	@Override
   	public SEQ<V> conj(V e) {
-  		return new Std.T.Cons<V>(_meta, e, this);
+		return new Cons<V>(_meta, e, this);
   	}
 
   	@Override
@@ -122,7 +126,7 @@ public interface Obj {
   	@SuppressWarnings("rawtypes")
   	@Override
   	public IColl empty() {
-  		return Std.T.Cons.EMPTY.withMeta(_meta);
+		return Cons.EMPTY.withMeta(_meta);
   	}
   }*/
 

@@ -1,5 +1,7 @@
 package hara.lang.data;
 
+import hara.data.types.*;
+
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -12,8 +14,7 @@ import hara.lang.base.*;
 import static hara.lang.data.SortedMap.Color.*;
 import hara.lang.protocol.*;
 
-public interface SortedMap<K, V>
-    extends Data.MapType<K, V>, INth<Map.Entry<K, V>>, IIndexedKV<K, V> {
+public interface SortedMap<K, V> extends IMapType<K, V>, INth<Map.Entry<K, V>>, IIndexedKV<K, V> {
 
   public enum Color {
     RED,
@@ -550,7 +551,7 @@ public interface SortedMap<K, V>
   }
 
   @SuppressWarnings("unchecked")
-  public final class Mutable<K, V> extends Data.RefType.MT implements Base<K, V>, IToPersistent {
+  public final class Mutable<K, V> extends IRefType.MT implements Base<K, V>, IToPersistent {
 
     private final Comparator<K> _comparator;
     public Node<K, V> _root;
@@ -625,7 +626,7 @@ public interface SortedMap<K, V>
   }
 
   @SuppressWarnings("unchecked")
-  public final class Standard<K, V> extends Data.RefType.PT
+  public final class Standard<K, V> extends IRefType.PT
       implements Base<K, V>, SortedMap<K, V>, IToMutable {
 
     // STATIC

@@ -1,5 +1,7 @@
 package hara.lang.base;
 
+import hara.lang.data.*;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -820,7 +822,7 @@ public interface It {
         }
       }
     }
-    return new Std.T.Tup2.L(null, new PairIterator(), new PairIterator());
+    return new Tuple.Tup2.L(null, new PairIterator(), new PairIterator());
   }
 
   public static <E> Iterator<E> constantly(E t) {
@@ -950,7 +952,7 @@ public interface It {
         if (!hasNext()) {
           throw new Ex.NoSuchElement();
         }
-        return new Std.T.Tup2.L(null, it0.next(), it1.next());
+        return new Tuple.Tup2.L(null, it0.next(), it1.next());
       }
     };
   }
@@ -997,7 +999,7 @@ public interface It {
       @Override
       public IPair<E, E> next() {
         if (it.hasNext()) {
-          var pair = new Std.T.Tup2.L(null, _v0, it.next());
+          var pair = new Tuple.Tup2.L(null, _v0, it.next());
           _state = T.State.NOT_SET;
           return pair;
         }

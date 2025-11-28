@@ -1,5 +1,7 @@
 package hara.kernel.base;
 
+import hara.data.types.*;
+
 import java.io.IOException;
 import java.io.PushbackReader;
 import java.io.Reader;
@@ -657,17 +659,17 @@ public interface Read {
 
         Object o = read(r, true, null, true, opts);
         if (o instanceof IObjType) {
-          Data.MapType ometa = (Data.MapType) ((IObjType) o).meta();
+          IMapType ometa = (IMapType) ((IObjType) o).meta();
 
-          ometa = (Data.MapType) merge(ometa, meta);
+          ometa = (IMapType) merge(ometa, meta);
           return ((IObjType) o).withMeta(ometa);
         } else throw new IllegalArgumentException("Metadata can only be applied to I.ObjTypes");
       }
     }
 
-    public static class VectorReader implements BiFunction<PushbackReader, Map, Data.LinearType> {
+    public static class VectorReader implements BiFunction<PushbackReader, Map, ILinearType> {
       @Override
-      public Data.LinearType apply(PushbackReader r, Map opts) {
+      public ILinearType apply(PushbackReader r, Map opts) {
         ArrayList list = readDelimitedList(']', r, true, opts);
         if (list.size() > 5) {
           return vector(list);

@@ -1,5 +1,7 @@
 package hara.lang.data;
 
+import hara.data.types.*;
+
 import java.util.Iterator;
 
 import java.util.NoSuchElementException;
@@ -12,7 +14,7 @@ import hara.lang.protocol.IPopLast;
 import hara.lang.protocol.IPushFirst;
 import hara.lang.protocol.*;
 
-public interface Vector<E> extends Data.VectorType<E>, IAssoc<Integer, E> {
+public interface Vector<E> extends IVectorType<E>, IAssoc<Integer, E> {
 
   public interface S {
 
@@ -225,7 +227,7 @@ public interface Vector<E> extends Data.VectorType<E>, IAssoc<Integer, E> {
     }
   }
 
-  public class Mutable<E> extends Data.RefType.MT implements Base<E>, IToPersistent {
+  public class Mutable<E> extends IRefType.MT implements Base<E>, IToPersistent {
 
     private int _size;
     private int _shift;
@@ -395,8 +397,7 @@ public interface Vector<E> extends Data.VectorType<E>, IAssoc<Integer, E> {
     }
   }
 
-  public class Standard<E> extends Data.RefType.PT
-      implements Base<E>, IToMutable, Data.LinearView<E> {
+  public class Standard<E> extends IRefType.PT implements Base<E>, IToMutable, ILinearView<E> {
 
     // STATIC
     public static final Standard<Object> EMPTY =
@@ -546,8 +547,8 @@ public interface Vector<E> extends Data.VectorType<E>, IAssoc<Integer, E> {
     }
   }
 
-  public class SubView<E> extends Data.RefType.PT
-      implements Vector<E>, IAssoc<Integer, E>, IObjType, Data.LinearView<E> {
+  public class SubView<E> extends IRefType.PT
+      implements Vector<E>, IAssoc<Integer, E>, IObjType, ILinearView<E> {
 
     final Vector<E> _v;
     final int _start;
