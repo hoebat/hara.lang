@@ -4,6 +4,7 @@ import hara.lang.data.Tuple;
 import hara.lang.protocol.IPair;
 import hara.lang.protocol.IToMutable;
 import hara.lang.protocol.IToPersistent;
+import hara.lang.base.iter.*;
 
 import java.util.*;
 import java.util.Map.Entry;
@@ -11,198 +12,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.*;
 
 public interface It {
-
-  public interface T {
-
-    public interface UnmodifiableIteratorType<V> extends java.util.Iterator<V> {
-
-      @Override
-      default void remove() {
-        throw new Ex.Unsupported();
-      }
-    }
-
-    public interface UnmodifiableListIteratorType<V> extends java.util.ListIterator<V> {
-
-      @Override
-      default void remove() {
-        throw new Ex.Unsupported();
-      }
-
-      @Override
-      default void set(V e) {
-        throw new Ex.Unsupported();
-      }
-
-      @Override
-      default void add(V e) {
-        throw new Ex.Unsupported();
-      }
-    }
-
-    public interface EmptySpliterator<V> extends java.util.Spliterator<V> {
-
-      @Override
-      default boolean tryAdvance(Consumer<? super V> action) {
-        return false;
-      }
-
-      @Override
-      default Spliterator<V> trySplit() {
-        return null;
-      }
-
-      @Override
-      default long estimateSize() {
-        return 0;
-      }
-
-      @Override
-      default int characteristics() {
-        return 0;
-      }
-    }
-
-    public interface EmptyIteratorType<V> extends UnmodifiableIteratorType<V> {
-
-      @Override
-      default boolean hasNext() {
-        return false;
-      }
-
-      @Override
-      default V next() {
-        throw new Ex.NoSuchElement();
-      }
-    }
-
-    public interface EmptyListIteratorType<V> extends UnmodifiableListIteratorType<V> {
-
-      @Override
-      default boolean hasPrevious() {
-        return false;
-      }
-
-      @Override
-      default V previous() {
-        return null;
-      }
-
-      @Override
-      default int nextIndex() {
-        return -1;
-      }
-
-      @Override
-      default int previousIndex() {
-        return -1;
-      }
-
-      @Override
-      default boolean hasNext() {
-        return false;
-      }
-
-      @Override
-      default V next() {
-        throw new Ex.NoSuchElement();
-      }
-    }
-
-    public final class ConcatIterator<E> implements java.util.Iterator<E> {
-
-      private static final class Iterators<E> {
-
-        private final java.util.Iterator<E> head;
-        private Iterators<E> tail;
-
-        @SuppressWarnings("unchecked")
-        Iterators(java.util.Iterator<? extends E> head) {
-          this.head = (java.util.Iterator<E>) head;
-        }
-      }
-
-      private Iterators<E> curr;
-      private Iterators<E> last;
-      private boolean nextCalculated = false;
-
-      ConcatIterator(java.util.Iterator<? extends java.util.Iterator<? extends E>> iterators) {
-        this.curr = this.last = iterators.hasNext() ? new Iterators<>(iterators.next()) : null;
-        while (iterators.hasNext()) {
-          this.last = this.last.tail = new Iterators<>(iterators.next());
-        }
-      }
-
-      @Override
-      public boolean hasNext() {
-        if (nextCalculated) {
-          return curr != null;
-        } else {
-          nextCalculated = true;
-          while (true) {
-            if (curr.head.hasNext()) {
-              return true;
-            } else {
-              curr = curr.tail;
-              if (curr == null) {
-                last = null; // release reference
-                return false;
-              }
-            }
-          }
-        }
-      }
-
-      @Override
-      public E next() {
-        if (!hasNext()) {
-          throw new Ex.NoSuchElement();
-        }
-        nextCalculated = false;
-        return curr.head.next();
-      }
-
-      public Iterator<E> concat(java.util.Iterator<? extends E> that) {
-        if (curr == null) {
-          nextCalculated = false;
-          curr = last = new Iterators<>(that);
-        } else {
-          last = last.tail = new Iterators<>(that);
-        }
-        return this;
-      }
-    }
-
-    final class SingletonIterator<E> implements java.util.Iterator<E> {
-
-      private final E _elem;
-      private boolean _next = true;
-
-      SingletonIterator(E element) {
-        this._elem = element;
-      }
-
-      @Override
-      public boolean hasNext() {
-        return _next;
-      }
-
-      @Override
-      public E next() {
-        if (!hasNext()) {
-          throw new Ex.NoSuchElement();
-        }
-        _next = false;
-        return _elem;
-      }
-    }
-
-    public enum State {
-      READY,
-      NOT_SET,
-      DONE
-    }
-  }
 
   public interface Nil {
     public static Iterator<Object> ITERATOR = new Iterator<Object>();
@@ -215,8 +24,18 @@ public interface It {
 
     public static Spliterator<Object> SPLITERATOR = new Spliterator<Object>();
 
-    public class Spliterator<V> implements T.EmptySpliterator<V> {}
+    public class Spliterator<V> implements EmptySpliterator<V> {}
   }
+
+  // Moved to hara.lang.base.iter
+  // UnmodifiableIteratorType
+  // UnmodifiableListIteratorType
+  // EmptySpliterator
+  // EmptyIteratorType
+  // EmptyListIteratorType
+  // ConcatIterator
+  // SingletonIterator
+  // State
 
   public static Iterator<?> emptyIterator() {
     return Nil.ITERATOR;
@@ -471,34 +290,34 @@ public interface It {
     return new Iterator<E>() {
 
       private E _val = null;
-      private T.State _state = T.State.NOT_SET;
+      private State _state = State.NOT_SET;
 
       private void prime() {
-        if (_state == T.State.NOT_SET) {
+        if (_state == State.NOT_SET) {
           while (it.hasNext()) {
             _val = it.next();
             if (f.test(_val)) {
-              _state = T.State.READY;
+              _state = State.READY;
               return;
             }
           }
-          _state = T.State.DONE;
+          _state = State.DONE;
         }
       }
 
       @Override
       public boolean hasNext() {
         prime();
-        return _state != T.State.DONE;
+        return _state != State.DONE;
       }
 
       @Override
       public E next() {
         prime();
-        if (_state == T.State.DONE) {
+        if (_state == State.DONE) {
           throw new NoSuchElementException();
         }
-        _state = T.State.NOT_SET;
+        _state = State.NOT_SET;
         return _val;
       }
     };
@@ -516,36 +335,36 @@ public interface It {
     return new Iterator<R>() {
 
       private R _out = null;
-      private T.State _state = T.State.NOT_SET;
+      private State _state = State.NOT_SET;
 
       private void prime() {
-        if (_state == T.State.NOT_SET) {
+        if (_state == State.NOT_SET) {
           while (it.hasNext()) {
             E _val = it.next();
             _out = f.apply(_val);
             if (_out != null) {
-              _state = T.State.READY;
+              _state = State.READY;
               return;
             }
           }
-          _state = T.State.DONE;
+          _state = State.DONE;
         }
       }
 
       @Override
       public boolean hasNext() {
         prime();
-        return _state != T.State.DONE;
+        return _state != State.DONE;
       }
 
       @Override
       public R next() {
         prime();
-        if (_state == T.State.DONE) {
+        if (_state == State.DONE) {
           throw new NoSuchElementException();
         }
 
-        _state = T.State.NOT_SET;
+        _state = State.NOT_SET;
         return _out;
       }
     };
@@ -724,12 +543,12 @@ public interface It {
 
   @SuppressWarnings({"unchecked", "rawtypes"})
   public static Iterator concat(Iterator x, Iterator y) {
-    return new T.ConcatIterator(It.objects(x, y));
+    return new ConcatIterator(It.objects(x, y));
   }
 
   @SuppressWarnings({"unchecked", "rawtypes"})
   public static Iterator concat(Iterator<Iterator> all) {
-    return new T.ConcatIterator(all);
+    return new ConcatIterator(all);
   }
 
   //
@@ -971,14 +790,14 @@ public interface It {
   public static <E> Iterator<Entry<E, E>> partitionPair(Iterator<E> it) {
     return new Iterator<Entry<E, E>>() {
       E _v0;
-      T.State _state = T.State.NOT_SET;
+      State _state = State.NOT_SET;
 
       @Override
       public boolean hasNext() {
-        if (_state == T.State.NOT_SET) {
+        if (_state == State.NOT_SET) {
           if (it.hasNext()) {
             _v0 = it.next();
-            _state = T.State.READY;
+            _state = State.READY;
           } else {
             return false;
           }
@@ -991,7 +810,7 @@ public interface It {
       public IPair<E, E> next() {
         if (it.hasNext()) {
           var pair = new Tuple.Tup2.L(null, _v0, it.next());
-          _state = T.State.NOT_SET;
+          _state = State.NOT_SET;
           return pair;
         }
         throw new Ex.NoSuchElement();

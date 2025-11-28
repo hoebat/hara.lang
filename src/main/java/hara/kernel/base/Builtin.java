@@ -4,6 +4,7 @@ import hara.data.types.ILinearType;
 import hara.data.types.IMapType;
 import hara.kernel.protocol.IRuntime;
 import hara.lang.base.*;
+import hara.lang.base.fn.*;
 import hara.lang.data.*;
 import hara.lang.data.Map.Standard;
 import hara.lang.data.Tuple.*;
@@ -671,7 +672,7 @@ public interface Builtin {
 
     @Module.Fn(name = "comp", vargs = true, complete = true)
     public static <FN, ITR> IFn comp(ITR fns) {
-      return new Fn.T.Comp(fns);
+      return new Comp(fns);
     }
 
     @Module.Fn(name = "F", vargs = true, complete = true)
@@ -852,7 +853,7 @@ public interface Builtin {
 
     @Module.Fn(name = "partial", vargs = true, complete = true)
     public static <FN, ITR> IFn partial(FN f, ITR vargs) {
-      return new Fn.T.Partial(f, vargs);
+      return new Partial(f, vargs);
     }
 
     @Module.Fn(name = "partition:pair", helper = true)
