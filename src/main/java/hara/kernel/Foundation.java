@@ -12,7 +12,7 @@ import java.lang.reflect.Method;
 import hara.lang.base.Arr;
 import hara.lang.base.Ex;
 import hara.lang.base.G;
-import hara.lang.base.I;
+import hara.lang.protocol.*;
 import hara.lang.base.It;
 import hara.compiler.Compiler;
 import hara.compiler.CompilerException;
@@ -23,7 +23,7 @@ import hara.kernel.base.RT.Instance;
 import hara.kernel.base.Read;
 
 @SuppressWarnings("rawtypes")
-public class Foundation implements I.Context {
+public class Foundation implements IContext {
 
 	static final int DEFAULT_PORT = 4164;
 	
@@ -155,7 +155,7 @@ public class Foundation implements I.Context {
 
 
 	@SuppressWarnings("unchecked")
-	public static Object runIn(Function<java.util.List<String>, Object> f, I.Context c, Object... args) {
+	public static Object runIn(Function<java.util.List<String>, Object> f, IContext c, Object... args) {
 		java.util.List input = (args.length == 1 && args[0] instanceof java.util.List)
 				? (java.util.List) args[0]
 				: Arrays.asList(args);
@@ -256,10 +256,10 @@ public class Foundation implements I.Context {
 		Object cmdObj = args.get(0);
 		String name;
 
-		if (cmdObj instanceof I.Namespaced) {
-			name = ((I.Namespaced) cmdObj).getName();
-		} else if (cmdObj instanceof I.Display) {
-			String display = ((I.Display) cmdObj).display();
+		if (cmdObj instanceof INamespaced) {
+			name = ((INamespaced) cmdObj).getName();
+		} else if (cmdObj instanceof IDisplay) {
+			String display = ((IDisplay) cmdObj).display();
 			name = display.startsWith(":") ? display.substring(1) : display;
 		} else {
 			name = cmdObj.toString();

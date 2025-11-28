@@ -1,11 +1,11 @@
 package hara.lib.zip;
 
 import hara.lang.base.G;
-import hara.lang.base.I;
+import hara.lang.protocol.*;
 import hara.lang.data.List;
 import hara.lang.data.Vector;
 
-public class Zipper implements I.ObjType {
+public class Zipper implements IObjType {
     public final Zipper parent;
     public final List left;
     public final List right;
@@ -73,17 +73,17 @@ public class Zipper implements I.ObjType {
     }
 
     @Override
-    public I.Metadata meta() {
+    public IMetadata meta() {
         return null;
     }
 
     @Override
-    public I.ObjType withMeta(I.Metadata meta) {
+    public IObjType withMeta(IMetadata meta) {
         return this;
     }
 
     @Override
-    public long hashCalc(G.HashType t) {
+    public long hashCalc(Constant.HashType t) {
         return 0;
     }
 
@@ -93,8 +93,8 @@ public class Zipper implements I.ObjType {
     }
 
     @Override
-    public G.ObjType getObjType() {
-        return G.ObjType.CLASS;
+    public Constant.ObjType getObjType() {
+        return Constant.ObjType.CLASS;
     }
 
     @Override

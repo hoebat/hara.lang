@@ -16,6 +16,8 @@ import hara.lang.data.*;
 import static hara.kernel.base.Builtin.Basic.*;
 import static hara.kernel.base.Builtin.Collection.*;
 import static hara.kernel.base.Builtin.Struct.*;
+import hara.lang.protocol.Constant;
+import hara.lang.protocol.*;
 
 public interface Read {
 
@@ -373,9 +375,9 @@ public interface Read {
 			if (s.equals("nil")) {
 				return null;
 			} else if (s.equals("true")) {
-				return G.T;
+				return Constant.T;
 			} else if (s.equals("false")) {
-				return G.F;
+				return Constant.F;
 			}
 
 			Object ret = matchSymbol(s);
@@ -660,7 +662,7 @@ public interface Read {
 			}
 		}
 
-		public static I.Metadata getMeta(PushbackReader r) {
+		public static IMetadata getMeta(PushbackReader r) {
 			int line = -1;
 			int column = -1;
 			if (r instanceof LineNumberingReader) {
@@ -678,26 +680,26 @@ public interface Read {
 			}
 		}
 
-		public static class MetaReader implements BiFunction<PushbackReader, Map, I.ObjType> {
+		public static class MetaReader implements BiFunction<PushbackReader, Map, IObjType> {
 
 			@Override
-			public I.ObjType apply(PushbackReader r, Map opts) {
+			public IObjType apply(PushbackReader r, Map opts) {
 
 				Object meta = read(r, true, null, true, opts);
 
 				if (meta instanceof Symbol || meta instanceof String)
 					meta = hashMap(Arr.objects(keyword("tag"), meta));
 				else if (meta instanceof Keyword)
-					meta = hashMap(Arr.objects(meta, G.T));
+					meta = hashMap(Arr.objects(meta, Constant.T));
 				else if (!(meta instanceof Map))
 					throw new IllegalArgumentException("Metadata must be Symbol,Keyword,String or ");
 
 				Object o = read(r, true, null, true, opts);
-				if (o instanceof I.ObjType) {
-					Data.MapType ometa = (Data.MapType) ((I.ObjType) o).meta();
+				if (o instanceof IObjType) {
+					Data.MapType ometa = (Data.MapType) ((IObjType) o).meta();
 					
 					ometa = (Data.MapType) merge(ometa, meta);
-					return ((I.ObjType) o).withMeta(ometa);
+					return ((IObjType) o).withMeta(ometa);
 				} else
 					throw new IllegalArgumentException("Metadata can only be applied to I.ObjTypes");
 			}

@@ -1,5 +1,8 @@
 package hara.lang.base;
 
+import hara.lang.protocol.*;
+import hara.lang.protocol.Constant.*;
+
 import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.function.Function;
@@ -7,15 +10,9 @@ import java.util.regex.Pattern;
 
 public interface G {
 	
-	public static final Object[] EMPTY_ARRAY = new Object[] {};
-	public static final Boolean F = Boolean.FALSE;
-	public static final Boolean T = Boolean.TRUE;
 	
-	public enum MetaType { OBJECT, MAP, STRING }
-	public enum HashType { SYSTEM, MURMUR3, SIP };
-	public enum ObjType { CLASS, KEYWORD, SYMBOL, POINTER, FUNCTION, MAP, SET, ITERATOR, SEQUENTIAL}
 
-	public static final HashType DEFAULT_HASH = HashType.MURMUR3;
+	public static final Constant.HashType DEFAULT_HASH = Constant.HashType.MURMUR3;
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public static String displayList(java.util.List l) {
@@ -37,8 +34,8 @@ public interface G {
 	public static String display(Object e) {
 		if(e == null) {
 			return "nil";
-		} else if (e instanceof I.Display) {
-			return ((I.Display)e).display();
+		} else if (e instanceof IDisplay) {
+			return ((IDisplay)e).display();
 		} else if (e instanceof String) {
 			return "\"" + Str.escapeJava((String)e) +  "\"";
 		} else if (e instanceof Character) {
@@ -72,8 +69,8 @@ public interface G {
 	}
 
 	public static long hashMurmur(Object o) {
-		if (o instanceof I.Hash) {
-			return ((I.Hash) o).hashGet(G.HashType.MURMUR3);
+		if (o instanceof IHash) {
+			return ((IHash) o).hashGet(Constant.HashType.MURMUR3);
 		} else if (o == null) {
 			return 0;
 		} else {
@@ -87,7 +84,7 @@ public interface G {
 		return o.hashCode();
 	}
 
-	public static Function<Object, Long> hashFn(G.HashType t) {
+	public static Function<Object, Long> hashFn(Constant.HashType t) {
 	
 		switch (t) {
 		case MURMUR3:

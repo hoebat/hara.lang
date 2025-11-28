@@ -21,6 +21,8 @@ import static hara.kernel.base.Builtin.Basic.*;
 import static hara.kernel.base.Builtin.Collection.zipmap;
 import static hara.kernel.base.Builtin.Lambda.*;
 import static hara.kernel.base.Builtin.Struct.*;
+import hara.lang.protocol.Constant;
+import hara.lang.protocol.*;
 
 
 @SuppressWarnings({ "unchecked", "rawtypes" })
@@ -96,7 +98,7 @@ public interface Env {
 			}
 		}
 		
-		public static I.Fn reduceFn(I.Fn f, I.Metadata meta, Module.Reduce opts) {
+		public static IFn reduceFn(IFn f, IMetadata meta, Module.Reduce opts) {
 			var init = reduceInit(opts.init());
 			switch (opts.type()) {
 			case ARRAY:   return new Fn.T.ReduceArray(meta, init, f);
@@ -128,20 +130,20 @@ public interface Env {
 		}
 	}
 
-	public static class FnEval<AST> extends Obj.FN implements I.Fn {
+	public static class FnEval<AST> extends Obj.FN implements IFn {
 		class FnEnv implements IEnv {
-			final I.Lookup _map;
+			final ILookup _map;
 			final IEnv _parent;
 			final IRuntime _rt;
 
-			FnEnv(IEnv parent, I.Lookup map, IRuntime rt) {
+			FnEnv(IEnv parent, ILookup map, IRuntime rt) {
 				_parent = parent;
 				_map = map;
 				_rt = rt;
 			}
 
 			@Override
-			public I.Lookup getMap() {
+			public ILookup getMap() {
 				return _map;
 			}
 
@@ -162,7 +164,7 @@ public interface Env {
 	    final IRuntime _rt;
 		final IEnv _env;
 	
-		public FnEval(I.Metadata meta, IRuntime rt, IEnv env, Data.LinearType params, AST body) {
+		public FnEval(IMetadata meta, IRuntime rt, IEnv env, Data.LinearType params, AST body) {
 	    	super(meta);
 	    	_rt = rt;
 			_env = env;
@@ -214,11 +216,11 @@ public interface Env {
 	    
 	}
 
-	public static class FnStaticLookup<R> extends Obj.FN implements I.Fn<R, Object, Object> {
+	public static class FnStaticLookup<R> extends Obj.FN implements IFn<R, Object, Object> {
 		
 		final Map<Integer, List<Method>> _mths;
 	
-		public FnStaticLookup(I.Metadata meta, Map<Integer, List<Method>> mths) {
+		public FnStaticLookup(IMetadata meta, Map<Integer, List<Method>> mths) {
 			super(meta);
 			_mths = mths;
 		}
@@ -226,7 +228,7 @@ public interface Env {
 		@Override
 		public Supplier<R> getArg0() {
 			Method m = getMethods(0).peekFirst();
-			return () -> Invoke.invokeMethod(m, G.EMPTY_ARRAY);
+			return () -> Invoke.invokeMethod(m, Constant.EMPTY_ARRAY);
 		}
 	
 		@Override
@@ -259,12 +261,12 @@ public interface Env {
 		}
 	}
 
-	public static class FnStaticVargs<R> extends Obj.FN implements I.Fn<R, Object, Object> {
+	public static class FnStaticVargs<R> extends Obj.FN implements IFn<R, Object, Object> {
 		
 		final int _argc;
 		final Method _m;
 	
-		public FnStaticVargs(I.Metadata meta, Method m) {
+		public FnStaticVargs(IMetadata meta, Method m) {
 			super(meta);
 			_m = m;
 			_argc = m.getParameterCount() - 1;
@@ -273,7 +275,7 @@ public interface Env {
 		@Override
 		public Supplier<R> getArg0() {
 			if(_argc == 0) {
-				return () -> Invoke.invokeMethod(_m, new Object[] {G.EMPTY_ARRAY});
+				return () -> Invoke.invokeMethod(_m, new Object[] {Constant.EMPTY_ARRAY});
 			} else {
 				throw new Ex.Arity(0, "Need at least " + _argc);
 			}
@@ -284,7 +286,7 @@ public interface Env {
 			if(_argc == 0) {
 				return (arg) -> Invoke.invokeMethod(_m, new Object[] { new Object[] { arg }});
 			} else if (_argc == 1) {
-				return (arg) ->  Invoke.invokeMethod(_m, new Object[] { new Object[] { arg, G.EMPTY_ARRAY }});
+				return (arg) ->  Invoke.invokeMethod(_m, new Object[] { new Object[] { arg, Constant.EMPTY_ARRAY }});
 			} else {
 				throw new Ex.Arity(1, "Need at least " + _argc);
 			}
@@ -297,7 +299,7 @@ public interface Env {
 			} else if (_argc == 1) {
 				return (a0, a1) ->  Invoke.invokeMethod(_m, new Object[] { a0, new Object[] { a1 }});
 			} else if (_argc == 2) {
-				return (a0, a1) ->  Invoke.invokeMethod(_m, new Object[] { a0, a1, G.EMPTY_ARRAY});
+				return (a0, a1) ->  Invoke.invokeMethod(_m, new Object[] { a0, a1, Constant.EMPTY_ARRAY});
 			} else {
 				throw new Ex.Arity(2, "Need at least " + _argc);
 			}
@@ -324,8 +326,8 @@ public interface Env {
 		
 		return It.groupBy(
 					(Iterator)pairs.apply(It.iter(cls.getDeclaredMethods())), 
-					(Function)p -> ((I.Pair) p).getKey(),
-					(Function)p -> ((I.Pair) p).getValue(),
+					(Function)p -> ((IPair) p).getKey(),
+					(Function)p -> ((IPair) p).getValue(),
 					(HashMap)map);
 	}
 	
@@ -333,7 +335,7 @@ public interface Env {
 		return getMethods(cls, new HashMap());
 	}
 	
-	public static I.Fn createFn(Entry<String, ArrayList<Method>> p){
+	public static IFn createFn(Entry<String, ArrayList<Method>> p){
 	
 		ArrayList<Method> all = p.getValue();
 		all.sort((m1, m2) -> Integer.compare(m1.getParameterCount(), m2.getParameterCount()));
@@ -420,7 +422,7 @@ public interface Env {
 					var f = createFn(p);
 					return pair(
 							symbol(k), 
-							new Var(k, f).withMeta(((I.ObjType)f).meta()));
+							new Var(k, f).withMeta(((IObjType)f).meta()));
 				}, raw);
 		
 		return fns;

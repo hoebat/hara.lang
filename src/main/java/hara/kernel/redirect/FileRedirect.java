@@ -6,7 +6,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.Arrays;
-import hara.lang.base.I;
+import hara.lang.protocol.*;
 import hara.lang.data.Vector;
 import hara.kernel.base.Builtin;
 import hara.kernel.protocol.IRedirect;
@@ -71,7 +71,7 @@ public class FileRedirect implements IRedirect {
 	public void write(Object obj) throws IOException {
 		if (this.logOut != null) {
 			String output;
-			if (obj instanceof I.Display) {
+			if (obj instanceof IDisplay) {
 				output = Builtin.Util.prStr(obj);
 			} else if (obj instanceof byte[]) {
 				StringBuilder sb = new StringBuilder();

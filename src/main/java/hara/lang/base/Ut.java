@@ -7,6 +7,7 @@ import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
+import hara.lang.protocol.*;
 
 
 public interface Ut {
@@ -210,7 +211,7 @@ public interface Ut {
 		}
 	}
 
-	public class Counter implements I.Deref<Integer>, I.Reset<Integer>, I.Display {
+	public class Counter implements IDeref<Integer>, IReset<Integer>, IDisplay {
 
 		private int _c;
 
@@ -250,7 +251,7 @@ public interface Ut {
 		}
 	}
 	
-	public class Delay<V> implements I.Deref<V>, I.Realize<V>, I.Display {
+	public class Delay<V> implements IDeref<V>, IRealize<V>, IDisplay {
 		volatile Throwable _ex;
 		volatile Supplier<V> _fn;
 		volatile V _val;
@@ -298,7 +299,7 @@ public interface Ut {
 
 	}
 
-	public class Flag implements I.Deref<Boolean>, I.Reset<Boolean>, I.Display {
+	public class Flag implements IDeref<Boolean>, IReset<Boolean>, IDisplay {
 		private boolean _val;
 		
 		public Flag(boolean val) {
@@ -406,7 +407,7 @@ public interface Ut {
 		}
 	}
 
-	public final class RefCache<K, V> implements I.Lookup<K, Reference<V>>, I.Count {
+	public final class RefCache<K, V> implements ILookup<K, Reference<V>>, ICount {
 
 		final ConcurrentHashMap<K, Reference<V>> _lu;
 		final ReferenceQueue<V> _rq;
@@ -718,7 +719,7 @@ public interface Ut {
 		}
 	}
 
-	public final class Volatile<V> implements I.Deref<V>, I.Reset<V>, I.Display {
+	public final class Volatile<V> implements IDeref<V>, IReset<V>, IDisplay {
 
 		public volatile V _val;
 

@@ -16,6 +16,7 @@ import hara.lang.data.*;
 
 import static hara.kernel.base.Builtin.Struct.*;
 import static hara.kernel.base.Builtin.Lambda.*;
+import hara.lang.protocol.*;
 
 @SuppressWarnings("unchecked")
 public interface RT {
@@ -49,7 +50,7 @@ public interface RT {
 	}
 
 	@SuppressWarnings("rawtypes")
-	public class Loader extends URLClassLoader implements I.Watch<Loader, Class> {
+	public class Loader extends URLClassLoader implements IWatch<Loader, Class> {
 		
 		final static URL[] EMPTY_URLS = new URL[] {};
 		
@@ -219,7 +220,7 @@ public interface RT {
 		}
 
 		@Override
-		public I.Lookup getMap() {
+		public ILookup getMap() {
 			throw new Ex.Unsupported();
 		}
 		
@@ -243,7 +244,7 @@ public interface RT {
 		final IEnv<Symbol, Var> _parent;
 		final ConcurrentHashMap<Symbol, Var> _methods;
 		public final ClassEnv _class;
-		public final I.Lookup<Symbol, Var> _facade;
+		public final ILookup<Symbol, Var> _facade;
 		
 		@SuppressWarnings("rawtypes")
 		public UserEnv(IEnv<Symbol, Var> parent, IRuntime rt) {
@@ -264,7 +265,7 @@ public interface RT {
 		}
 
 		@Override
-		public I.Lookup<Symbol, Var> getMap() {
+		public ILookup<Symbol, Var> getMap() {
 			return _facade;
 		}
 
@@ -299,14 +300,14 @@ public interface RT {
 
 	@SuppressWarnings("rawtypes")
 	public class Instance<AST> implements IRuntime<AST, Symbol, Var> {
-		public final I.Context _root;
+		public final IContext _root;
 		public final String _key;
 		public final Loader _loader;
 		public final RootEnv _rootEnv;
 		public final UserEnv _userEnv;
 		public final ThreadLocal<List<IEnv<Symbol, Var>>> _stack;
 		
-		public Instance(I.Context root, String key) {
+		public Instance(IContext root, String key) {
 			_root = root;
 			_key = key;
 			_loader = new Loader();
@@ -325,7 +326,7 @@ public interface RT {
 		}
 
 		@Override
-		public I.Context getRoot() {
+		public IContext getRoot() {
 			return _root;
 		}
 		
@@ -361,12 +362,12 @@ public interface RT {
 		}
 		
 		@Override
-		public I.Fn findFn(Class cls, String name) {
+		public IFn findFn(Class cls, String name) {
 			return null;
 		}
 
 		@Override
-		public I.Fn findFn(Class cls, String name, int args) {
+		public IFn findFn(Class cls, String name, int args) {
 			return null;
 		}
 
@@ -395,13 +396,13 @@ public interface RT {
 		}
 		
 		@Override
-		public I.Coll<URL> pathAdd(URL url) {
+		public IColl<URL> pathAdd(URL url) {
 			_loader.addURL(url);
 			return _loader.getPaths();
 		}
 
 		@Override
-		public I.Coll<URL> pathAdd(String[] paths) {
+		public IColl<URL> pathAdd(String[] paths) {
 			Arr.toIter(paths).forEachRemaining(
 					(path) -> {
 						try {
@@ -414,7 +415,7 @@ public interface RT {
 		}
 		
 		@Override
-		public I.Coll<URL> pathRemove(String[] paths) {
+		public IColl<URL> pathRemove(String[] paths) {
 			Arr.toIter(paths).forEachRemaining(
 					(path) -> {
 						try {
@@ -442,7 +443,7 @@ public interface RT {
 		}
 
 		@Override
-		public I.Coll<URL> pathCache() {
+		public IColl<URL> pathCache() {
 			return _loader.getPaths();
 		}
 	}

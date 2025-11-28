@@ -5,13 +5,14 @@ import java.util.*;
 import hara.lang.base.*;
 
 import static hara.lang.base.P.Bits.log2Ceil;
+import hara.lang.protocol.*;
 
 public interface List<E> extends Data.VectorType<E> {
 
 	public static int CHUNK_SIZE = 32;
 	public static int DEFAULT_CAPACITY = 4;
 
-	public interface Base<E> extends List<E>, I.Assoc<Integer, E>, I.ObjType {
+	public interface Base<E> extends List<E>, IAssoc<Integer, E>, IObjType {
 
 		@Override
 		default String startString() {
@@ -38,21 +39,21 @@ public interface List<E> extends Data.VectorType<E> {
 		}
 	}
 
-	class Standard<E> extends Data.RefType.PT implements Base<E>, I.ToMutable {
+	class Standard<E> extends Data.RefType.PT implements Base<E>, IToMutable {
 
 		final Chunk<E> _head;
 		final int _size;
 
 		public static final Standard EMPTY = new Standard(null, null, 0);
 
-		public Standard(I.Metadata meta, Chunk<E> head, int size) {
+		public Standard(IMetadata meta, Chunk<E> head, int size) {
 			super(meta);
 			_head = head;
 			_size = size;
 		}
 		
 		@SuppressWarnings("unchecked")
-		public static <E> Standard<E> from(I.Metadata meta, E... elements) {
+		public static <E> Standard<E> from(IMetadata meta, E... elements) {
              Mutable<E> m = new Mutable<>(meta);
              for(E e : elements) {
                  m.pushLast(e);
@@ -79,7 +80,7 @@ public interface List<E> extends Data.VectorType<E> {
 		}
 
 		@Override
-		public Standard<E> withMeta(I.Metadata meta) {
+		public Standard<E> withMeta(IMetadata meta) {
 			return new Standard<>(meta, _head, _size);
 		}
 
@@ -185,7 +186,7 @@ public interface List<E> extends Data.VectorType<E> {
 		}
 	}
 
-	class Mutable<E> extends Data.RefType.MT implements Base<E>, I.ToPersistent {
+	class Mutable<E> extends Data.RefType.MT implements Base<E>, IToPersistent {
 
 		// Use Ring Buffer logic for efficient Mutable operations
 		private Object[] _elements;
@@ -196,11 +197,11 @@ public interface List<E> extends Data.VectorType<E> {
 			this(null, DEFAULT_CAPACITY);
 		}
 
-		public Mutable(I.Metadata meta) {
+		public Mutable(IMetadata meta) {
 			this(meta, DEFAULT_CAPACITY);
 		}
 
-		public Mutable(I.Metadata meta, int capacity) {
+		public Mutable(IMetadata meta, int capacity) {
 			super(meta);
 			_elements = new Object[Math.max(1, 1 << log2Ceil(capacity))];
 			_size = 0;
@@ -209,7 +210,7 @@ public interface List<E> extends Data.VectorType<E> {
 		}
 
 		// Constructor for converting from Persistent Chunk list
-		public Mutable(I.Metadata meta, Chunk<E> head, int size) {
+		public Mutable(IMetadata meta, Chunk<E> head, int size) {
 			super(meta);
 			_size = size;
 			_elements = new Object[Math.max(1, 1 << log2Ceil(size + 1))];
@@ -227,7 +228,7 @@ public interface List<E> extends Data.VectorType<E> {
 		}
 
 		@SafeVarargs
-		public static <E> Mutable<E> from(I.Metadata meta, E... objs) {
+		public static <E> Mutable<E> from(IMetadata meta, E... objs) {
 			Mutable<E> mut = new Mutable<E>(meta, objs.length);
 			return Arr.reduce((arr, e) -> (Mutable<E>) arr.pushLast(e), mut, objs);
 		}

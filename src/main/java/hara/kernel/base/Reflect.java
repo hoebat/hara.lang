@@ -6,6 +6,8 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import hara.lang.base.*;
+import hara.lang.protocol.Constant;
+import hara.lang.protocol.*;
 
 @SuppressWarnings({ "rawtypes", "unchecked" })
 public interface Reflect {
@@ -303,7 +305,7 @@ public interface Reflect {
 		} else {
 			List meths = getMethods(c, 0, name, false);
 			if (meths.size() > 0)
-				return invokeMatchingMethod(name, meths, target, G.EMPTY_ARRAY);
+				return invokeMatchingMethod(name, meths, target, Constant.EMPTY_ARRAY);
 			else
 				return getInstanceField(target, name);
 		}
@@ -320,7 +322,7 @@ public interface Reflect {
 				throw Ex.Sneaky(e);
 			}
 		}
-		return invokeInstanceMethod(target, name, G.EMPTY_ARRAY);
+		return invokeInstanceMethod(target, name, Constant.EMPTY_ARRAY);
 	}
 
 	public static Object invokeInstanceMember(String name, Object target, Object arg1) {

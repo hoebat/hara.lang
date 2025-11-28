@@ -11,10 +11,11 @@ import hara.lang.base.*;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import hara.lang.protocol.*;
 
 public interface Atom<V> {
 
-	public abstract class Struct<R, V> implements Swap<R, V>, I.Reset<V>, I.Display {
+	public abstract class Struct<R, V> implements Swap<R, V>, IReset<V>, IDisplay {
 		final AtomicReference<V> _state;
 
 		public Struct(V init) {
@@ -89,7 +90,7 @@ public interface Atom<V> {
 
 	}
 	
-	public interface Swap<R, V> extends I.Watch<R, V>, I.Validate<V>, I.Deref<V> {
+	public interface Swap<R, V> extends IWatch<R, V>, IValidate<V>, IDeref<V> {
 		
 		boolean cas(V oldVal, V newVal);
 

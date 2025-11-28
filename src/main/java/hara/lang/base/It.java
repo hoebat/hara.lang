@@ -15,6 +15,7 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.concurrent.atomic.AtomicReference;
+import hara.lang.protocol.*;
 
 public interface It {
 
@@ -399,15 +400,15 @@ public interface It {
 	public static <E, R> R reduceIn(Iterator<E> it, R init, BiFunction<R, E, R> f) {
 		R _init;
 		boolean _change = false;
-		if(init instanceof I.ToMutable) {
-			_init = (R)((I.ToMutable)init).toMutable();
+		if(init instanceof IToMutable) {
+			_init = (R)((IToMutable)init).toMutable();
 			_change = true;
 		} else {
 			_init = init;
 		}
 		R out = reduce(it, _init, f);
-		if(out instanceof I.ToPersistent && _change == true) {
-			return (R)((I.ToPersistent)out).toPersistent();
+		if(out instanceof IToPersistent && _change == true) {
+			return (R)((IToPersistent)out).toPersistent();
 		} else {
 			return out;
 		}
@@ -815,7 +816,7 @@ public interface It {
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public static <E> I.Pair<Iterator<E>, Iterator<E>> duplicate(Iterator<E> it) {
+	public static <E> IPair<Iterator<E>, Iterator<E>> duplicate(Iterator<E> it) {
 		final java.util.Queue<E> _gap = new java.util.LinkedList<>();
 		final AtomicReference<Iterator<E>> _ahead = new AtomicReference<>();
 		class PairIterator implements Iterator<E> {
@@ -958,8 +959,8 @@ public interface It {
 		};
 	}
 
-	public static <A, B> Iterator<I.Pair<A, B>> zipPair(Iterator<A> it0, Iterator<B> it1) {
-		return new Iterator<I.Pair<A, B>>() {
+	public static <A, B> Iterator<IPair<A, B>> zipPair(Iterator<A> it0, Iterator<B> it1) {
+		return new Iterator<IPair<A, B>>() {
 			@Override
 			public boolean hasNext() {
 				return it0.hasNext() && it1.hasNext();
@@ -967,7 +968,7 @@ public interface It {
 
 			@SuppressWarnings({ "rawtypes", "unchecked" })
 			@Override
-			public I.Pair<A, B> next() {
+			public IPair<A, B> next() {
 				if (!hasNext()) {
 					throw new Ex.NoSuchElement();
 				}
@@ -1016,7 +1017,7 @@ public interface It {
 
 			@SuppressWarnings({ "unchecked", "rawtypes" })
 			@Override
-			public I.Pair<E, E> next() {
+			public IPair<E, E> next() {
 				if(it.hasNext()) {
 					var pair = new Std.T.Tup2.L(null, _v0, it.next());
 					_state = T.State.NOT_SET;

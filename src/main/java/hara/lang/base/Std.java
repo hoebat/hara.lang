@@ -3,6 +3,7 @@ package hara.lang.base;
 import java.util.Iterator;
 
 import hara.lang.data.*;
+import hara.lang.protocol.*;
 
 public interface Std {
 	
@@ -13,12 +14,12 @@ public interface Std {
 
 			public final static Tup0 EMPTY = new Tup0(null);
 			
-			public Tup0(I.Metadata meta) {
+			public Tup0(IMetadata meta) {
 				super(meta);
 			}
 
 			@Override
-			public Tup0 withMeta(I.Metadata meta) {
+			public Tup0 withMeta(IMetadata meta) {
 				return (_meta == meta) ? this : new Tup0(meta);
 			}
 			
@@ -79,7 +80,7 @@ public interface Std {
 					return _a;
 				}
 
-				public L(I.Metadata meta, A a) {
+				public L(IMetadata meta, A a) {
 					super(meta);
 					_a = a;
 				}
@@ -90,7 +91,7 @@ public interface Std {
 				}
 
 				@Override
-				public I.ObjType withMeta(I.Metadata meta) {
+				public IObjType withMeta(IMetadata meta) {
 					return (_meta == meta) ? this : new L<A>(meta, _a);
 				}
 
@@ -148,11 +149,11 @@ public interface Std {
 
 			public class L<A, B>  extends Obj.PT 
 				implements Tup2<A, B>, 
-						  I.Pair<A, B> {
+						  IPair<A, B> {
 				A _a;
 				B _b;
 
-				public L(I.Metadata meta, A a, B b) {
+				public L(IMetadata meta, A a, B b) {
 					super(meta);
 					_a = a;
 					_b = b;
@@ -185,7 +186,7 @@ public interface Std {
 
 
 				@Override
-				public I.ObjType withMeta(I.Metadata meta) {
+				public IObjType withMeta(IMetadata meta) {
 					return (_meta == meta) ? this : new L<A, B>(meta, _a, _b);
 				}
 
@@ -247,7 +248,7 @@ public interface Std {
 				B _b;
 				C _c;
 
-				public L(I.Metadata meta, A a, B b, C c) {
+				public L(IMetadata meta, A a, B b, C c) {
 					super(meta);
 					_a = a;
 					_b = b;
@@ -276,7 +277,7 @@ public interface Std {
 
 
 				@Override
-				public I.ObjType withMeta(I.Metadata meta) {
+				public IObjType withMeta(IMetadata meta) {
 					return (_meta == meta) ? this : new L<A, B, C>(meta, _a, _b, _c);
 				}
 
@@ -338,7 +339,7 @@ public interface Std {
 				C _c;
 				D _d;
 
-				public L(I.Metadata meta, A a, B b, C c, D d) {
+				public L(IMetadata meta, A a, B b, C c, D d) {
 					_a = a;
 					_b = b;
 					_c = c;
@@ -372,7 +373,7 @@ public interface Std {
 
 
 				@Override
-				public I.ObjType withMeta(I.Metadata meta) {
+				public IObjType withMeta(IMetadata meta) {
 					return (_meta == meta) ? this : new L<A, B, C, D>(meta, _a, _b, _c, _d);
 				}
 
@@ -436,7 +437,7 @@ public interface Std {
 				Y _d;
 				Z _e;
 
-				public L(I.Metadata meta, A a, B b, X c, Y d, Z e) {
+				public L(IMetadata meta, A a, B b, X c, Y d, Z e) {
 					_a = a;
 					_b = b;
 					_c = c;
@@ -476,7 +477,7 @@ public interface Std {
 
 
 				@Override
-				public I.ObjType withMeta(I.Metadata meta) {
+				public IObjType withMeta(IMetadata meta) {
 					return (_meta == meta) ? this : new L<A, B, X, Y, Z>(meta, _a, _b, _c, _d, _e);
 				}
 
@@ -543,7 +544,7 @@ public interface Std {
 				_state._rest = (E) _state;
 			}
 
-			public Seq(I.Metadata meta, Iterator<E> iter, State<E> state) {
+			public Seq(IMetadata meta, Iterator<E> iter, State<E> state) {
 				super(meta);
 				_iter = iter;
 				_state = state;
@@ -584,7 +585,7 @@ public interface Std {
 			}
 
 			@Override
-			public Seq<E> withMeta(I.Metadata meta) {
+			public Seq<E> withMeta(IMetadata meta) {
 				return new Seq<E>(meta, _iter, _state);
 			}
 
@@ -606,14 +607,14 @@ public interface Std {
 			private final E _first;
 			private final Data.LinkedType<E> _more;
 		
-			public Cons(I.Metadata meta, E first, Data.LinkedType<E> more) {
+			public Cons(IMetadata meta, E first, Data.LinkedType<E> more) {
 				super(meta);
 				_first = first;
 				_more = more;
 			}
 		
 			@Override
-			public final Cons<E> withMeta(I.Metadata meta) {
+			public final Cons<E> withMeta(IMetadata meta) {
 				return (meta() == meta) ? this : new Cons<E>(meta, _first, _more);
 			}
 		

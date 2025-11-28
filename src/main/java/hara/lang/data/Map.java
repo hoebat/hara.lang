@@ -5,6 +5,7 @@ import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicReference;
 import hara.lang.base.*;
 import hara.lang.base.Ut.Counter;
+import hara.lang.protocol.*;
 
 public interface Map<K, V> extends Data.MapType<K, V> {
 
@@ -17,7 +18,7 @@ public interface Map<K, V> extends Data.MapType<K, V> {
 				AtomicReference<Thread> edit, int shift, int hash, 
 				K key, Counter removed_leaf);
 
-		I.Pair<K, V> find(int shift, int hash, K key);
+		IPair<K, V> find(int shift, int hash, K key);
 
 		boolean isSingle();
 
@@ -252,7 +253,7 @@ public interface Map<K, V> extends Data.MapType<K, V> {
 
 		@Override
 		@SuppressWarnings({ "unchecked", "rawtypes" })
-		public I.Pair<K, V> find(int shift, int hash, K key) {
+		public IPair<K, V> find(int shift, int hash, K key) {
 			final int bit = S.bitpos(hash, shift);
 
 			if ((_datamap & bit) != 0) {
@@ -406,7 +407,7 @@ public interface Map<K, V> extends Data.MapType<K, V> {
 
 		@Override
 		@SuppressWarnings({ "unchecked", "rawtypes" })
-		public I.Pair<K, V> find(int shift, int hash, Object key) {
+		public IPair<K, V> find(int shift, int hash, Object key) {
 			int idx = findIndex(key);
 			if (idx < 0) {
 				return null;
@@ -539,12 +540,12 @@ public interface Map<K, V> extends Data.MapType<K, V> {
         }
 
         @Override
-		public I.Pair<K, V> next(){
+		public IPair<K, V> next(){
         	Object ret = _next;
             if(ret != NULL)
             {
                 _next = NULL;
-                return (I.Pair<K, V>)ret;
+                return (IPair<K, V>)ret;
             }
             else if(advance()) {
                 return next();
@@ -559,12 +560,12 @@ public interface Map<K, V> extends Data.MapType<K, V> {
     }
 
 
-	public interface Base<K, V> extends Map<K, V>, I.Assoc<K, V>, I.ObjType {
+	public interface Base<K, V> extends Map<K, V>, IAssoc<K, V>, IObjType {
 		abstract Node<K, V> _root();
 		abstract int _size();
 
 		@Override
-		default I.Pair<K, V> find(K key) {
+		default IPair<K, V> find(K key) {
 			return _root().find(0, (int)G.hashMurmur(key), key);
 		}
 
@@ -584,7 +585,7 @@ public interface Map<K, V> extends Data.MapType<K, V> {
 
 	@SuppressWarnings("unchecked")
 	public final class Mutable<K, V> extends Data.RefType.MT 
-		implements Base<K, V>, I.ToPersistent{
+		implements Base<K, V>, IToPersistent{
 
 		private volatile Node<K, V> _root;
 		private volatile int _size;
@@ -592,19 +593,19 @@ public interface Map<K, V> extends Data.MapType<K, V> {
 		private final AtomicReference<Thread> _edit;
 		private final Counter _leafFlag = new Counter(0);
 
-		public Mutable(I.Metadata meta, AtomicReference<Thread> edit, Node<K, V> root, int size) {
+		public Mutable(IMetadata meta, AtomicReference<Thread> edit, Node<K, V> root, int size) {
 			super(meta);
 			_edit = edit;
 			_root = root;
 			_size = size;
 		}
 
-		public static <K, V> Mutable<K, V> empty(I.Metadata meta) {
+		public static <K, V> Mutable<K, V> empty(IMetadata meta) {
 			return new Mutable<K, V>(meta, new AtomicReference<Thread>(Thread.currentThread()), DataNode.EMPTY, 0);
 		}
 
 		@SuppressWarnings("rawtypes")
-		public static <K, V> Mutable<K, V> from(I.Metadata meta, Object... elements){
+		public static <K, V> Mutable<K, V> from(IMetadata meta, Object... elements){
 			return into(empty(meta), (Iterator)It.partitionPair(Arr.toIter(elements)));
 		}
 
@@ -628,7 +629,7 @@ public interface Map<K, V> extends Data.MapType<K, V> {
 			}
 		}
 
-		public static <K, V> Mutable<K, V> create(I.Metadata meta, Base<K, V> other) {
+		public static <K, V> Mutable<K, V> create(IMetadata meta, Base<K, V> other) {
 			var ret = empty(meta);
 			for (Object o : other) {
 				var e = (Entry<K, V>) o;
@@ -676,7 +677,7 @@ public interface Map<K, V> extends Data.MapType<K, V> {
 		}
 
 		@Override
-		public I.Empty empty() {
+		public IEmpty empty() {
 			_size = 0;
 			_root = DataNode.EMPTY;
 			return this;
@@ -685,7 +686,7 @@ public interface Map<K, V> extends Data.MapType<K, V> {
 
 	@SuppressWarnings("unchecked")
 	public class Standard<K, V> extends Data.RefType.PT 
-		implements Base<K, V>, I.ToMutable {
+		implements Base<K, V>, IToMutable {
 
 		private final int _size;
 		private final Node<K, V> _root;
@@ -693,13 +694,13 @@ public interface Map<K, V> extends Data.MapType<K, V> {
 		@SuppressWarnings("rawtypes")
 		final public static Standard EMPTY = new Standard(null, 0, DataNode.EMPTY);		
 
-		Standard(I.Metadata meta, int size, Node<K, V> root) {
+		Standard(IMetadata meta, int size, Node<K, V> root) {
 			super(meta);
 			_size = size;
 			_root = root;
 		}
 
-		public static <K, V> Standard<K, V> from(I.Metadata meta, Object... elements){
+		public static <K, V> Standard<K, V> from(IMetadata meta, Object... elements){
 			return (Standard<K, V>) Mutable.from(meta, elements).toPersistent();
 		}
 		
@@ -745,7 +746,7 @@ public interface Map<K, V> extends Data.MapType<K, V> {
 		}
 
 		@Override
-		public Standard<K, V> withMeta(I.Metadata meta) {
+		public Standard<K, V> withMeta(IMetadata meta) {
 			return (meta() == meta) ? this : new Standard<K, V>(meta, _size, _root);
 		}
 

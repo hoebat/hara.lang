@@ -4,9 +4,10 @@ import java.util.ArrayList;
 import java.util.Iterator;
 
 import hara.lang.base.*;
+import hara.lang.protocol.*;
 
 public interface Queue<E> extends
-	I.Coll<E>,
+	IColl<E>,
 	Data.LinearType<E>,
 	Data.SequentialLookupType<E> {
 
@@ -90,7 +91,7 @@ public interface Queue<E> extends
 	}
 	
 	public class Mutable<E> extends Data.RefType.MT 
-		implements Base<E>, I.ToPersistent {
+		implements Base<E>, IToPersistent {
 		int _size;
 		int _offset;
 
@@ -99,7 +100,7 @@ public interface Queue<E> extends
 		List<Vector<E>> _buffer;
 
 		@SuppressWarnings("unchecked")
-		public Mutable(I.Metadata meta) {
+		public Mutable(IMetadata meta) {
 			super(meta);
 			_size = 0;
 			_offset = 0;
@@ -109,7 +110,7 @@ public interface Queue<E> extends
 		}
 
 
-		public Mutable(I.Metadata meta, int size, int offset, Vector<E> head, Vector<E> tail,
+		public Mutable(IMetadata meta, int size, int offset, Vector<E> head, Vector<E> tail,
 				List<Vector<E>> buffer) {
 			super(meta);
 			_size = size;
@@ -121,13 +122,13 @@ public interface Queue<E> extends
 		}
 
 		@SuppressWarnings("unchecked")
-		public static <E> Mutable<E> from(I.Metadata meta, E... objs) {
+		public static <E> Mutable<E> from(IMetadata meta, E... objs) {
 			var vec = Mutable.empty(meta);
 			return Arr.reduce((v, e) -> v.pushLast(e), vec, objs);
 		}
 		
 		@SuppressWarnings({"rawtypes"})
-		public static Mutable empty (I.Metadata meta) {
+		public static Mutable empty (IMetadata meta) {
 			return new Mutable(meta);
 		}
 
@@ -245,7 +246,7 @@ public interface Queue<E> extends
 	}
 
 	public class Standard<E> extends Data.RefType.PT 
-		implements Base<E>, I.ToMutable {
+		implements Base<E>, IToMutable {
 		final int _size;
 		final int _offset;
 
@@ -257,7 +258,7 @@ public interface Queue<E> extends
 		public final static Standard<Object> EMPTY = new Standard<>(null);
 
 		@SuppressWarnings("unchecked")
-		public Standard(I.Metadata meta) {
+		public Standard(IMetadata meta) {
 			super(meta);
 			_size = 0;
 			_offset = 0;
@@ -267,7 +268,7 @@ public interface Queue<E> extends
 					
 		}
 
-		private Standard(I.Metadata meta, int size, int offset, Vector<E> head, Vector<E> tail,
+		private Standard(IMetadata meta, int size, int offset, Vector<E> head, Vector<E> tail,
 				List<Vector<E>> buffer) {
 			super(meta);
 			_size = size;
@@ -279,13 +280,13 @@ public interface Queue<E> extends
 		}
 		
 		@SuppressWarnings("unchecked")
-		public static <E> Standard<E> empty(I.Metadata meta) {
+		public static <E> Standard<E> empty(IMetadata meta) {
 			Standard<E> ret = (Standard<E>) EMPTY;
 			return (meta == null) ? ret : ret.withMeta(meta);
 		}
 
 		@SuppressWarnings("unchecked")
-		public static <E> Standard<E> from(I.Metadata meta, E... objs) {
+		public static <E> Standard<E> from(IMetadata meta, E... objs) {
 			return Mutable.from(meta, objs).toPersistent();
 		}
 		
@@ -358,7 +359,7 @@ public interface Queue<E> extends
 		}
 		
 		@Override
-		public Standard<E> withMeta(I.Metadata meta) {
+		public Standard<E> withMeta(IMetadata meta) {
 			return (meta == _meta) ? this : new Standard<E>(meta, _size, _offset, _head, _tail, _buffer);
 		}
 

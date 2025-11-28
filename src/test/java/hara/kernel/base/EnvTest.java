@@ -2,7 +2,7 @@ package hara.kernel.base;
 
 import org.junit.Test;
 import static org.junit.Assert.*;
-import hara.lang.base.I;
+import hara.lang.protocol.*;
 import hara.lang.data.Keyword;
 import hara.lang.data.Symbol;
 import hara.lang.data.Map;
@@ -28,7 +28,7 @@ public class EnvTest {
         Var flagVar = fns.lookup(Symbol.create("flag"));
         assertNotNull("flag var should exist", flagVar);
 
-        I.Metadata meta = flagVar.meta();
+        IMetadata meta = flagVar.meta();
         assertNotNull("metadata should not be null", meta);
         assertTrue("metadata should be a map", meta instanceof hara.lang.data.Map);
 

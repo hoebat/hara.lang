@@ -3,6 +3,7 @@ package hara.lang.base;
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.BiPredicate;
+import hara.lang.protocol.*;
 
 public interface Eq {
 
@@ -13,10 +14,10 @@ public interface Eq {
 			return false;
 		} else if (a instanceof Number && b instanceof Number) {
 			return Num.eq(a, b);
-		} else if (a instanceof I.Equality) {
-			return ((I.Equality) a).equality(b);
-		} else if (b instanceof I.Equality) {
-			return ((I.Equality) b).equality(a);
+		} else if (a instanceof IEquality) {
+			return ((IEquality) a).equality(b);
+		} else if (b instanceof IEquality) {
+			return ((IEquality) b).equality(a);
 		} else {
 			return a.equals(b);
 		}

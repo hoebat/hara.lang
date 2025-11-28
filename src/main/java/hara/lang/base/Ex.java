@@ -1,6 +1,7 @@
 package hara.lang.base;
 
 import java.util.NoSuchElementException;
+import hara.lang.protocol.*;
 
 public interface Ex {
 
@@ -35,14 +36,14 @@ public interface Ex {
 	}
 
 	@SuppressWarnings("serial")
-	public class Info extends RuntimeException implements I.ExInfo {
-		public final I.Metadata data;
+	public class Info extends RuntimeException implements IExInfo {
+		public final IMetadata data;
 
-		public Info(String s, I.Metadata data) {
+		public Info(String s, IMetadata data) {
 			this(s, data, null);
 		}
 
-		public Info(String s, I.Metadata data, Throwable throwable) {
+		public Info(String s, IMetadata data, Throwable throwable) {
 			super(s, throwable);
 			if (data != null) {
 				this.data = data;
@@ -52,7 +53,7 @@ public interface Ex {
 		}
 
 		@Override
-		public I.Metadata getData() {
+		public IMetadata getData() {
 			return data;
 		}
 

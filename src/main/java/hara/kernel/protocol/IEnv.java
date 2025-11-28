@@ -3,12 +3,12 @@ package hara.kernel.protocol;
 import java.util.Iterator;
 import java.util.Map.Entry;
 import hara.lang.base.Ex;
-import hara.lang.base.I;
+import hara.lang.protocol.*;
 
-public interface IEnv<K, V> extends I.Lookup<K, V> {
+public interface IEnv<K, V> extends ILookup<K, V> {
 	IEnv<K, V> getParent();
 
-	I.Lookup<K, V> getMap();
+	ILookup<K, V> getMap();
 
 	@SuppressWarnings("rawtypes")
 	IRuntime getRuntime();

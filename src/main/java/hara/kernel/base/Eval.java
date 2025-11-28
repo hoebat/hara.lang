@@ -11,6 +11,7 @@ import java.util.function.*;
 import hara.lang.base.*;
 import hara.lang.data.*;
 import static hara.kernel.base.Builtin.Struct.*;
+import hara.lang.protocol.*;
 
 @SuppressWarnings({ "rawtypes", "unchecked" })
 public interface Eval {
@@ -44,8 +45,8 @@ public interface Eval {
 		}
 
 		@Override
-		public I.Lookup getMap() {
-			return new I.Lookup<Symbol, Object>() {
+		public ILookup getMap() {
+			return new ILookup<Symbol, Object>() {
 				@Override
 				public Entry<Symbol, Object> find(Symbol key) {
 					if (bindings.containsKey(key)) {
@@ -140,12 +141,12 @@ public interface Eval {
 				if (v.isMacro()) {
 					f = v.deref();
 					var args = It.iter(ast.popFirst());
-					var m = ((I.ObjType)f).meta();
+					var m = ((IObjType)f).meta();
 
 					if (m != null) {
-						if ((Boolean)((I.Lookup)m).lookup(Keyword.create("env"), false)) {
+						if ((Boolean)((ILookup)m).lookup(Keyword.create("env"), false)) {
 							args = It.concat(It.objects(env), args);
-						} else if ((Boolean)((I.Lookup)m).lookup(Keyword.create("rt"), false)) {
+						} else if ((Boolean)((ILookup)m).lookup(Keyword.create("rt"), false)) {
 							args = It.concat(It.objects(env.getRuntime()), args);
 						}
 					}
@@ -154,12 +155,12 @@ public interface Eval {
 				} else if (v.isControl()) {
 					f = v.deref();
 					var args = It.iter(ast.popFirst());
-					var m = ((I.ObjType)f).meta();
+					var m = ((IObjType)f).meta();
 
 					if (m != null) {
-						if ((Boolean)((I.Lookup)m).lookup(Keyword.create("env"), false)) {
+						if ((Boolean)((ILookup)m).lookup(Keyword.create("env"), false)) {
 							args = It.concat(It.objects(env), args);
-						} else if ((Boolean)((I.Lookup)m).lookup(Keyword.create("rt"), false)) {
+						} else if ((Boolean)((ILookup)m).lookup(Keyword.create("rt"), false)) {
 							args = It.concat(It.objects(env.getRuntime()), args);
 						}
 					}
