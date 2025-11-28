@@ -70,44 +70,44 @@ public interface It {
   }
 
   public static Iterator<Boolean> booleans(boolean... arr) {
-    return new Arr.T.ToIter_boolean(arr, 0);
+    return new BooleanArrayIterator(arr, 0);
   }
 
   public static Iterator<Byte> bytes(byte... arr) {
-    return new Arr.T.ToIter_byte(arr, 0);
+    return new ByteArrayIterator(arr, 0);
   }
 
   public static Iterator<Character> chars(char... arr) {
-    return new Arr.T.ToIter_char(arr, 0);
+    return new CharArrayIterator(arr, 0);
   }
 
   public static Iterator<Short> shorts(short... arr) {
-    return new Arr.T.ToIter_short(arr, 0);
+    return new ShortArrayIterator(arr, 0);
   }
 
   public static Iterator<Integer> ints(int... arr) {
-    return new Arr.T.ToIter_int(arr, 0);
+    return new IntArrayIterator(arr, 0);
   }
 
   public static Iterator<Long> longs(long... arr) {
-    return new Arr.T.ToIter_long(arr, 0);
+    return new LongArrayIterator(arr, 0);
   }
 
   public static Iterator<Float> floats(float... arr) {
-    return new Arr.T.ToIter_float(arr, 0);
+    return new FloatArrayIterator(arr, 0);
   }
 
   public static Iterator<Double> doubles(double... arr) {
-    return new Arr.T.ToIter_double(arr, 0);
+    return new DoubleArrayIterator(arr, 0);
   }
 
   @SafeVarargs
   public static <E> Iterator<E> objects(E... arr) {
-    return new Arr.T.ToIter<E>(arr, 0);
+    return new ArrayIterator<E>(arr, 0);
   }
 
   public static <E> Iterator<E> from(E[] arr) {
-    return new Arr.T.ToIter<>(arr, 0);
+    return new ArrayIterator<>(arr, 0);
   }
 
   public static <E> Iterator<E> from(Iterable<E> coll) {
