@@ -3,6 +3,7 @@ package hara.lang.lib;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -333,6 +334,7 @@ public interface Env {
 	public static I.Fn createFn(Entry<String, ArrayList<Method>> p){
 	
 		ArrayList<Method> all = p.getValue();
+		all.sort((m1, m2) -> Integer.compare(m1.getParameterCount(), m2.getParameterCount()));
 
 		BiFunction<ArrayList<Method>, Predicate<Method>, ArrayList<Method>> filterList 
 			= (list, pred) -> It.toArrayList(It.filter(It.iter(list), pred));
@@ -350,6 +352,16 @@ public interface Env {
 				keyword("name"), p.getKey(),
 				keyword("rt"), S.fnOpts(all.get(0)).rt(),
 				keyword("env"), S.fnOpts(all.get(0)).env()));
+
+		Function<Method, Data.LinearType> toArgs = (m) -> {
+			Parameter[] params = m.getParameters();
+			return Vector.Standard.into(It.map(
+					It.iter(params),
+					(pm) -> symbol(((Parameter)pm).getName())));
+		};
+
+		var arglists = Vector.Standard.into(It.map(It.iter(all), toArgs));
+		meta = meta.assoc(keyword("arglists"), arglists);
 		
 		if(!ropts.isEmpty()) {
 			meta = meta.assoc(keyword("reduce"), ropts.get(0));
