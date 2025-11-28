@@ -48,55 +48,40 @@ public class Foundation implements I.Context {
 	public final ConcurrentHashMap<String, Cmd> REGISTRY = new ConcurrentHashMap<>();
 
 	public Foundation() {
-		loadCommands();
+		loadCommands(Arrays.asList(
+			hara.lang.kernel.command.Core.class,
+			hara.lang.kernel.command.Jvm.class,
+			hara.lang.kernel.command.Os.class,
+			hara.lang.kernel.command.Server.class,
+			hara.lang.kernel.command.Session.class,
+			hara.lang.kernel.command.Peer.class,
+			hara.lang.kernel.command.Maven.class
+		));
 	}
 
 	public void register(String name, Cmd cmd) {
 		REGISTRY.put(name, cmd);
 	}
 
-	public void loadCommands() {
-		for (Method method : Fn.class.getDeclaredMethods()) {
-			Command annotation = method.getAnnotation(Command.class);
-			if (annotation != null) {
-				register(annotation.name(), (F, args) -> {
-					try {
-						return method.invoke(null, F, args);
-					} catch (Exception e) {
-						throw Ex.Sneaky(e);
-					}
-				});
+	public void loadCommands(java.util.List<Class<?>> classes) {
+		for (Class<?> cls : classes) {
+			for (Method method : cls.getDeclaredMethods()) {
+				Command annotation = method.getAnnotation(Command.class);
+				if (annotation != null) {
+					register(annotation.name(), (F, args) -> {
+						try {
+							return method.invoke(null, F, args);
+						} catch (Exception e) {
+							throw Ex.Sneaky(e);
+						}
+					});
+				}
 			}
 		}
 	}
 	
-	public enum OS {
-		HELP, PWD, LS, RUN
-	}
-	
-	public enum JVM {
-		HELP, HOME, PROPS, ENV, VERSION, VENDOR, BOOTPATH, 
-		CLASSPATH, CP, CLASSLOADER,
-	}
-	
-	public enum SERVER {
-		HELP, NEW, EXISTS, LIST, INFO, STOP
-	}
-	
-	public enum SESSION {
-		HELP, NEW, GET, EXISTS, LIST, INFO, KILL, PATH
-	}
-	
 	public enum CLASSPATH {
 		ADD, LIST, REMOVE, PURGE
-	}
-
-	public enum PEER {
-		HELP, ADD, LIST, REMOVE, PING
-	}
-
-	public enum MAVEN {
-		HELP, LOAD
 	}
 
 	@SuppressWarnings("unchecked")
@@ -174,115 +159,7 @@ public class Foundation implements I.Context {
 			return It.toArrayList(
 					It.map(Arr.toIter(enums), (x) -> x.toString()));
 		}
-
-		@Command(name = "HELP")
-		public static Object cmdHELP(Foundation F, java.util.List<Object> args) {
-			return runHELP(F, F.REGISTRY.keySet());
-		}
-
-		@Command(name = "SHUTDOWN")
-		public static Object cmdSHUTDOWN(Foundation F, java.util.List<Object> args) {
-			System.exit(1);
-			return null;
-		}
-
-		@Command(name = "PING")
-		public static Object cmdPING(Foundation F, java.util.List<Object> args) {
-			return "PONG";
-		}
-
-		@Command(name = "ECHO")
-		public static Object cmdECHO(Foundation F, java.util.List<Object> args) {
-			return args;
-		}
-
-		@Command(name = "DIR")
-		public static Object cmdDIR(Foundation F, java.util.List<Object> args) {
-			return runDIR(F);
-		}
-
-		@Command(name = "JVM")
-		public static Object runJVM(Foundation F, java.util.List<Object> argsObj) {
-			java.util.List<String> args = toStringList(argsObj);
-			JVM cmd = JVM.valueOf(args.get(0));
-			args.remove(0);
-			
-			switch(cmd) {
-			case HELP: 			return Fn.runHELP(F, JVM.values());
-			case BOOTPATH:  	return run(Fn::JVM_PROPS, "sun.boot.library.path");
-			case CP:
-			case CLASSPATH: 	return run(Fn::JVM_PROPS, "java.class.path");
-			case CLASSLOADER: 	return ClassLoader.getSystemClassLoader().toString();
-			case ENV:     		return run(Fn::JVM_ENV, args);
-			case HOME:    		return run(Fn::JVM_PROPS, "java.home");
-			case PROPS:   		return run(Fn::JVM_PROPS, args);
-			case VENDOR:  		return run(Fn::JVM_PROPS, "java.vendor");
-			case VERSION: 		return run(Fn::JVM_PROPS, "java.version");
-			}
-			throw new Ex.Unsupported();
-		}
 		
-		@Command(name = "SERVER")
-		public static Object runServer(Foundation F, java.util.List<Object> argsObj) {
-			java.util.List<String> args = toStringList(argsObj);
-			SERVER cmd = SERVER.valueOf(args.get(0));
-			args.remove(0);
-			switch(cmd) {			
-			case HELP: return Fn.runHELP(F, SERVER.values());
-			case INFO:
-				break;
-			case LIST:
-				break;
-			case NEW:
-				break;
-			case STOP:
-				break;
-			case EXISTS:
-				break;
-			}
-			throw new Ex.Unsupported();
-		}
-		
-		@Command(name = "OS")
-		public static Object runOS(Foundation F, java.util.List<Object> argsObj) {
-			java.util.List<String> args = toStringList(argsObj);
-			OS cmd = OS.valueOf(args.get(0));
-			args.remove(0);
-			switch(cmd) {
-			case HELP:  return Fn.runHELP(F, OS.values());
-			case LS: 	args.add(0, "ls");
-						return runProcess(args);
-			case PWD: 	return run(Fn::JVM_ENV, "PWD");
-			case RUN: 	return runProcess(args);
-			}
-
-			throw new Ex.Unsupported();
-		}
-		
-		@Command(name = "PEER")
-		public static Object runPeer(Foundation F, java.util.List<Object> argsObj) {
-			java.util.List<String> args = toStringList(argsObj);
-			PEER cmd = PEER.valueOf(args.get(0));
-			args.remove(0);
-			switch(cmd) {
-			case HELP: return Fn.runHELP(F, PEER.values());
-			case LIST: return mapToList(F.PEERS);
-			case ADD:
-				// PEER ADD name host port
-				String name = args.get(0);
-				String host = args.get(1);
-				int port = Integer.parseInt(args.get(2));
-				F.PEERS.put(name, new Peer(name, host, port));
-				return name;
-			case REMOVE:
-				return F.PEERS.remove(args.get(0)) != null;
-			case PING:
-				// Minimal implementation: check if we have a record
-				return F.PEERS.containsKey(args.get(0));
-			}
-			throw new Ex.Unsupported();
-		}
-
 		public static Object runSessionFor(Foundation F, String key, Function<RT.Instance, Object> f) {
 			RT.Instance s = (Instance) F.RTS.get(key);
 			
@@ -322,68 +199,6 @@ public class Foundation implements I.Context {
 			case LIST:   return rt.pathCache();
 			}
 			throw new Ex.Unsupported();
-		}
-		
-		@Command(name = "SESSION")
-		public static Object runSession(Foundation F, java.util.List<Object> argsObj) {
-			java.util.List<String> args = toStringList(argsObj);
-			SESSION cmd = SESSION.valueOf(args.get(0));
-			args.remove(0);
-			
-			switch(cmd) {
-			case HELP:   return Fn.runHELP(F, SESSION.values());
-			case EXISTS: return runSessionFor(F, args.get(0), (rt) -> rt != null);
-			case GET:    return runSessionCreate(F, args, false);
-			case NEW:    return runSessionCreate(F, args, true);
-			case PATH:   return runSessionFor(F, args.get(0), (rt) -> runSessionClasspath(rt, args));
-			case LIST:   return It.toArrayList(F.RTS.keys());
-			case KILL:   return runSessionFor(F, args.get(0), (rt) -> F.RTS.remove(args.get(0)));
-			case INFO:   throw new Ex.TODO();
-			}
-			throw new Ex.Unsupported();
-		}
-
-		@Command(name = "MAVEN")
-		public static Object runMaven(Foundation F, java.util.List<Object> argsObj) {
-			java.util.List<String> args = toStringList(argsObj);
-			MAVEN cmd = MAVEN.valueOf(args.get(0));
-			args.remove(0);
-
-			switch(cmd) {
-			case HELP:   return Fn.runHELP(F, MAVEN.values());
-			case LOAD:
-				return runSessionFor(F, args.get(0),
-					(rt) -> hara.lang.lib.Maven.load.invoke(rt, args.get(1))
-				);
-			}
-			throw new Ex.Unsupported();
-		}
-
-		@Command(name = "INFO")
-		public static Object runInfo(Foundation F, java.util.List<Object> args) {
-			return runInfo(F);
-		}
-
-		@Command(name = "EVAL")
-		public static Object runEval(Foundation F, java.util.List<Object> args) {
-			return Fn.runSessionFor(F, args.get(0).toString(),
-					rt -> G.display(rt.eval(rt.readString(args.get(1).toString()))));
-		}
-
-		@Command(name = "COMPILE")
-		public static Object runCompile(Foundation F, java.util.List<Object> args) {
-			try {
-				hara.lang.data.List expression = (hara.lang.data.List) Read.LispReader.readString(args.get(0).toString(), null);
-				Compiler compiler = new Compiler();
-				byte[] bytecode = compiler.compile(expression);
-				DynamicClassLoader loader = new DynamicClassLoader(Foundation.class.getClassLoader());
-				Class<?> clazz = loader.defineClass(null, bytecode);
-				return clazz.getConstructor().newInstance();
-			} catch (CompilerException e) {
-				throw new RuntimeException(e);
-			} catch (Exception e) {
-				throw Ex.Sneaky(e);
-			}
 		}
 	}
 
