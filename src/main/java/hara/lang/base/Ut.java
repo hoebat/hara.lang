@@ -1,8 +1,11 @@
 package hara.lang.base;
 
-import hara.data.types.*;
-
-import hara.lang.data.*;
+import hara.data.types.ILinearType;
+import hara.data.types.IMapType;
+import hara.data.types.ISequentialType;
+import hara.data.types.ISetType;
+import hara.lang.data.Tuple;
+import hara.lang.protocol.*;
 
 import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
@@ -11,7 +14,6 @@ import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
-import hara.lang.protocol.*;
 
 public interface Ut {
 

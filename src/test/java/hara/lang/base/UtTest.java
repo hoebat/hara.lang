@@ -1,10 +1,7 @@
 package hara.lang.base;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import hara.lang.base.Ut.*;
+import org.junit.Test;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -13,18 +10,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
-import org.junit.Test;
-
-import hara.lang.base.Ut.AsList;
-import hara.lang.base.Ut.AsMap;
-import hara.lang.base.Ut.AsSet;
-import hara.lang.base.Ut.Clock;
-import hara.lang.base.Ut.Counter;
-import hara.lang.base.Ut.Delay;
-import hara.lang.base.Ut.Flag;
-import hara.lang.base.Ut.Murmur3;
-import hara.lang.base.Ut.RefCache;
-import hara.lang.base.Ex;
+import static org.junit.Assert.*;
 
 public class UtTest {
 

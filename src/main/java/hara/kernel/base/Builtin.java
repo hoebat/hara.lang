@@ -1,12 +1,13 @@
 package hara.kernel.base;
 
-import hara.data.types.*;
-
-import hara.kernel.protocol.IEnv;
+import hara.data.types.ILinearType;
+import hara.data.types.IMapType;
 import hara.kernel.protocol.IRuntime;
-
-import static hara.kernel.base.Module.ReduceInit.*;
-import static hara.kernel.base.Module.ReduceType.*;
+import hara.lang.base.*;
+import hara.lang.data.*;
+import hara.lang.data.Map.Standard;
+import hara.lang.data.Tuple.*;
+import hara.lang.protocol.*;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -20,12 +21,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 
-import hara.lang.base.*;
-import hara.lang.data.Tuple.*;
-import hara.kernel.base.Module;
-import hara.lang.data.*;
-import hara.lang.data.Map.Standard;
-import hara.lang.protocol.*;
+import static hara.kernel.base.Module.ReduceInit.*;
+import static hara.kernel.base.Module.ReduceType.*;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public interface Builtin {

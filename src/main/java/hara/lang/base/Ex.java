@@ -1,7 +1,9 @@
 package hara.lang.base;
 
+import hara.lang.protocol.IExInfo;
+import hara.lang.protocol.IMetadata;
+
 import java.util.NoSuchElementException;
-import hara.lang.protocol.*;
 
 public interface Ex {
 

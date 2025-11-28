@@ -1,11 +1,11 @@
 package hara.kernel.base;
 
+import hara.lang.data.List;
+import hara.lang.data.Symbol;
 import org.junit.Before;
 import org.junit.Test;
-import static org.junit.Assert.*;
-import hara.lang.data.Symbol;
-import hara.lang.data.List;
-import hara.lang.data.Vector;
+
+import static org.junit.Assert.assertEquals;
 
 public class MacroTest {
 

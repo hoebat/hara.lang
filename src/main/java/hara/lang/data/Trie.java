@@ -1,22 +1,15 @@
 package hara.lang.data;
 
-import hara.data.types.*;
+import hara.data.types.IRefType;
 import hara.lang.base.G;
-import hara.lang.protocol.*;
 import hara.lang.base.It;
+import hara.lang.protocol.*;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
+import java.util.*;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.NoSuchElementException;
-import java.util.Stack;
 import java.util.function.Function;
-import java.util.Objects;
-import java.util.AbstractMap;
 
 public interface Trie<V>
     extends IColl<String>, IObjType, IAssoc<String, V>, IDissoc<String>, ILookup<String, V> {

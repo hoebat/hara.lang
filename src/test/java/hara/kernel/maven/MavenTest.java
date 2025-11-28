@@ -1,13 +1,10 @@
 package hara.kernel.maven;
 
+import hara.kernel.Foundation;
 import hara.kernel.protocol.IRuntime;
-
-import static org.junit.Assert.*;
-
 import org.junit.Test;
 
-import hara.lang.protocol.*;
-import hara.kernel.Foundation;
+import static org.junit.Assert.assertNotNull;
 
 public class MavenTest {
 

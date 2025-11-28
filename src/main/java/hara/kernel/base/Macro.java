@@ -1,20 +1,24 @@
 package hara.kernel.base;
 
-import hara.data.types.*;
-
+import hara.data.types.ILinearType;
 import hara.kernel.protocol.IEnv;
 import hara.kernel.protocol.IRuntime;
+import hara.lang.base.*;
+import hara.lang.data.List;
+import hara.lang.data.Symbol;
+import hara.lang.data.Tuple;
+import hara.lang.data.Vector;
+import hara.lang.protocol.IFn;
+import hara.lang.protocol.ILookup;
+import hara.lang.protocol.INth;
+import hara.lang.protocol.IPair;
 
 import java.util.Iterator;
-import hara.lang.base.*;
-import hara.kernel.base.Module;
-import hara.lang.data.*;
 
-import static hara.kernel.base.Builtin.Runtime.*;
-import static hara.kernel.base.Builtin.Struct.*;
-import static hara.kernel.base.Builtin.Basic.*;
-import static hara.kernel.base.Builtin.Check.*;
-import hara.lang.protocol.*;
+import static hara.kernel.base.Builtin.Basic.atomVolatile;
+import static hara.kernel.base.Builtin.Basic.symbol;
+import static hara.kernel.base.Builtin.Check.isTruthy;
+import static hara.kernel.base.Builtin.Struct.list;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
 public interface Macro {

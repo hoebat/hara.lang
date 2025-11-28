@@ -1,12 +1,18 @@
 package hara.lang.data;
 
-import hara.data.types.*;
+import hara.data.types.ILinearType;
+import hara.data.types.IRefType;
+import hara.data.types.ISequentialLookupType;
+import hara.lang.base.Arr;
+import hara.lang.base.Ex;
+import hara.lang.base.It;
+import hara.lang.protocol.IColl;
+import hara.lang.protocol.IMetadata;
+import hara.lang.protocol.IToMutable;
+import hara.lang.protocol.IToPersistent;
 
 import java.util.ArrayList;
 import java.util.Iterator;
-
-import hara.lang.base.*;
-import hara.lang.protocol.*;
 
 public interface Queue<E> extends IColl<E>, ILinearType<E>, ISequentialLookupType<E> {
 

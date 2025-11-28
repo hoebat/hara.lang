@@ -1,17 +1,16 @@
 package hara.lang.data;
 
+import hara.lang.base.G;
+import hara.lang.protocol.*;
+
+import java.util.Iterator;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
-
-import hara.lang.base.*;
-
-import java.util.Iterator;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-import hara.lang.protocol.*;
 
 public interface Atom<V> {
 

@@ -1,12 +1,13 @@
 package hara.kernel.base;
 
-import org.junit.Test;
-import static org.junit.Assert.*;
-import hara.lang.data.Symbol;
-import hara.lang.data.List;
-import hara.lang.data.Map;
 import hara.lang.data.Keyword;
+import hara.lang.data.List;
 import hara.lang.data.OrderedMap;
+import hara.lang.data.Symbol;
+import org.junit.Test;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class ReadTest {
 

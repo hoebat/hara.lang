@@ -1,9 +1,8 @@
 package hara.lang.base;
 
-import hara.lang.data.*;
-
-import hara.lang.protocol.*;
-import hara.lang.protocol.Constant.*;
+import hara.lang.protocol.Constant;
+import hara.lang.protocol.IDisplay;
+import hara.lang.protocol.IHash;
 
 import java.util.Iterator;
 import java.util.Map.Entry;

@@ -1,10 +1,9 @@
 package hara.kernel.base;
 
-import org.junit.Test;
-import static org.junit.Assert.*;
-import hara.lang.data.Keyword;
-import hara.lang.data.Symbol;
 import hara.lang.data.Atom;
+import org.junit.Test;
+
+import static org.junit.Assert.*;
 
 public class BuiltinTest {
 

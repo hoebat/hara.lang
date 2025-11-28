@@ -1,9 +1,9 @@
 package hara.data.types;
 
-import hara.data.types.*;
-
-import hara.lang.protocol.*;
 import hara.lang.base.Obj;
+import hara.lang.protocol.IHashCached;
+import hara.lang.protocol.IMetadata;
+import hara.lang.protocol.IObjType;
 
 public interface IRefType {
 

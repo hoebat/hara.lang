@@ -1,13 +1,12 @@
 package hara.kernel;
 
-import hara.lang.data.*;
+import hara.kernel.protocol.IRedirect;
 
 import java.io.*;
 import java.net.Socket;
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
-import hara.kernel.protocol.IRedirect;
 
 /**
  * A lightweight implementation of the SocketConnection server protocol at

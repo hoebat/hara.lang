@@ -1,8 +1,11 @@
 package hara.kernel.protocol;
 
+import hara.lang.protocol.IColl;
+import hara.lang.protocol.IContext;
+import hara.lang.protocol.IFn;
+
 import java.net.URL;
 import java.util.Map.Entry;
-import hara.lang.protocol.*;
 
 @SuppressWarnings("rawtypes")
 public interface IRuntime<AST, K, V> extends IContext {

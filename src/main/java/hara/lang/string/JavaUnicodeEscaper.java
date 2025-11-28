@@ -16,8 +16,6 @@
  */
 package hara.lang.string;
 
-import hara.lang.data.*;
-
 /**
  * Translates codepoints to their Unicode escaped value suitable for Java source.
  *

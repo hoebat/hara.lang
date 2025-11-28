@@ -1,13 +1,16 @@
 package hara.lang.data;
 
-import hara.data.types.*;
+import hara.data.types.IRefType;
+import hara.data.types.IVectorType;
+import hara.lang.base.Arr;
+import hara.lang.base.It;
+import hara.lang.protocol.*;
 
-import java.util.*;
-
-import hara.lang.base.*;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 import static hara.lang.base.P.Bits.log2Ceil;
-import hara.lang.protocol.*;
 
 public interface List<E> extends IVectorType<E> {
 

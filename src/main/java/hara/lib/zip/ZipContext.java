@@ -1,8 +1,8 @@
 package hara.lib.zip;
 
-import hara.lang.protocol.*;
 import hara.lang.data.List;
 import hara.lang.data.Vector;
+import hara.lang.protocol.IColl;
 
 public class ZipContext implements IZipContext {
 

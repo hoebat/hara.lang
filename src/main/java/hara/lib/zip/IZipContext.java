@@ -1,6 +1,5 @@
 package hara.lib.zip;
 
-import hara.lang.protocol.*;
 import hara.lang.data.List;
 
 public interface IZipContext {

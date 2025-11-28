@@ -1,9 +1,9 @@
 package hara.lib.zip;
 
-import hara.lang.base.G;
-import hara.lang.protocol.*;
 import hara.lang.data.List;
-import hara.lang.data.Vector;
+import hara.lang.protocol.Constant;
+import hara.lang.protocol.IMetadata;
+import hara.lang.protocol.IObjType;
 
 public class Zipper implements IObjType {
   public final Zipper parent;

@@ -1,11 +1,7 @@
 package hara.data.types;
 
-import hara.lang.data.*;
-
-import hara.data.types.*;
-
-import hara.lang.protocol.*;
 import hara.lang.base.Ex;
+import hara.lang.protocol.*;
 
 public interface ILinearType<E>
     extends IColl<E>,

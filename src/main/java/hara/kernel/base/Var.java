@@ -1,13 +1,13 @@
 package hara.kernel.base;
 
-import hara.data.types.*;
-
-import hara.lang.base.*;
-import hara.lang.data.*;
-
-import static hara.kernel.base.Builtin.Basic.*;
+import hara.data.types.INamespacedType;
+import hara.data.types.IStringType;
+import hara.data.types.IVarType;
+import hara.lang.data.Map;
 import hara.lang.protocol.Constant;
-import hara.lang.protocol.*;
+import hara.lang.protocol.IReset;
+
+import static hara.kernel.base.Builtin.Basic.keyword;
 
 public class Var extends INamespacedType.MT implements IStringType, IVarType, IReset<Object> {
 

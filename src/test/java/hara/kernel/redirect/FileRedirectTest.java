@@ -1,18 +1,17 @@
 package hara.kernel.redirect;
 
-import java.io.File;
+import hara.lang.data.Vector;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.List;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
-import static org.junit.Assert.*;
-
-import hara.lang.data.Vector;
+import static org.junit.Assert.assertEquals;
 
 public class FileRedirectTest {
 

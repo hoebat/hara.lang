@@ -1,12 +1,9 @@
 package hara.data.types;
 
-import hara.lang.data.*;
-
-import hara.data.types.*;
+import hara.lang.base.Eq;
+import hara.lang.protocol.*;
 
 import java.util.Iterator;
-import hara.lang.protocol.*;
-import hara.lang.base.Eq;
 
 public interface ISequentialType<E>
     extends Iterable<E>, ICount, IEquality, IHash, IObjType, IOrderedType<E> {

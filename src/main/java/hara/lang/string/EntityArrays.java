@@ -16,8 +16,6 @@
  */
 package hara.lang.string;
 
-import hara.lang.data.*;
-
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;

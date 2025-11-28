@@ -1,9 +1,5 @@
 package hara.data.types;
 
-import hara.lang.data.*;
-
-import hara.data.types.*;
-
 import hara.lang.protocol.*;
 
 public interface IVectorType<E>

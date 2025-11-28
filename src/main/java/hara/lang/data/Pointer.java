@@ -1,10 +1,9 @@
 package hara.lang.data;
 
-import hara.data.types.*;
-
-import hara.lang.base.*;
+import hara.data.types.INamespacedType;
+import hara.data.types.IStringType;
 import hara.lang.protocol.Constant;
-import hara.lang.protocol.*;
+import hara.lang.protocol.IMetadata;
 
 public class Pointer extends INamespacedType.PT implements IStringType {
 

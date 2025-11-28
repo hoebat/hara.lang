@@ -1,9 +1,5 @@
 package hara.kernel.maven;
 
-import java.io.File;
-import java.util.List;
-import java.util.stream.Collectors;
-
 import org.apache.maven.repository.internal.MavenRepositorySystemUtils;
 import org.eclipse.aether.DefaultRepositorySystemSession;
 import org.eclipse.aether.RepositorySystem;
@@ -16,9 +12,10 @@ import org.eclipse.aether.repository.RemoteRepository;
 import org.eclipse.aether.resolution.ArtifactResult;
 import org.eclipse.aether.resolution.DependencyRequest;
 import org.eclipse.aether.resolution.DependencyResolutionException;
-import org.eclipse.aether.util.graph.visitor.PreorderNodeListGenerator;
 
-import hara.kernel.maven.RepositorySystemFactory;
+import java.io.File;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class MavenResolver {
 

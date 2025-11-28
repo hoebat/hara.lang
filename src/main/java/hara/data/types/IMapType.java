@@ -1,19 +1,15 @@
 package hara.data.types;
 
-import hara.lang.data.*;
-
-import hara.data.types.*;
+import hara.lang.base.Eq;
+import hara.lang.base.G;
+import hara.lang.base.It;
+import hara.lang.protocol.*;
 
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.function.BiFunction;
 import java.util.function.Function;
-
-import hara.lang.protocol.*;
-import hara.lang.base.G;
-import hara.lang.base.It;
-import hara.lang.base.Eq;
 
 public interface IMapType<K, V>
     extends IColl<Entry<K, V>>,

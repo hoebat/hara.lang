@@ -1,14 +1,14 @@
 package hara.lang.data;
 
-import hara.data.types.*;
+import hara.data.types.IStringType;
+import hara.lang.base.Arr;
+import hara.lang.base.Ex;
+import hara.lang.base.Ut;
+import hara.lang.protocol.*;
 
 import java.lang.ref.WeakReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
-
-import hara.lang.base.*;
-import hara.lang.protocol.Constant;
-import hara.lang.protocol.*;
 
 public final class Keyword
     implements Comparable<Keyword>, IStringType, INamespaced, IDisplay, IObjType, IOFn, IMetadata {

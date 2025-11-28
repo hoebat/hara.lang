@@ -1,11 +1,8 @@
 package hara.data.types;
 
-import hara.lang.data.*;
-
-import hara.data.types.*;
-
-import hara.lang.protocol.*;
 import hara.lang.base.Ut;
+import hara.lang.protocol.Constant;
+import hara.lang.protocol.IHash;
 
 public interface IStringType extends IHash {
 

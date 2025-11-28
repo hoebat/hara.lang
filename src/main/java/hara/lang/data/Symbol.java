@@ -1,12 +1,12 @@
 package hara.lang.data;
 
-import hara.data.types.*;
+import hara.data.types.INamespacedType;
+import hara.data.types.IStringType;
+import hara.lang.base.Ut;
+import hara.lang.protocol.Constant;
+import hara.lang.protocol.IMetadata;
 
 import java.lang.ref.WeakReference;
-
-import hara.lang.base.*;
-import hara.lang.protocol.Constant;
-import hara.lang.protocol.*;
 
 public class Symbol extends INamespacedType.PT implements IStringType {
 

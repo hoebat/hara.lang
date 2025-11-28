@@ -1,8 +1,9 @@
 package hara.lang.base;
 
-import java.math.BigInteger;
-import java.math.BigDecimal;
 import hara.lang.base.P.Ratio;
+
+import java.math.BigDecimal;
+import java.math.BigInteger;
 
 public interface Num {
 

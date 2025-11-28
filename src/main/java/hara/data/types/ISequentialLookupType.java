@@ -1,13 +1,10 @@
 package hara.data.types;
 
-import hara.lang.data.*;
-
-import hara.data.types.*;
+import hara.lang.base.It;
+import hara.lang.protocol.*;
 
 import java.util.Iterator;
 import java.util.Map.Entry;
-import hara.lang.base.It;
-import hara.lang.protocol.*;
 
 public interface ISequentialLookupType<E>
     extends ISequentialType<E>,

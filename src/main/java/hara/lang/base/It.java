@@ -1,23 +1,14 @@
 package hara.lang.base;
 
-import hara.lang.data.*;
+import hara.lang.data.Tuple;
+import hara.lang.protocol.IPair;
+import hara.lang.protocol.IToMutable;
+import hara.lang.protocol.IToPersistent;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.ListIterator;
+import java.util.*;
 import java.util.Map.Entry;
-import java.util.NoSuchElementException;
-import java.util.Spliterator;
-import java.util.function.BiFunction;
-import java.util.function.BiPredicate;
-import java.util.function.BooleanSupplier;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.Predicate;
-import java.util.function.Supplier;
 import java.util.concurrent.atomic.AtomicReference;
-import hara.lang.protocol.*;
+import java.util.function.*;
 
 public interface It {
 

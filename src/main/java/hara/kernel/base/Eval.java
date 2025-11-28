@@ -1,20 +1,24 @@
 package hara.kernel.base;
 
-import hara.data.types.*;
-
+import hara.data.types.ILinearType;
+import hara.data.types.IMapType;
 import hara.kernel.protocol.IEnv;
 import hara.kernel.protocol.IRuntime;
+import hara.lang.base.Ex;
+import hara.lang.base.Fn;
+import hara.lang.base.G;
+import hara.lang.base.It;
+import hara.lang.data.Keyword;
+import hara.lang.data.List;
+import hara.lang.data.Symbol;
+import hara.lang.protocol.ILookup;
+import hara.lang.protocol.IObjType;
 
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Map.Entry;
-import java.util.function.*;
+import java.util.function.Function;
 
-import hara.lang.base.*;
-import hara.lang.data.*;
 import static hara.kernel.base.Builtin.Struct.*;
-import hara.lang.protocol.*;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
 public interface Eval {

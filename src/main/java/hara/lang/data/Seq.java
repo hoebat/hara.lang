@@ -1,9 +1,11 @@
 package hara.lang.data;
 
-import java.util.Iterator;
+import hara.data.types.ILinkedType;
+import hara.data.types.ISequentialType;
 import hara.lang.base.Obj;
-import hara.lang.protocol.*;
-import hara.data.types.*;
+import hara.lang.protocol.IMetadata;
+
+import java.util.Iterator;
 
 public class Seq<E> extends Obj.PT implements ISequentialType<E>, ILinkedType<E> {
 

@@ -1,9 +1,8 @@
 package hara.data.types;
 
-import hara.data.types.*;
+import hara.lang.protocol.IContext;
 
 import java.util.Iterator;
-import hara.lang.protocol.*;
 
 public interface IDepsType<K, E> {
   E depGet(IContext ctx, K id);

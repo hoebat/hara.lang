@@ -1,19 +1,12 @@
 package hara.lang.protocol;
 
-import java.net.URL;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.function.*;
-
-import hara.lang.base.*;
+import hara.data.types.ILinearType;
 import hara.lang.base.Ex;
-import hara.lang.data.*;
-import hara.data.types.*;
-import hara.lang.base.Arr;
-import hara.lang.base.It;
-import hara.lang.base.Str;
-import hara.lang.base.G;
+
+import java.util.Iterator;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 public interface IFn<R, T1, T2> extends Function<Object, R> {
 

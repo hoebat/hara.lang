@@ -1,11 +1,7 @@
 package hara.data.types;
 
-import hara.lang.data.*;
-
-import hara.data.types.*;
-
-import hara.lang.protocol.*;
 import hara.lang.base.It;
+import hara.lang.protocol.*;
 
 public interface ISetType<E>
     extends IColl<E>, IObjType, IDissoc<E>, IFind<E, E>, IUnOrderedType<E>, IFn<E, E, E> {

@@ -1,11 +1,12 @@
 package hara.lang.data;
 
-import java.util.Iterator;
-import hara.lang.base.Obj;
+import hara.data.types.ILinkedType;
+import hara.data.types.ISequentialType;
 import hara.lang.base.Ex;
-import hara.lang.base.It;
-import hara.lang.protocol.*;
-import hara.data.types.*;
+import hara.lang.base.Obj;
+import hara.lang.protocol.IMetadata;
+
+import java.util.Iterator;
 
 public class Cons<E> extends Obj.PT implements ISequentialType<E>, ILinkedType<E> {
 

@@ -1,9 +1,10 @@
 package hara.lang.base;
 
+import hara.lang.protocol.IEquality;
+
 import java.util.Iterator;
 import java.util.List;
 import java.util.function.BiPredicate;
-import hara.lang.protocol.*;
 
 public interface Eq {
 

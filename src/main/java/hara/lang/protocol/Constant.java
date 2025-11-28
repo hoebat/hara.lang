@@ -1,7 +1,5 @@
 package hara.lang.protocol;
 
-import hara.lang.data.*;
-
 public class Constant {
 
   public static final Object[] EMPTY_ARRAY = new Object[] {};

@@ -1,9 +1,17 @@
 package hara.kernel.base;
 
-import hara.data.types.*;
-
+import hara.data.types.IMapType;
 import hara.kernel.protocol.IEnv;
 import hara.kernel.protocol.IRuntime;
+import hara.lang.base.Arr;
+import hara.lang.base.Ex;
+import hara.lang.base.It;
+import hara.lang.base.Ut;
+import hara.lang.data.Keyword;
+import hara.lang.data.List;
+import hara.lang.data.Map;
+import hara.lang.data.Symbol;
+import hara.lang.protocol.*;
 
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -14,12 +22,10 @@ import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
-import hara.lang.base.*;
-import hara.lang.data.*;
-
-import static hara.kernel.base.Builtin.Struct.*;
-import static hara.kernel.base.Builtin.Lambda.*;
-import hara.lang.protocol.*;
+import static hara.kernel.base.Builtin.Lambda.mapVals;
+import static hara.kernel.base.Builtin.Lambda.partial;
+import static hara.kernel.base.Builtin.Struct.list;
+import static hara.kernel.base.Builtin.Struct.pair;
 
 @SuppressWarnings("unchecked")
 public interface RT {

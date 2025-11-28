@@ -1,11 +1,15 @@
 package hara.lang.data;
 
-import java.util.Iterator;
-import hara.lang.base.Obj;
+import hara.data.types.ILinearType;
+import hara.data.types.ISequentialType;
 import hara.lang.base.Ex;
 import hara.lang.base.It;
-import hara.lang.protocol.*;
-import hara.data.types.*;
+import hara.lang.base.Obj;
+import hara.lang.protocol.IMetadata;
+import hara.lang.protocol.IObjType;
+import hara.lang.protocol.IPair;
+
+import java.util.Iterator;
 
 public interface Tuple {
 

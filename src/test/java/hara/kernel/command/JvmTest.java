@@ -1,10 +1,12 @@
 package hara.kernel.command;
 
+import hara.kernel.Foundation;
 import org.junit.Test;
-import static org.junit.Assert.*;
+
 import java.util.Arrays;
 import java.util.List;
-import hara.kernel.Foundation;
+
+import static org.junit.Assert.*;
 
 public class JvmTest {
 

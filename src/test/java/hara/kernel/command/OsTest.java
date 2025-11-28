@@ -1,10 +1,12 @@
 package hara.kernel.command;
 
-import org.junit.Test;
-import static org.junit.Assert.*;
-import java.util.Arrays;
-import java.util.List;
 import hara.kernel.Foundation;
+import org.junit.Test;
+
+import java.util.List;
+
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 public class OsTest {
 

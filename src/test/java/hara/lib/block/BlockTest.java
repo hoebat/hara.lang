@@ -2,6 +2,7 @@ package hara.lib.block;
 
 import hara.lang.data.Vector;
 import org.junit.Test;
+
 import static org.junit.Assert.*;
 
 public class BlockTest {

@@ -1,8 +1,7 @@
 package hara.data.types;
 
-import hara.data.types.*;
-
-import hara.lang.protocol.*;
+import hara.lang.protocol.IMetadata;
+import hara.lang.protocol.INamespaced;
 
 public interface INamespacedType {
 

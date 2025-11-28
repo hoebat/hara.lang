@@ -1,8 +1,10 @@
 package hara.lang.base;
 
 import org.junit.Test;
-import static org.junit.Assert.*;
+
 import java.util.Iterator;
+
+import static org.junit.Assert.*;
 
 public class ArrTest {
 

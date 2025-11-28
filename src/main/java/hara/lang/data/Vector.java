@@ -1,18 +1,16 @@
 package hara.lang.data;
 
-import hara.data.types.*;
+import hara.data.types.ILinearView;
+import hara.data.types.IRefType;
+import hara.data.types.IVectorType;
+import hara.lang.base.Arr;
+import hara.lang.base.Ex;
+import hara.lang.base.It;
+import hara.lang.protocol.*;
 
 import java.util.Iterator;
-
 import java.util.NoSuchElementException;
 import java.util.concurrent.atomic.AtomicReference;
-
-import hara.lang.base.*;
-import hara.lang.protocol.IMetadata;
-import hara.lang.protocol.IPopFirst;
-import hara.lang.protocol.IPopLast;
-import hara.lang.protocol.IPushFirst;
-import hara.lang.protocol.*;
 
 public interface Vector<E> extends IVectorType<E>, IAssoc<Integer, E> {
 

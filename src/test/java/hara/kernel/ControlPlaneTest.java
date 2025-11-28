@@ -1,14 +1,14 @@
 package hara.kernel;
 
+import hara.kernel.base.Builtin;
+import hara.kernel.base.RT;
 import hara.kernel.protocol.IRuntime;
-
 import org.junit.Test;
-import static org.junit.Assert.*;
+
 import java.util.Arrays;
 import java.util.List;
-import hara.lang.protocol.*;
-import hara.kernel.base.RT;
-import hara.kernel.base.Builtin;
+
+import static org.junit.Assert.*;
 
 public class ControlPlaneTest {
 

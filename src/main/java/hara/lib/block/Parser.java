@@ -1,9 +1,9 @@
 package hara.lib.block;
 
 import hara.lang.data.Vector;
+
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Predicate;
 
 public class Parser {
 

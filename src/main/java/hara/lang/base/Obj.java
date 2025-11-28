@@ -1,14 +1,9 @@
 package hara.lang.base;
 
-import hara.data.types.*;
-
-import hara.lang.data.*;
+import hara.lang.data.Keyword;
+import hara.lang.protocol.*;
 
 import java.util.Iterator;
-
-import hara.lang.data.Keyword;
-import hara.lang.protocol.Constant;
-import hara.lang.protocol.*;
 
 public interface Obj {
 

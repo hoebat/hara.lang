@@ -1,8 +1,9 @@
 package hara.compiler;
 
-import java.util.function.Function;
-import junit.framework.TestCase;
 import hara.kernel.Foundation;
+import junit.framework.TestCase;
+
+import java.util.function.Function;
 
 public class CompilerTest extends TestCase {
 
