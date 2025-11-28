@@ -1,5 +1,7 @@
 package hara.lang.data;
 
+import hara.data.types.*;
+
 import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicReference;
@@ -7,7 +9,7 @@ import hara.lang.base.*;
 import hara.lang.base.Ut.Counter;
 import hara.lang.protocol.*;
 
-public interface Map<K, V> extends Data.MapType<K, V> {
+public interface Map<K, V> extends IMapType<K, V> {
 
   public interface Node<K, V> {
     Node<K, V> assoc(
@@ -280,7 +282,7 @@ public interface Map<K, V> extends Data.MapType<K, V> {
         final int idx = bitmapNodeIndex(_datamap, bit);
         final K current_key = (K) _array[2 * idx];
         if (Eq.eq(current_key, key)) {
-          return new Std.T.Tup2.L(null, current_key, _array[2 * idx + 1]);
+          return new Tuple.Tup2.L(null, current_key, _array[2 * idx + 1]);
         } else {
           return null;
         }
@@ -433,7 +435,7 @@ public interface Map<K, V> extends Data.MapType<K, V> {
         return null;
       }
       if (Eq.eq(key, _array[idx])) {
-        return new Std.T.Tup2.L(null, _array[idx], _array[idx + 1]);
+        return new Tuple.Tup2.L(null, _array[idx], _array[idx + 1]);
       }
       return null;
     }
@@ -499,14 +501,14 @@ public interface Map<K, V> extends Data.MapType<K, V> {
         _data_len = _data_len - 1;
       }
 
-      _next = new Std.T.Tup2.L(null, _array[(_data_idx * 2)], _array[((_data_idx * 2) + 1)]);
+      _next = new Tuple.Tup2.L(null, _array[(_data_idx * 2)], _array[((_data_idx * 2) + 1)]);
     }
 
     @SuppressWarnings("rawtypes")
     private boolean advance() {
       if (_data_idx < _data_len) {
         _data_idx = _data_idx + 1;
-        _next = new Std.T.Tup2.L(null, _array[(_data_idx * 2)], _array[((_data_idx * 2) + 1)]);
+        _next = new Tuple.Tup2.L(null, _array[(_data_idx * 2)], _array[((_data_idx * 2) + 1)]);
 
         return true;
       } else {
@@ -532,7 +534,7 @@ public interface Map<K, V> extends Data.MapType<K, V> {
               _data_idx = 0;
               _data_len = (node.dataArity() - 1);
               _next =
-                  new Std.T.Tup2.L(null, _array[(_data_idx * 2)], _array[((_data_idx * 2) + 1)]);
+                  new Tuple.Tup2.L(null, _array[(_data_idx * 2)], _array[((_data_idx * 2) + 1)]);
 
               return true;
             }
@@ -597,7 +599,7 @@ public interface Map<K, V> extends Data.MapType<K, V> {
   }
 
   @SuppressWarnings("unchecked")
-  public final class Mutable<K, V> extends Data.RefType.MT implements Base<K, V>, IToPersistent {
+  public final class Mutable<K, V> extends IRefType.MT implements Base<K, V>, IToPersistent {
 
     private volatile Node<K, V> _root;
     private volatile int _size;
@@ -697,7 +699,7 @@ public interface Map<K, V> extends Data.MapType<K, V> {
   }
 
   @SuppressWarnings("unchecked")
-  public class Standard<K, V> extends Data.RefType.PT implements Base<K, V>, IToMutable {
+  public class Standard<K, V> extends IRefType.PT implements Base<K, V>, IToMutable {
 
     private final int _size;
     private final Node<K, V> _root;

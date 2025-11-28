@@ -8,8 +8,8 @@ import java.util.function.*;
 
 import hara.lang.base.*;
 import hara.lang.base.Ex;
-import hara.lang.base.Std;
-import hara.lang.base.Data;
+import hara.lang.data.*;
+import hara.data.types.*;
 import hara.lang.base.Arr;
 import hara.lang.base.It;
 import hara.lang.base.Str;
@@ -61,8 +61,8 @@ public interface IFn<R, T1, T2> extends Function<Object, R> {
     } else if (vargs instanceof java.util.List) {
       var l = (java.util.List) vargs;
       return applyAsIterator(this, l.iterator(), l.size());
-    } else if (vargs instanceof Data.LinearType) {
-      var l = (Data.LinearType) vargs;
+    } else if (vargs instanceof ILinearType) {
+      var l = (ILinearType) vargs;
       return applyAsIterator(this, l.iterator(), l.count());
     } else if (vargs instanceof Iterable) {
       return applyAsIterator(this, (Iterator) vargs);

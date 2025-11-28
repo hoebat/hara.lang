@@ -1,5 +1,7 @@
 package hara.kernel.base;
 
+import hara.data.types.*;
+
 import hara.kernel.protocol.IEnv;
 import hara.kernel.protocol.IRuntime;
 
@@ -108,11 +110,11 @@ public interface Eval {
       }
     } else if (ast instanceof List) {
       return evalList((List) ast, env);
-    } else if (ast instanceof Data.MapType) {
+    } else if (ast instanceof IMapType) {
       Function<Entry, Entry> mf = (e) -> pair(eval(e.getKey(), env), eval(e.getValue(), env));
       return hara.lang.data.Map.Standard.into(It.map(It.iter(ast), mf));
-    } else if (ast instanceof Data.LinearType) {
-      var v = (Data.LinearType) ast;
+    } else if (ast instanceof ILinearType) {
+      var v = (ILinearType) ast;
       var it = It.map(It.iter(ast), obj -> eval(obj, env));
       if (v.count() > 5) {
         return vector(it);

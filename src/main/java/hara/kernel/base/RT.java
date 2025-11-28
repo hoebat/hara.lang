@@ -1,5 +1,7 @@
 package hara.kernel.base;
 
+import hara.data.types.*;
+
 import hara.kernel.protocol.IEnv;
 import hara.kernel.protocol.IRuntime;
 
@@ -346,7 +348,7 @@ public interface RT {
     }
 
     @Override
-    public Data.MapType<String, Class> classCache() {
+    public IMapType<String, Class> classCache() {
       return _loader.getCache();
     }
 

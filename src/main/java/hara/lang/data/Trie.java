@@ -1,6 +1,6 @@
 package hara.lang.data;
 
-import hara.lang.base.Data;
+import hara.data.types.*;
 import hara.lang.base.G;
 import hara.lang.protocol.*;
 import hara.lang.base.It;
@@ -38,7 +38,7 @@ public interface Trie<V>
       current = node;
     }
     return current.isEndOfWord()
-        ? new hara.lang.base.Std.T.Tup2.L<>(null, key, current.getValue())
+        ? new hara.lang.data.Tuple.Tup2.L<>(null, key, current.getValue())
         : null;
   }
 
@@ -180,7 +180,7 @@ public interface Trie<V>
         }
 
         if (node.isEndOfWord()) {
-          nextValue = new hara.lang.base.Std.T.Tup2.L<>(null, prefix, node.getValue());
+          nextValue = new hara.lang.data.Tuple.Tup2.L<>(null, prefix, node.getValue());
           return;
         }
       }
@@ -205,7 +205,7 @@ public interface Trie<V>
     }
   }
 
-  public class Mutable<V> extends Data.RefType.MT implements Trie<V> {
+  public class Mutable<V> extends IRefType.MT implements Trie<V> {
     private Node<V> root;
     private int _size;
 
@@ -292,7 +292,7 @@ public interface Trie<V>
     }
   }
 
-  public class Standard<V> extends Data.RefType.PT implements Trie<V> {
+  public class Standard<V> extends IRefType.PT implements Trie<V> {
     private final Node<V> root;
     private final int _size;
 

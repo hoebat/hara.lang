@@ -1,5 +1,7 @@
 package hara.kernel.base;
 
+import hara.data.types.*;
+
 import hara.kernel.protocol.IEnv;
 import hara.kernel.protocol.IRuntime;
 
@@ -39,7 +41,7 @@ public interface Macro {
                 G.display(method),
                 It.toArray(It.map(It.drop(It.iter(l), 1), (expr) -> rt.eval(expr))));
 
-      } else if (cmd instanceof Vector || cmd instanceof Std.T.Tup1) {
+      } else if (cmd instanceof Vector || cmd instanceof Tuple.Tup1) {
         var idx = rt.eval(((INth) cmd).nth(0));
         if (o.getClass().isArray()) {
           return (R) ((Object[]) o)[(int) idx];
@@ -101,13 +103,13 @@ public interface Macro {
 
     @Module.Fn(name = "fn", complete = true, env = true, vargs = true)
     @Module.Var(control = true)
-    public static <ITR> IFn fnExpr(IEnv env, Data.LinearType bindings, ITR args) {
+    public static <ITR> IFn fnExpr(IEnv env, ILinearType bindings, ITR args) {
       return new Env.FnEval(null, env.getRuntime(), env, bindings, list(args).cons(symbol("do")));
     }
 
     @Module.Fn(name = "let", complete = true, env = true, vargs = true)
     @Module.Var(control = true)
-    public static <ITR> Object letExpr(IEnv env, Data.LinearType bindings, ITR body) {
+    public static <ITR> Object letExpr(IEnv env, ILinearType bindings, ITR body) {
       if (bindings.count() % 2 != 0) {
         throw new Ex.Runtime("let bindings must have an even number of forms");
       }
@@ -294,7 +296,7 @@ public interface Macro {
 
     @Module.Fn(name = "loop", complete = true, env = true, vargs = true)
     @Module.Var(control = true)
-    public static <ITR> Object loopExpr(IEnv env, Data.LinearType bindings, ITR body) {
+    public static <ITR> Object loopExpr(IEnv env, ILinearType bindings, ITR body) {
       if (bindings.count() % 2 != 0) {
         throw new Ex.Runtime("loop bindings must have an even number of forms");
       }

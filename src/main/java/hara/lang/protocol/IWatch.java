@@ -8,8 +8,8 @@ import java.util.function.*;
 
 import hara.lang.base.*;
 import hara.lang.base.Ex;
-import hara.lang.base.Std;
-import hara.lang.base.Data;
+import hara.lang.data.*;
+import hara.data.types.*;
 import hara.lang.base.Arr;
 import hara.lang.base.It;
 import hara.lang.base.Str;
@@ -37,7 +37,7 @@ public interface IWatch<R, V> {
   }
 
   @SuppressWarnings("unchecked")
-  public class WatchEntry<R, V> extends Std.T.Tup5.L<Object, R, Object, V, V> {
+  public class WatchEntry<R, V> extends Tuple.Tup5.L<Object, R, Object, V, V> {
 
     WatchEntry(Object key, IWatch<R, V> ref, V oldVal, V newVal) {
       super(null, key, (R) ref, null, oldVal, newVal);

@@ -1,5 +1,7 @@
 package hara.kernel.base;
 
+import hara.data.types.*;
+
 import hara.kernel.protocol.IEnv;
 import hara.kernel.protocol.IRuntime;
 
@@ -19,7 +21,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 
 import hara.lang.base.*;
-import hara.lang.base.Std.T.*;
+import hara.lang.data.Tuple.*;
 import hara.kernel.base.Module;
 import hara.lang.data.*;
 import hara.lang.data.Map.Standard;
@@ -516,8 +518,8 @@ public interface Builtin {
     }
 
     @Module.Fn(name = "to:seq", complete = true)
-    public static <ITR> Std.T.Seq toSeq(ITR source) {
-      return new Std.T.Seq(It.iter(source));
+    public static <ITR> Seq toSeq(ITR source) {
+      return new Seq(It.iter(source));
     }
 
     @Module.Fn(name = "to:set", complete = true)
@@ -1142,7 +1144,7 @@ public interface Builtin {
     @Module.Fn(name = "sys:cache-remove", rt = true, vargs = true)
     public static <ITR> IColl sysCacheRemove(IRuntime rt, ITR names) {
       return It.reduce(
-          It.iter(names), rt.classCache(), (m, n) -> (Data.MapType) ((Data.MapType) m).dissoc(n));
+          It.iter(names), rt.classCache(), (m, n) -> (IMapType) ((IMapType) m).dissoc(n));
     }
   }
 
@@ -1260,7 +1262,7 @@ public interface Builtin {
 
     @Module.Fn(name = "pair", complete = true)
     public static <K, V> IPair<K, V> pair(K key, V val) {
-      return new Std.T.Tup2.L(null, key, val);
+      return new Tuple.Tup2.L(null, key, val);
     }
 
     @Module.Fn(name = "queue", vargs = true, complete = true)
@@ -1279,12 +1281,12 @@ public interface Builtin {
     }
 
     @Module.Fn(name = "to:facade", complete = true)
-    public static <E> Data.LinearType<E> toFacade(java.util.List<E> l) {
+    public static <E> ILinearType<E> toFacade(java.util.List<E> l) {
       return new Ut.AsList<E>(l);
     }
 
     @Module.Fn(name = "to:facade", complete = true)
-    public static <K, V> Data.MapType<K, V> toFacade(java.util.Map<K, V> m) {
+    public static <K, V> IMapType<K, V> toFacade(java.util.Map<K, V> m) {
       return new Ut.AsMap<K, V>(m);
     }
 
@@ -1318,7 +1320,7 @@ public interface Builtin {
       return new Tup5.L(null, a, b, c, d, e);
     }
 
-    public static Data.LinearType tuple(Object[] xs) {
+    public static ILinearType tuple(Object[] xs) {
       switch (xs.length) {
         case 0:
           return Tup0.EMPTY;

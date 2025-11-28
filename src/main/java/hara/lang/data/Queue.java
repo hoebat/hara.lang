@@ -1,12 +1,14 @@
 package hara.lang.data;
 
+import hara.data.types.*;
+
 import java.util.ArrayList;
 import java.util.Iterator;
 
 import hara.lang.base.*;
 import hara.lang.protocol.*;
 
-public interface Queue<E> extends IColl<E>, Data.LinearType<E>, Data.SequentialLookupType<E> {
+public interface Queue<E> extends IColl<E>, ILinearType<E>, ISequentialLookupType<E> {
 
   public static int MAX_LENGTH = 1024;
 
@@ -100,7 +102,7 @@ public interface Queue<E> extends IColl<E>, Data.LinearType<E>, Data.SequentialL
     }
   }
 
-  public class Mutable<E> extends Data.RefType.MT implements Base<E>, IToPersistent {
+  public class Mutable<E> extends IRefType.MT implements Base<E>, IToPersistent {
     int _size;
     int _offset;
 
@@ -260,7 +262,7 @@ public interface Queue<E> extends IColl<E>, Data.LinearType<E>, Data.SequentialL
     }
   }
 
-  public class Standard<E> extends Data.RefType.PT implements Base<E>, IToMutable {
+  public class Standard<E> extends IRefType.PT implements Base<E>, IToMutable {
     final int _size;
     final int _offset;
 

@@ -1,5 +1,7 @@
 package hara.kernel.base;
 
+import hara.data.types.*;
+
 import hara.kernel.protocol.IEnv;
 import hara.kernel.protocol.IRuntime;
 
@@ -171,12 +173,12 @@ public interface Env {
     }
 
     final AST _body;
-    final Data.LinearType _params;
+    final ILinearType _params;
 
     final IRuntime _rt;
     final IEnv _env;
 
-    public FnEval(IMetadata meta, IRuntime rt, IEnv env, Data.LinearType params, AST body) {
+    public FnEval(IMetadata meta, IRuntime rt, IEnv env, ILinearType params, AST body) {
       super(meta);
       _rt = rt;
       _env = env;
@@ -374,7 +376,7 @@ public interface Env {
                 keyword("rt"), S.fnOpts(all.get(0)).rt(),
                 keyword("env"), S.fnOpts(all.get(0)).env()));
 
-    Function<Method, Data.LinearType> toArgs =
+    Function<Method, ILinearType> toArgs =
         (m) -> {
           Parameter[] params = m.getParameters();
           return Vector.Standard.into(

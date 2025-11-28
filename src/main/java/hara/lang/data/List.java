@@ -1,5 +1,7 @@
 package hara.lang.data;
 
+import hara.data.types.*;
+
 import java.util.*;
 
 import hara.lang.base.*;
@@ -7,7 +9,7 @@ import hara.lang.base.*;
 import static hara.lang.base.P.Bits.log2Ceil;
 import hara.lang.protocol.*;
 
-public interface List<E> extends Data.VectorType<E> {
+public interface List<E> extends IVectorType<E> {
 
   public static int CHUNK_SIZE = 32;
   public static int DEFAULT_CAPACITY = 4;
@@ -39,7 +41,7 @@ public interface List<E> extends Data.VectorType<E> {
     }
   }
 
-  class Standard<E> extends Data.RefType.PT implements Base<E>, IToMutable {
+  class Standard<E> extends IRefType.PT implements Base<E>, IToMutable {
 
     final Chunk<E> _head;
     final int _size;
@@ -184,7 +186,7 @@ public interface List<E> extends Data.VectorType<E> {
     }
   }
 
-  class Mutable<E> extends Data.RefType.MT implements Base<E>, IToPersistent {
+  class Mutable<E> extends IRefType.MT implements Base<E>, IToPersistent {
 
     // Use Ring Buffer logic for efficient Mutable operations
     private Object[] _elements;

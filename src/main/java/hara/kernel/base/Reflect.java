@@ -1,5 +1,7 @@
 package hara.kernel.base;
 
+import hara.lang.data.*;
+
 import java.lang.invoke.*;
 import java.lang.reflect.*;
 import java.util.*;
@@ -49,7 +51,7 @@ public interface Reflect {
   }
 
   public static Collection<Class> interfaces(Class c) {
-    Set<Class> interfaces = new HashSet<Class>();
+    java.util.Set<Class> interfaces = new HashSet<Class>();
     Deque<Class> toWalk = new ArrayDeque<Class>();
     toWalk.addAll(Arrays.asList(c.getInterfaces()));
     Class iface = toWalk.poll();
@@ -87,7 +89,7 @@ public interface Reflect {
 
   public static Object invokeInstanceMethod(Object target, String methodName, Object[] args) {
     Class c = target.getClass();
-    List methods =
+    java.util.List methods =
         getMethods(c, args.length, methodName, false).stream()
             .map(method -> toAccessibleSuperMethod(method, target))
             .filter(method -> (method != null))
@@ -115,7 +117,7 @@ public interface Reflect {
   }
 
   public static Object invokeMatchingMethod(
-      String methodName, List methods, Object target, Object[] args) {
+      String methodName, java.util.List methods, Object target, Object[] args) {
     Method m = null;
     Object[] boxedArgs = null;
     if (methods.isEmpty()) {
@@ -227,7 +229,7 @@ public interface Reflect {
 
   public static Object invokeStaticMethod(Class c, String methodName, Object[] args) {
     if (methodName.equals("new")) return invokeConstructor(c, args);
-    List methods = getMethods(c, args.length, methodName, true);
+    java.util.List methods = getMethods(c, args.length, methodName, true);
     return invokeMatchingMethod(methodName, methods, null, args);
   }
 
@@ -299,7 +301,7 @@ public interface Reflect {
         throw new IllegalArgumentException(
             "No matching field found: " + name + " for " + target.getClass());
     } else {
-      List meths = getMethods(c, 0, name, false);
+      java.util.List meths = getMethods(c, 0, name, false);
       if (meths.size() > 0) return invokeMatchingMethod(name, meths, target, Constant.EMPTY_ARRAY);
       else return getInstanceField(target, name);
     }
@@ -345,7 +347,8 @@ public interface Reflect {
     return null;
   }
 
-  public static List<Method> getMethods(Class c, int arity, String name, boolean getStatics) {
+  public static java.util.List<Method> getMethods(
+      Class c, int arity, String name, boolean getStatics) {
     Method[] allmethods = c.getMethods();
     ArrayList methods = new ArrayList();
     ArrayList bridgeMethods = new ArrayList();

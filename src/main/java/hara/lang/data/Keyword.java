@@ -1,5 +1,7 @@
 package hara.lang.data;
 
+import hara.data.types.*;
+
 import java.lang.ref.WeakReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -9,13 +11,7 @@ import hara.lang.protocol.Constant;
 import hara.lang.protocol.*;
 
 public final class Keyword
-    implements Comparable<Keyword>,
-        Data.StringType,
-        INamespaced,
-        IDisplay,
-        IObjType,
-        IOFn,
-        IMetadata {
+    implements Comparable<Keyword>, IStringType, INamespaced, IDisplay, IObjType, IOFn, IMetadata {
   public static Ut.RefCache<String, Keyword> GLOBAL = new Ut.RefCache<String, Keyword>();
 
   private final String _ns;

@@ -16,6 +16,8 @@
  */
 package hara.lang.string;
 
+import hara.lang.data.*;
+
 import java.io.IOException;
 import java.io.Writer;
 import java.util.Collections;
