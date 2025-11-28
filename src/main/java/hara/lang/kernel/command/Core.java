@@ -61,8 +61,6 @@ public class Core {
             DynamicClassLoader loader = new DynamicClassLoader(Foundation.class.getClassLoader());
             Class<?> clazz = loader.defineClass(null, bytecode);
             return clazz.getConstructor().newInstance();
-        } catch (CompilerException e) {
-            throw new RuntimeException(e);
         } catch (Exception e) {
             throw Ex.Sneaky(e);
         }
