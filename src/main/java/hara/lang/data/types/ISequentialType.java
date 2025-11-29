@@ -1,4 +1,4 @@
-package hara.data.types;
+package hara.lang.data.types;
 
 import hara.lang.base.Eq;
 import hara.lang.protocol.*;

@@ -1,9 +1,13 @@
 package hara.lang.data;
 
-import hara.data.types.IMapType;
-import hara.data.types.IRefType;
-import hara.lang.base.Arr;
-import hara.lang.base.It;
+import hara.lang.data.types.ObjMutable;
+
+import hara.lang.data.types.ObjPersistent;
+
+import hara.lang.data.types.IMapType;
+import hara.lang.data.types.IRefType;
+import hara.lang.base.primitive.Array;
+import hara.lang.base.Iter;
 import hara.lang.protocol.IMetadata;
 import hara.lang.protocol.INth;
 import hara.lang.protocol.IToMutable;
@@ -21,7 +25,7 @@ public interface OrderedMap<K, V> extends IMapType<K, V>, INth<Entry<K, V>> {
 
     @Override
     default Iterator<Entry<K, V>> iterator() {
-      return It.keep(_order().iterator(), x -> x);
+      return Iter.keep(_order().iterator(), x -> x);
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -38,12 +42,12 @@ public interface OrderedMap<K, V> extends IMapType<K, V>, INth<Entry<K, V>> {
 
     @Override
     default Entry<K, V> nth(long i) {
-      return It.nth(iterator(), i);
+      return Iter.nth(iterator(), i);
     }
   }
 
   @SuppressWarnings("unchecked")
-  public class Mutable<K, V> extends IRefType.MT implements Base<K, V>, IToPersistent {
+  public class Mutable<K, V> extends ObjMutable implements Base<K, V>, IToPersistent {
 
     private Vector.Mutable<Entry<K, V>> _order;
     private Map.Mutable<K, Entry<Integer, V>> _lookup;
@@ -63,7 +67,7 @@ public interface OrderedMap<K, V> extends IMapType<K, V>, INth<Entry<K, V>> {
 
     @SuppressWarnings("rawtypes")
     public static <K, V> Mutable<K, V> from(IMetadata meta, Object... elements) {
-      return into(new Mutable<K, V>(null), (Iterator) It.partitionPair(Arr.toIter(elements)));
+      return into(new Mutable<K, V>(null), (Iterator) Iter.partitionPair(Array.toIter(elements)));
     }
 
     public static <K, V> Mutable<K, V> into(Iterator<Entry<K, V>> it) {
@@ -71,7 +75,7 @@ public interface OrderedMap<K, V> extends IMapType<K, V>, INth<Entry<K, V>> {
     }
 
     public static <K, V> Mutable<K, V> into(Mutable<K, V> map, Iterator<Entry<K, V>> it) {
-      It.reduce(it, map, (m, e) -> m.assoc(e.getKey(), e.getValue()));
+      Iter.reduce(it, map, (m, e) -> m.assoc(e.getKey(), e.getValue()));
       return map;
     }
 
@@ -151,7 +155,7 @@ public interface OrderedMap<K, V> extends IMapType<K, V>, INth<Entry<K, V>> {
   }
 
   @SuppressWarnings("unchecked")
-  public class Standard<K, V> extends IRefType.PT implements Base<K, V>, IToMutable {
+  public class Standard<K, V> extends ObjPersistent implements Base<K, V>, IToMutable {
     private final Map.Standard<K, Entry<Integer, V>> _lookup;
     private final Vector.Standard<Entry<K, V>> _order;
 

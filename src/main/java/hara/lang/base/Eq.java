@@ -46,6 +46,6 @@ public interface Eq {
 
   public static boolean eqIterator(
       Iterator<Object> a, Iterator<Object> b, BiPredicate<Object, Object> equals) {
-    return It.equals(a, b, equals);
+    return Iter.equals(a, b, equals);
   }
 }
