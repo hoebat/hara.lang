@@ -1,6 +1,6 @@
 package hara.lang.protocol;
 
-import hara.lang.base.It;
+import hara.lang.base.Iter;
 
 public interface IColl<E>
     extends Iterable<E>, IEquality, IConj<E>, IEmpty, ICount, IHash, IDisplay {
@@ -15,6 +15,6 @@ public interface IColl<E>
 
   @Override
   default String display() {
-    return It.display(iterator(), startString(), endString(), sepString());
+    return Iter.display(iterator(), startString(), endString(), sepString());
   }
 }

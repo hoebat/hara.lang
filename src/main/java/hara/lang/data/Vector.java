@@ -1,11 +1,15 @@
 package hara.lang.data;
 
-import hara.data.types.ILinearView;
-import hara.data.types.IRefType;
-import hara.data.types.IVectorType;
-import hara.lang.base.Arr;
+import hara.lang.data.types.ObjMutable;
+
+import hara.lang.data.types.ObjPersistent;
+
+import hara.lang.data.types.ILinearView;
+import hara.lang.data.types.IRefType;
+import hara.lang.data.types.IVectorType;
+import hara.lang.base.primitive.Array;
 import hara.lang.base.Ex;
-import hara.lang.base.It;
+import hara.lang.base.Iter;
 import hara.lang.protocol.*;
 
 import java.util.Iterator;
@@ -225,7 +229,7 @@ public interface Vector<E> extends IVectorType<E>, IAssoc<Integer, E> {
     }
   }
 
-  public class Mutable<E> extends IRefType.MT implements Base<E>, IToPersistent {
+  public class Mutable<E> extends ObjMutable implements Base<E>, IToPersistent {
 
     private int _size;
     private int _shift;
@@ -248,7 +252,7 @@ public interface Vector<E> extends IVectorType<E>, IAssoc<Integer, E> {
     @SuppressWarnings("unchecked")
     public static <E> Mutable<E> from(IMetadata meta, E... objs) {
       var vec = empty(meta);
-      return Arr.reduce((v, e) -> v.pushLast(e), vec, objs);
+      return Array.reduce((v, e) -> v.pushLast(e), vec, objs);
     }
 
     @SuppressWarnings("unchecked")
@@ -257,7 +261,7 @@ public interface Vector<E> extends IVectorType<E>, IAssoc<Integer, E> {
     }
 
     public static <E> Mutable<E> into(Mutable<E> coll, Iterator<E> it) {
-      return It.reduce(it, coll, (m, e) -> m.pushLast(e));
+      return Iter.reduce(it, coll, (m, e) -> m.pushLast(e));
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
@@ -395,7 +399,7 @@ public interface Vector<E> extends IVectorType<E>, IAssoc<Integer, E> {
     }
   }
 
-  public class Standard<E> extends IRefType.PT implements Base<E>, IToMutable, ILinearView<E> {
+  public class Standard<E> extends ObjPersistent implements Base<E>, IToMutable, ILinearView<E> {
 
     // STATIC
     public static final Standard<Object> EMPTY =
@@ -545,7 +549,7 @@ public interface Vector<E> extends IVectorType<E>, IAssoc<Integer, E> {
     }
   }
 
-  public class SubView<E> extends IRefType.PT
+  public class SubView<E> extends ObjPersistent
       implements Vector<E>, IAssoc<Integer, E>, IObjType, ILinearView<E> {
 
     final Vector<E> _v;

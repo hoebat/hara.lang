@@ -1,10 +1,14 @@
 package hara.lang.data;
 
-import hara.data.types.IRefType;
-import hara.data.types.ISetType;
-import hara.lang.base.Arr;
+import hara.lang.data.types.ObjMutable;
+
+import hara.lang.data.types.ObjPersistent;
+
+import hara.lang.data.types.IRefType;
+import hara.lang.data.types.ISetType;
+import hara.lang.base.primitive.Array;
 import hara.lang.base.Ex;
-import hara.lang.base.It;
+import hara.lang.base.Iter;
 import hara.lang.protocol.IMetadata;
 import hara.lang.protocol.INth;
 import hara.lang.protocol.IToMutable;
@@ -21,7 +25,7 @@ public interface OrderedSet<E> extends ISetType<E>, INth<E> {
 
     @Override
     default Iterator<E> iterator() {
-      return It.keep(_order().iterator(), x -> x);
+      return Iter.keep(_order().iterator(), x -> x);
     }
 
     @Override
@@ -37,11 +41,11 @@ public interface OrderedSet<E> extends ISetType<E>, INth<E> {
 
     @Override
     default E nth(long i) {
-      return It.nth(iterator(), i);
+      return Iter.nth(iterator(), i);
     }
   }
 
-  public class Mutable<E> extends IRefType.MT implements Base<E>, IToPersistent {
+  public class Mutable<E> extends ObjMutable implements Base<E>, IToPersistent {
 
     private Vector.Mutable<E> _order;
 
@@ -68,7 +72,7 @@ public interface OrderedSet<E> extends ISetType<E>, INth<E> {
     @SuppressWarnings("unchecked")
     public static <E> Mutable<E> from(IMetadata meta, E... objs) {
       Mutable<E> mut = new Mutable<E>(meta);
-      return Arr.reduce((arr, e) -> arr.conj(e), mut, objs);
+      return Array.reduce((arr, e) -> arr.conj(e), mut, objs);
     }
 
     public static <E> Mutable<E> into(Iterator<E> it) {
@@ -76,7 +80,7 @@ public interface OrderedSet<E> extends ISetType<E>, INth<E> {
     }
 
     public static <E> Mutable<E> into(Mutable<E> coll, Iterator<E> it) {
-      return It.reduce(it, coll, (m, e) -> m.conj(e));
+      return Iter.reduce(it, coll, (m, e) -> m.conj(e));
     }
 
     @Override
@@ -142,7 +146,7 @@ public interface OrderedSet<E> extends ISetType<E>, INth<E> {
     }
   }
 
-  public class Standard<E> extends IRefType.PT implements Base<E>, IToMutable {
+  public class Standard<E> extends ObjPersistent implements Base<E>, IToMutable {
 
     private final Map.Standard<E, Integer> _lookup;
     private final Vector.Standard<E> _order;

@@ -3,9 +3,9 @@ package hara.kernel;
 import hara.kernel.base.RT;
 import hara.kernel.base.RT.Instance;
 import hara.kernel.protocol.IRuntime;
-import hara.lang.base.Arr;
+import hara.lang.base.primitive.Array;
 import hara.lang.base.Ex;
-import hara.lang.base.It;
+import hara.lang.base.Iter;
 import hara.lang.protocol.IContext;
 import hara.lang.protocol.IDisplay;
 import hara.lang.protocol.INamespaced;
@@ -82,7 +82,7 @@ public class Foundation implements IContext {
                 // Default to HELP if no subcommand
                 java.util.Set<String> keys = new java.util.HashSet<>(subCommands.keySet());
                 keys.add("HELP");
-                return It.toArrayList(Arr.toIter(keys.toArray()));
+                return Iter.toArrayList(Array.toIter(keys.toArray()));
               }
 
               String subName = args.get(0).toString().toUpperCase();
@@ -91,7 +91,7 @@ public class Foundation implements IContext {
               if ("HELP".equals(subName)) {
                 java.util.Set<String> keys = new java.util.HashSet<>(subCommands.keySet());
                 keys.add("HELP");
-                return It.toArrayList(Arr.toIter(keys.toArray()));
+                return Iter.toArrayList(Array.toIter(keys.toArray()));
               }
 
               Method m = subCommands.get(subName);
@@ -185,9 +185,9 @@ public class Foundation implements IContext {
 
     public static java.util.List runDIR(Foundation F) {
       return Arrays.asList(
-          "SERVERS", It.toArrayList(F.SERVERS.keys()),
-          "RTS", It.toArrayList(F.RTS.keys()),
-          "PEERS", It.toArrayList(F.PEERS.keys()));
+          "SERVERS", Iter.toArrayList(F.SERVERS.keys()),
+          "RTS", Iter.toArrayList(F.RTS.keys()),
+          "PEERS", Iter.toArrayList(F.PEERS.keys()));
     }
 
     public static Object runInfo(Foundation F) {
@@ -211,7 +211,7 @@ public class Foundation implements IContext {
 
     @SuppressWarnings("unchecked")
     public static java.util.List runHELP(Foundation F, Object enums) {
-      return It.toArrayList(It.map(Arr.toIter(enums), (x) -> x.toString()));
+      return Iter.toArrayList(Iter.map(Array.toIter(enums), (x) -> x.toString()));
     }
 
     public static Object runSessionFor(Foundation F, String key, Function<RT.Instance, Object> f) {
@@ -291,7 +291,7 @@ public class Foundation implements IContext {
   @SuppressWarnings("unchecked")
   @Override
   public Object call(Object... args) {
-    java.util.List<Object> inputs = It.toArrayList(It.iter(args));
+    java.util.List<Object> inputs = Iter.toArrayList(Iter.iter(args));
     return runCommand(this, inputs);
   }
 }

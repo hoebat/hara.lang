@@ -1,13 +1,13 @@
 package hara.kernel.base;
 
-import hara.data.types.ILinearType;
-import hara.data.types.IMapType;
+import hara.lang.data.types.ILinearType;
+import hara.lang.data.types.IMapType;
 import hara.kernel.protocol.IEnv;
 import hara.kernel.protocol.IRuntime;
 import hara.lang.base.Ex;
 import hara.lang.base.Fn;
 import hara.lang.base.G;
-import hara.lang.base.It;
+import hara.lang.base.Iter;
 import hara.lang.data.Keyword;
 import hara.lang.data.List;
 import hara.lang.data.Symbol;
@@ -80,12 +80,12 @@ public interface Eval {
 
     @Override
     public Iterator keys() {
-      return It.concat(bindings.keySet().iterator(), parent.keys());
+      return Iter.concat(bindings.keySet().iterator(), parent.keys());
     }
 
     @Override
     public Iterator vals() {
-      return It.concat(bindings.values().iterator(), parent.vals());
+      return Iter.concat(bindings.values().iterator(), parent.vals());
     }
   }
 
@@ -116,14 +116,14 @@ public interface Eval {
       return evalList((List) ast, env);
     } else if (ast instanceof IMapType) {
       Function<Entry, Entry> mf = (e) -> pair(eval(e.getKey(), env), eval(e.getValue(), env));
-      return hara.lang.data.Map.Standard.into(It.map(It.iter(ast), mf));
+      return hara.lang.data.Map.Standard.into(Iter.map(Iter.iter(ast), mf));
     } else if (ast instanceof ILinearType) {
       var v = (ILinearType) ast;
-      var it = It.map(It.iter(ast), obj -> eval(obj, env));
+      var it = Iter.map(Iter.iter(ast), obj -> eval(obj, env));
       if (v.count() > 5) {
         return vector(it);
       } else {
-        var arr = It.toArray(it);
+        var arr = Iter.toArray(it);
         return tuple(arr);
       }
     } else {
@@ -145,28 +145,28 @@ public interface Eval {
         var v = (Var) e.getValue();
         if (v.isMacro()) {
           f = v.deref();
-          var args = It.iter(ast.popFirst());
+          var args = Iter.iter(ast.popFirst());
           var m = ((IObjType) f).meta();
 
           if (m != null) {
             if ((Boolean) ((ILookup) m).lookup(Keyword.create("env"), false)) {
-              args = It.concat(It.objects(env), args);
+              args = Iter.concat(Iter.objects(env), args);
             } else if ((Boolean) ((ILookup) m).lookup(Keyword.create("rt"), false)) {
-              args = It.concat(It.objects(env.getRuntime()), args);
+              args = Iter.concat(Iter.objects(env.getRuntime()), args);
             }
           }
           var ret = apply(f, args);
           return eval(ret, env);
         } else if (v.isControl()) {
           f = v.deref();
-          var args = It.iter(ast.popFirst());
+          var args = Iter.iter(ast.popFirst());
           var m = ((IObjType) f).meta();
 
           if (m != null) {
             if ((Boolean) ((ILookup) m).lookup(Keyword.create("env"), false)) {
-              args = It.concat(It.objects(env), args);
+              args = Iter.concat(Iter.objects(env), args);
             } else if ((Boolean) ((ILookup) m).lookup(Keyword.create("rt"), false)) {
-              args = It.concat(It.objects(env.getRuntime()), args);
+              args = Iter.concat(Iter.objects(env.getRuntime()), args);
             }
           }
           return apply(f, args);
@@ -176,8 +176,8 @@ public interface Eval {
       }
     }
 
-    Iterator it = It.map(It.iter(ast), obj -> eval(obj, env));
-    return apply(it.next(), It.toArray(it));
+    Iterator it = Iter.map(Iter.iter(ast), obj -> eval(obj, env));
+    return apply(it.next(), Iter.toArray(it));
   }
 
   /*

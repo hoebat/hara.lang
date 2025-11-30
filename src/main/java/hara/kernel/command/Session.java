@@ -3,7 +3,7 @@ package hara.kernel.command;
 import hara.kernel.Command;
 import hara.kernel.Foundation;
 import hara.lang.base.Ex;
-import hara.lang.base.It;
+import hara.lang.base.Iter;
 
 import java.util.List;
 
@@ -37,7 +37,7 @@ public class Session {
 
   @Command.Sub(name = "LIST")
   public static Object list(Foundation F, List<Object> args) {
-    return It.toArrayList(F.RTS.keys());
+    return Iter.toArrayList(F.RTS.keys());
   }
 
   @Command.Sub(name = "KILL")

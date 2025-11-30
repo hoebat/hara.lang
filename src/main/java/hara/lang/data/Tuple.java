@@ -1,9 +1,13 @@
 package hara.lang.data;
 
-import hara.data.types.ILinearType;
-import hara.data.types.ISequentialType;
+import hara.lang.data.types.ObjEmpty;
+
+import hara.lang.data.types.ObjPersistent;
+
+import hara.lang.data.types.ILinearType;
+import hara.lang.data.types.ISequentialType;
 import hara.lang.base.Ex;
-import hara.lang.base.It;
+import hara.lang.base.Iter;
 import hara.lang.base.Obj;
 import hara.lang.protocol.IMetadata;
 import hara.lang.protocol.IObjType;
@@ -14,7 +18,7 @@ import java.util.Iterator;
 public interface Tuple {
 
   @SuppressWarnings({"unchecked", "rawtypes"})
-  public class Tup0 extends Obj.EMPTY implements ISequentialType, ILinearType {
+  public class Tup0 extends ObjEmpty implements ISequentialType, ILinearType {
 
     public static final Tup0 EMPTY = new Tup0(null);
 
@@ -73,7 +77,7 @@ public interface Tuple {
 
     A A();
 
-    public class L<A> extends Obj.PT implements Tup1<A> {
+    public class L<A> extends ObjPersistent implements Tup1<A> {
 
       final A _a;
 
@@ -89,7 +93,7 @@ public interface Tuple {
 
       @Override
       public Iterator iterator() {
-        return It.objects(_a);
+        return Iter.objects(_a);
       }
 
       @Override
@@ -149,7 +153,7 @@ public interface Tuple {
 
     B B();
 
-    public class L<A, B> extends Obj.PT implements Tup2<A, B>, IPair<A, B> {
+    public class L<A, B> extends ObjPersistent implements Tup2<A, B>, IPair<A, B> {
       A _a;
       B _b;
 
@@ -181,7 +185,7 @@ public interface Tuple {
 
       @Override
       public Iterator iterator() {
-        return It.objects(_a, _b);
+        return Iter.objects(_a, _b);
       }
 
       @Override
@@ -243,7 +247,7 @@ public interface Tuple {
 
     public X C();
 
-    public class L<A, B, C> extends Obj.PT implements Tup3<A, B, C> {
+    public class L<A, B, C> extends ObjPersistent implements Tup3<A, B, C> {
       A _a;
       B _b;
       C _c;
@@ -272,7 +276,7 @@ public interface Tuple {
 
       @Override
       public Iterator iterator() {
-        return It.objects(_a, _b, _c);
+        return Iter.objects(_a, _b, _c);
       }
 
       @Override
@@ -336,7 +340,7 @@ public interface Tuple {
 
     public D D();
 
-    public class L<A, B, C, D> extends Obj.PT implements Tup4<A, B, C, D> {
+    public class L<A, B, C, D> extends ObjPersistent implements Tup4<A, B, C, D> {
       A _a;
       B _b;
       C _c;
@@ -372,7 +376,7 @@ public interface Tuple {
 
       @Override
       public Iterator iterator() {
-        return It.objects(_a, _b, _c, _d);
+        return Iter.objects(_a, _b, _c, _d);
       }
 
       @Override
@@ -438,7 +442,7 @@ public interface Tuple {
 
     public E E();
 
-    public class L<A, B, X, Y, Z> extends Obj.PT implements Tup5<A, B, X, Y, Z> {
+    public class L<A, B, X, Y, Z> extends ObjPersistent implements Tup5<A, B, X, Y, Z> {
       A _a;
       B _b;
       X _c;
@@ -481,7 +485,7 @@ public interface Tuple {
 
       @Override
       public Iterator iterator() {
-        return It.objects(_a, _b, _c, _d, _e);
+        return Iter.objects(_a, _b, _c, _d, _e);
       }
 
       @Override
@@ -550,7 +554,7 @@ public interface Tuple {
 
     public F F();
 
-    public class L<A, B, C, D, E, F> extends Obj.PT implements Tup6<A, B, C, D, E, F> {
+    public class L<A, B, C, D, E, F> extends ObjPersistent implements Tup6<A, B, C, D, E, F> {
       A _a;
       B _b;
       C _c;
@@ -600,7 +604,7 @@ public interface Tuple {
 
       @Override
       public Iterator iterator() {
-        return It.objects(_a, _b, _c, _d, _e, _f);
+        return Iter.objects(_a, _b, _c, _d, _e, _f);
       }
 
       @Override
@@ -671,7 +675,7 @@ public interface Tuple {
 
     public G G();
 
-    public class L<A, B, C, D, E, F, G> extends Obj.PT implements Tup7<A, B, C, D, E, F, G> {
+    public class L<A, B, C, D, E, F, G> extends ObjPersistent implements Tup7<A, B, C, D, E, F, G> {
       A _a;
       B _b;
       C _c;
@@ -728,7 +732,7 @@ public interface Tuple {
 
       @Override
       public Iterator iterator() {
-        return It.objects(_a, _b, _c, _d, _e, _f, _g);
+        return Iter.objects(_a, _b, _c, _d, _e, _f, _g);
       }
 
       @Override
@@ -803,7 +807,8 @@ public interface Tuple {
 
     public H H();
 
-    public class L<A, B, C, D, E, F, G, H> extends Obj.PT implements Tup8<A, B, C, D, E, F, G, H> {
+    public class L<A, B, C, D, E, F, G, H> extends ObjPersistent
+        implements Tup8<A, B, C, D, E, F, G, H> {
       A _a;
       B _b;
       C _c;
@@ -867,7 +872,7 @@ public interface Tuple {
 
       @Override
       public Iterator iterator() {
-        return It.objects(_a, _b, _c, _d, _e, _f, _g, _h);
+        return Iter.objects(_a, _b, _c, _d, _e, _f, _g, _h);
       }
 
       @Override

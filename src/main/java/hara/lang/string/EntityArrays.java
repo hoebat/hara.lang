@@ -297,7 +297,7 @@ public class EntityArrays {
     initialMap.put("\u2283", "&sup;"); // superset of, U+2283 ISOtech -->
     // <!-- note that nsup, 'not a superset of, U+2283' is not covered by the
     // Symbol font encoding and is not included. Should it be, for symmetry?
-    // It is in ISOamsn -->,
+    // Iter is in ISOamsn -->,
     initialMap.put("\u2284", "&nsub;"); // not a subset of, U+2284 ISOamsn -->
     initialMap.put("\u2286", "&sube;"); // subset of or equal to, U+2286 ISOtech -->
     initialMap.put("\u2287", "&supe;"); // superset of or equal to,U+2287 ISOtech -->

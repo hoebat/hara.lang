@@ -1,9 +1,13 @@
 package hara.lang.data;
 
-import hara.data.types.IMapType;
-import hara.data.types.IRefType;
-import hara.lang.base.Arr;
-import hara.lang.base.It;
+import hara.lang.data.types.ObjMutable;
+
+import hara.lang.data.types.ObjPersistent;
+
+import hara.lang.data.types.IMapType;
+import hara.lang.data.types.IRefType;
+import hara.lang.base.primitive.Array;
+import hara.lang.base.Iter;
 import hara.lang.protocol.*;
 
 import java.util.Comparator;
@@ -440,7 +444,7 @@ public interface SortedMap<K, V> extends IMapType<K, V>, INth<Map.Entry<K, V>>, 
     public static <K, V> Iterator<Map.Entry<K, V>> iterator(Node<K, V> root) {
 
       if (root.size == 0) {
-        return (Iterator<Entry<K, V>>) It.emptyIterator();
+        return (Iterator<Entry<K, V>>) Iter.emptyIterator();
       }
 
       return new Iterator<Map.Entry<K, V>>() {
@@ -552,7 +556,7 @@ public interface SortedMap<K, V> extends IMapType<K, V>, INth<Map.Entry<K, V>>, 
   }
 
   @SuppressWarnings("unchecked")
-  public final class Mutable<K, V> extends IRefType.MT implements Base<K, V>, IToPersistent {
+  public final class Mutable<K, V> extends ObjMutable implements Base<K, V>, IToPersistent {
 
     private final Comparator<K> _comparator;
     public Node<K, V> _root;
@@ -569,7 +573,7 @@ public interface SortedMap<K, V> extends IMapType<K, V>, INth<Map.Entry<K, V>>, 
 
     @SuppressWarnings("rawtypes")
     public static <K, V> Mutable<K, V> from(IMetadata meta, Object... elements) {
-      return into(new Mutable<K, V>(null), (Iterator) It.partitionPair(Arr.toIter(elements)));
+      return into(new Mutable<K, V>(null), (Iterator) Iter.partitionPair(Array.toIter(elements)));
     }
 
     public static <K, V> Mutable<K, V> into(Iterator<Entry<K, V>> it) {
@@ -577,7 +581,7 @@ public interface SortedMap<K, V> extends IMapType<K, V>, INth<Map.Entry<K, V>>, 
     }
 
     public static <K, V> Mutable<K, V> into(Mutable<K, V> map, Iterator<Entry<K, V>> it) {
-      return It.reduce(it, map, (m, e) -> m.assoc(e.getKey(), e.getValue()));
+      return Iter.reduce(it, map, (m, e) -> m.assoc(e.getKey(), e.getValue()));
     }
 
     public Mutable<K, V> assocWith(K key, V value, BinaryOperator<V> merge) {
@@ -627,7 +631,7 @@ public interface SortedMap<K, V> extends IMapType<K, V>, INth<Map.Entry<K, V>>, 
   }
 
   @SuppressWarnings("unchecked")
-  public final class Standard<K, V> extends IRefType.PT
+  public final class Standard<K, V> extends ObjPersistent
       implements Base<K, V>, SortedMap<K, V>, IToMutable {
 
     // STATIC

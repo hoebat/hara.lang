@@ -1,11 +1,13 @@
 package hara.lang.data;
 
-import hara.data.types.INamespacedType;
-import hara.data.types.IStringType;
+import hara.lang.data.types.ObjPersistent;
+
+import hara.lang.data.types.INamespacedType;
+import hara.lang.data.types.IStringType;
 import hara.lang.protocol.Constant;
 import hara.lang.protocol.IMetadata;
 
-public class Pointer extends INamespacedType.PT implements IStringType {
+public class Pointer extends INamespacedType.ObjPersistent implements IStringType {
 
   public Pointer(IMetadata meta, String ns, String name) {
     super(meta, ns, name);

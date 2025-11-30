@@ -1,11 +1,15 @@
 package hara.kernel.base;
 
-import hara.data.types.IMapType;
+import hara.lang.data.AsSet;
+
+import hara.lang.data.AsMap;
+
+import hara.lang.data.types.IMapType;
 import hara.kernel.protocol.IEnv;
 import hara.kernel.protocol.IRuntime;
-import hara.lang.base.Arr;
+import hara.lang.base.primitive.Array;
 import hara.lang.base.Ex;
-import hara.lang.base.It;
+import hara.lang.base.Iter;
 import hara.lang.base.Ut;
 import hara.lang.data.Keyword;
 import hara.lang.data.List;
@@ -64,9 +68,9 @@ public interface RT {
     static final URL[] EMPTY_URLS = new URL[] {};
 
     final HashSet<URL> _urls = new HashSet();
-    final Ut.AsSet<URL> _urls_facade = new Ut.AsSet<>(_urls);
+    final AsSet<URL> _urls_facade = new AsSet<>(_urls);
     final ConcurrentHashMap<String, Class> _cache = new ConcurrentHashMap();
-    final Ut.AsMap<String, Class> _cache_facade = new Ut.AsMap(_cache);
+    final AsMap<String, Class> _cache_facade = new AsMap(_cache);
     final ClassLoader _parent;
 
     public Loader() {
@@ -119,11 +123,11 @@ public interface RT {
       return _urls.toArray(EMPTY_URLS);
     }
 
-    public Ut.AsMap<String, Class> getCache() {
+    public AsMap<String, Class> getCache() {
       return _cache_facade;
     }
 
-    public Ut.AsSet<URL> getPaths() {
+    public AsSet<URL> getPaths() {
       return _urls_facade;
     }
   }
@@ -152,7 +156,7 @@ public interface RT {
               (obj) -> {
                 var v = (Var) obj;
                 if ((Boolean) Keyword.create("rt").invoke(v.meta())) {
-                  v.reset(partial(v.deref(), Arr.objects(rt)));
+                  v.reset(partial(v.deref(), Array.objects(rt)));
                 }
                 return v;
               },
@@ -171,12 +175,12 @@ public interface RT {
 
     @Override
     public Iterator<Symbol> keys() {
-      return It.map(_methods.iterator(), e -> e.getKey());
+      return Iter.map(_methods.iterator(), e -> e.getKey());
     }
 
     @Override
     public Iterator<Var> vals() {
-      return It.map(_methods.iterator(), e -> e.getValue());
+      return Iter.map(_methods.iterator(), e -> e.getValue());
     }
   }
 
@@ -185,7 +189,7 @@ public interface RT {
 
     final IRuntime _rt;
     final ConcurrentHashMap<String, Class> _alias = new ConcurrentHashMap();
-    public final Ut.AsMap<String, Class> _alias_facade = new Ut.AsMap<>(_alias);
+    public final AsMap<String, Class> _alias_facade = new AsMap<>(_alias);
 
     public ClassEnv(IRuntime rt) {
       _rt = rt;
@@ -266,7 +270,7 @@ public interface RT {
     public UserEnv(IEnv<Symbol, Var> parent, IRuntime rt) {
       _parent = parent;
       _methods = new ConcurrentHashMap<Symbol, Var>();
-      _facade = new Ut.AsMap<Symbol, Var>(_methods);
+      _facade = new AsMap<Symbol, Var>(_methods);
       _class = new ClassEnv(rt);
     }
 
@@ -287,12 +291,13 @@ public interface RT {
 
     @Override
     public Iterator<Symbol> keys() {
-      return It.concat(It.map(_methods.entrySet().iterator(), e -> e.getKey()), _parent.keys());
+      return Iter.concat(Iter.map(_methods.entrySet().iterator(), e -> e.getKey()), _parent.keys());
     }
 
     @Override
     public Iterator<Var> vals() {
-      return It.concat(It.map(_methods.entrySet().iterator(), e -> e.getValue()), _parent.vals());
+      return Iter.concat(
+          Iter.map(_methods.entrySet().iterator(), e -> e.getValue()), _parent.vals());
     }
 
     @Override
@@ -333,7 +338,7 @@ public interface RT {
           new ThreadLocal() {
             @Override
             protected List<IEnv<Symbol, Var>> initialValue() {
-              return list(Arr.objects(_userEnv));
+              return list(Array.objects(_userEnv));
             }
           };
     }
@@ -421,7 +426,7 @@ public interface RT {
 
     @Override
     public IColl<URL> pathAdd(String[] paths) {
-      Arr.toIter(paths)
+      Array.toIter(paths)
           .forEachRemaining(
               (path) -> {
                 try {
@@ -435,7 +440,7 @@ public interface RT {
 
     @Override
     public IColl<URL> pathRemove(String[] paths) {
-      Arr.toIter(paths)
+      Array.toIter(paths)
           .forEachRemaining(
               (path) -> {
                 try {
@@ -458,7 +463,7 @@ public interface RT {
     }
 
     @Override
-    public Ut.AsMap<String, Class> aliasCache() {
+    public AsMap<String, Class> aliasCache() {
       return _userEnv._class._alias_facade;
     }
 

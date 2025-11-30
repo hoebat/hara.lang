@@ -1,5 +1,7 @@
 package hara.lang.base;
 
+import hara.lang.base.primitive.Num;
+
 import hara.lang.protocol.IEquality;
 
 import java.util.Iterator;
@@ -46,6 +48,6 @@ public interface Eq {
 
   public static boolean eqIterator(
       Iterator<Object> a, Iterator<Object> b, BiPredicate<Object, Object> equals) {
-    return It.equals(a, b, equals);
+    return Iter.equals(a, b, equals);
   }
 }
