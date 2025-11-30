@@ -46,13 +46,6 @@ public class Session {
       throw new Ex.Runtime("No Session: " + key);
     }
 
-    // Original logic passed full sArgs to runSessionClasspath, which did:
-    // CLASSPATH cmd = (args.size() == 1) ? CLASSPATH.LIST : CLASSPATH.valueOf(args.get(1));
-    // args.remove(0); args.remove(0); and then switch on cmd.
-
-    // Here sArgs is [session_name, subcmd, ...]
-    // So if size == 1, it's just PATH session_name -> LIST
-
     CLASSPATH cmd = (sArgs.size() == 1) ? CLASSPATH.LIST : CLASSPATH.valueOf(sArgs.get(1));
     if (cmd == CLASSPATH.LIST) {
       return rt.pathCache();
@@ -87,12 +80,7 @@ public class Session {
     if (rt == null) {
       throw new Ex.Runtime("No Session: " + key);
     }
-    F.RTS.remove(key);
-    return true; // or whatever runSessionFor returned for logic?
-    // runSessionFor called f(rt). The logic was F.RTS.remove(sArgs.get(0)).
-    // F.RTS.remove returns the value.
-    // Wait, the lambda was (rt) -> F.RTS.remove(sArgs.get(0)).
-    // F.RTS.remove returns the removed object or null.
+    return F.RTS.remove(key);
   }
 
   @Command.Sub(name = "INFO")

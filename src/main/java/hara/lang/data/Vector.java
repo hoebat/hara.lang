@@ -166,6 +166,13 @@ public interface Vector<E> extends IVectorType<E>, IAssoc<Integer, E> {
 
     public E[] _tail();
 
+    // NOTE: This default method is ignored by classes extending ObjPersistent/ObjMutable
+    // so we must override display() in Standard and Mutable explicitly.
+    @Override
+    default String display() {
+      return Iter.display(iterator(), "[", "]", " ");
+    }
+
     @Override
     default Base<E> conj(E e) {
       return (Base<E>) pushLast(e);
@@ -271,6 +278,11 @@ public interface Vector<E> extends IVectorType<E>, IAssoc<Integer, E> {
       if (_root.edit.get() == null) {
         throw new IllegalStateException("Mutable used after immutable! call");
       }
+    }
+
+    @Override
+    public String display() {
+      return Base.super.display();
     }
 
     @Override
@@ -440,6 +452,11 @@ public interface Vector<E> extends IVectorType<E>, IAssoc<Integer, E> {
     }
 
     @Override
+    public String display() {
+      return Base.super.display();
+    }
+
+    @Override
     public int _size() {
       return _size;
     }
@@ -563,6 +580,24 @@ public interface Vector<E> extends IVectorType<E>, IAssoc<Integer, E> {
     @Override
     public Vector<E> empty() {
       return Standard.empty(_meta);
+    }
+
+    @Override
+    public String display() {
+      // SubView also needs to override display, or delegate to Base/Standard?
+      // SubView doesn't extend Standard, it extends ObjPersistent.
+      // And implements Vector<E>.
+      // So I should override it here too.
+      // But SubView does NOT implement Vector.Base. It implements Vector<E>.
+      // So Base.super.display() is not available if it doesn't extend Base.
+      // Wait, let's check class definition above.
+
+      // public class SubView<E> extends ObjPersistent implements Vector<E>, IAssoc<Integer, E>,
+      // IObjType, ILinearView<E>
+
+      // Vector<E> does not have display(). Base<E> has it.
+      // So SubView needs its own implementation or use Iter.display.
+      return Iter.display(iterator(), "[", "]", " ");
     }
 
     @Override
