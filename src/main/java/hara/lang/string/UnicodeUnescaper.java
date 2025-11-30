@@ -20,8 +20,8 @@ import java.io.IOException;
 import java.io.Writer;
 
 /**
- * Translates escaped Unicode values of the form \\u+\d\d\d\d back to Unicode. It supports multiple
- * 'u' characters and will work with or without the +.
+ * Translates escaped Unicode values of the form \\u+\d\d\d\d back to Unicode. Iter supports
+ * multiple 'u' characters and will work with or without the +.
  *
  * @since 1.0
  */

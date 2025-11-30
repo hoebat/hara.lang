@@ -1,12 +1,14 @@
 package hara.lang.base.fn;
 
+import hara.lang.data.types.ObjFn;
+
 import hara.lang.base.Obj;
 import hara.lang.protocol.IFn;
 import hara.lang.protocol.IMetadata;
 import java.util.function.Function;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class Fn1<R, T1> extends Obj.FN implements IFn<R, T1, Object> {
+public class Fn1<R, T1> extends ObjFn implements IFn<R, T1, Object> {
 
   final Function<T1, R> _f1;
 

@@ -1,6 +1,8 @@
 package hara.kernel.base;
 
-import hara.data.types.ILinearType;
+import hara.lang.base.primitive.Array;
+
+import hara.lang.data.types.ILinearType;
 import hara.kernel.protocol.IEnv;
 import hara.kernel.protocol.IRuntime;
 import hara.lang.base.*;
@@ -43,7 +45,7 @@ public interface Macro {
             Reflect.invokeInstanceMethod(
                 o,
                 G.display(method),
-                It.toArray(It.map(It.drop(It.iter(l), 1), (expr) -> rt.eval(expr))));
+                Iter.toArray(Iter.map(Iter.drop(Iter.iter(l), 1), (expr) -> rt.eval(expr))));
 
       } else if (cmd instanceof Vector || cmd instanceof Tuple.Tup1) {
         var idx = rt.eval(((INth) cmd).nth(0));
@@ -65,8 +67,8 @@ public interface Macro {
     public static <R, AST, ITR> R dotExpr(IEnv env, AST expr, AST cmd, ITR more) {
       Object o = Eval.eval(expr, env);
       return (R)
-          It.reduce(
-              It.iter(more),
+          Iter.reduce(
+              Iter.iter(more),
               dotExpr(env.getRuntime(), o, cmd),
               (acc, c) -> dotExpr(env.getRuntime(), acc, c));
     }
@@ -77,7 +79,7 @@ public interface Macro {
       Class cls = (Class) Eval.eval(clsym, env);
 
       // Evaluate args
-      Object[] evalArgs = It.toArray(It.map(It.iter(args), arg -> Eval.eval(arg, env)));
+      Object[] evalArgs = Iter.toArray(Iter.map(Iter.iter(args), arg -> Eval.eval(arg, env)));
       return (R) Reflect.invokeConstructor(cls, evalArgs);
     }
   }
@@ -102,7 +104,7 @@ public interface Macro {
     @Module.Fn(name = "do", complete = true, env = true, vargs = true)
     @Module.Var(control = true)
     public static <ITR> Object doExpr(IEnv env, ITR exprs) {
-      return It.reduce(It.iter(exprs), null, (out, expr) -> Eval.eval(expr, env));
+      return Iter.reduce(Iter.iter(exprs), null, (out, expr) -> Eval.eval(expr, env));
     }
 
     @Module.Fn(name = "fn", complete = true, env = true, vargs = true)
@@ -130,7 +132,7 @@ public interface Macro {
       }
 
       Object result = null;
-      Iterator it = It.iter(body);
+      Iterator it = Iter.iter(body);
       while (it.hasNext()) {
         result = Eval.eval(it.next(), localEnv);
       }
@@ -156,8 +158,8 @@ public interface Macro {
     @Module.Fn(name = "cond", complete = true, env = true, vargs = true)
     @Module.Var(control = true)
     public static <ITR> Object conjExpr(IEnv env, ITR pairs) {
-      Iterator<IPair> branches = It.partitionPair(It.iter(pairs));
-      IPair p = It.some(branches, (e) -> isTruthy(Eval.eval(e.getKey(), env)));
+      Iterator<IPair> branches = Iter.partitionPair(Iter.iter(pairs));
+      IPair p = Iter.some(branches, (e) -> isTruthy(Eval.eval(e.getKey(), env)));
       return (p != null) ? Eval.eval(p.getValue(), env) : null;
     }
 
@@ -165,19 +167,19 @@ public interface Macro {
     @Module.Var(macro = true)
     public static <R, ITR> R threadFirst(Object any, ITR args) {
       return (R)
-          It.reduce(
-              It.iter(args),
+          Iter.reduce(
+              Iter.iter(args),
               any,
               (acc, e) -> {
                 if (!(e instanceof List.Standard)) {
-                  return list(Arr.objects(e, acc));
+                  return list(Array.objects(e, acc));
                 } else {
                   var l = (List.Standard) e;
                   var changed = atomVolatile(false);
                   var ret =
                       list(
-                          It.map(
-                              It.iter(l),
+                          Iter.map(
+                              Iter.iter(l),
                               (i) -> {
                                 if (Eq.eq(i, Symbol.create("%"))) {
                                   changed.reset(true);
@@ -198,12 +200,12 @@ public interface Macro {
     @Module.Var(macro = true)
     public static <R, ITR> R threadLast(Object any, ITR args) {
       return (R)
-          It.reduce(
-              It.iter(args),
+          Iter.reduce(
+              Iter.iter(args),
               any,
               (acc, e) -> {
                 if (!(e instanceof List.Standard)) {
-                  return list(Arr.objects(e, acc));
+                  return list(Array.objects(e, acc));
                 } else {
                   var l = (List.Standard) e;
                   return l.conj(acc);
@@ -214,7 +216,7 @@ public interface Macro {
     @Module.Fn(name = "try", complete = true, env = true, vargs = true)
     @Module.Var(control = true)
     public static <ITR> Object tryExpr(IEnv env, ITR body) {
-      Iterator it = It.iter(body);
+      Iterator it = Iter.iter(body);
       Object res = null;
       List.Standard catches = List.Standard.EMPTY;
       List.Standard finallies = List.Standard.EMPTY;
@@ -256,7 +258,7 @@ public interface Macro {
             Eval.LocalEnv localEnv = new Eval.LocalEnv(env);
             localEnv.addBinding(bindSym, cause);
 
-            Iterator bit = It.drop(clause.iterator(), 3);
+            Iterator bit = Iter.drop(clause.iterator(), 3);
             while (bit.hasNext()) {
               res = Eval.eval(bit.next(), localEnv);
             }
@@ -271,7 +273,7 @@ public interface Macro {
         Iterator fit = finallies.iterator();
         while (fit.hasNext()) {
           List clause = (List) fit.next();
-          Iterator bit = It.drop(clause.iterator(), 1);
+          Iterator bit = Iter.drop(clause.iterator(), 1);
           while (bit.hasNext()) {
             Eval.eval(bit.next(), env);
           }
@@ -294,7 +296,7 @@ public interface Macro {
     @Module.Fn(name = "recur", complete = true, env = true, vargs = true)
     @Module.Var(control = true)
     public static <ITR> Object recurExpr(IEnv env, ITR args) {
-      Object[] newVals = It.toArray(It.map(It.iter(args), arg -> Eval.eval(arg, env)));
+      Object[] newVals = Iter.toArray(Iter.map(Iter.iter(args), arg -> Eval.eval(arg, env)));
       return new Recur(newVals);
     }
 
@@ -321,7 +323,7 @@ public interface Macro {
 
       Object result = null;
       List bodyList =
-          List.Standard.into(It.iter(body)); // materialize body to iterate multiple times
+          List.Standard.into(Iter.iter(body)); // materialize body to iterate multiple times
 
       while (true) {
         Iterator it = bodyList.iterator();

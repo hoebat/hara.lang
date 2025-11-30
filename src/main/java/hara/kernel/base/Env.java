@@ -1,6 +1,10 @@
 package hara.kernel.base;
 
-import hara.data.types.ILinearType;
+import hara.lang.base.primitive.Array;
+
+import hara.lang.data.types.ObjFn;
+
+import hara.lang.data.types.ILinearType;
 import hara.kernel.protocol.IEnv;
 import hara.kernel.protocol.IRuntime;
 import hara.lang.base.*;
@@ -48,12 +52,13 @@ public interface Env {
     }
 
     public static <R, ITR> R invokeMatch(List<Method> ms, ITR args, int len) {
-      var arr = Arr.toArray(args);
+      var arr = Array.toArray(args);
       var l =
-          It.reduce(
-              It.range(len),
+          Iter.reduce(
+              Iter.range(len),
               ms.iterator(),
-              (it, i) -> It.filter(it, (m) -> assignable(m, i.intValue()).test(arr[i.intValue()])));
+              (it, i) ->
+                  Iter.filter(it, (m) -> assignable(m, i.intValue()).test(arr[i.intValue()])));
 
       if (!l.hasNext()) {
         throw new Ex.Unsupported(
@@ -65,7 +70,7 @@ public interface Env {
 
     public static <R, ITR> R invokeMatch(List<Method> ms, Object arg) {
 
-      var it = It.filter(ms.iterator(), (m) -> assignable(m, 0).test(arg));
+      var it = Iter.filter(ms.iterator(), (m) -> assignable(m, 0).test(arg));
       if (!it.hasNext()) {
         throw new Ex.Unsupported(ms.peekFirst().getName() + " cannot be applied to " + arg);
       }
@@ -128,7 +133,7 @@ public interface Env {
     }
 
     public static Object getAnnotation(Annotation[] ann, Class c) {
-      return Arr.some((a) -> a.annotationType() == c, ann);
+      return Array.some((a) -> a.annotationType() == c, ann);
     }
 
     public static Object getAnnotation(Method m, Class c) {
@@ -148,7 +153,7 @@ public interface Env {
     }
   }
 
-  public static class FnEval<AST> extends Obj.FN implements IFn {
+  public static class FnEval<AST> extends ObjFn implements IFn {
     class FnEnv implements IEnv {
       final ILookup _map;
       final IEnv _parent;
@@ -217,7 +222,7 @@ public interface Env {
     @Override
     public Function getArgN() {
       return (vargs) -> {
-        java.util.List args = It.toArrayList(It.iter(vargs));
+        java.util.List args = Iter.toArrayList(Iter.iter(vargs));
         checkArgs(args.size());
         return invokeEval(args);
       };
@@ -233,7 +238,7 @@ public interface Env {
     }
   }
 
-  public static class FnStaticLookup<R> extends Obj.FN implements IFn<R, Object, Object> {
+  public static class FnStaticLookup<R> extends ObjFn implements IFn<R, Object, Object> {
 
     final Map<Integer, List<Method>> _mths;
 
@@ -257,13 +262,13 @@ public interface Env {
     @Override
     public BiFunction<Object, Object, R> getArg2() {
       List<Method> mths = _mths.lookup(2);
-      return (a0, a1) -> Invoke.invokeMatch(mths, Arr.objects(a0, a1), 2);
+      return (a0, a1) -> Invoke.invokeMatch(mths, Array.objects(a0, a1), 2);
     }
 
     @Override
     public Function<Object, R> getArgN() {
       return (vargs) -> {
-        var args = Arr.toArray(vargs);
+        var args = Array.toArray(vargs);
         List<Method> mths = _mths.lookup(args.length);
         return Invoke.invokeMatch(mths, args, args.length);
       };
@@ -278,7 +283,7 @@ public interface Env {
     }
   }
 
-  public static class FnStaticVargs<R> extends Obj.FN implements IFn<R, Object, Object> {
+  public static class FnStaticVargs<R> extends ObjFn implements IFn<R, Object, Object> {
 
     final int _argc;
     final Method _m;
@@ -326,9 +331,9 @@ public interface Env {
     @Override
     public Function<Object, R> getArgN() {
       return (vargs) -> {
-        var it = It.iter(vargs);
-        var pargs = It.toArrayList(It.take(it, _argc));
-        var args = It.toArray(it);
+        var it = Iter.iter(vargs);
+        var pargs = Iter.toArrayList(Iter.take(it, _argc));
+        var args = Iter.toArray(it);
         pargs.add(args);
         return Invoke.invokeMethod(_m, pargs.toArray());
       };
@@ -339,14 +344,14 @@ public interface Env {
       Class cls, HashMap<String, ArrayList<Method>> map) {
 
     Function pairs =
-        It.keep(
+        Iter.keep(
             (m) -> {
               Module.Fn v = S.fnOpts((Method) m);
               return (v != null && !v.helper()) ? Builtin.Struct.pair(v.name(), m) : null;
             });
 
-    return It.groupBy(
-        (Iterator) pairs.apply(It.iter(cls.getDeclaredMethods())),
+    return Iter.groupBy(
+        (Iterator) pairs.apply(Iter.iter(cls.getDeclaredMethods())),
         (Function) p -> ((IPair) p).getKey(),
         (Function) p -> ((IPair) p).getValue(),
         (HashMap) map);
@@ -362,9 +367,9 @@ public interface Env {
     all.sort((m1, m2) -> Integer.compare(m1.getParameterCount(), m2.getParameterCount()));
 
     BiFunction<ArrayList<Method>, Predicate<Method>, ArrayList<Method>> filterList =
-        (list, pred) -> It.toArrayList(It.filter(It.iter(list), pred));
+        (list, pred) -> Iter.toArrayList(Iter.filter(Iter.iter(list), pred));
     BiFunction<ArrayList<Method>, Function<Method, ?>, ArrayList> keepList =
-        (list, f) -> It.toArrayList(It.keep(It.iter(list), f));
+        (list, f) -> Iter.toArrayList(Iter.keep(Iter.iter(list), f));
 
     var vArgs = filterList.apply(all, (m) -> S.fnOpts(m).vargs());
     var nArgs = filterList.apply(all, (m) -> !S.fnOpts(m).vargs());
@@ -375,7 +380,7 @@ public interface Env {
 
     var meta =
         hashMap(
-            Arr.objects(
+            Array.objects(
                 keyword("name"), p.getKey(),
                 keyword("rt"), S.fnOpts(all.get(0)).rt(),
                 keyword("env"), S.fnOpts(all.get(0)).env()));
@@ -384,10 +389,10 @@ public interface Env {
         (m) -> {
           Parameter[] params = m.getParameters();
           return Vector.Standard.into(
-              It.map(It.iter(params), (pm) -> symbol(((Parameter) pm).getName())));
+              Iter.map(Iter.iter(params), (pm) -> symbol(((Parameter) pm).getName())));
         };
 
-    var arglists = Vector.Standard.into(It.map(It.iter(all), toArgs));
+    var arglists = Vector.Standard.into(Iter.map(Iter.iter(all), toArgs));
     meta = meta.assoc(keyword("arglists"), arglists);
 
     if (!ropts.isEmpty()) {
@@ -428,9 +433,9 @@ public interface Env {
 
     var raw = new HashMap();
 
-    Arr.reduce((map, cls) -> getMethods(cls, map), raw, Builtin.class.getDeclaredClasses());
+    Array.reduce((map, cls) -> getMethods(cls, map), raw, Builtin.class.getDeclaredClasses());
 
-    Arr.reduce((map, cls) -> getMethods(cls, map), raw, Macro.class.getDeclaredClasses());
+    Array.reduce((map, cls) -> getMethods(cls, map), raw, Macro.class.getDeclaredClasses());
 
     Map<Symbol, Var> fns =
         mapEntries(

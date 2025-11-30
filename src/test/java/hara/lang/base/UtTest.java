@@ -1,5 +1,7 @@
 package hara.lang.base;
 
+import hara.lang.data.*;
+
 import hara.lang.base.Ut.*;
 import org.junit.Test;
 

@@ -1,9 +1,13 @@
 package hara.lang.base;
 
-import hara.data.types.ILinearType;
-import hara.data.types.IMapType;
-import hara.data.types.ISequentialType;
-import hara.data.types.ISetType;
+import hara.lang.base.primitive.Bits;
+
+import hara.lang.data.types.ObjMutable;
+
+import hara.lang.data.types.ILinearType;
+import hara.lang.data.types.IMapType;
+import hara.lang.data.types.ISequentialType;
+import hara.lang.data.types.ISetType;
 import hara.lang.data.Tuple;
 import hara.lang.protocol.*;
 
@@ -17,169 +21,7 @@ import java.util.function.Supplier;
 
 public interface Ut {
 
-  public class AsList<E> extends Obj.MT implements ILinearType<E>, ISequentialType<E> {
-
-    final java.util.List<E> _l;
-
-    public AsList(java.util.List<E> l) {
-      _l = l;
-    }
-
-    @Override
-    public long count() {
-      return _l.size();
-    }
-
-    @Override
-    public AsList<E> empty() {
-      _l.clear();
-      return this;
-    }
-
-    @Override
-    public Iterator<E> iterator() {
-      return _l.iterator();
-    }
-
-    @Override
-    public E nth(long i) {
-      return _l.get((int) i);
-    }
-
-    @Override
-    public E peekFirst() {
-      return _l.get(0);
-    }
-
-    @Override
-    public E peekLast() {
-      return _l.get(_l.size() - 1);
-    }
-
-    @Override
-    public AsList<E> popFirst() {
-      _l.remove(0);
-      return this;
-    }
-
-    @Override
-    public AsList<E> popLast() {
-      _l.remove(_l.size() - 1);
-      return this;
-    }
-
-    @Override
-    public AsList<E> pushFirst(E e) {
-      _l.add(0, e);
-      return this;
-    }
-
-    @Override
-    public AsList<E> pushLast(E e) {
-      _l.add(e);
-      return this;
-    }
-  }
-
   @SuppressWarnings("unchecked")
-  public class AsMap<K, V> extends Obj.MT implements IMapType<K, V> {
-
-    final java.util.Map<K, V> _m;
-
-    public AsMap(java.util.Map<K, V> m) {
-      _m = m;
-    }
-
-    @Override
-    public AsMap<K, V> assoc(K k, V v) {
-      _m.put(k, v);
-      return this;
-    }
-
-    @Override
-    public long count() {
-      return _m.size();
-    }
-
-    @Override
-    public AsMap<K, V> dissoc(K k) {
-      _m.remove(k);
-      return this;
-    }
-
-    @Override
-    public AsMap<K, V> empty() {
-      _m.clear();
-      return this;
-    }
-
-    @Override
-    public Entry<K, V> find(K key) {
-      return (_m.containsKey(key)) ? new Tuple.Tup2.L<K, V>(null, key, _m.get(key)) : null;
-    }
-
-    @Override
-    public boolean has(K key) {
-      return _m.containsKey(key);
-    }
-
-    @Override
-    public Iterator<Entry<K, V>> iterator() {
-      return _m.entrySet().iterator();
-    }
-
-    @Override
-    public V lookup(K key) {
-      return _m.get(key);
-    }
-
-    @Override
-    public V lookup(K key, V notFound) {
-      return _m.getOrDefault(key, notFound);
-    }
-  }
-
-  public class AsSet<E> extends Obj.MT implements ISetType<E> {
-    final java.util.Set<E> _s;
-
-    public AsSet(java.util.Set<E> s) {
-      _s = s;
-    }
-
-    @Override
-    public AsSet<E> conj(E e) {
-      _s.add(e);
-      return this;
-    }
-
-    @Override
-    public long count() {
-      return _s.size();
-    }
-
-    @Override
-    public AsSet<E> dissoc(E k) {
-      _s.remove(k);
-      return this;
-    }
-
-    @Override
-    public AsSet<E> empty() {
-      _s.clear();
-      return this;
-    }
-
-    @Override
-    public E find(E key) {
-      return (_s.contains(key)) ? key : null;
-    }
-
-    @Override
-    public Iterator<E> iterator() {
-      return _s.iterator();
-    }
-  }
-
   public class Clock {
 
     private static final Clock _clock;
@@ -419,7 +261,7 @@ public interface Ut {
         while (_rq.poll() != null) {}
 
         var it = _lu.entrySet().iterator();
-        It.filter(it, (e) -> (e.getValue() == null) || (e.getValue().get() == null))
+        Iter.filter(it, (e) -> (e.getValue() == null) || (e.getValue().get() == null))
             .forEachRemaining((e) -> _lu.remove(e.getKey()));
       }
     }
