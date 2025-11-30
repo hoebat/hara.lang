@@ -12,17 +12,20 @@ import hara.lang.data.Symbol;
 import hara.lang.data.Tuple;
 import hara.lang.data.Vector;
 import hara.lang.data.types.ILinearType;
+import hara.lang.data.types.IMapType;
 import hara.lang.protocol.IFn;
 import hara.lang.protocol.ILookup;
 import hara.lang.protocol.INth;
 import hara.lang.protocol.IPair;
 
 import java.util.Iterator;
+import java.util.Map.Entry;
 
 import static hara.kernel.base.Builtin.Basic.atomVolatile;
 import static hara.kernel.base.Builtin.Basic.symbol;
 import static hara.kernel.base.Builtin.Check.isTruthy;
 import static hara.kernel.base.Builtin.Struct.list;
+import static hara.kernel.base.Builtin.Struct.vector;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
 public interface Macro {
@@ -92,6 +95,97 @@ public interface Macro {
     @Module.Var(control = true)
     public static Object quoteExpr(Object expr) {
       return expr;
+    }
+
+    @Module.Fn(name = "syntax-quote")
+    @Module.Var(macro = true)
+    public static Object syntaxQuoteExpr(Object form) {
+      return sqExpand(form);
+    }
+
+    public static Object sqExpand(Object form) {
+      if (form instanceof Symbol) {
+        return list(Array.objects(symbol("quote"), form));
+      } else if (form instanceof List) {
+        List l = (List) form;
+        if (l.count() == 2 && Eq.eq(l.peekFirst(), Symbol.create("unquote"))) {
+          return l.nth(1);
+        }
+        return sqExpandCollection(form);
+      } else if (form instanceof ILinearType) {
+        // Vectors, Tuples
+        return sqExpandCollection(form);
+      } else if (form instanceof java.util.Map) {
+        // Maps
+        return sqExpandMap((java.util.Map) form);
+      } else {
+        return form;
+      }
+    }
+
+    public static Object sqExpandMap(java.util.Map form) {
+      java.util.List<Object> args = new java.util.ArrayList<>();
+      args.add(symbol("hash-map"));
+
+      Iterator<Entry> it = form.entrySet().iterator();
+      while(it.hasNext()){
+          Entry e = it.next();
+          args.add(sqExpand(e.getKey()));
+          args.add(sqExpand(e.getValue()));
+      }
+
+      // DEBUG
+      // System.out.println("DEBUG sqExpandMap args: " + args);
+      // for(Object o : args) { System.out.println("Item type: " + (o==null?"null":o.getClass().getName()) + " val: " + o); }
+
+      // Use vector to preserve order (List.into reverses), then convert to list
+      return list(Array.objects(symbol("to:list"), vector(Iter.iter(args))));
+    }
+
+    public static Object sqExpandCollection(Object form) {
+      Iterator it = Iter.iter(form);
+
+      // Determine if we should build a vector or a list
+      boolean isVector =
+          (form instanceof Vector || (form instanceof Tuple.Tup1 || form instanceof Tuple.Tup0));
+      if (form instanceof Tuple) {
+        isVector = true;
+      }
+
+      Object concatForm = list(Array.objects(symbol("into")));
+      Object target =
+          isVector ? list(Array.objects(symbol("vector"))) : list(Array.objects(symbol("list")));
+
+      Object current = list(Array.objects(symbol("vector")));
+
+      java.util.List<Object> parts = new java.util.ArrayList<>();
+
+      while (it.hasNext()) {
+        Object item = it.next();
+        if (item instanceof List) {
+          List l = (List) item;
+          if (l.count() > 0 && Eq.eq(l.peekFirst(), Symbol.create("unquote"))) {
+            parts.add(list(Array.objects(symbol("list"), l.nth(1))));
+            continue;
+          } else if (l.count() > 0 && Eq.eq(l.peekFirst(), Symbol.create("unquote-splicing"))) {
+            parts.add(l.nth(1));
+            continue;
+          }
+        }
+
+        // Recursively syntax-quote the item
+        parts.add(list(Array.objects(symbol("list"), sqExpand(item))));
+      }
+
+      for (Object part : parts) {
+        current = list(Array.objects(symbol("into"), current, part));
+      }
+
+      if (!isVector) {
+        return list(Array.objects(symbol("to:list"), current));
+      } else {
+        return current;
+      }
     }
 
     @Module.Fn(name = "def", complete = true, env = true)
