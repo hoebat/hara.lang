@@ -1,15 +1,11 @@
-package hara.lang.data.types;
-
-import hara.lang.data.types.ObjMutable;
-
-import hara.lang.data.types.ObjPersistent;
+package hara.data.types;
 
 import hara.lang.protocol.IMetadata;
 import hara.lang.protocol.INamespaced;
 
 public interface INamespacedType {
 
-  public abstract class MT extends ObjMutable implements INamespaced {
+  public abstract class MT extends IRefType.MT implements INamespaced {
 
     private final String _name;
     private final String _ns;
@@ -53,14 +49,13 @@ public interface INamespacedType {
     }
   }
 
-  public abstract class ObjPersistent extends hara.lang.data.types.ObjPersistent
-      implements INamespaced {
+  public abstract class PT extends IRefType.PT implements INamespaced {
 
     private final String _name;
     private final String _ns;
     private transient String _str;
 
-    public ObjPersistent(IMetadata meta, String nsname) {
+    public PT(IMetadata meta, String nsname) {
       super(meta);
 
       int i = nsname.indexOf('/');
@@ -73,7 +68,7 @@ public interface INamespacedType {
       }
     }
 
-    public ObjPersistent(IMetadata meta, String ns, String name) {
+    public PT(IMetadata meta, String ns, String name) {
       super(meta);
       _ns = ns;
       _name = name;
@@ -95,11 +90,6 @@ public interface INamespacedType {
         else _str = _name;
       }
       return _str;
-    }
-
-    @Override
-    public String display() {
-      return pathString();
     }
   }
 }

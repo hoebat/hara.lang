@@ -1,5 +1,6 @@
-package hara.lang.base.primitive;
+package hara.lang.base;
 
+import java.lang.reflect.Array;
 import java.util.Arrays;
 import hara.lang.base.iter.ArrayIterator;
 import hara.lang.base.iter.BooleanArrayIterator;
@@ -16,10 +17,8 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
-import hara.lang.base.G;
-import hara.lang.base.Iter;
 
-public interface Array {
+public interface Arr {
 
   public static boolean[] booleans(boolean... arr) {
     return arr;
@@ -120,11 +119,11 @@ public interface Array {
 
   public static Object[] toArray(Object obj) {
     if (obj instanceof Iterator) {
-      return Iter.toArray((Iterator<?>) obj);
+      return It.toArray((Iterator<?>) obj);
     } else if (obj.getClass().isArray()) {
       return (Object[]) obj;
     } else {
-      return Iter.toArray(Iter.iter(obj));
+      return It.toArray(It.iter(obj));
     }
   }
 
@@ -140,7 +139,7 @@ public interface Array {
 
   @SuppressWarnings({"rawtypes", "unchecked"})
   public static Iterator toIter(Object array) {
-    if (array == null || java.lang.reflect.Array.getLength(array) == 0) return Iter.emptyIterator();
+    if (array == null || java.lang.reflect.Array.getLength(array) == 0) return It.emptyIterator();
     Class aclass = array.getClass();
     if (aclass == int[].class) return new IntArrayIterator((int[]) array, 0);
     if (aclass == float[].class) return new FloatArrayIterator((float[]) array, 0);
@@ -162,18 +161,18 @@ public interface Array {
 
   @SuppressWarnings("unchecked")
   public static <E> E[] newArray(Class<E> type, int length) {
-    return (E[]) java.lang.reflect.Array.newInstance(type, length);
+    return (E[]) Array.newInstance(type, length);
   }
 
   @SuppressWarnings({"unchecked"})
   public static <E> Iterator<E> toIter(E... array) {
-    if (array == null || array.length == 0) return (Iterator<E>) Iter.emptyIterator();
+    if (array == null || array.length == 0) return (Iterator<E>) It.emptyIterator();
     return new ArrayIterator<E>(array, 0);
   }
 
   @SuppressWarnings({"unchecked"})
   public static <E> Iterator<E> toIter(E[] array, int start, int end) {
-    if (array == null || array.length == 0) return (Iterator<E>) Iter.emptyIterator();
+    if (array == null || array.length == 0) return (Iterator<E>) It.emptyIterator();
     return new ArrayIterator<E>(array, start, end);
   }
 
@@ -211,7 +210,7 @@ public interface Array {
 
   @SuppressWarnings({"unchecked", "rawtypes"})
   public static <E, R> R[] map(Function<E, R> f, Class type, E[] array) {
-    var out = (R[]) java.lang.reflect.Array.newInstance(type, array.length);
-    return fillArray(Iter.map(toIter(array), f), out);
+    var out = (R[]) Array.newInstance(type, array.length);
+    return fillArray(It.map(toIter(array), f), out);
   }
 }

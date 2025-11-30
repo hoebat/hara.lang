@@ -1,8 +1,8 @@
 package hara.kernel.base;
 
-import hara.lang.data.types.ILinearType;
-import hara.lang.data.types.IMapType;
-import hara.lang.base.primitive.Array;
+import hara.data.types.ILinearType;
+import hara.data.types.IMapType;
+import hara.lang.base.Arr;
 import hara.lang.base.Ex;
 import hara.lang.base.G;
 import hara.lang.base.Num;
@@ -638,7 +638,7 @@ public interface Read {
         line = ((LineNumberingReader) r).getLineNumber();
         column = ((LineNumberingReader) r).getColumnNumber() - 1;
       }
-      return hashMap(Array.objects(keyword("line"), line, keyword("column"), column));
+      return hashMap(Arr.objects(keyword("line"), line, keyword("column"), column));
     }
 
     public static class ListReader implements BiFunction<PushbackReader, Map, List> {
@@ -657,8 +657,8 @@ public interface Read {
         Object meta = read(r, true, null, true, opts);
 
         if (meta instanceof Symbol || meta instanceof String)
-          meta = hashMap(Array.objects(keyword("tag"), meta));
-        else if (meta instanceof Keyword) meta = hashMap(Array.objects(meta, Constant.T));
+          meta = hashMap(Arr.objects(keyword("tag"), meta));
+        else if (meta instanceof Keyword) meta = hashMap(Arr.objects(meta, Constant.T));
         else if (!(meta instanceof Map))
           throw new IllegalArgumentException("Metadata must be Symbol,Keyword,String or ");
 

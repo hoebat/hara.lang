@@ -1,16 +1,14 @@
 package hara.lang.data;
 
-import hara.lang.data.types.ObjPersistent;
-
-import hara.lang.data.types.INamespacedType;
-import hara.lang.data.types.IStringType;
+import hara.data.types.INamespacedType;
+import hara.data.types.IStringType;
 import hara.lang.base.Ut;
 import hara.lang.protocol.Constant;
 import hara.lang.protocol.IMetadata;
 
 import java.lang.ref.WeakReference;
 
-public class Symbol extends INamespacedType.ObjPersistent implements IStringType {
+public class Symbol extends INamespacedType.PT implements IStringType {
 
   public static Ut.RefCache<String, Symbol> GLOBAL = new Ut.RefCache<String, Symbol>();
 

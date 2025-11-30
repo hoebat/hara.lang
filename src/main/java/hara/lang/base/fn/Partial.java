@@ -1,7 +1,7 @@
 package hara.lang.base.fn;
 
 import hara.lang.base.Fn;
-import hara.lang.base.Iter;
+import hara.lang.base.It;
 import hara.lang.data.List;
 import hara.lang.protocol.IFn;
 import hara.lang.protocol.IOFn;
@@ -17,7 +17,7 @@ public class Partial<FN, ITR> implements IOFn {
 
   public Partial(FN f, ITR vars) {
     _f = Fn.toFn(f);
-    _args = List.Standard.into(Iter.iter(vars));
+    _args = List.Standard.into(It.iter(vars));
   }
 
   @Override
@@ -37,6 +37,6 @@ public class Partial<FN, ITR> implements IOFn {
 
   @Override
   public Function getArgN() {
-    return (args) -> _f.apply(Iter.concat(Iter.iter(_args), Iter.iter(args)));
+    return (args) -> _f.apply(It.concat(It.iter(_args), It.iter(args)));
   }
 }

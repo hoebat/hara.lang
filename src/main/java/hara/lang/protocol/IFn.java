@@ -1,6 +1,6 @@
 package hara.lang.protocol;
 
-import hara.lang.data.types.ILinearType;
+import hara.data.types.ILinearType;
 import hara.lang.base.Ex;
 
 import java.util.Iterator;

@@ -1,8 +1,8 @@
-package hara.lang.data.types;
+package hara.data.types;
 
 import hara.lang.base.Eq;
 import hara.lang.base.G;
-import hara.lang.base.Iter;
+import hara.lang.base.It;
 import hara.lang.protocol.*;
 
 import java.util.Iterator;
@@ -54,12 +54,12 @@ public interface IMapType<K, V>
 
   @Override
   default Iterator<K> keys() {
-    return Iter.map(iterator(), (n) -> n.getKey());
+    return It.map(iterator(), (n) -> n.getKey());
   }
 
   @Override
   default Iterator<V> vals() {
-    return Iter.map(iterator(), (n) -> n.getValue());
+    return It.map(iterator(), (n) -> n.getValue());
   }
 
   @Override
@@ -79,7 +79,7 @@ public interface IMapType<K, V>
 
   @Override
   default String display() {
-    return Iter.toString(
+    return It.toString(
         iterator(),
         startString(),
         endString(),
@@ -93,7 +93,7 @@ public interface IMapType<K, V>
 
     if (obj instanceof IMapType) {
       return (count() == ((IMapType) obj).count())
-          && Iter.every(
+          && It.every(
               this.iterator(),
               (e) -> {
                 Map.Entry oe = (Entry) ((IMapType) obj).find(e.getKey());
@@ -101,7 +101,7 @@ public interface IMapType<K, V>
               });
     } else if (obj instanceof java.util.Map) {
       return (this.count() == ((java.util.Map) obj).size())
-          && Iter.every(
+          && It.every(
               ((java.util.Map) obj).entrySet().iterator(),
               (e) -> {
                 Map.Entry oe = (Map.Entry) e;

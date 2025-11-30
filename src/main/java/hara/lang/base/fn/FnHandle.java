@@ -1,9 +1,7 @@
 package hara.lang.base.fn;
 
-import hara.lang.data.types.ObjFn;
-
 import hara.lang.base.Ex;
-import hara.lang.base.Iter;
+import hara.lang.base.It;
 import hara.lang.base.Obj;
 import hara.lang.protocol.IFn;
 import hara.lang.protocol.IMetadata;
@@ -15,7 +13,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class FnHandle<R> extends ObjFn implements IFn<R, Object, Object> {
+public class FnHandle<R> extends Obj.FN implements IFn<R, Object, Object> {
   final MethodHandle _mh;
   final int _num;
 
@@ -56,7 +54,7 @@ public class FnHandle<R> extends ObjFn implements IFn<R, Object, Object> {
   @Override
   public Function<Object, R> getArgN() {
     return (vargs) -> {
-      java.util.List args = Iter.toArrayList(Iter.iter(vargs));
+      java.util.List args = It.toArrayList(It.iter(vargs));
       checkArgs(args.size());
       return invokeHandle(args);
     };

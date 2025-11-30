@@ -1,11 +1,11 @@
 package hara.kernel.base;
 
-import hara.lang.data.types.IMapType;
+import hara.data.types.IMapType;
 import hara.kernel.protocol.IEnv;
 import hara.kernel.protocol.IRuntime;
-import hara.lang.base.primitive.Array;
+import hara.lang.base.Arr;
 import hara.lang.base.Ex;
-import hara.lang.base.Iter;
+import hara.lang.base.It;
 import hara.lang.base.Ut;
 import hara.lang.data.Keyword;
 import hara.lang.data.List;
@@ -152,7 +152,7 @@ public interface RT {
               (obj) -> {
                 var v = (Var) obj;
                 if ((Boolean) Keyword.create("rt").invoke(v.meta())) {
-                  v.reset(partial(v.deref(), Array.objects(rt)));
+                  v.reset(partial(v.deref(), Arr.objects(rt)));
                 }
                 return v;
               },
@@ -171,12 +171,12 @@ public interface RT {
 
     @Override
     public Iterator<Symbol> keys() {
-      return Iter.map(_methods.iterator(), e -> e.getKey());
+      return It.map(_methods.iterator(), e -> e.getKey());
     }
 
     @Override
     public Iterator<Var> vals() {
-      return Iter.map(_methods.iterator(), e -> e.getValue());
+      return It.map(_methods.iterator(), e -> e.getValue());
     }
   }
 
@@ -287,13 +287,12 @@ public interface RT {
 
     @Override
     public Iterator<Symbol> keys() {
-      return Iter.concat(Iter.map(_methods.entrySet().iterator(), e -> e.getKey()), _parent.keys());
+      return It.concat(It.map(_methods.entrySet().iterator(), e -> e.getKey()), _parent.keys());
     }
 
     @Override
     public Iterator<Var> vals() {
-      return Iter.concat(
-          Iter.map(_methods.entrySet().iterator(), e -> e.getValue()), _parent.vals());
+      return It.concat(It.map(_methods.entrySet().iterator(), e -> e.getValue()), _parent.vals());
     }
 
     @Override
@@ -334,7 +333,7 @@ public interface RT {
           new ThreadLocal() {
             @Override
             protected List<IEnv<Symbol, Var>> initialValue() {
-              return list(Array.objects(_userEnv));
+              return list(Arr.objects(_userEnv));
             }
           };
     }
@@ -422,7 +421,7 @@ public interface RT {
 
     @Override
     public IColl<URL> pathAdd(String[] paths) {
-      Array.toIter(paths)
+      Arr.toIter(paths)
           .forEachRemaining(
               (path) -> {
                 try {
@@ -436,7 +435,7 @@ public interface RT {
 
     @Override
     public IColl<URL> pathRemove(String[] paths) {
-      Array.toIter(paths)
+      Arr.toIter(paths)
           .forEachRemaining(
               (path) -> {
                 try {

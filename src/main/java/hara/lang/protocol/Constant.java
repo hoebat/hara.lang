@@ -1,6 +1,6 @@
 package hara.lang.protocol;
 
-public interface Constant {
+public class Constant {
 
   public static final Object[] EMPTY_ARRAY = new Object[] {};
   public static final Boolean F = Boolean.FALSE;
@@ -20,35 +20,13 @@ public interface Constant {
 
   public enum ObjType {
     CLASS,
-    TYPE,
-    NIL,
-    BOOLEAN,
-    NUMBER,
-    CHARACTER,
-    STRING,
-    SYMBOL,
     KEYWORD,
-    PATTERN,
-    DATE,
-    UUID,
-    URI,
-    SEQUENTIAL,
-    LIST,
-    VECTOR,
-    TUPLE,
+    SYMBOL,
+    POINTER,
+    FUNCTION,
     MAP,
     SET,
-    FUNCTION,
-    ATOM,
-    META,
-    OBJECT,
     ITERATOR,
-    FUTURE,
-    PROMISE,
-    DELAY,
-    PENDING,
-    ERROR,
-    READER,
-    POINTER
+    SEQUENTIAL
   }
 }

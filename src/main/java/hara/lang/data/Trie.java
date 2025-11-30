@@ -1,12 +1,8 @@
 package hara.lang.data;
 
-import hara.lang.data.types.ObjMutable;
-
-import hara.lang.data.types.ObjPersistent;
-
-import hara.lang.data.types.IRefType;
+import hara.data.types.IRefType;
 import hara.lang.base.G;
-import hara.lang.base.Iter;
+import hara.lang.base.It;
 import hara.lang.protocol.*;
 
 import java.util.*;
@@ -46,7 +42,7 @@ public interface Trie<V>
 
   @Override
   default Iterator<V> vals() {
-    return Iter.map(new TrieEntryIterator<>(rootNode()), Entry::getValue);
+    return It.map(new TrieEntryIterator<>(rootNode()), Entry::getValue);
   }
 
   Node<V> rootNode();
@@ -202,7 +198,7 @@ public interface Trie<V>
     }
   }
 
-  public class Mutable<V> extends ObjMutable implements Trie<V> {
+  public class Mutable<V> extends IRefType.MT implements Trie<V> {
     private Node<V> root;
     private int _size;
 
@@ -289,7 +285,7 @@ public interface Trie<V>
     }
   }
 
-  public class Standard<V> extends ObjPersistent implements Trie<V> {
+  public class Standard<V> extends IRefType.PT implements Trie<V> {
     private final Node<V> root;
     private final int _size;
 

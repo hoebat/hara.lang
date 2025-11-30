@@ -1,13 +1,9 @@
 package hara.lang.data;
 
-import hara.lang.data.types.ObjMutable;
-
-import hara.lang.data.types.ObjPersistent;
-
-import hara.lang.data.types.IRefType;
-import hara.lang.data.types.IVectorType;
-import hara.lang.base.primitive.Array;
-import hara.lang.base.Iter;
+import hara.data.types.IRefType;
+import hara.data.types.IVectorType;
+import hara.lang.base.Arr;
+import hara.lang.base.It;
 import hara.lang.protocol.*;
 
 import java.util.Arrays;
@@ -48,7 +44,7 @@ public interface List<E> extends IVectorType<E> {
     }
   }
 
-  class Standard<E> extends ObjPersistent implements Base<E>, IToMutable {
+  class Standard<E> extends IRefType.PT implements Base<E>, IToMutable {
 
     final Chunk<E> _head;
     final int _size;
@@ -193,7 +189,7 @@ public interface List<E> extends IVectorType<E> {
     }
   }
 
-  class Mutable<E> extends ObjMutable implements Base<E>, IToPersistent {
+  class Mutable<E> extends IRefType.MT implements Base<E>, IToPersistent {
 
     // Use Ring Buffer logic for efficient Mutable operations
     private Object[] _elements;
@@ -237,7 +233,7 @@ public interface List<E> extends IVectorType<E> {
     @SafeVarargs
     public static <E> Mutable<E> from(IMetadata meta, E... objs) {
       Mutable<E> mut = new Mutable<E>(meta, objs.length);
-      return Array.reduce((arr, e) -> (Mutable<E>) arr.pushLast(e), mut, objs);
+      return Arr.reduce((arr, e) -> (Mutable<E>) arr.pushLast(e), mut, objs);
     }
 
     public static <E> Mutable<E> into(Iterator<E> it) {
@@ -245,7 +241,7 @@ public interface List<E> extends IVectorType<E> {
     }
 
     public static <E> Mutable<E> into(Mutable<E> coll, Iterator<E> it) {
-      return Iter.reduce(it, coll, (m, e) -> (Mutable<E>) m.conj(e));
+      return It.reduce(it, coll, (m, e) -> (Mutable<E>) m.conj(e));
     }
 
     // Helper for resizing
@@ -333,7 +329,7 @@ public interface List<E> extends IVectorType<E> {
     }
 
     public Mutable<E> conjAll(Iterator<E> it) {
-      return Iter.reduce(it, this, (m, e) -> (Mutable<E>) m.conj(e));
+      return It.reduce(it, this, (m, e) -> (Mutable<E>) m.conj(e));
     }
 
     public Standard<E> toPersistentRaw() {

@@ -1,13 +1,7 @@
 package hara.lang.data;
 
-import hara.lang.base.primitive.Array;
-
-import hara.lang.data.types.ObjMutable;
-
-import hara.lang.data.types.ObjPersistent;
-
-import hara.lang.data.types.IMapType;
-import hara.lang.data.types.IRefType;
+import hara.data.types.IMapType;
+import hara.data.types.IRefType;
 import hara.lang.base.*;
 import hara.lang.base.Ut.Counter;
 import hara.lang.protocol.*;
@@ -595,7 +589,7 @@ public interface Map<K, V> extends IMapType<K, V> {
     @Override
     default Iterator<Entry<K, V>> iterator() {
       return ((_root() == null) || (_size() == 0))
-          ? (Iterator<Entry<K, V>>) Iter.emptyIterator()
+          ? (Iterator<Entry<K, V>>) It.emptyIterator()
           : new NodeIter<K, V>(_root());
     }
 
@@ -606,7 +600,7 @@ public interface Map<K, V> extends IMapType<K, V> {
   }
 
   @SuppressWarnings("unchecked")
-  public final class Mutable<K, V> extends ObjMutable implements Base<K, V>, IToPersistent {
+  public final class Mutable<K, V> extends IRefType.MT implements Base<K, V>, IToPersistent {
 
     private volatile Node<K, V> _root;
     private volatile int _size;
@@ -628,7 +622,7 @@ public interface Map<K, V> extends IMapType<K, V> {
 
     @SuppressWarnings("rawtypes")
     public static <K, V> Mutable<K, V> from(IMetadata meta, Object... elements) {
-      return into(empty(meta), (Iterator) Iter.partitionPair(Array.toIter(elements)));
+      return into(empty(meta), (Iterator) It.partitionPair(Arr.toIter(elements)));
     }
 
     public static <K, V> Mutable<K, V> into(Iterator<Entry<K, V>> it) {
@@ -636,7 +630,7 @@ public interface Map<K, V> extends IMapType<K, V> {
     }
 
     public static <K, V> Mutable<K, V> into(Mutable<K, V> map, Iterator<Entry<K, V>> it) {
-      return Iter.reduce(it, map, (m, e) -> m.assoc(e.getKey(), e.getValue()));
+      return It.reduce(it, map, (m, e) -> m.assoc(e.getKey(), e.getValue()));
     }
 
     private void ensureEditable() {
@@ -706,7 +700,7 @@ public interface Map<K, V> extends IMapType<K, V> {
   }
 
   @SuppressWarnings("unchecked")
-  public class Standard<K, V> extends ObjPersistent implements Base<K, V>, IToMutable {
+  public class Standard<K, V> extends IRefType.PT implements Base<K, V>, IToMutable {
 
     private final int _size;
     private final Node<K, V> _root;

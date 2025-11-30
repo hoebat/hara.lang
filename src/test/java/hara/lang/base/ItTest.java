@@ -8,12 +8,12 @@ import java.util.List;
 
 import static org.junit.Assert.*;
 
-public class IterTest {
+public class ItTest {
 
   @Test
   public void testIter() {
     Integer[] arr = {1, 2, 3};
-    Iterator<Integer> iter = Iter.iter(arr);
+    Iterator<Integer> iter = It.iter(arr);
     assertTrue(iter.hasNext());
     assertEquals(Integer.valueOf(1), iter.next());
     assertTrue(iter.hasNext());
@@ -26,14 +26,14 @@ public class IterTest {
   @Test
   public void testReduce() {
     List<Integer> list = Arrays.asList(1, 2, 3, 4, 5);
-    Integer result = Iter.reduce(list.iterator(), (a, b) -> a + b);
+    Integer result = It.reduce(list.iterator(), (a, b) -> a + b);
     assertEquals(Integer.valueOf(15), result);
   }
 
   @Test
   public void testMap() {
     List<Integer> list = Arrays.asList(1, 2, 3);
-    Iterator<String> iter = Iter.map(list.iterator(), n -> "v" + n);
+    Iterator<String> iter = It.map(list.iterator(), n -> "v" + n);
     assertEquals("v1", iter.next());
     assertEquals("v2", iter.next());
     assertEquals("v3", iter.next());
@@ -43,7 +43,7 @@ public class IterTest {
   @Test
   public void testFilter() {
     List<Integer> list = Arrays.asList(1, 2, 3, 4, 5);
-    Iterator<Integer> iter = Iter.filter(list.iterator(), n -> n % 2 == 0);
+    Iterator<Integer> iter = It.filter(list.iterator(), n -> n % 2 == 0);
     assertTrue(iter.hasNext());
     assertEquals(Integer.valueOf(2), iter.next());
     assertTrue(iter.hasNext());
@@ -55,7 +55,7 @@ public class IterTest {
   public void testConcat() {
     List<Integer> list1 = Arrays.asList(1, 2);
     List<Integer> list2 = Arrays.asList(3, 4);
-    Iterator<Integer> iter = Iter.concat(list1.iterator(), list2.iterator());
+    Iterator<Integer> iter = It.concat(list1.iterator(), list2.iterator());
     assertEquals(Integer.valueOf(1), iter.next());
     assertEquals(Integer.valueOf(2), iter.next());
     assertEquals(Integer.valueOf(3), iter.next());

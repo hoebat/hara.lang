@@ -1,7 +1,5 @@
 package hara.lang.base;
 
-import hara.lang.base.primitive.Array;
-
 import hara.lang.protocol.Constant;
 import hara.lang.protocol.IDisplay;
 import hara.lang.protocol.IHash;
@@ -13,25 +11,17 @@ import java.util.regex.Pattern;
 
 public interface G {
 
-  public static class Exception extends RuntimeException {
-    public Exception() {}
-
-    public Exception(String msg) {
-      super(msg);
-    }
-  }
-
   public static final Constant.HashType DEFAULT_HASH = Constant.HashType.MURMUR3;
 
   @SuppressWarnings({"rawtypes", "unchecked"})
   public static String displayList(java.util.List l) {
-    return "#j" + Iter.display(l.iterator());
+    return "#j" + It.display(l.iterator());
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})
   public static String displayMap(java.util.Map m) {
     return "#j"
-        + Iter.toString(
+        + It.toString(
             m.entrySet().iterator(),
             "{",
             "}",
@@ -66,9 +56,9 @@ public interface G {
     } else if (e instanceof Entry) {
       return displayMapEntry((Entry) e);
     } else if (e instanceof Iterator) {
-      return "#i" + Iter.display((Iterator) e);
+      return "#i" + It.display((Iterator) e);
     } else if (e.getClass().isArray()) {
-      return "#arr" + Iter.display(Array.toIter(e));
+      return "#arr" + It.display(Arr.toIter(e));
     } else {
       return e.toString();
     }
@@ -80,7 +70,7 @@ public interface G {
   }
 
   public static void prn(Object... arr) {
-    System.out.println(getLineNumber() + ":\n" + Array.display(arr));
+    System.out.println(getLineNumber() + ":\n" + Arr.display(arr));
   }
 
   public static long hashMurmur(Object o) {
@@ -110,9 +100,5 @@ public interface G {
       default:
         throw new UnsupportedOperationException("Not Supported");
     }
-  }
-
-  public static long hashCalc(Constant.HashType t, Object o) {
-    return hashFn(t).apply(o);
   }
 }
