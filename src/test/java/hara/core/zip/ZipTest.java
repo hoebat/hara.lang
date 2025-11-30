@@ -1,4 +1,4 @@
-package hara.lib.zip;
+package hara.core.zip;
 
 import hara.lang.data.Vector;
 import org.junit.Test;

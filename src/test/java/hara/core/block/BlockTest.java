@@ -1,4 +1,4 @@
-package hara.lib.block;
+package hara.core.block;
 
 import hara.lang.data.Vector;
 import org.junit.Test;

@@ -1,4 +1,4 @@
-package hara.lib.zip;
+package hara.core.zip;
 
 public class BaseHandler implements IZipHandler {
 
