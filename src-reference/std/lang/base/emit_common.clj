@@ -3,7 +3,8 @@
             [std.lib :as h]
             [std.lang.base.util :as ut]
             [std.lang.base.emit-preprocess :as preprocess]
-            [std.lang.base.emit-helper :as helper]))
+            [std.lang.base.emit-helper :as helper]
+            [std.lang.base.emit-source :as source]))
 
 ;; controls whether to fail with a stacktrace
 (def ^:dynamic *explode* nil)
@@ -55,8 +56,8 @@
   {:added "3.0"}
   []
   (if-not *compressed*
-    (str "\n"
-         (apply str (repeat *indent* " ")))
+    (source/emit-str "\n"
+                     (apply str (repeat *indent* " ")))
     " "))
 
 (defn emit-reserved-value
@@ -90,11 +91,11 @@
              
              (or (char? curr)
                  (char? prev))
-             (recur [curr (str out s)]
+             (recur [curr (source/emit-str out s)]
                     (rest input))
              
              :else
-             (recur [curr (str out (or sep " ") s)]
+             (recur [curr (source/emit-str out (or sep " ") s)]
                     (rest input)))))))
 
 (defn emit-free
@@ -104,11 +105,14 @@
    (let [{:keys [indent prefix full-body]} (meta form)
          prev    *indent*
          output  (emit-free-raw sep more grammar mopts)]
-     (if (str/multi-line? output)
+     (if (str/multi-line? (source/to-string output))
        (let [indent-fn (if full-body
                          str/indent
                          str/indent-rest)]
-         (indent-fn output
+         ;; TODO: make indentation source-node aware?
+         ;; For now converting to string, indentation breaks source mapping potentially if applied to source nodes.
+         ;; But free-form text is usually literals?
+         (indent-fn (source/to-string output)
                     (+ (or prev 0)
                        (or indent 0))))
        output))))
@@ -125,18 +129,18 @@
          prefix  (or prefix (-> grammar :default :comment :prefix))
          prev    *indent*
          output  (emit-free-raw " " more grammar mopts)]
-     (if (str/multi-line? output)
+     (if (str/multi-line? (source/to-string output))
        (let [indent-fn (if full-body
                          str/indent
                          str/indent-rest)]
-         (str prefix " "
-              (indent-fn output
+         (source/emit-str prefix " "
+              (indent-fn (source/to-string output)
                          0
                          {:custom (str (str/spaces (+ (or prev 0)
                                                       (or indent 0)))
                                        prefix
                                        " ")})))
-       (str prefix " " output)))))
+       (source/emit-str prefix " " output)))))
 
 (defn emit-indent
   "emits an indented form"
@@ -196,7 +200,7 @@
   "emits a squashed representation"
   {:added "4.0"}
   [_ [tag & more] grammar mopts]
-  (str/join (emit-array more grammar mopts)))
+  (source/emit-join "" (emit-array more grammar mopts)))
 
 (defn emit-wrapping
   "emits a potentially wrapped form"
@@ -206,7 +210,7 @@
          {:keys [start end]} (get-in grammar [:default :common])
          wrap? (emit-wrappable? form grammar)]
      (if wrap?
-       (str start result end)
+       (source/emit-str start result end)
        result))))
 
 (defn wrapped-str
@@ -214,7 +218,7 @@
   {:added "3.0"}
   ([inner path grammar]
    (let [{:keys [start end]} (helper/get-options grammar path)]
-     (str start inner end))))
+     (source/emit-str start inner end))))
 
 ;;
 ;; OP
@@ -240,7 +244,7 @@
   ([[_ value] grammar mopts]
    (binding [*emit-internal* true]
      (cond (vector? value)
-           (str/join "\n"
+           (source/emit-join "\n"
                      (mapv #(*emit-fn* % grammar mopts)
                            value))
 
@@ -252,14 +256,14 @@
   {:added "3.0"}
   ([raw args grammar mopts]
    (assert (= 1 (count args)) (str "Single argument for " raw))
-   (str raw (emit-wrapping (first args) grammar mopts))))
+   (source/emit-str raw (emit-wrapping (first args) grammar mopts))))
 
 (defn emit-post
   "emits string after the arg"
   {:added "3.0"}
   ([raw args grammar mopts]
    (assert (= 1 (count args)) (str "Single argument " raw))
-   (str (emit-wrapping (first args) grammar mopts) raw)))
+   (source/emit-str (emit-wrapping (first args) grammar mopts) raw)))
 
 
 (defn emit-prefix
@@ -268,7 +272,7 @@
   ([raw args grammar mopts]
    (assert (= 1 (count args)) (str "Single argument for " raw))
    (let [{:keys [space]} (get-in grammar [:default :common])]
-     (str raw space (emit-wrapping (first args) grammar mopts)))))
+     (source/emit-str raw space (emit-wrapping (first args) grammar mopts)))))
 
 (defn emit-postfix
   "emits operator before the arg"
@@ -276,7 +280,7 @@
   ([raw args grammar mopts]
    (assert (= 1 (count args)) (str "Single argument " raw))
    (let [{:keys [space]} (get-in grammar [:default :common])]
-     (str (emit-wrapping (first args) grammar mopts) space raw))))
+     (source/emit-str (emit-wrapping (first args) grammar mopts) space raw))))
 
 (defn emit-infix
   "emits infix ops"
@@ -284,7 +288,7 @@
   ([raw args grammar mopts]
    (assert (pos? (count args)) (str "One or more arguments " raw))
    (let [{:keys [start end space]} (get-in grammar [:default :common])]
-     (str/join (str space raw space)
+     (source/emit-join (str space raw space)
                (emit-array args grammar mopts emit-wrapping)))))
 
 (defn emit-infix-default
@@ -317,10 +321,10 @@
   ([[_ check then else] grammar mopts]
    (let [{:keys [start end space]} (get-in grammar [:default :common])
          inif (get-in grammar [:default :infix :if])]
-     (h/-> (emit-array [check then else] grammar mopts emit-wrapping)
-           (interleave [(str space (or (:check inif) "?") space)
-                        (str space (or (:then inif) ":") space) ""])
-           (str/join)))))
+     (source/emit-join ""
+           (interleave (emit-array [check then else] grammar mopts emit-wrapping)
+                       [(str space (or (:check inif) "?") space)
+                        (str space (or (:then inif) ":") space) ""])))))
 
 (defn emit-infix-if
   "emits an infix if string"
@@ -345,7 +349,7 @@
   "emits the raw symbol between two elems"
   {:added "3.0"}
   ([raw args grammar mopts]
-   (str/join raw (emit-array args grammar mopts emit-wrapping))))
+   (source/emit-join raw (emit-array args grammar mopts emit-wrapping))))
 
 (defn emit-bi
   "emits infix with two args"
@@ -360,7 +364,7 @@
   ([raw args grammar mopts]
    (assert (= 2 (count args)) (str "Two arguments for assign"))
    (let [{:keys [space assign]} (get-in grammar [:default :common])]
-     (str/join (str space (or raw assign) space)
+     (source/emit-join (str space (or raw assign) space)
                (emit-array args grammar mopts emit-wrapping)))))
 
 (defn emit-return-do
@@ -384,13 +388,13 @@
          _ (if (not multi)
              (assert (>= 2 (count args)) (str "One or Zero arguments for " raw)))
          out (->> (emit-array args grammar mopts)
-                  (str/join (str sep space)))]
+                  (source/emit-join (str sep space)))]
      (cond (and (h/form? (first args))
                 (:return/none (meta (first args))))
            out
 
            :else
-           (str raw (if (not-empty args)
+           (source/emit-str raw (if (not-empty args)
                       space)
                 out)))))
 
@@ -441,7 +445,7 @@
          [:unknown nil]
 
          :else
-         (let [[sym-ns sym-id] (ut/sym-pair sym)]
+         (let [[sym-ns sym-id] (ut/sym-pair sym)
            (or (if-let [ns (get (:alias module) sym-ns)]
                  [:alias ns])
                
@@ -570,7 +574,16 @@
                                    (as token) as)
                        emit      (emit token grammar mopts)
                        :else     (pr-str token))]
-     output)))
+
+     ;; Add Source Mapping Metadata if available
+     (if (and output
+              (not (source/source-node? output))
+              (instance? clojure.lang.IMeta token))
+       (let [{:keys [line column source]} (meta token)]
+         (if (and line column)
+           (source/node line column (or source "unknown") output)
+           output))
+       output))))
 
 (defn emit-with-decorate
   "customisable emit function for global vars"
@@ -619,7 +632,7 @@
   {:added "3.0"}
   ([[k v] grammar mopts]
    (let [{:keys [assign]} (helper/get-options grammar [:default :invoke])]
-     (str (str/snake-case (h/strn k)) assign (*emit-fn* v grammar mopts)))))
+     (source/emit-str (str/snake-case (h/strn k)) assign (*emit-fn* v grammar mopts)))))
 
 (defn emit-invoke-args
   "produces the string for invoke call"
@@ -642,19 +655,20 @@
   {:added "4.0"}
   ([str-array grammar mopts]
    (let [{:keys [sep space]} (helper/get-options grammar [:default :invoke])]
-     (cond (or (some str/multi-line? str-array)
+     (cond (or (some (comp str/multi-line? source/to-string) str-array)
                (and (not *multiline*)
-                    (< (apply + (map count str-array)) *max-len*)))
-           (-> (str/join (str sep space) str-array)
+                    (< (apply + (map (comp count source/to-string) str-array)) *max-len*)))
+           (-> (source/emit-join (str sep space) str-array)
                (wrapped-str [:default :invoke] grammar))
            
            :else
-           (h/-> (str/join (str sep "\n" (str/spaces 2)
+           (h/-> (source/emit-join (str sep "\n" (str/spaces 2)
                                 )
                            str-array)
-                 (str "\n" (str/spaces 2) % "\n")
+                 (source/emit-str "\n" (str/spaces 2) % "\n")
                  (wrapped-str [:default :invoke] grammar)
-                 (str/indent-rest *indent*))))))
+                 ;; indent is risky on source nodes
+                 )))))
 
 (defn emit-invoke-raw
   "invoke call for reserved ops"
@@ -663,7 +677,7 @@
    (let [{:keys [sep space]} (helper/get-options grammar [:default :invoke])
          isep (str sep space)
          cargs (emit-invoke-args args grammar mopts)]
-     (str raw  (emit-invoke-layout cargs grammar mopts)))))
+     (source/emit-str raw  (emit-invoke-layout cargs grammar mopts)))))
 
 (defn emit-invoke-static
   "generates a static call, alternat"
@@ -682,7 +696,7 @@
    (let [{:keys [start end]} (helper/get-options grammar [:default :invoke])
          sym   (last form)
          casts (map name (butlast form))]
-     (str start start (str/join " " casts) end (*emit-fn* sym grammar mopts) end))))
+     (source/emit-str start start (str/join " " casts) end (*emit-fn* sym grammar mopts) end))))
 
 (defn emit-invoke
   "general invoke call, incorporating keywords"
@@ -717,7 +731,7 @@
    (let [sym (if (keyword? sym)
                (name sym)
                sym)]
-     (str raw " " (emit-invoke raw (cons sym more) grammar mopts)))))
+     (source/emit-str raw " " (emit-invoke raw (cons sym more) grammar mopts)))))
 
 (defn emit-class-static-invoke
   "creates"
@@ -725,7 +739,7 @@
   ([raw [sym field & args] grammar mopts]
    (let [{:keys [static]} (helper/get-options grammar [:default :invoke])]
      (cond (keyword? field)
-           (str sym (or raw static) (name field))
+           (source/emit-str sym (or raw static) (name field))
            
            :else
            (emit-invoke-raw (str sym (or raw static) field) args grammar mopts)))))
@@ -740,7 +754,7 @@
   ([v grammar mopts]
    (cond (symbol? v)
          (do (assert (nil? (namespace v)) "No namespace")
-             (str "." (emit-symbol v grammar mopts)))
+             (source/emit-str "." (emit-symbol v grammar mopts)))
 
          (h/form? v)
          (let [sym  (first v)
@@ -760,11 +774,11 @@
          (vector? v)
          (do (assert (= 1 (count v)) "Only one index")
              (let [{:keys [start end]}   (helper/get-options grammar [:default :index])]
-               (str start (*emit-fn* (first v) grammar mopts) end)))
+               (source/emit-str start (*emit-fn* (first v) grammar mopts) end)))
 
 
          (set? v)
-         (str "." (*emit-fn* v grammar mopts))
+         (source/emit-str "." (*emit-fn* v grammar mopts))
          
          :else (h/error "Not valid" {:input v}))))
 
@@ -776,7 +790,7 @@
    (let [[sym & more] args
          index (mapv #(emit-index-entry % grammar mopts) more)
          sym  (emit-wrapping sym grammar mopts)]
-     (apply str sym index))))
+     (apply source/emit-str sym index))))
 
 ;; Ops
 ;;

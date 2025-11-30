@@ -1,7 +1,8 @@
 (ns std.make.compile
   (:require [std.lib :as h]
             [std.string :as str]
-            [std.fs :as fs])
+            [std.fs :as fs]
+            [std.lang.base.emit-source :as source])
   (:refer-clojure :exclude [compile]))
 
 (def ^:dynamic *mock-compile* false)
@@ -17,11 +18,17 @@
   "helper function for compile methods"
   {:added "4.0"}
   ([body {:keys [header footer]}]
-   (->> (concat
-         (if header [header])
-         [body]
-         (if footer [footer]))
-        (str/join "\n\n"))))
+   (cond (source/source-node? body)
+         (source/emit-join "\n\n"
+                           (concat (if header [header])
+                                   [body]
+                                   (if footer [footer])))
+         :else
+         (->> (concat
+               (if header [header])
+               [body]
+               (if footer [footer]))
+              (str/join "\n\n")))))
 
 (defn compile-out-path
   "creates the output path for file"
@@ -45,18 +52,38 @@
            orig  (when (fs/exists? file)
                    (slurp file))]
        (cond (not (fs/exists? file))
-             (cond (empty? body)
-                   [:blank file]
+             (cond (nil? body) [:blank file] ;; Empty body handling: if nil or empty str.
+                   (and (string? body) (empty? body)) [:blank file]
+
+                   (source/source-node? body)
+                   (do (fs/create-directory (fs/parent path))
+                       (let [{:keys [code map]} (source/generate-source-map body
+                                                                           {:file (str file)
+                                                                            :source-root ""})]
+                         (doto file (spit (str code "\n//# sourceMappingURL=" (fs/file-name file) ".map")))
+                         (doto (fs/path (str file ".map")) (spit map))
+                         [:written file]))
 
                    :else
                    (do (fs/create-directory (fs/parent path))
                        [:written (doto file (spit body))]))
 
-             (empty? body)
+             (and (string? body) (empty? body))
              [:deleted  (doto file (fs/delete))]
              
-             (= orig body)
+             (and (string? body) (= orig body))
              [:unchanged   file]
+
+             (source/source-node? body)
+             (let [{:keys [code map]} (source/generate-source-map body
+                                                                 {:file (str file)
+                                                                  :source-root ""})
+                   code (str code "\n//# sourceMappingURL=" (fs/file-name file) ".map")]
+               (if (= orig code)
+                 [:unchanged file]
+                 (do (doto file (spit code))
+                     (doto (fs/path (str file ".map")) (spit map))
+                     [:written file])))
 
              :else
              [:written (doto file (spit body))])))))

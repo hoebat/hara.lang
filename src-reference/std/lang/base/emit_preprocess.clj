@@ -310,7 +310,9 @@
                          update
                          import
                          (fnil #(conj % sym) #{})))))]
-    sym))
+    (if (instance? clojure.lang.IObj sym)
+      (with-meta sym (meta sym))
+      sym)))
 
 (defn to-staging
   "converts the stage"
@@ -329,9 +331,13 @@
                          (to-staging-form form grammar modules mopts deps-fragment walk-fn)
                          
                          (and (symbol? form))
-                         (if (namespace form)
-                           (process-namespaced-symbol form modules mopts deps deps-fragment walk-fn)
-                           (process-standard-symbol form mopts deps-native))
+                         (let [res (if (namespace form)
+                                     (process-namespaced-symbol form modules mopts deps deps-fragment walk-fn)
+                                     (process-standard-symbol form mopts deps-native))]
+                           (if (and (instance? clojure.lang.IObj res)
+                                    (instance? clojure.lang.IObj form))
+                             (with-meta res (meta form))
+                             res))
                          
                          :else form))
                  input)
