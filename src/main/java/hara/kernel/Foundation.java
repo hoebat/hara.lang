@@ -1,7 +1,6 @@
 package hara.kernel;
 
 import hara.kernel.base.RT;
-import hara.kernel.base.RT.Instance;
 import hara.kernel.protocol.IRuntime;
 import hara.lang.base.Ex;
 import hara.lang.base.Iter;
@@ -15,7 +14,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @SuppressWarnings("rawtypes")
@@ -125,13 +123,6 @@ public class Foundation implements IContext {
     }
   }
 
-  public enum CLASSPATH {
-    ADD,
-    LIST,
-    REMOVE,
-    PURGE
-  }
-
   @SuppressWarnings("unchecked")
   public static java.util.List<String> toStringList(java.util.List<Object> args) {
     return args.stream().map(Object::toString).collect(Collectors.toList());
@@ -149,112 +140,6 @@ public class Foundation implements IContext {
               .collect(Collectors.toList());
     } else {
       return m;
-    }
-  }
-
-  @SuppressWarnings("unchecked")
-  public static Object run(Function<java.util.List<String>, Object> f, Object... args) {
-    java.util.List input =
-        (args.length == 1 && args[0] instanceof java.util.List)
-            ? (java.util.List) args[0]
-            : Arrays.asList(args);
-    return f.apply(input);
-  }
-
-  @SuppressWarnings("unchecked")
-  public static Object runIn(
-      Function<java.util.List<String>, Object> f, IContext c, Object... args) {
-    java.util.List input =
-        (args.length == 1 && args[0] instanceof java.util.List)
-            ? (java.util.List) args[0]
-            : Arrays.asList(args);
-    return f.apply(input);
-  }
-
-  public interface Fn {
-
-    public static Object JVM_ENV(java.util.List<String> args) {
-      return (args.size() == 0) ? mapToList(System.getenv()) : System.getenv(args.get(0));
-    }
-
-    public static Object JVM_PROPS(java.util.List<String> args) {
-      return (args.size() == 0)
-          ? mapToList(System.getProperties())
-          : System.getProperty(args.get(0));
-    }
-
-    public static java.util.List runDIR(Foundation F) {
-      return Arrays.asList(
-          "SERVERS", Iter.toArrayList(F.SERVERS.keys()),
-          "RTS", Iter.toArrayList(F.RTS.keys()),
-          "PEERS", Iter.toArrayList(F.PEERS.keys()));
-    }
-
-    public static Object runInfo(Foundation F) {
-      return mapToList(
-          Map.of(
-              "java.version", System.getProperty("java.version"),
-              "os.name", System.getProperty("os.name"),
-              "sessions", F.RTS.size(),
-              "servers", F.SERVERS.size(),
-              "peers", F.PEERS.size()));
-    }
-
-    public static String runProcess(java.util.List<String> args) {
-      try {
-        var p = new ProcessBuilder().command(args).start();
-        return new String(p.getInputStream().readAllBytes());
-      } catch (Throwable t) {
-        throw Ex.Sneaky(t);
-      }
-    }
-
-    @SuppressWarnings("unchecked")
-    public static java.util.List runHELP(Foundation F, Object enums) {
-      return Iter.toArrayList(Iter.map(Array.toIter(enums), (x) -> x.toString()));
-    }
-
-    public static Object runSessionFor(Foundation F, String key, Function<RT.Instance, Object> f) {
-      RT.Instance s = (Instance) F.RTS.get(key);
-
-      if (s != null) return f.apply(s);
-      throw new Ex.Runtime("No Session: " + key);
-    }
-
-    public static Object runSessionCreate(
-        Foundation F, java.util.List<String> args, boolean raise) {
-      var key = args.get(0);
-      var s = F.RTS.get(key);
-      if (s != null) {
-        if (raise) {
-          throw new Ex.Runtime("Session already exists: " + key);
-        }
-      } else {
-        F.RTS.put(key, new RT.Instance(F, key));
-      }
-      return key;
-    }
-
-    public static Object runSessionClasspath(RT.Instance rt, java.util.List<String> args) {
-      CLASSPATH cmd = (args.size() == 1) ? CLASSPATH.LIST : CLASSPATH.valueOf(args.get(1));
-      if (cmd == CLASSPATH.LIST) {
-        System.out.println("LIST");
-        return rt.pathCache();
-      }
-
-      args.remove(0);
-      args.remove(0);
-      switch (cmd) {
-        case ADD:
-          return rt.pathAdd(args.toArray(new String[] {}));
-        case REMOVE:
-          return rt.pathRemove(args.toArray(new String[] {}));
-        case PURGE:
-          return rt.pathCache().empty();
-        case LIST:
-          return rt.pathCache();
-      }
-      throw new Ex.Unsupported();
     }
   }
 

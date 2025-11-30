@@ -2,6 +2,8 @@ package hara.kernel.command;
 
 import hara.kernel.Command;
 import hara.kernel.Foundation;
+import hara.kernel.base.RT;
+import hara.lang.base.Ex;
 
 import java.util.List;
 
@@ -11,7 +13,11 @@ public class Maven {
   @Command.Sub(name = "LOAD")
   public static Object load(Foundation F, List<Object> args) {
     List<String> sArgs = Foundation.toStringList(args);
-    return Foundation.Fn.runSessionFor(
-        F, sArgs.get(0), (rt) -> hara.kernel.maven.Maven.load.invoke(rt, sArgs.get(1)));
+    String key = sArgs.get(0);
+    RT.Instance rt = (RT.Instance) F.RTS.get(key);
+    if (rt == null) {
+      throw new Ex.Runtime("No Session: " + key);
+    }
+    return hara.kernel.maven.Maven.load.invoke(rt, sArgs.get(1));
   }
 }
