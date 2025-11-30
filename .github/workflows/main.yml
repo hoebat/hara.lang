@@ -20,3 +20,9 @@ jobs:
         cache: maven
     - name: Build and test with Maven
       run: mvn -B package --file pom.xml
+
+    - name: Upload Coverage Report
+      uses: actions/upload-artifact@v3
+      with:
+        name: jacoco-report
+        path: target/site/jacoco/
