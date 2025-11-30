@@ -69,3 +69,31 @@ The key interface groups include:
 *   **Dependency Management (`IDeps`, `IDepsMutate`):** A protocol for managing dependencies between different modules or components within the system.
 *   **Function Arity (`Fn`, `OFn`):** A flexible abstraction for defining functions that can handle a variable number of arguments (arities), a common feature in Lisp-like languages.
 *   **I/O and Networking (`IWire`, `IByteSource`, `IArchive`):** A collection of interfaces for abstracting away the details of I/O operations, including network communication and file archiving.
+
+## Roadmap & TODOs
+
+The following is a list of known tasks and missing features identified during the porting process from the reference Clojure implementation.
+
+### Missing Standard Library Modules
+Porting these modules from `src-reference/std` to `src/main/java/hara` is a priority.
+
+*   **FileSystem (`std.fs`)**: File manipulation, paths, and attributes.
+*   **Concurrency (`std.concurrent`)**: Advanced concurrency tools, atoms, and agents.
+*   **Image (`std.image`)**: Image processing and generation.
+*   **JSON (`std.json`)**: JSON serialization and parsing.
+*   **Time (`std.time`)**: Comprehensive date and time library.
+*   **Math (`std.math`)**: Advanced mathematical functions and statistics.
+
+### Documentation
+*   **Specification**: Create `SPECIFICATION.md` to detail the language syntax and behavior.
+
+### Refactoring
+*   **Foundation**: Improve command dispatch mechanism and extract `Foundation.Fn` static methods into dedicated classes.
+*   **Testing**: Improve test coverage for core components.
+
+### Code TODOs
+Specific areas in the codebase marked for improvement:
+
+*   `hara.kernel.command.Session`: Implement `INFO` command.
+*   `hara.lang.data.Cons`: Implement Iterator support.
+*   `hara.kernel.base.Read`: Add checks for duplicate keys in maps.
