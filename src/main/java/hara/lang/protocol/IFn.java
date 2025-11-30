@@ -1,7 +1,7 @@
 package hara.lang.protocol;
 
-import hara.lang.data.types.ILinearType;
 import hara.lang.base.Ex;
+import hara.lang.data.types.ILinearType;
 
 import java.util.Iterator;
 import java.util.function.BiFunction;

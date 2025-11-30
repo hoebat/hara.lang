@@ -1,13 +1,10 @@
 package hara.lang.data;
 
+import hara.lang.data.types.IMapType;
 import hara.lang.data.types.ObjMutable;
-import java.util.Map.Entry;
-import hara.lang.data.types.*;
-import hara.lang.protocol.*;
-import hara.lang.base.Iter;
-import hara.lang.base.primitive.*;
+
 import java.util.Iterator;
-import java.util.Collection;
+import java.util.Map.Entry;
 
 public class AsMap<K, V> extends ObjMutable implements IMapType<K, V> {
 

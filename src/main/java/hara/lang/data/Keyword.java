@@ -1,9 +1,8 @@
 package hara.lang.data;
 
-import hara.lang.data.types.IStringType;
-import hara.lang.base.primitive.Array;
 import hara.lang.base.Ex;
-
+import hara.lang.base.primitive.Array;
+import hara.lang.data.types.IStringType;
 import hara.lang.protocol.*;
 
 import java.lang.ref.WeakReference;

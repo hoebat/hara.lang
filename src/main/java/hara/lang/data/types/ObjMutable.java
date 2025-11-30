@@ -1,8 +1,7 @@
 package hara.lang.data.types;
 
-import hara.lang.protocol.*;
 import hara.lang.base.Iter;
-import java.util.Iterator;
+import hara.lang.protocol.*;
 
 public abstract class ObjMutable implements IObjType, IMutable, IHash {
   public IMetadata _meta;

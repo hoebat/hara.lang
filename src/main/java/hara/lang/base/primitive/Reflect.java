@@ -1,17 +1,20 @@
 package hara.lang.base.primitive;
 
-import hara.lang.data.types.ObjFn;
 import hara.lang.base.Ex;
 import hara.lang.base.Iter;
+import hara.lang.data.types.ObjFn;
 import hara.lang.protocol.IFn;
 import hara.lang.protocol.IMetadata;
+
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.LinkedList;
-import java.util.function.*;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+import java.util.function.Supplier;
 
 public interface Reflect {
 

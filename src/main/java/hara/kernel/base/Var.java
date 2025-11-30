@@ -1,9 +1,9 @@
 package hara.kernel.base;
 
+import hara.lang.data.Map;
 import hara.lang.data.types.INamespacedType;
 import hara.lang.data.types.IStringType;
 import hara.lang.data.types.IVarType;
-import hara.lang.data.Map;
 import hara.lang.protocol.Constant;
 import hara.lang.protocol.IReset;
 

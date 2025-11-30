@@ -1,12 +1,10 @@
 package hara.lang.data;
 
+import hara.lang.data.types.ILinearType;
+import hara.lang.data.types.ISequentialType;
 import hara.lang.data.types.ObjMutable;
-import hara.lang.data.types.*;
-import hara.lang.protocol.*;
-import hara.lang.base.Iter;
-import hara.lang.base.primitive.*;
+
 import java.util.Iterator;
-import java.util.Collection;
 
 public class AsList<E> extends ObjMutable implements ILinearType<E>, ISequentialType<E> {
 

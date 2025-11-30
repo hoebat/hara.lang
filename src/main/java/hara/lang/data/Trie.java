@@ -1,12 +1,9 @@
 package hara.lang.data;
 
-import hara.lang.data.types.ObjMutable;
-
-import hara.lang.data.types.ObjPersistent;
-
-import hara.lang.data.types.IRefType;
 import hara.lang.base.G;
 import hara.lang.base.Iter;
+import hara.lang.data.types.ObjMutable;
+import hara.lang.data.types.ObjPersistent;
 import hara.lang.protocol.*;
 
 import java.util.*;

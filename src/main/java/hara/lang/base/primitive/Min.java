@@ -1,10 +1,5 @@
 package hara.lang.base.primitive;
 
-import hara.lang.base.NumOps;
-import hara.lang.base.NumUtils;
-import java.math.BigDecimal;
-import java.math.BigInteger;
-
 public interface Min {
   public static double min(double x, double y) {
     return Math.min(x, y);

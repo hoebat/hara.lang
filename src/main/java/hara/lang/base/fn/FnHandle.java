@@ -1,11 +1,11 @@
 package hara.lang.base.fn;
 
-import hara.lang.data.types.ObjFn;
-
 import hara.lang.base.Ex;
 import hara.lang.base.Iter;
+import hara.lang.data.types.ObjFn;
 import hara.lang.protocol.IFn;
 import hara.lang.protocol.IMetadata;
+
 import java.lang.invoke.MethodHandle;
 import java.util.Arrays;
 import java.util.LinkedList;

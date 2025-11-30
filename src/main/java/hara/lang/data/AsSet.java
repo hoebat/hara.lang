@@ -1,12 +1,9 @@
 package hara.lang.data;
 
+import hara.lang.data.types.ISetType;
 import hara.lang.data.types.ObjMutable;
-import hara.lang.data.types.*;
-import hara.lang.protocol.*;
-import hara.lang.base.Iter;
-import hara.lang.base.primitive.*;
+
 import java.util.Iterator;
-import java.util.Collection;
 
 public class AsSet<E> extends ObjMutable implements ISetType<E> {
   final java.util.Set<E> _s;

@@ -1,10 +1,7 @@
 package hara.lang.data;
 
-import hara.lang.data.types.ObjPersistent;
-
 import hara.lang.data.types.INamespacedType;
 import hara.lang.data.types.IStringType;
-
 import hara.lang.protocol.Constant;
 import hara.lang.protocol.IMetadata;
 

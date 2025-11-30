@@ -1,9 +1,8 @@
 package hara.lang.data;
 
-import hara.lang.data.types.ObjPersistent;
-
 import hara.lang.data.types.ILinkedType;
 import hara.lang.data.types.ISequentialType;
+import hara.lang.data.types.ObjPersistent;
 import hara.lang.protocol.IMetadata;
 
 import java.util.Iterator;

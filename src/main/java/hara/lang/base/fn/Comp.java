@@ -1,10 +1,11 @@
 package hara.lang.base.fn;
 
-import hara.lang.base.primitive.Array;
 import hara.lang.base.Fn;
 import hara.lang.base.Iter;
+import hara.lang.base.primitive.Array;
 import hara.lang.protocol.IFn;
 import hara.lang.protocol.IOFn;
+
 import java.util.function.Function;
 
 @SuppressWarnings({"rawtypes", "unchecked"})

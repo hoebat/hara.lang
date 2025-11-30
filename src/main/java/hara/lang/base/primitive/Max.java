@@ -1,10 +1,5 @@
 package hara.lang.base.primitive;
 
-import hara.lang.base.NumOps;
-import hara.lang.base.NumUtils;
-import java.math.BigDecimal;
-import java.math.BigInteger;
-
 public interface Max {
 
   public static double max(double x, double y) {

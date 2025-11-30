@@ -1,15 +1,6 @@
 package hara.lang.base;
 
-import hara.lang.base.primitive.Ratio;
-
-import hara.lang.base.primitive.Complex;
-
-import hara.lang.base.primitive.Cast;
-
-import hara.lang.base.primitive.Box;
-
-import hara.lang.base.primitive.Bits;
-
+import hara.lang.base.primitive.*;
 import org.junit.Test;
 
 import java.math.BigInteger;

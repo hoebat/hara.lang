@@ -2,7 +2,6 @@ package hara.kernel;
 
 import hara.kernel.protocol.IRedirect;
 import hara.lang.base.Ex;
-
 import hara.lang.protocol.IComponent;
 import hara.lang.protocol.IMetadata;
 

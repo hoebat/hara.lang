@@ -1,9 +1,6 @@
 package hara.lang.base;
 
 import hara.lang.base.primitive.Num;
-
-import hara.lang.base.primitive.Ratio;
-
 import hara.lang.base.primitive.Ratio;
 
 import java.math.BigDecimal;

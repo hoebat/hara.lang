@@ -1,13 +1,10 @@
 package hara.lang.data;
 
-import hara.lang.data.types.ObjMutable;
-
-import hara.lang.data.types.ObjPersistent;
-
-import hara.lang.data.types.IRefType;
-import hara.lang.data.types.ISetType;
-import hara.lang.base.primitive.Array;
 import hara.lang.base.Iter;
+import hara.lang.base.primitive.Array;
+import hara.lang.data.types.ISetType;
+import hara.lang.data.types.ObjMutable;
+import hara.lang.data.types.ObjPersistent;
 import hara.lang.protocol.IMetadata;
 import hara.lang.protocol.IToMutable;
 import hara.lang.protocol.IToPersistent;

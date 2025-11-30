@@ -1,9 +1,5 @@
 package hara.lang.data.types;
 
-import hara.lang.data.types.ObjMutable;
-
-import hara.lang.data.types.ObjPersistent;
-
 import hara.lang.protocol.IMetadata;
 import hara.lang.protocol.INamespaced;
 

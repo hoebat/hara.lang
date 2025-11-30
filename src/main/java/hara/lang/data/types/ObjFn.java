@@ -1,11 +1,11 @@
 package hara.lang.data.types;
 
-import hara.lang.data.types.ObjFn;
-
 import hara.lang.base.Ex;
 import hara.lang.base.G;
 import hara.lang.data.Keyword;
-import hara.lang.protocol.*;
+import hara.lang.protocol.Constant;
+import hara.lang.protocol.IHash;
+import hara.lang.protocol.IMetadata;
 
 public abstract class ObjFn extends ObjPersistent {
 

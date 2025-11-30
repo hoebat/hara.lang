@@ -1,19 +1,22 @@
 package hara.kernel.base;
 
-import hara.lang.base.primitive.Array;
-
-import hara.lang.data.types.ObjFn;
-
-import hara.lang.data.types.ILinearType;
 import hara.kernel.protocol.IEnv;
 import hara.kernel.protocol.IRuntime;
-import hara.lang.base.*;
-import hara.lang.base.fn.*;
+import hara.lang.base.Ex;
+import hara.lang.base.G;
+import hara.lang.base.Iter;
+import hara.lang.base.fn.ReduceArray;
+import hara.lang.base.fn.ReduceCompare;
+import hara.lang.base.fn.ReduceInit;
+import hara.lang.base.fn.ReduceSelf;
+import hara.lang.base.primitive.Array;
 import hara.lang.data.*;
 import hara.lang.data.List;
 import hara.lang.data.Map;
 import hara.lang.data.Queue;
 import hara.lang.data.Vector;
+import hara.lang.data.types.ILinearType;
+import hara.lang.data.types.ObjFn;
 import hara.lang.protocol.*;
 
 import java.lang.annotation.Annotation;

@@ -1,14 +1,10 @@
 package hara.lang.base.primitive;
 
-import hara.lang.base.*;
-import hara.lang.base.primitive.Bits;
-import hara.lang.data.types.ObjMutable;
-import hara.lang.data.types.ILinearType;
-import hara.lang.data.types.IMapType;
-import hara.lang.data.types.ISequentialType;
-import hara.lang.data.types.ISetType;
+import hara.lang.base.Iter;
 import hara.lang.data.Tuple;
-import hara.lang.protocol.*;
+import hara.lang.protocol.ICount;
+import hara.lang.protocol.ILookup;
+
 import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;

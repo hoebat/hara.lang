@@ -1,7 +1,6 @@
 package hara.lang.base;
 
 import hara.lang.base.primitive.Num;
-
 import hara.lang.protocol.IEquality;
 
 import java.util.Iterator;

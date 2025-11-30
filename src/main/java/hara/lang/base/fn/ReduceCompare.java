@@ -1,12 +1,12 @@
 package hara.lang.base.fn;
 
-import hara.lang.data.types.ObjFn;
-
 import hara.lang.base.Fn;
 import hara.lang.base.Iter;
 import hara.lang.data.Tuple;
+import hara.lang.data.types.ObjFn;
 import hara.lang.protocol.IFn;
 import hara.lang.protocol.IMetadata;
+
 import java.util.Iterator;
 import java.util.function.BiFunction;
 import java.util.function.Function;

@@ -1,7 +1,5 @@
 package hara.lang.base.primitive;
 
-import hara.lang.base.primitive.Array;
-
 import org.junit.Test;
 
 import java.util.Iterator;

@@ -1,7 +1,6 @@
 package hara.lang.base;
 
 import hara.lang.base.primitive.Array;
-
 import hara.lang.protocol.Constant;
 import hara.lang.protocol.IDisplay;
 import hara.lang.protocol.IHash;

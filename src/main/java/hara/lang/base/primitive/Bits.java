@@ -1,11 +1,5 @@
 package hara.lang.base.primitive;
 
-import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.math.MathContext;
-import java.util.Objects;
-import hara.lang.base.primitive.Num;
-
 public interface Bits {
 
   public static final byte deBruijnIndex[] =

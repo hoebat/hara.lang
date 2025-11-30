@@ -1,9 +1,10 @@
 package hara.lang.data.types;
 
-import hara.lang.data.types.ObjEmpty;
-
 import hara.lang.base.Iter;
-import hara.lang.protocol.*;
+import hara.lang.protocol.IColl;
+import hara.lang.protocol.IMetadata;
+import hara.lang.protocol.INth;
+
 import java.util.Iterator;
 
 public abstract class ObjEmpty<E> extends ObjPersistent implements IColl<E>, INth<E> {

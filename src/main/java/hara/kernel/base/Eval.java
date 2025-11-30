@@ -1,7 +1,5 @@
 package hara.kernel.base;
 
-import hara.lang.data.types.ILinearType;
-import hara.lang.data.types.IMapType;
 import hara.kernel.protocol.IEnv;
 import hara.kernel.protocol.IRuntime;
 import hara.lang.base.Ex;
@@ -11,6 +9,8 @@ import hara.lang.base.Iter;
 import hara.lang.data.Keyword;
 import hara.lang.data.List;
 import hara.lang.data.Symbol;
+import hara.lang.data.types.ILinearType;
+import hara.lang.data.types.IMapType;
 import hara.lang.protocol.ILookup;
 import hara.lang.protocol.IObjType;
 

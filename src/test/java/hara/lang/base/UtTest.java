@@ -1,8 +1,9 @@
 package hara.lang.base;
 
-import hara.lang.data.*;
-
 import hara.lang.base.primitive.*;
+import hara.lang.data.AsList;
+import hara.lang.data.AsMap;
+import hara.lang.data.AsSet;
 import org.junit.Test;
 
 import java.util.ArrayList;

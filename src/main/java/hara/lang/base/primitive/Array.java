@@ -1,23 +1,15 @@
 package hara.lang.base.primitive;
 
+import hara.lang.base.G;
+import hara.lang.base.Iter;
+import hara.lang.base.iter.*;
+
 import java.util.Arrays;
-import hara.lang.base.iter.ArrayIterator;
-import hara.lang.base.iter.BooleanArrayIterator;
-import hara.lang.base.iter.ByteArrayIterator;
-import hara.lang.base.iter.CharArrayIterator;
-import hara.lang.base.iter.DoubleArrayIterator;
-import hara.lang.base.iter.FloatArrayIterator;
-import hara.lang.base.iter.IntArrayIterator;
-import hara.lang.base.iter.LongArrayIterator;
-import hara.lang.base.iter.ReverseArrayIterator;
-import hara.lang.base.iter.ShortArrayIterator;
 import java.util.Iterator;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
-import hara.lang.base.G;
-import hara.lang.base.Iter;
 
 public interface Array {
 
