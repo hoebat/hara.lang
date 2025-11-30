@@ -1,4 +1,4 @@
-package hara.lang.data.types;
+package hara.data.types;
 
 import hara.lang.protocol.IDeref;
 

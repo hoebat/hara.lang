@@ -1,9 +1,7 @@
 package hara.lang.base.fn;
 
-import hara.lang.data.types.ObjFn;
-
 import hara.lang.base.Fn;
-import hara.lang.base.Iter;
+import hara.lang.base.It;
 import hara.lang.base.Obj;
 import hara.lang.protocol.IFn;
 import hara.lang.protocol.IMetadata;
@@ -12,7 +10,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class ReduceSelf<R, E, FN> extends ObjFn implements IFn<R, R, E> {
+public class ReduceSelf<R, E, FN> extends Obj.FN implements IFn<R, R, E> {
   final BiFunction<R, E, R> _f2;
   final R _init;
 
@@ -43,6 +41,6 @@ public class ReduceSelf<R, E, FN> extends ObjFn implements IFn<R, R, E> {
 
   @Override
   public Function getArgN() {
-    return (es) -> Iter.reduceIn(Iter.iter(es), _init, _f2);
+    return (es) -> It.reduceIn(It.iter(es), _init, _f2);
   }
 }

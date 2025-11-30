@@ -1,7 +1,5 @@
 package hara.lang.base.fn;
 
-import hara.lang.data.types.ObjFn;
-
 import hara.lang.base.Obj;
 import hara.lang.protocol.IFn;
 import hara.lang.protocol.IMetadata;
@@ -10,7 +8,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class FnVargs<R, ITR> extends ObjFn implements IFn<R, Object, Object> {
+public class FnVargs<R, ITR> extends Obj.FN implements IFn<R, Object, Object> {
 
   final Function<ITR, R> _f;
 

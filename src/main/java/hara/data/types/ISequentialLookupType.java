@@ -1,6 +1,6 @@
-package hara.lang.data.types;
+package hara.data.types;
 
-import hara.lang.base.Iter;
+import hara.lang.base.It;
 import hara.lang.protocol.*;
 
 import java.util.Iterator;
@@ -41,7 +41,7 @@ public interface ISequentialLookupType<E>
 
   @Override
   default Iterator<Long> keys() {
-    return Iter.range(0, count());
+    return It.range(0, count());
   }
 
   @Override

@@ -1,11 +1,9 @@
 package hara.lang.base;
 
-import hara.lang.data.types.ObjMutable;
-
-import hara.lang.data.types.ILinearType;
-import hara.lang.data.types.IMapType;
-import hara.lang.data.types.ISequentialType;
-import hara.lang.data.types.ISetType;
+import hara.data.types.ILinearType;
+import hara.data.types.IMapType;
+import hara.data.types.ISequentialType;
+import hara.data.types.ISetType;
 import hara.lang.data.Tuple;
 import hara.lang.protocol.*;
 
@@ -19,7 +17,7 @@ import java.util.function.Supplier;
 
 public interface Ut {
 
-  public class AsList<E> extends ObjMutable implements ILinearType<E>, ISequentialType<E> {
+  public class AsList<E> extends Obj.MT implements ILinearType<E>, ISequentialType<E> {
 
     final java.util.List<E> _l;
 
@@ -84,7 +82,7 @@ public interface Ut {
   }
 
   @SuppressWarnings("unchecked")
-  public class AsMap<K, V> extends ObjMutable implements IMapType<K, V> {
+  public class AsMap<K, V> extends Obj.MT implements IMapType<K, V> {
 
     final java.util.Map<K, V> _m;
 
@@ -141,7 +139,7 @@ public interface Ut {
     }
   }
 
-  public class AsSet<E> extends ObjMutable implements ISetType<E> {
+  public class AsSet<E> extends Obj.MT implements ISetType<E> {
     final java.util.Set<E> _s;
 
     public AsSet(java.util.Set<E> s) {
@@ -421,7 +419,7 @@ public interface Ut {
         while (_rq.poll() != null) {}
 
         var it = _lu.entrySet().iterator();
-        Iter.filter(it, (e) -> (e.getValue() == null) || (e.getValue().get() == null))
+        It.filter(it, (e) -> (e.getValue() == null) || (e.getValue().get() == null))
             .forEachRemaining((e) -> _lu.remove(e.getKey()));
       }
     }

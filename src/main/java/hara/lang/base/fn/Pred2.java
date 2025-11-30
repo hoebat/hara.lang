@@ -1,7 +1,5 @@
 package hara.lang.base.fn;
 
-import hara.lang.data.types.ObjFn;
-
 import hara.lang.base.Obj;
 import hara.lang.protocol.IFn;
 import hara.lang.protocol.IMetadata;
@@ -9,7 +7,7 @@ import java.util.function.BiFunction;
 import java.util.function.BiPredicate;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
-public class Pred2<T1, T2> extends ObjFn implements IFn<Boolean, T1, T2> {
+public class Pred2<T1, T2> extends Obj.FN implements IFn<Boolean, T1, T2> {
 
   final BiPredicate<T1, T2> _p2;
 

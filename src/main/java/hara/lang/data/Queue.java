@@ -1,15 +1,11 @@
 package hara.lang.data;
 
-import hara.lang.data.types.ObjMutable;
-
-import hara.lang.data.types.ObjPersistent;
-
-import hara.lang.data.types.ILinearType;
-import hara.lang.data.types.IRefType;
-import hara.lang.data.types.ISequentialLookupType;
-import hara.lang.base.primitive.Array;
+import hara.data.types.ILinearType;
+import hara.data.types.IRefType;
+import hara.data.types.ISequentialLookupType;
+import hara.lang.base.Arr;
 import hara.lang.base.Ex;
-import hara.lang.base.Iter;
+import hara.lang.base.It;
 import hara.lang.protocol.IColl;
 import hara.lang.protocol.IMetadata;
 import hara.lang.protocol.IToMutable;
@@ -59,12 +55,12 @@ public interface Queue<E> extends IColl<E>, ILinearType<E>, ISequentialLookupTyp
     @Override
     default Iterator<E> iterator() {
       if (_size() == 0) {
-        return (Iterator<E>) Iter.emptyIterator();
+        return (Iterator<E>) It.emptyIterator();
       }
       ;
       ArrayList<Iterator> all = new ArrayList<Iterator>();
       all.add(_head().iterator());
-      Iter.reduce(
+      It.reduce(
           _buffer().iterator(),
           all,
           (arr, v) -> {
@@ -72,7 +68,7 @@ public interface Queue<E> extends IColl<E>, ILinearType<E>, ISequentialLookupTyp
             return all;
           });
       all.add(_tail().iterator());
-      return Iter.concat(all.iterator());
+      return It.concat(all.iterator());
     }
 
     @Override
@@ -112,7 +108,7 @@ public interface Queue<E> extends IColl<E>, ILinearType<E>, ISequentialLookupTyp
     }
   }
 
-  public class Mutable<E> extends ObjMutable implements Base<E>, IToPersistent {
+  public class Mutable<E> extends IRefType.MT implements Base<E>, IToPersistent {
     int _size;
     int _offset;
 
@@ -149,7 +145,7 @@ public interface Queue<E> extends IColl<E>, ILinearType<E>, ISequentialLookupTyp
     @SuppressWarnings("unchecked")
     public static <E> Mutable<E> from(IMetadata meta, E... objs) {
       var vec = Mutable.empty(meta);
-      return Array.reduce((v, e) -> v.pushLast(e), vec, objs);
+      return Arr.reduce((v, e) -> v.pushLast(e), vec, objs);
     }
 
     @SuppressWarnings({"rawtypes"})
@@ -162,7 +158,7 @@ public interface Queue<E> extends IColl<E>, ILinearType<E>, ISequentialLookupTyp
     }
 
     public static <E> Mutable<E> into(Mutable<E> coll, Iterator<E> it) {
-      return Iter.reduce(it, coll, (m, e) -> m.pushLast(e));
+      return It.reduce(it, coll, (m, e) -> m.pushLast(e));
     }
 
     @SuppressWarnings({"unchecked"})
@@ -272,7 +268,7 @@ public interface Queue<E> extends IColl<E>, ILinearType<E>, ISequentialLookupTyp
     }
   }
 
-  public class Standard<E> extends ObjPersistent implements Base<E>, IToMutable {
+  public class Standard<E> extends IRefType.PT implements Base<E>, IToMutable {
     final int _size;
     final int _offset;
 
