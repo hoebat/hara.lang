@@ -1,4 +1,4 @@
-package hara.core.block;
+package hara.kernel.base;
 
 import java.io.IOException;
 import java.io.PushbackReader;
@@ -12,7 +12,15 @@ public class Reader {
   private int columnNumber = 1;
 
   public Reader(String s) {
-    this.reader = new PushbackReader(new StringReader(s), 2);
+    this(new StringReader(s));
+  }
+
+  public Reader(java.io.Reader r) {
+    if (r instanceof PushbackReader) {
+      this.reader = (PushbackReader) r;
+    } else {
+      this.reader = new PushbackReader(r, 2);
+    }
   }
 
   public int getLineNumber() {

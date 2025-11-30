@@ -5,7 +5,7 @@ import hara.compiler.DynamicClassLoader;
 import hara.kernel.Command;
 import hara.kernel.Foundation;
 import hara.kernel.base.RT;
-import hara.kernel.base.Read;
+import hara.kernel.base.Parser;
 import hara.lang.base.Ex;
 import hara.lang.base.G;
 import hara.lang.base.Iter;
@@ -72,7 +72,7 @@ public class Core {
   public static Object runCompile(Foundation F, List<Object> args) {
     try {
       hara.lang.data.List expression =
-          (hara.lang.data.List) Read.LispReader.readString(args.get(0).toString(), null);
+          (hara.lang.data.List) Parser.LispReader.readString(args.get(0).toString(), null);
       Compiler compiler = new Compiler();
       byte[] bytecode = compiler.compile(expression);
       DynamicClassLoader loader = new DynamicClassLoader(Foundation.class.getClassLoader());
