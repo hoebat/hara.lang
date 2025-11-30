@@ -2,7 +2,7 @@ package hara.lang.base;
 
 import hara.lang.data.*;
 
-import hara.lang.base.Ut.*;
+import hara.lang.base.primitive.*;
 import org.junit.Test;
 
 import java.util.ArrayList;

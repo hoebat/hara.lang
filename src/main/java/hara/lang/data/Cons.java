@@ -5,7 +5,6 @@ import hara.lang.data.types.ObjPersistent;
 import hara.lang.data.types.ILinkedType;
 import hara.lang.data.types.ISequentialType;
 import hara.lang.base.Ex;
-import hara.lang.base.Obj;
 import hara.lang.protocol.IMetadata;
 
 import java.util.Iterator;
