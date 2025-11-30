@@ -29,7 +29,8 @@ public abstract class ObjPersistent implements IObjType, IPersistent, IHashCache
 
   public String display() {
     if (this instanceof IColl) {
-      return Iter.display(((IColl) this).iterator());
+      IColl coll = (IColl) this;
+      return Iter.display(coll.iterator(), coll.startString(), coll.endString(), coll.sepString());
     }
     return super.toString();
   }
