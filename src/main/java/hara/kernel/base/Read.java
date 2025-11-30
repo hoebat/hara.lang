@@ -150,6 +150,8 @@ public interface Read {
       macros['\\'] = new CharacterReader();
       macros['#'] = new DispatchReader();
       macros['@'] = new DerefReader();
+      macros['`'] = new SyntaxQuoteReader();
+      macros['~'] = new UnquoteReader();
 
       dispatchMacros['#'] = new SymbolicValueReader();
       dispatchMacros['^'] = new MetaReader();
@@ -458,6 +460,30 @@ public interface Read {
       public Object apply(PushbackReader r, Map opts) {
         Object o = read(r, true, null, true, opts);
         return List.Standard.from(null, Symbol.create("deref"), o);
+      }
+    }
+
+    public static class SyntaxQuoteReader implements BiFunction<PushbackReader, Map, Object> {
+      @Override
+      public Object apply(PushbackReader r, Map opts) {
+        Object o = read(r, true, null, true, opts);
+        return List.Standard.from(null, Symbol.create("syntax-quote"), o);
+      }
+    }
+
+    public static class UnquoteReader implements BiFunction<PushbackReader, Map, Object> {
+      @Override
+      public Object apply(PushbackReader r, Map opts) {
+        int ch = readSingle(r);
+        if (ch == -1) throw new Ex.Runtime("EOF while reading character");
+        if (ch == '@') {
+          Object o = read(r, true, null, true, opts);
+          return List.Standard.from(null, Symbol.create("unquote-splicing"), o);
+        } else {
+          unread(r, ch);
+          Object o = read(r, true, null, true, opts);
+          return List.Standard.from(null, Symbol.create("unquote"), o);
+        }
       }
     }
 
