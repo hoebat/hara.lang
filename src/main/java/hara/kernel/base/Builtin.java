@@ -1,7 +1,9 @@
 package hara.kernel.base;
 
-import hara.data.types.ILinearType;
-import hara.data.types.IMapType;
+import hara.lang.base.primitive.Array;
+
+import hara.lang.data.types.ILinearType;
+import hara.lang.data.types.IMapType;
 import hara.kernel.protocol.IRuntime;
 import hara.lang.base.*;
 import hara.lang.base.fn.*;
@@ -284,7 +286,7 @@ public interface Builtin {
 
     @Module.Fn(name = "count", option = true)
     public static long count(Iterable coll) {
-      return It.count(It.iter(coll));
+      return Iter.count(Iter.iter(coll));
     }
 
     @Module.Fn(name = "count", option = true)
@@ -403,27 +405,27 @@ public interface Builtin {
 
     @Module.Fn(name = "into", protocol = true)
     public static <ITR> IConj into(IConj coll, ITR source) {
-      return It.reduceIn(It.iter(source), coll, Collection::conj);
+      return Iter.reduceIn(Iter.iter(source), coll, Collection::conj);
     }
 
     @Module.Fn(name = "into", option = true)
     public static <ITR> java.util.List into(java.util.List coll, ITR source) {
-      return It.reduceIn(It.iter(source), coll, Collection::conj);
+      return Iter.reduceIn(Iter.iter(source), coll, Collection::conj);
     }
 
     @Module.Fn(name = "into", option = true)
     public static <ITR> java.util.Map into(java.util.Map coll, ITR source) {
-      return It.reduceIn((Iterator<Entry>) It.iter(source), coll, Collection::conj);
+      return Iter.reduceIn((Iterator<Entry>) Iter.iter(source), coll, Collection::conj);
     }
 
     @Module.Fn(name = "into", option = true)
     public static <ITR> java.util.Set into(java.util.Set coll, ITR source) {
-      return It.reduceIn(It.iter(source), coll, Collection::conj);
+      return Iter.reduceIn(Iter.iter(source), coll, Collection::conj);
     }
 
     @Module.Fn(name = "iter", complete = true)
     public static <ITR> Iterator iter(ITR obj) {
-      return It.iter(obj);
+      return Iter.iter(obj);
     }
 
     @Module.Fn(name = "keys", protocol = true)
@@ -439,8 +441,8 @@ public interface Builtin {
     @Module.Fn(name = "merge", protocol = true)
     @Module.Reduce(type = SELF, init = EMPTY_MAP)
     public static <ITR> IAssoc merge(IAssoc coll, ITR other) {
-      Iterator<Entry> it = It.iter(other);
-      return It.reduce(
+      Iterator<Entry> it = Iter.iter(other);
+      return Iter.reduce(
           it,
           coll,
           (m, e) -> {
@@ -450,8 +452,8 @@ public interface Builtin {
 
     @Module.Fn(name = "merge", option = true)
     public static <ITR> java.util.Map merge(java.util.Map coll, ITR other) {
-      Iterator<Entry> it = It.iter(other);
-      return It.reduce(
+      Iterator<Entry> it = Iter.iter(other);
+      return Iter.reduce(
           it,
           coll,
           (m, e) -> {
@@ -472,7 +474,7 @@ public interface Builtin {
 
     @Module.Fn(name = "nth", option = true)
     public static <E> E nth(Iterable<E> coll, long idx) {
-      return (E) It.nth(It.iter(coll), idx);
+      return (E) Iter.nth(Iter.iter(coll), idx);
     }
 
     @Module.Fn(name = "nth", option = true)
@@ -487,22 +489,22 @@ public interface Builtin {
 
     @Module.Fn(name = "range", complete = true)
     public static Iterator<Long> range(Long max) {
-      return It.range(max);
+      return Iter.range(max);
     }
 
     @Module.Fn(name = "range", complete = true)
     public static Iterator<Long> range(Long min, Long max) {
-      return It.range(min, max);
+      return Iter.range(min, max);
     }
 
     @Module.Fn(name = "to:list", complete = true)
     public static <ITR> List.Standard toList(ITR source) {
-      return List.Standard.into(It.iter(source));
+      return List.Standard.into(Iter.iter(source));
     }
 
     @Module.Fn(name = "to:map", complete = true)
     public static <ITR> Map.Standard toMap(ITR source) {
-      return Map.Standard.into(It.iter(source));
+      return Map.Standard.into(Iter.iter(source));
     }
 
     @Module.Fn(name = "to:mutable", complete = true)
@@ -517,17 +519,17 @@ public interface Builtin {
 
     @Module.Fn(name = "to:seq", complete = true)
     public static <ITR> Seq toSeq(ITR source) {
-      return new Seq(It.iter(source));
+      return new Seq(Iter.iter(source));
     }
 
     @Module.Fn(name = "to:set", complete = true)
     public static <ITR> Set.Standard toSet(ITR source) {
-      return Set.Standard.into(It.iter(source));
+      return Set.Standard.into(Iter.iter(source));
     }
 
     @Module.Fn(name = "to:vec", complete = true)
     public static <ITR> Vector.Standard toVec(ITR source) {
-      return Vector.Standard.into(It.iter(source));
+      return Vector.Standard.into(Iter.iter(source));
     }
 
     @Module.Fn(name = "vals", protocol = true)
@@ -542,12 +544,12 @@ public interface Builtin {
 
     @Module.Fn(name = "zip", vargs = true, complete = true)
     public static <ITR> Iterator zip(ITR elements) {
-      return It.zip(It.iter(elements));
+      return Iter.zip(Iter.iter(elements));
     }
 
     @Module.Fn(name = "zipmap", complete = true)
     public static <ITR> Map.Standard zipmap(ITR keys, ITR vals) {
-      return toMap(It.zipPair(It.iter(keys), It.iter(vals)));
+      return toMap(Iter.zipPair(Iter.iter(keys), Iter.iter(vals)));
     }
   }
 
@@ -580,27 +582,28 @@ public interface Builtin {
 
     @Module.Fn(name = "class:static-methods")
     public static Set<String> classStaticMethods(Class cls) {
-      Iterator<Method> methods = It.iter(cls.getMethods());
+      Iterator<Method> methods = Iter.iter(cls.getMethods());
       return Collection.toSet(
-          It.map(
-              It.filter(methods, (m) -> Modifier.isStatic(m.getModifiers())), (m) -> m.getName()));
+          Iter.map(
+              Iter.filter(methods, (m) -> Modifier.isStatic(m.getModifiers())),
+              (m) -> m.getName()));
     }
 
     @Module.Fn(name = "class:static-fields")
     public static Iterator<String> classStaticFields(Class cls) {
-      Iterator<Field> fields = It.iter(cls.getFields());
-      return It.map(
-          It.filter(fields, (m) -> Modifier.isStatic(m.getModifiers())), (m) -> m.getName());
+      Iterator<Field> fields = Iter.iter(cls.getFields());
+      return Iter.map(
+          Iter.filter(fields, (m) -> Modifier.isStatic(m.getModifiers())), (m) -> m.getName());
     }
 
     @Module.Fn(name = "invoke:new", vargs = true)
     public static <R, ITR> Object invokeNew(Class c, ITR args) {
-      return Reflect.invokeConstructor(c, It.toArray(args));
+      return Reflect.invokeConstructor(c, Iter.toArray(args));
     }
 
     @Module.Fn(name = "invoke", vargs = true)
     public static <R, ITR> Object invokeObj(Object o, String method, ITR args) {
-      return Reflect.invokeInstanceMethod(o, method, It.toArray(args));
+      return Reflect.invokeInstanceMethod(o, method, Iter.toArray(args));
     }
 
     @Module.Fn(name = "invoke:get")
@@ -615,7 +618,7 @@ public interface Builtin {
 
     @Module.Fn(name = "invoke:static", vargs = true)
     public static <R, ITR> Object invokeStatic(Class c, String method, ITR args) {
-      return Reflect.invokeStaticMethod(c, method, It.toArray(args));
+      return Reflect.invokeStaticMethod(c, method, Iter.toArray(args));
     }
 
     @Module.Fn(name = "invoke:fn")
@@ -623,12 +626,12 @@ public interface Builtin {
       var lu = classStaticMethods(c);
       if (lu.has(method)) {
         return Fn.toFnVargs(
-            Struct.hashMap(Arr.objects(Basic.keyword("name"), c.getName() + "/" + method)),
-            (Function) args -> (R) Reflect.invokeStaticMethod(c, method, It.toArray(args)));
+            Struct.hashMap(Array.objects(Basic.keyword("name"), c.getName() + "/" + method)),
+            (Function) args -> (R) Reflect.invokeStaticMethod(c, method, Iter.toArray(args)));
       } else {
         throw new Ex.Info(
             "Method not found: " + method,
-            Struct.hashMap(Arr.objects(Basic.keyword("options"), lu)));
+            Struct.hashMap(Array.objects(Basic.keyword("options"), lu)));
       }
     }
 
@@ -653,9 +656,9 @@ public interface Builtin {
 
     @Module.Fn(name = "apply", vargs = true, helper = true)
     public static <R, ITR> R apply(IFn f, ITR vargs) {
-      Object[] args = Arr.toArray(vargs);
-      var lit = It.iter(args[args.length - 1]);
-      var it = It.concat(Arr.toIter(args, 1, args.length - 1), lit);
+      Object[] args = Array.toArray(vargs);
+      var lit = Iter.iter(args[args.length - 1]);
+      var it = Iter.concat(Array.toIter(args, 1, args.length - 1), lit);
       return (R) f.apply(it);
     }
 
@@ -666,7 +669,7 @@ public interface Builtin {
 
     @Module.Fn(name = "call", vargs = true, helper = true)
     public static <R, ANY, ITR> R call(ANY o, IFn f, ITR vargs) {
-      Object[] arr = Arr.toArray(It.concat(It.objects(o), It.iter(vargs)));
+      Object[] arr = Array.toArray(Iter.concat(Iter.objects(o), Iter.iter(vargs)));
       return (R) f.apply(arr);
     }
 
@@ -688,8 +691,8 @@ public interface Builtin {
     @Module.Fn(name = "group-by", helper = true)
     public static <ITR, K> Map.Standard<K, List> groupBy(IFn fk, IFn fv, ITR source) {
       return (Standard<K, List>)
-          It.reduceIn(
-              It.iter(source),
+          Iter.reduceIn(
+              Iter.iter(source),
               (Map<K, List>) Map.Standard.EMPTY,
               (m, e) -> {
                 K key = (K) fk.invoke(e);
@@ -713,9 +716,9 @@ public interface Builtin {
 
     @Module.Fn(name = "juxt", vargs = true, complete = true)
     public static <FN, ITR> IFn<Iterator, Iterator, Object> juxt(ITR fns) {
-      var jl = It.toArray(It.map(It.iter(fns), Fn::toFn));
+      var jl = Iter.toArray(Iter.map(Iter.iter(fns), Fn::toFn));
       return Fn.toFn(
-          (Function) (e) -> Struct.vector(It.map(It.iter(jl), (f) -> ((IFn) f).invoke(e))));
+          (Function) (e) -> Struct.vector(Iter.map(Iter.iter(jl), (f) -> ((IFn) f).invoke(e))));
     }
 
     @Module.Fn(name = "keep", complete = true)
@@ -735,8 +738,8 @@ public interface Builtin {
 
     @Module.Fn(name = "keep", helper = true)
     public static <ITR> Iterator keep(IFn f, ITR source) {
-      var it = It.iter(source);
-      return It.from(it::hasNext, () -> f.invoke(it.next()));
+      var it = Iter.iter(source);
+      return Iter.from(it::hasNext, () -> f.invoke(it.next()));
     }
 
     @Module.Fn(name = "map", complete = true)
@@ -756,8 +759,8 @@ public interface Builtin {
 
     @Module.Fn(name = "map", helper = true)
     public static <ITR> Iterator map(IFn f, ITR source) {
-      var it = It.iter(source);
-      return It.from(it::hasNext, () -> f.invoke(it.next()));
+      var it = Iter.iter(source);
+      return Iter.from(it::hasNext, () -> f.invoke(it.next()));
     }
 
     @Module.Fn(name = "map:apply", complete = true)
@@ -777,8 +780,8 @@ public interface Builtin {
 
     @Module.Fn(name = "map:apply", helper = true)
     public static <ITR> Iterator mapApply(IFn f, ITR source) {
-      var it = It.iter(source);
-      return It.from(it::hasNext, () -> f.apply(it.next()));
+      var it = Iter.iter(source);
+      return Iter.from(it::hasNext, () -> f.apply(it.next()));
     }
 
     @Module.Fn(name = "mapcat", complete = true)
@@ -798,8 +801,8 @@ public interface Builtin {
 
     @Module.Fn(name = "mapcat", helper = true)
     public static <ITR> Iterator mapcat(IFn f, ITR source) {
-      var it = It.iter(source);
-      return It.mapcat(it, (e) -> (Iterator) f.invoke(e));
+      var it = Iter.iter(source);
+      return Iter.mapcat(it, (e) -> (Iterator) f.invoke(e));
     }
 
     @Module.Fn(name = "map:entries", complete = true)
@@ -809,14 +812,14 @@ public interface Builtin {
 
     @Module.Fn(name = "map:entries", helper = true)
     public static <ITR> Map.Standard mapEntries(IFn f, ITR source) {
-      Iterator<Entry> it = It.iter(source);
-      return Map.Standard.into(It.map(it, e -> (Entry) f.invoke(e)));
+      Iterator<Entry> it = Iter.iter(source);
+      return Map.Standard.into(Iter.map(it, e -> (Entry) f.invoke(e)));
     }
 
     @Module.Fn(name = "map:juxt", helper = true)
     public static <ITR> Map.Standard mapJuxt(IFn fk, IFn fv, ITR source) {
-      var it = It.iter(source);
-      return Map.Standard.into(It.map(it, e -> Struct.pair(fk.invoke(e), fv.invoke(e))));
+      var it = Iter.iter(source);
+      return Map.Standard.into(Iter.map(it, e -> Struct.pair(fk.invoke(e), fv.invoke(e))));
     }
 
     @Module.Fn(name = "map:juxt", complete = true)
@@ -831,8 +834,8 @@ public interface Builtin {
 
     @Module.Fn(name = "map:keys", helper = true)
     public static <ITR> Map.Standard mapKeys(IFn f, ITR source) {
-      Iterator<Entry> it = It.iter(source);
-      return Map.Standard.into(It.map(it, e -> Struct.pair(f.invoke(e.getKey()), e.getValue())));
+      Iterator<Entry> it = Iter.iter(source);
+      return Map.Standard.into(Iter.map(it, e -> Struct.pair(f.invoke(e.getKey()), e.getValue())));
     }
 
     @Module.Fn(name = "map:vals", complete = true)
@@ -842,8 +845,8 @@ public interface Builtin {
 
     @Module.Fn(name = "map:vals", helper = true)
     public static <ITR> Map.Standard mapVals(IFn f, ITR source) {
-      Iterator<Entry> it = It.iter(source);
-      return Map.Standard.into(It.map(it, e -> Struct.pair(e.getKey(), f.invoke(e.getValue()))));
+      Iterator<Entry> it = Iter.iter(source);
+      return Map.Standard.into(Iter.map(it, e -> Struct.pair(e.getKey(), f.invoke(e.getValue()))));
     }
 
     @Module.Fn(name = "NIL", vargs = true, complete = true)
@@ -863,15 +866,15 @@ public interface Builtin {
 
     @Module.Fn(name = "partition:pair", complete = true)
     public static <ITR> Iterator partitionPair(ITR source) {
-      var it = It.iter(source);
-      return It.partitionPair(it);
+      var it = Iter.iter(source);
+      return Iter.partitionPair(it);
     }
 
     @Module.Fn(name = "pipe", vargs = true, complete = true)
     public static <FN, ITR> IFn<Iterator, Iterator, Object> pipe(ITR fns) {
-      var pl = It.toArray(It.map(It.iter(fns), Fn::toFn));
+      var pl = Iter.toArray(Iter.map(Iter.iter(fns), Fn::toFn));
       return Fn.toFn(
-          (Function) (it) -> Arr.reduce((i, f) -> (Iterator) ((IFn) f).invoke(i), it, pl));
+          (Function) (it) -> Array.reduce((i, f) -> (Iterator) ((IFn) f).invoke(i), it, pl));
     }
 
     @Module.Fn(name = "reduce", complete = true)
@@ -891,21 +894,22 @@ public interface Builtin {
 
     @Module.Fn(name = "reduce", helper = true)
     public static <ITR, R> R reduce(IFn f, IFn end, R init, ITR source) {
-      var it = It.iter(source);
+      var it = Iter.iter(source);
       return (R)
-          It.reduce(it, init, (acc, e) -> (R) f.invoke(acc, e), (acc) -> (Boolean) end.invoke(acc));
+          Iter.reduce(
+              it, init, (acc, e) -> (R) f.invoke(acc, e), (acc) -> (Boolean) end.invoke(acc));
     }
 
     @Module.Fn(name = "reduce", helper = true)
     public static <ITR, R> R reduce(IFn f, ITR source) {
-      var it = It.iter(source);
-      return (R) It.reduce(it, (acc, e) -> f.invoke(acc, e));
+      var it = Iter.iter(source);
+      return (R) Iter.reduce(it, (acc, e) -> f.invoke(acc, e));
     }
 
     @Module.Fn(name = "reduce", helper = true)
     public static <ITR, R> R reduce(IFn f, R init, ITR source) {
-      var it = It.iter(source);
-      return (R) It.reduce(it, init, (acc, e) -> (R) f.invoke(acc, e));
+      var it = Iter.iter(source);
+      return (R) Iter.reduce(it, init, (acc, e) -> (R) f.invoke(acc, e));
     }
 
     @Module.Fn(name = "reduce-in", complete = true)
@@ -915,8 +919,8 @@ public interface Builtin {
 
     @Module.Fn(name = "reduce-in", helper = true)
     public static <ITR, R> R reduceIn(R init, IFn f, ITR source) {
-      var it = It.iter(source);
-      return (R) It.reduceIn(it, init, (acc, e) -> (R) f.invoke(acc, e));
+      var it = Iter.iter(source);
+      return (R) Iter.reduceIn(it, init, (acc, e) -> (R) f.invoke(acc, e));
     }
 
     @Module.Fn(name = "T", vargs = true, complete = true)
@@ -1052,7 +1056,7 @@ public interface Builtin {
 
     @Module.Fn(name = "ctl", vargs = true, rt = true)
     public static <ITR> Object ctl(IRuntime rt, ITR args) {
-      return rt.getRoot().call(Arr.toArray(args));
+      return rt.getRoot().call(Array.toArray(args));
     }
 
     @Module.Fn(name = "sys:path", rt = true)
@@ -1062,12 +1066,12 @@ public interface Builtin {
 
     @Module.Fn(name = "sys:path-add", rt = true)
     public static <ITR> IColl<String> sysPathAdd(IRuntime rt, ITR paths) {
-      return rt.pathAdd((String[]) It.toArray(It.iter(paths), String.class));
+      return rt.pathAdd((String[]) Iter.toArray(Iter.iter(paths), String.class));
     }
 
     @Module.Fn(name = "sys:path-remove", rt = true)
     public static <ITR> IColl<String> sysPathRemove(IRuntime rt, ITR paths) {
-      return rt.pathRemove((String[]) It.toArray(It.iter(paths), String.class));
+      return rt.pathRemove((String[]) Iter.toArray(Iter.iter(paths), String.class));
     }
 
     @Module.Fn(name = "sys:path-purge", rt = true)
@@ -1092,7 +1096,7 @@ public interface Builtin {
 
     @Module.Fn(name = "sys:call", vargs = true, rt = true)
     public static <ITR> Object sysCall(IRuntime rt, ITR inputs) {
-      return rt.call(Arr.toArray(inputs));
+      return rt.call(Array.toArray(inputs));
     }
 
     @Module.Fn(name = "sys:alias-add", rt = true)
@@ -1117,10 +1121,10 @@ public interface Builtin {
 
     @Module.Fn(name = "sys:import", vargs = true, rt = true)
     public static <ITR> Class[] sysImport(IRuntime rt, ITR inputs) {
-      Iterator<Entry> it = It.partitionPair(It.iter(inputs));
+      Iterator<Entry> it = Iter.partitionPair(Iter.iter(inputs));
       return (Class[])
-          It.toArray(
-              (Iterator) It.map(it, (p) -> rt.aliasAdd(p.getKey(), (Class) p.getValue())),
+          Iter.toArray(
+              (Iterator) Iter.map(it, (p) -> rt.aliasAdd(p.getKey(), (Class) p.getValue())),
               Class.class);
     }
 
@@ -1141,8 +1145,8 @@ public interface Builtin {
 
     @Module.Fn(name = "sys:cache-remove", rt = true, vargs = true)
     public static <ITR> IColl sysCacheRemove(IRuntime rt, ITR names) {
-      return It.reduce(
-          It.iter(names), rt.classCache(), (m, n) -> (IMapType) ((IMapType) m).dissoc(n));
+      return Iter.reduce(
+          Iter.iter(names), rt.classCache(), (m, n) -> (IMapType) ((IMapType) m).dissoc(n));
     }
   }
 
@@ -1155,29 +1159,29 @@ public interface Builtin {
 
     @Module.Fn(name = "hash-map", vargs = true, complete = true)
     public static <ITR, K, V> Map.Standard<K, V> hashMap(ITR elements) {
-      return Map.Standard.into(It.partitionPair(It.iter(elements)));
+      return Map.Standard.into(Iter.partitionPair(Iter.iter(elements)));
     }
 
     @Module.Fn(name = "hash-set", vargs = true, complete = true)
     public static <ITR, E> Set.Standard<E> hashSet(ITR elements) {
-      return Set.Standard.into(It.iter(elements));
+      return Set.Standard.into(Iter.iter(elements));
     }
 
     @Module.Fn(name = "j:arr", complete = true)
     public static <ITR, E> E[] jArr(Class<E> type, ITR vargs) {
-      return (E[]) It.toArray(It.iter(vargs), type);
+      return (E[]) Iter.toArray(Iter.iter(vargs), type);
     }
 
     @Module.Fn(name = "j:objs", vargs = true, complete = true)
     public static <ITR> Object[] jArr(ITR vargs) {
-      return Arr.toArray(vargs);
+      return Array.toArray(vargs);
     }
 
     @Module.Fn(name = "j:hash-map", vargs = true, complete = true)
     public static <ITR> java.util.HashMap jHashMap(ITR vargs) {
       var m = new java.util.HashMap();
-      It.each(
-          It.partitionPair(It.iter(vargs)),
+      Iter.each(
+          Iter.partitionPair(Iter.iter(vargs)),
           (p) -> m.put(((Entry) p).getKey(), ((Entry) p).getValue()));
       return m;
     }
@@ -1185,7 +1189,7 @@ public interface Builtin {
     @Module.Fn(name = "j:hash-set", vargs = true, complete = true)
     public static <ITR> java.util.HashSet jHashSet(ITR vargs) {
       var s = new java.util.HashSet();
-      It.each(It.iter(vargs), (e) -> s.add(e));
+      Iter.each(Iter.iter(vargs), (e) -> s.add(e));
       return s;
     }
 
@@ -1195,67 +1199,67 @@ public interface Builtin {
 
     @Module.Fn(name = "j:list", vargs = true, complete = true)
     public static <ITR> java.util.ArrayList jList(ITR vargs) {
-      return It.toArrayList(It.iter(vargs));
+      return Iter.toArrayList(Iter.iter(vargs));
     }
 
     @Module.Fn(name = "list", vargs = true, complete = true)
     public static <ITR, E> List.Standard<E> list(ITR elements) {
-      return List.Standard.into(It.iter(elements));
+      return List.Standard.into(Iter.iter(elements));
     }
 
     @Module.Fn(name = "mut:hash-map", vargs = true, complete = true)
     public static <ITR, K, V> Map.Mutable<K, V> mutHashMap(ITR elements) {
-      return Map.Mutable.into(It.partitionPair(It.iter(elements)));
+      return Map.Mutable.into(Iter.partitionPair(Iter.iter(elements)));
     }
 
     @Module.Fn(name = "mut:hash-set", vargs = true, complete = true)
     public static <ITR, E> Set.Mutable<E> mutHashSet(ITR elements) {
-      return Set.Mutable.into(It.iter(elements));
+      return Set.Mutable.into(Iter.iter(elements));
     }
 
     @Module.Fn(name = "mut:list", vargs = true, complete = true)
     public static <ITR, E> List.Mutable<E> mutList(ITR elements) {
-      return List.Mutable.into(It.iter(elements));
+      return List.Mutable.into(Iter.iter(elements));
     }
 
     @Module.Fn(name = "mut:ordered-map", vargs = true, complete = true)
     public static <ITR, K, V> OrderedMap.Mutable<K, V> mutOrderedMap(ITR elements) {
-      return OrderedMap.Mutable.into(It.partitionPair(It.iter(elements)));
+      return OrderedMap.Mutable.into(Iter.partitionPair(Iter.iter(elements)));
     }
 
     @Module.Fn(name = "mut:ordered-set", vargs = true, complete = true)
     public static <ITR, E> OrderedSet.Mutable<E> mutOrderedSet(ITR elements) {
-      return OrderedSet.Mutable.into(It.iter(elements));
+      return OrderedSet.Mutable.into(Iter.iter(elements));
     }
 
     @Module.Fn(name = "mut:queue", vargs = true, complete = true)
     public static <ITR, E> Queue.Mutable<E> mutQueue(ITR elements) {
-      return Queue.Mutable.into(It.iter(elements));
+      return Queue.Mutable.into(Iter.iter(elements));
     }
 
     @Module.Fn(name = "mut:sorted-map", vargs = true, complete = true)
     public static <ITR, K, V> SortedMap.Mutable<K, V> mutSortedMap(ITR elements) {
-      return SortedMap.Mutable.into(It.partitionPair(It.iter(elements)));
+      return SortedMap.Mutable.into(Iter.partitionPair(Iter.iter(elements)));
     }
 
     @Module.Fn(name = "mut:sorted-set", vargs = true, complete = true)
     public static <ITR, E> SortedSet.Mutable<E> mutSortedSet(ITR elements) {
-      return SortedSet.Mutable.into(It.iter(elements));
+      return SortedSet.Mutable.into(Iter.iter(elements));
     }
 
     @Module.Fn(name = "mut:vector", vargs = true, complete = true)
     public static <ITR, E> Vector.Mutable<E> mutVector(ITR elements) {
-      return Vector.Mutable.into(It.iter(elements));
+      return Vector.Mutable.into(Iter.iter(elements));
     }
 
     @Module.Fn(name = "ordered-map", vargs = true, complete = true)
     public static <ITR, K, V> OrderedMap.Standard<K, V> orderedMap(ITR elements) {
-      return OrderedMap.Standard.into(It.partitionPair(It.iter(elements)));
+      return OrderedMap.Standard.into(Iter.partitionPair(Iter.iter(elements)));
     }
 
     @Module.Fn(name = "ordered-set", vargs = true, complete = true)
     public static <ITR, E> OrderedSet.Standard<E> orderedSet(ITR elements) {
-      return OrderedSet.Standard.into(It.iter(elements));
+      return OrderedSet.Standard.into(Iter.iter(elements));
     }
 
     @Module.Fn(name = "pair", complete = true)
@@ -1265,17 +1269,17 @@ public interface Builtin {
 
     @Module.Fn(name = "queue", vargs = true, complete = true)
     public static <ITR, E> Queue.Standard<E> queue(ITR elements) {
-      return Queue.Standard.into(It.iter(elements));
+      return Queue.Standard.into(Iter.iter(elements));
     }
 
     @Module.Fn(name = "sorted-map", vargs = true, complete = true)
     public static <ITR, K, V> SortedMap.Standard<K, V> sortedMap(ITR elements) {
-      return SortedMap.Standard.into(It.partitionPair(It.iter(elements)));
+      return SortedMap.Standard.into(Iter.partitionPair(Iter.iter(elements)));
     }
 
     @Module.Fn(name = "sorted-set", vargs = true, complete = true)
     public static <ITR, E> SortedSet.Standard<E> sortedSet(ITR elements) {
-      return SortedSet.Standard.into(It.iter(elements));
+      return SortedSet.Standard.into(Iter.iter(elements));
     }
 
     @Module.Fn(name = "to:facade", complete = true)
@@ -1339,7 +1343,7 @@ public interface Builtin {
 
     @Module.Fn(name = "vector", vargs = true, complete = true)
     public static <ITR, E> Vector.Standard<E> vector(ITR elements) {
-      return Vector.Standard.into(It.iter(elements));
+      return Vector.Standard.into(Iter.iter(elements));
     }
   }
 
@@ -1378,8 +1382,8 @@ public interface Builtin {
 
     @Module.Fn(name = "str", vargs = true, complete = true)
     public static <ITR> String str(ITR args) {
-      return It.toString(
-          It.iter(args),
+      return Iter.toString(
+          Iter.iter(args),
           "",
           "",
           "",

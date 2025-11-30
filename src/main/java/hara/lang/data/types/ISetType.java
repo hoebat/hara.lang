@@ -1,6 +1,6 @@
-package hara.data.types;
+package hara.lang.data.types;
 
-import hara.lang.base.It;
+import hara.lang.base.Iter;
 import hara.lang.protocol.*;
 
 public interface ISetType<E>
@@ -20,10 +20,10 @@ public interface ISetType<E>
   default boolean equality(Object obj) {
     if (obj instanceof ISetType) {
       return (count() == ((ISetType) obj).count())
-          && It.every(this.iterator(), (e) -> ((ISetType) obj).find(e) != null);
+          && Iter.every(this.iterator(), (e) -> ((ISetType) obj).find(e) != null);
     } else if (obj instanceof java.util.Set) {
       return (this.count() == ((java.util.Set) obj).size())
-          && It.every(((java.util.Set) obj).iterator(), (e) -> this.find((E) e) != null);
+          && Iter.every(((java.util.Set) obj).iterator(), (e) -> this.find((E) e) != null);
     } else {
       return false;
     }

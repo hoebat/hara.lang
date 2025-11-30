@@ -1,7 +1,7 @@
 package hara.lang.data;
 
-import hara.data.types.IStringType;
-import hara.lang.base.Arr;
+import hara.lang.data.types.IStringType;
+import hara.lang.base.primitive.Array;
 import hara.lang.base.Ex;
 import hara.lang.base.Ut;
 import hara.lang.protocol.*;
@@ -138,7 +138,7 @@ public final class Keyword
   @Override
   public final Function getArgN() {
     return (vargs) -> {
-      var args = Arr.toArray(vargs);
+      var args = Array.toArray(vargs);
       if (args.length > 0) {
         if (args[0] instanceof IContext) {
           IContext ctx = (IContext) args[0];

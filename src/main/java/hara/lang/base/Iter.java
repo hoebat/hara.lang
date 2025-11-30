@@ -1,5 +1,7 @@
 package hara.lang.base;
 
+import hara.lang.base.primitive.Array;
+
 import hara.lang.data.Tuple;
 import hara.lang.protocol.IPair;
 import hara.lang.protocol.IToMutable;
@@ -11,7 +13,7 @@ import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.*;
 
-public interface It {
+public interface Iter {
 
   public interface Nil {
     public static Iterator<Object> ITERATOR = new Iterator<Object>();
@@ -61,9 +63,9 @@ public interface It {
       return ((java.util.Map) obj).entrySet().iterator();
     } else if (obj instanceof java.util.Map.Entry) {
       Entry e = (Entry) obj;
-      return It.objects(e.getKey(), e.getValue());
+      return Iter.objects(e.getKey(), e.getValue());
     } else if (obj.getClass().isArray()) {
-      return Arr.toIter(obj);
+      return Array.toIter(obj);
     } else {
       throw new Ex.Unsupported();
     }
@@ -164,7 +166,7 @@ public interface It {
   //
   @SuppressWarnings({"rawtypes", "unchecked"})
   public static <E, R> Iterator<R> stream(Iterator<E> it, Function<Iterator, Iterator>... fns) {
-    return (Iterator<R>) Arr.reduce((itr, f) -> f.apply(itr), it, fns);
+    return (Iterator<R>) Array.reduce((itr, f) -> f.apply(itr), it, fns);
   }
 
   //
@@ -516,7 +518,7 @@ public interface It {
   @SuppressWarnings({"rawtypes", "unchecked"})
   public static <E> ArrayList<E> toArrayList(Object input, Function<Iterator, Iterator>... pl) {
     Iterator it = iter(input);
-    return (ArrayList<E>) collect(It::toArrayList, it, pl);
+    return (ArrayList<E>) collect(Iter::toArrayList, it, pl);
   }
 
   public static Object[] toArray(Iterator<?> it) {
@@ -526,14 +528,14 @@ public interface It {
   @SuppressWarnings({"rawtypes", "unchecked"})
   public static Object[] toArray(Object input, Function<Iterator, Iterator>... pl) {
     Iterator it = iter(input);
-    return collect(It::toArray, it, pl);
+    return collect(Iter::toArray, it, pl);
   }
 
   @SuppressWarnings({"unchecked", "rawtypes"})
   public static <E> E[] toArray(Iterator<E> it, Class cls) {
     ArrayList<E> c = toArrayList(it);
-    E[] arr = (E[]) Arr.newArray(cls, c.size());
-    Arr.fillArray(c.iterator(), arr);
+    E[] arr = (E[]) Array.newArray(cls, c.size());
+    Array.fillArray(c.iterator(), arr);
     return arr;
   }
 
@@ -543,7 +545,7 @@ public interface It {
 
   @SuppressWarnings({"unchecked", "rawtypes"})
   public static Iterator concat(Iterator x, Iterator y) {
-    return new ConcatIterator(It.objects(x, y));
+    return new ConcatIterator(Iter.objects(x, y));
   }
 
   @SuppressWarnings({"unchecked", "rawtypes"})
@@ -769,12 +771,12 @@ public interface It {
 
   @SuppressWarnings({"rawtypes"})
   public static Iterator<Object[]> zip(Iterator<Iterator<Object>> input) {
-    Iterator[] its = It.toArray(input, Iterator.class);
+    Iterator[] its = Iter.toArray(input, Iterator.class);
 
     return new Iterator<Object[]>() {
       @Override
       public boolean hasNext() {
-        return Arr.every((it) -> it.hasNext(), its);
+        return Array.every((it) -> it.hasNext(), its);
       }
 
       @Override
@@ -782,7 +784,7 @@ public interface It {
         if (!hasNext()) {
           throw new Ex.NoSuchElement();
         }
-        return Arr.map((it) -> it.next(), Object.class, its);
+        return Array.map((it) -> it.next(), Object.class, its);
       }
     };
   }

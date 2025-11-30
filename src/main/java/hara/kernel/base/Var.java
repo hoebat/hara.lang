@@ -1,8 +1,8 @@
 package hara.kernel.base;
 
-import hara.data.types.INamespacedType;
-import hara.data.types.IStringType;
-import hara.data.types.IVarType;
+import hara.lang.data.types.INamespacedType;
+import hara.lang.data.types.IStringType;
+import hara.lang.data.types.IVarType;
 import hara.lang.data.Map;
 import hara.lang.protocol.Constant;
 import hara.lang.protocol.IReset;

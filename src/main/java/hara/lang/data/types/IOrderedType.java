@@ -1,7 +1,7 @@
-package hara.data.types;
+package hara.lang.data.types;
 
 import hara.lang.base.G;
-import hara.lang.base.It;
+import hara.lang.base.Iter;
 import hara.lang.protocol.Constant;
 import hara.lang.protocol.IHash;
 
@@ -13,7 +13,7 @@ public interface IOrderedType<E> extends Iterable<E>, IHash {
   default long hashCalc(Constant.HashType t) {
 
     Function<Object, Long> f = G.hashFn(t);
-    return It.reduce(
+    return Iter.reduce(
         iterator(), Long.valueOf(hashSeed().hashCode()), (acc, item) -> (acc * 31) + f.apply(item));
   }
 }
