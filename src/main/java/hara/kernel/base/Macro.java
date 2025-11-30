@@ -128,15 +128,16 @@ public interface Macro {
       args.add(symbol("hash-map"));
 
       Iterator<Entry> it = form.entrySet().iterator();
-      while(it.hasNext()){
-          Entry e = it.next();
-          args.add(sqExpand(e.getKey()));
-          args.add(sqExpand(e.getValue()));
+      while (it.hasNext()) {
+        Entry e = it.next();
+        args.add(sqExpand(e.getKey()));
+        args.add(sqExpand(e.getValue()));
       }
 
       // DEBUG
       // System.out.println("DEBUG sqExpandMap args: " + args);
-      // for(Object o : args) { System.out.println("Item type: " + (o==null?"null":o.getClass().getName()) + " val: " + o); }
+      // for(Object o : args) { System.out.println("Item type: " +
+      // (o==null?"null":o.getClass().getName()) + " val: " + o); }
 
       // Use vector to preserve order (List.into reverses), then convert to list
       return list(Array.objects(symbol("to:list"), vector(Iter.iter(args))));

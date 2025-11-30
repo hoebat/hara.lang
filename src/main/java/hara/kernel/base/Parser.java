@@ -12,9 +12,6 @@ import hara.lang.protocol.IMetadata;
 import hara.lang.protocol.IObjType;
 
 import java.io.IOException;
-import java.io.LineNumberReader;
-import java.io.PushbackReader;
-import java.io.Reader;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
@@ -26,100 +23,7 @@ import static hara.kernel.base.Builtin.Basic.keyword;
 import static hara.kernel.base.Builtin.Collection.merge;
 import static hara.kernel.base.Builtin.Struct.*;
 
-public interface Read {
-
-  public class LineNumberingReader extends PushbackReader {
-
-    private static final int newline = '\n';
-
-    private boolean _atLineStart = true;
-    private boolean _prev;
-    private int _columnNumber = 1;
-    private StringBuilder sb = null;
-
-    public LineNumberingReader(PushbackReader r) {
-      super(new LineNumberReader(r));
-    }
-
-    public LineNumberingReader(PushbackReader r, int size) {
-      super(new LineNumberReader(r, size));
-    }
-
-    public int getLineNumber() {
-      return ((LineNumberReader) in).getLineNumber() + 1;
-    }
-
-    public void setLineNumber(int line) {
-      ((LineNumberReader) in).setLineNumber(line - 1);
-    }
-
-    public void captureString() {
-      this.sb = new StringBuilder();
-    }
-
-    public String getString() {
-      if (sb != null) {
-        String ret = sb.toString();
-        sb = null;
-        return ret;
-      }
-      return null;
-    }
-
-    public int getColumnNumber() {
-      return _columnNumber;
-    }
-
-    @Override
-    public int read() throws IOException {
-      int c = super.read();
-      _prev = _atLineStart;
-      if ((c == newline) || (c == -1)) {
-        _atLineStart = true;
-        _columnNumber = 1;
-      } else {
-        _atLineStart = false;
-        _columnNumber++;
-      }
-      if (sb != null && c != -1) sb.append((char) c);
-      return c;
-    }
-
-    @Override
-    public void unread(int c) throws IOException {
-      super.unread(c);
-      _atLineStart = _prev;
-      _columnNumber--;
-      if (sb != null) sb.deleteCharAt(sb.length() - 1);
-    }
-
-    public String readLine() throws IOException {
-      int c = read();
-      String line;
-      switch (c) {
-        case -1:
-          line = null;
-          break;
-        case newline:
-          line = "";
-          break;
-        default:
-          String first = String.valueOf((char) c);
-          String rest = ((LineNumberReader) in).readLine();
-          if (sb != null) sb.append(rest + "\n");
-          line = (rest == null) ? first : first + rest;
-          _prev = false;
-          _atLineStart = true;
-          _columnNumber = 1;
-          break;
-      }
-      return line;
-    }
-
-    public boolean atLineStart() {
-      return _atLineStart;
-    }
-  }
+public interface Parser {
 
   @SuppressWarnings("rawtypes")
   public class LispReader {
@@ -135,8 +39,6 @@ public interface Read {
     static Pattern ratioPat = Pattern.compile("([-+]?[0-9]+)/([0-9]+)");
     static Pattern floatPat = Pattern.compile("([-+]?[0-9]+(\\.[0-9]*)?([eE][-+]?[0-9]+)?)(M)?");
 
-    // static Function taggedReader = new TaggedReader();
-
     static {
       macros['"'] = new StringReader();
       macros[';'] = new CommentReader();
@@ -149,6 +51,7 @@ public interface Read {
       macros['}'] = new UnmatchedDelimiterReader();
       macros['\\'] = new CharacterReader();
       macros['#'] = new DispatchReader();
+      macros['\''] = new QuoteReader(); // Added QuoteReader
       macros['@'] = new DerefReader();
       macros['`'] = new SyntaxQuoteReader();
       macros['~'] = new UnquoteReader();
@@ -174,18 +77,13 @@ public interface Read {
     }
 
     public static Object readString(String s, Map opts) {
-      PushbackReader r = new PushbackReader(new java.io.StringReader(s));
+      Reader r = new Reader(s);
 
       return read(r, (opts == null) ? hashMap(new Object[] {}) : opts);
     }
 
-    static void unread(PushbackReader r, int ch) {
-      if (ch != -1)
-        try {
-          r.unread(ch);
-        } catch (IOException e) {
-          throw Ex.Sneaky(e);
-        }
+    static void unread(Reader r, int ch) {
+      if (ch != -1) r.unreadChar((char) ch);
     }
 
     @SuppressWarnings("serial")
@@ -200,22 +98,19 @@ public interface Read {
       }
     }
 
-    public static int readSingle(PushbackReader r) {
-      try {
-        return r.read();
-      } catch (IOException e) {
-        throw Ex.Sneaky(e);
-      }
+    public static int readSingle(Reader r) {
+      Character c = r.readChar();
+      return (c == null) ? -1 : c;
     }
 
     @SuppressWarnings("unchecked")
-    public static Object read(PushbackReader r, Map opts) {
+    public static Object read(Reader r, Map opts) {
       return read(r, !opts.has(EOF), opts.lookup(EOF), false, opts);
     }
 
     @SuppressWarnings("unchecked")
     public static Object read(
-        PushbackReader r, boolean eofIsError, Object eofValue, boolean isRecursive, Map opts) {
+        Reader r, boolean eofIsError, Object eofValue, boolean isRecursive, Map opts) {
 
       try {
         for (; ; ) {
@@ -254,19 +149,14 @@ public interface Read {
           return interpretToken(token);
         }
       } catch (Exception e) {
-        if (isRecursive || !(r instanceof LineNumberingReader)) throw Ex.Sneaky(e);
-        LineNumberingReader rdr = (LineNumberingReader) r;
-        // throw new Ex.Runtime(String.format("ReaderError:(%d,1) %s",
-        // rdr.getLineNumber(), e.getMessage()), e);
-        throw new ReaderException(rdr.getLineNumber(), rdr.getColumnNumber(), e);
+        if (isRecursive) throw Ex.Sneaky(e);
+        throw new ReaderException(r.getLineNumber(), r.getColumnNumber(), e);
       }
     }
 
     @SuppressWarnings("unchecked")
-    public static ArrayList readDelimitedList(
-        char delim, PushbackReader r, boolean isRecursive, Map opts) {
-      final int firstline =
-          (r instanceof LineNumberingReader) ? ((LineNumberingReader) r).getLineNumber() : -1;
+    public static ArrayList readDelimitedList(char delim, Reader r, boolean isRecursive, Map opts) {
+      final int firstline = r.getLineNumber();
 
       ArrayList list = new ArrayList();
 
@@ -295,7 +185,7 @@ public interface Read {
       return list;
     }
 
-    private static String readToken(PushbackReader r, char initch, boolean leadConstituent) {
+    private static String readToken(Reader r, char initch, boolean leadConstituent) {
       StringBuilder sb = new StringBuilder();
       if (leadConstituent && S.nonConstituent(initch))
         throw new Ex.Runtime("Invalid leading character: " + initch);
@@ -314,7 +204,7 @@ public interface Read {
       }
     }
 
-    private static Object readNumber(PushbackReader r, char initch) {
+    private static Object readNumber(Reader r, char initch) {
       StringBuilder sb = new StringBuilder();
       sb.append(initch);
 
@@ -345,8 +235,7 @@ public interface Read {
       return (char) uc;
     }
 
-    private static int readUnicodeChar(
-        PushbackReader r, int initch, int base, int length, boolean exact) {
+    private static int readUnicodeChar(Reader r, int initch, int base, int length, boolean exact) {
       int uc = Character.digit(initch, base);
       if (uc == -1) throw new IllegalArgumentException("Invalid digit: " + (char) initch);
       int i = 1;
@@ -415,14 +304,6 @@ public interface Read {
         if (m.group(4) != null) return new BigDecimal(m.group(1));
         return Double.parseDouble(s);
       }
-      /*
-       * m = ratioPat.matcher(s); if (m.matches()) { String numerator = m.group(1); if
-       * (numerator.startsWith("+")) numerator = numerator.substring(1);
-       *
-       * return Num.divide(Num.reduceBigInt(BigInt.fromBigInteger(new
-       * BigInteger(numerator))), Num.reduceBigInt(BigInt.fromBigInteger(new
-       * BigInteger(m.group(2))))); }
-       */
       return null;
     }
 
@@ -439,41 +320,49 @@ public interface Read {
       return (ch != '#' && ch != '\'' && isMacro(ch));
     }
 
-    public static class UnreadableReader implements BiFunction<PushbackReader, Map, Void> {
+    public static class UnreadableReader implements BiFunction<Reader, Map, Void> {
       @Override
-      public Void apply(PushbackReader reader, Map opts) {
+      public Void apply(Reader reader, Map opts) {
         throw new Ex.Runtime("Unreadable form");
       }
     }
 
-    public static class UnmatchedDelimiterReader implements BiFunction<PushbackReader, Map, Void> {
+    public static class UnmatchedDelimiterReader implements BiFunction<Reader, Map, Void> {
 
       @SuppressWarnings("unchecked")
       @Override
-      public Void apply(PushbackReader reader, Map opts) {
+      public Void apply(Reader reader, Map opts) {
         throw new Ex.Runtime("Unmatched delimiter: " + opts.lookup(Keyword.create("delimiter")));
       }
     }
 
-    public static class DerefReader implements BiFunction<PushbackReader, Map, Object> {
+    public static class QuoteReader implements BiFunction<Reader, Map, Object> {
       @Override
-      public Object apply(PushbackReader r, Map opts) {
+      public Object apply(Reader r, Map opts) {
+        Object o = read(r, true, null, true, opts);
+        return List.Standard.from(null, Symbol.create("quote"), o);
+      }
+    }
+
+    public static class DerefReader implements BiFunction<Reader, Map, Object> {
+      @Override
+      public Object apply(Reader r, Map opts) {
         Object o = read(r, true, null, true, opts);
         return List.Standard.from(null, Symbol.create("deref"), o);
       }
     }
 
-    public static class SyntaxQuoteReader implements BiFunction<PushbackReader, Map, Object> {
+    public static class SyntaxQuoteReader implements BiFunction<Reader, Map, Object> {
       @Override
-      public Object apply(PushbackReader r, Map opts) {
+      public Object apply(Reader r, Map opts) {
         Object o = read(r, true, null, true, opts);
         return List.Standard.from(null, Symbol.create("syntax-quote"), o);
       }
     }
 
-    public static class UnquoteReader implements BiFunction<PushbackReader, Map, Object> {
+    public static class UnquoteReader implements BiFunction<Reader, Map, Object> {
       @Override
-      public Object apply(PushbackReader r, Map opts) {
+      public Object apply(Reader r, Map opts) {
         int ch = readSingle(r);
         if (ch == -1) throw new Ex.Runtime("EOF while reading character");
         if (ch == '@') {
@@ -487,11 +376,11 @@ public interface Read {
       }
     }
 
-    public static class CharacterReader implements BiFunction<PushbackReader, Map, Character> {
+    public static class CharacterReader implements BiFunction<Reader, Map, Character> {
 
       @Override
-      public Character apply(PushbackReader reader, Map opts) {
-        PushbackReader r = reader;
+      public Character apply(Reader reader, Map opts) {
+        Reader r = reader;
         int ch = readSingle(r);
         if (ch == -1) throw new Ex.Runtime("EOF while reading character");
         String token = readToken(r, (char) ch, false);
@@ -518,9 +407,9 @@ public interface Read {
       }
     }
 
-    public static class StringReader implements BiFunction<PushbackReader, Map, String> {
+    public static class StringReader implements BiFunction<Reader, Map, String> {
       @Override
-      public String apply(PushbackReader r, Map opts) {
+      public String apply(Reader r, Map opts) {
         StringBuilder sb = new StringBuilder();
 
         for (int ch = readSingle(r); ch != '"'; ch = readSingle(r)) {
@@ -573,11 +462,11 @@ public interface Read {
       }
     }
 
-    public static class RegexReader implements BiFunction<PushbackReader, Map, Pattern> {
-      static StringReader stringrdr = new StringReader();
+    public static class RegexReader implements BiFunction<Reader, Map, Pattern> {
+      static java.io.StringReader stringrdr = new java.io.StringReader(""); // Unused?
 
       @Override
-      public Pattern apply(PushbackReader r, Map opts) {
+      public Pattern apply(Reader r, Map opts) {
         StringBuilder sb = new StringBuilder();
         for (int ch = readSingle(r); ch != '"'; ch = readSingle(r)) {
           if (ch == -1) throw new Ex.Runtime("EOF while reading regex");
@@ -593,9 +482,9 @@ public interface Read {
       }
     }
 
-    public static class CommentReader implements BiFunction<PushbackReader, Map, Reader> {
+    public static class CommentReader implements BiFunction<Reader, Map, Reader> {
       @Override
-      public Reader apply(PushbackReader r, Map opts) {
+      public Reader apply(Reader r, Map opts) {
         int ch;
         do {
           ch = readSingle(r);
@@ -604,38 +493,31 @@ public interface Read {
       }
     }
 
-    public static class DiscardReader implements BiFunction<PushbackReader, Map, Reader> {
+    public static class DiscardReader implements BiFunction<Reader, Map, Reader> {
       @Override
-      public Reader apply(PushbackReader r, Map opts) {
+      public Reader apply(Reader r, Map opts) {
         read(r, true, null, true, opts);
         return r;
       }
     }
 
-    public static class DispatchReader implements BiFunction<PushbackReader, Map, Object> {
+    public static class DispatchReader implements BiFunction<Reader, Map, Object> {
 
       @SuppressWarnings("unchecked")
       @Override
-      public Object apply(PushbackReader r, Map opts) {
+      public Object apply(Reader r, Map opts) {
         int ch = readSingle(r);
         if (ch == -1) throw new Ex.Runtime("EOF while reading character");
         BiFunction fn = dispatchMacros[ch];
 
         if (fn == null) {
-          // try tagged reader
-
-          /*
-           * if (Character.isLetter(ch)) { unread((PushbackReader) reader, ch); return
-           * taggedReader.invoke(reader, ch, opts); }
-           */
-
           throw new Ex.Runtime(String.format("No dispatch macro for: %c", (char) ch));
         }
         return fn.apply(r, opts);
       }
     }
 
-    public static class SymbolicValueReader implements BiFunction<PushbackReader, Map, Object> {
+    public static class SymbolicValueReader implements BiFunction<Reader, Map, Object> {
 
       static Map specials =
           hashMap(
@@ -647,7 +529,7 @@ public interface Read {
 
       @SuppressWarnings("unchecked")
       @Override
-      public Object apply(PushbackReader r, Map opts) {
+      public Object apply(Reader r, Map opts) {
         Object o = read(r, true, null, true, opts);
 
         if (!(o instanceof Symbol)) throw new Ex.Runtime("Invalid token: ##" + o);
@@ -657,28 +539,24 @@ public interface Read {
       }
     }
 
-    public static IMetadata getMeta(PushbackReader r) {
-      int line = -1;
-      int column = -1;
-      if (r instanceof LineNumberingReader) {
-        line = ((LineNumberingReader) r).getLineNumber();
-        column = ((LineNumberingReader) r).getColumnNumber() - 1;
-      }
+    public static IMetadata getMeta(Reader r) {
+      int line = r.getLineNumber();
+      int column = r.getColumnNumber();
       return hashMap(Array.objects(keyword("line"), line, keyword("column"), column));
     }
 
-    public static class ListReader implements BiFunction<PushbackReader, Map, List> {
+    public static class ListReader implements BiFunction<Reader, Map, List> {
       @Override
-      public List apply(PushbackReader r, Map opts) {
+      public List apply(Reader r, Map opts) {
         ArrayList list = readDelimitedList(')', r, true, opts);
         return (list.isEmpty()) ? List.Standard.EMPTY : list(list);
       }
     }
 
-    public static class MetaReader implements BiFunction<PushbackReader, Map, IObjType> {
+    public static class MetaReader implements BiFunction<Reader, Map, IObjType> {
 
       @Override
-      public IObjType apply(PushbackReader r, Map opts) {
+      public IObjType apply(Reader r, Map opts) {
 
         Object meta = read(r, true, null, true, opts);
 
@@ -692,15 +570,19 @@ public interface Read {
         if (o instanceof IObjType) {
           IMapType ometa = (IMapType) ((IObjType) o).meta();
 
-          ometa = (IMapType) merge(ometa, meta);
+          if (ometa == null) {
+            ometa = (IMapType) meta;
+          } else {
+            ometa = (IMapType) merge(ometa, meta);
+          }
           return ((IObjType) o).withMeta(ometa);
         } else throw new IllegalArgumentException("Metadata can only be applied to I.ObjTypes");
       }
     }
 
-    public static class VectorReader implements BiFunction<PushbackReader, Map, ILinearType> {
+    public static class VectorReader implements BiFunction<Reader, Map, ILinearType> {
       @Override
-      public ILinearType apply(PushbackReader r, Map opts) {
+      public ILinearType apply(Reader r, Map opts) {
         ArrayList list = readDelimitedList(']', r, true, opts);
         if (list.size() > 5) {
           return vector(list);
@@ -710,9 +592,9 @@ public interface Read {
       }
     }
 
-    public static class MapReader implements BiFunction<PushbackReader, Map, OrderedMap> {
+    public static class MapReader implements BiFunction<Reader, Map, OrderedMap> {
       @Override
-      public OrderedMap apply(PushbackReader r, Map opts) {
+      public OrderedMap apply(Reader r, Map opts) {
         ArrayList list = readDelimitedList('}', r, true, opts);
 
         if ((list.size() & 1) == 1) {
@@ -724,18 +606,18 @@ public interface Read {
       }
     }
 
-    public static class SetReader implements BiFunction<PushbackReader, Map, OrderedSet> {
+    public static class SetReader implements BiFunction<Reader, Map, OrderedSet> {
       @Override
-      public OrderedSet apply(PushbackReader r, Map opts) {
+      public OrderedSet apply(Reader r, Map opts) {
         ArrayList list = readDelimitedList('}', r, true, opts);
         // TODO: Check for same entries
         return orderedSet(list);
       }
     }
 
-    public static class QueueReader implements BiFunction<PushbackReader, Map, Queue> {
+    public static class QueueReader implements BiFunction<Reader, Map, Queue> {
       @Override
-      public Queue apply(PushbackReader r, Map opts) {
+      public Queue apply(Reader r, Map opts) {
         ArrayList list = readDelimitedList(']', r, true, opts);
         return queue(list);
       }
