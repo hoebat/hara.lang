@@ -1,9 +1,15 @@
 package hara.kernel;
 
+import hara.kernel.base.Builtin;
 import hara.kernel.base.RT;
+import hara.kernel.base.Read;
 import hara.kernel.redirect.FileRedirect;
+import hara.lang.base.Ex;
+import hara.lang.base.G;
 
 import java.io.FileNotFoundException;
+import java.io.InputStreamReader;
+import java.io.PushbackReader;
 
 @SuppressWarnings("rawtypes")
 public class Main {
@@ -18,5 +24,34 @@ public class Main {
     F.RTS.put(rt._key, rt);
 
     server.start();
+
+    // REPL Loop
+    System.out.println("Hara Runtime Environment (HRE)");
+    System.out.println("Session: " + rt._key);
+
+    PushbackReader r = new PushbackReader(new InputStreamReader(System.in));
+    // Use hara.lang.data.Map from Builtin.Struct.hashMap
+    hara.lang.data.Map opts = Builtin.Struct.hashMap(new Object[] {});
+    Object EOF_SENTINEL = new Object();
+
+    while (true) {
+      try {
+        System.out.print("> ");
+        System.out.flush();
+        // Pass EOF_SENTINEL as eofValue
+        Object form = Read.LispReader.read(r, false, EOF_SENTINEL, false, opts);
+
+        if (form == EOF_SENTINEL) break;
+
+        Object res = rt.eval(form);
+        G.prn(res);
+      } catch (Throwable t) {
+        if (t instanceof Ex.Runtime) {
+          System.out.println("Error: " + t.getMessage());
+        } else {
+          t.printStackTrace();
+        }
+      }
+    }
   }
 }
