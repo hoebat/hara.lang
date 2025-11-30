@@ -124,4 +124,58 @@ public class ParserTest {
     assertTrue(result instanceof List);
     assertEquals(Symbol.create("syntax-quote"), ((List) result).nth(0));
   }
+
+  @Test
+  public void testReadUnmatchedDelimiter() {
+    try {
+      Parser.LispReader.readString(")", null);
+      fail("Should throw RuntimeException for unmatched delimiter");
+    } catch (Exception e) {
+      assertTrue(e.getMessage().contains("Unmatched delimiter"));
+    }
+  }
+
+  @Test
+  public void testReadUnfinishedString() {
+    try {
+      Parser.LispReader.readString("\"", null);
+      fail("Should throw RuntimeException for EOF while reading string");
+    } catch (Exception e) {
+      // ReaderException wraps the actual exception
+      assertTrue(e.getCause().getMessage().contains("EOF while reading string"));
+    }
+  }
+
+  @Test
+  public void testReadInvalidNumber() {
+    try {
+      // "123a" - Parser splits at macro/whitespace. 'a' is not macro/whitespace.
+      // Wait, 123a is read as a token? No, readNumber reads until macro or whitespace.
+      // If 1 starts, it calls readNumber.
+      // readNumber loops until macro or whitespace. 'a' is neither.
+      // So it reads "123a" and tries to matchNumber("123a").
+      // matchNumber will return null.
+      // Then it throws NumberFormatException.
+      Parser.LispReader.readString("123a", null);
+      fail("Should throw NumberFormatException");
+    } catch (Exception e) {
+      assertTrue(e.getCause() instanceof NumberFormatException);
+    }
+  }
+
+  @Test
+  public void testReadNilTrueFalse() {
+    assertNull(Parser.LispReader.readString("nil", null));
+    assertEquals(Boolean.TRUE, Parser.LispReader.readString("true", null));
+    assertEquals(Boolean.FALSE, Parser.LispReader.readString("false", null));
+  }
+
+  @Test
+  public void testDeref() {
+    Object result = Parser.LispReader.readString("@a", null);
+    assertTrue(result instanceof List);
+    List l = (List) result;
+    assertEquals(Symbol.create("deref"), l.nth(0));
+    assertEquals(Symbol.create("a"), l.nth(1));
+  }
 }
