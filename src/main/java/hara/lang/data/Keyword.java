@@ -3,7 +3,7 @@ package hara.lang.data;
 import hara.lang.data.types.IStringType;
 import hara.lang.base.primitive.Array;
 import hara.lang.base.Ex;
-import hara.lang.base.Ut;
+
 import hara.lang.protocol.*;
 
 import java.lang.ref.WeakReference;
@@ -12,7 +12,8 @@ import java.util.function.Function;
 
 public final class Keyword
     implements Comparable<Keyword>, IStringType, INamespaced, IDisplay, IObjType, IOFn, IMetadata {
-  public static Ut.RefCache<String, Keyword> GLOBAL = new Ut.RefCache<String, Keyword>();
+  public static hara.lang.base.primitive.RefCache<String, Keyword> GLOBAL =
+      new hara.lang.base.primitive.RefCache<String, Keyword>();
 
   private final String _ns;
   private final String _name;

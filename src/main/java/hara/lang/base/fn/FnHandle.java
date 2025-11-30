@@ -4,7 +4,6 @@ import hara.lang.data.types.ObjFn;
 
 import hara.lang.base.Ex;
 import hara.lang.base.Iter;
-import hara.lang.base.Obj;
 import hara.lang.protocol.IFn;
 import hara.lang.protocol.IMetadata;
 import java.lang.invoke.MethodHandle;

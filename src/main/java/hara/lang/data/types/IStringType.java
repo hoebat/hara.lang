@@ -1,6 +1,5 @@
 package hara.lang.data.types;
 
-import hara.lang.base.Ut;
 import hara.lang.protocol.Constant;
 import hara.lang.protocol.IHash;
 
@@ -12,7 +11,7 @@ public interface IStringType extends IHash {
       case SYSTEM:
         return (hashSeed() + "|" + toString()).hashCode();
       case MURMUR3:
-        return Ut.Murmur3.hashChars(hashSeed() + "|" + toString());
+        return hara.lang.base.primitive.Murmur3.hashChars(hashSeed() + "|" + toString());
       case SIP:
         break;
       default:

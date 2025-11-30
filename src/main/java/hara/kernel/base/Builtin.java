@@ -50,8 +50,8 @@ public interface Builtin {
     }
 
     @Module.Fn(name = "volatile", complete = true)
-    public static <V> Ut.Volatile<V> atomVolatile(V val) {
-      return new Ut.Volatile<V>(val);
+    public static <V> hara.lang.base.primitive.Volatile<V> atomVolatile(V val) {
+      return new hara.lang.base.primitive.Volatile<V>(val);
     }
 
     @Module.Fn(name = "compare", complete = true)
@@ -66,13 +66,13 @@ public interface Builtin {
     }
 
     @Module.Fn(name = "counter", complete = true)
-    public static Ut.Counter counter() {
-      return new Ut.Counter(-1);
+    public static hara.lang.base.primitive.Counter counter() {
+      return new hara.lang.base.primitive.Counter(-1);
     }
 
     @Module.Fn(name = "counter", complete = true)
-    public static Ut.Counter counter(Integer start) {
-      return new Ut.Counter(start);
+    public static hara.lang.base.primitive.Counter counter(Integer start) {
+      return new hara.lang.base.primitive.Counter(start);
     }
 
     @Module.Fn(name = "deref", protocol = true)
@@ -106,13 +106,13 @@ public interface Builtin {
     }
 
     @Module.Fn(name = "flag", complete = true)
-    public static Ut.Flag flag() {
-      return new Ut.Flag(false);
+    public static hara.lang.base.primitive.Flag flag() {
+      return new hara.lang.base.primitive.Flag(false);
     }
 
     @Module.Fn(name = "flag", complete = true)
-    public static Ut.Flag flag(Boolean val) {
-      return new Ut.Flag(val);
+    public static hara.lang.base.primitive.Flag flag(Boolean val) {
+      return new hara.lang.base.primitive.Flag(val);
     }
 
     @Module.Fn(name = "hash", protocol = true)
@@ -1358,9 +1358,9 @@ public interface Builtin {
 
     @Module.Fn(name = "bench:fn", complete = true)
     public static long bench(IFn f) {
-      long start = Ut.Clock.currentTimeNanos();
+      long start = hara.lang.base.primitive.Clock.currentTimeNanos();
       f.invoke();
-      long end = Ut.Clock.currentTimeNanos();
+      long end = hara.lang.base.primitive.Clock.currentTimeNanos();
       return end - start;
     }
 
@@ -1370,7 +1370,7 @@ public interface Builtin {
 
     @Module.Fn(name = "now", complete = true)
     public static long now() {
-      return Ut.Clock.currentTimeNanos();
+      return hara.lang.base.primitive.Clock.currentTimeNanos();
     }
   }
 

@@ -2,7 +2,6 @@ package hara.lang.base.fn;
 
 import hara.lang.data.types.ObjFn;
 
-import hara.lang.base.Obj;
 import hara.lang.protocol.IFn;
 import hara.lang.protocol.IMetadata;
 import java.util.function.Function;

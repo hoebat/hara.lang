@@ -2,7 +2,7 @@ package hara.kernel;
 
 import hara.kernel.protocol.IRedirect;
 import hara.lang.base.Ex;
-import hara.lang.base.Ut;
+
 import hara.lang.protocol.IComponent;
 import hara.lang.protocol.IMetadata;
 
@@ -15,7 +15,8 @@ import java.util.stream.Collectors;
 @SuppressWarnings("rawtypes")
 public class Server implements IComponent {
 
-  final Ut.RefCache<Thread, Conn> CLIENTS = new Ut.RefCache<>();
+  final hara.lang.base.primitive.RefCache<Thread, Conn> CLIENTS =
+      new hara.lang.base.primitive.RefCache<>();
 
   public final Foundation _F;
   public final String _key;

@@ -9,7 +9,7 @@ import hara.lang.data.types.ObjPersistent;
 import hara.lang.data.types.IMapType;
 import hara.lang.data.types.IRefType;
 import hara.lang.base.*;
-import hara.lang.base.Ut.Counter;
+import hara.lang.base.primitive.Counter;
 import hara.lang.protocol.*;
 
 import java.util.Iterator;

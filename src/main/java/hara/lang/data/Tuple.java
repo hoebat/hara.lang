@@ -8,7 +8,6 @@ import hara.lang.data.types.ILinearType;
 import hara.lang.data.types.ISequentialType;
 import hara.lang.base.Ex;
 import hara.lang.base.Iter;
-import hara.lang.base.Obj;
 import hara.lang.protocol.IMetadata;
 import hara.lang.protocol.IObjType;
 import hara.lang.protocol.IPair;
