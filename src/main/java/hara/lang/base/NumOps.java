@@ -137,7 +137,7 @@ public interface NumOps {
 
     @Override
     public Number dec(Number x) {
-      BigDecimal bx = (BigDecimal) x;
+      BigDecimal bx = NumUtils.toBigDecimal(x);
       return bx.subtract(BigDecimal.ONE);
     }
 
@@ -158,25 +158,25 @@ public interface NumOps {
 
     @Override
     public Number inc(Number x) {
-      BigDecimal bx = (BigDecimal) x;
+      BigDecimal bx = NumUtils.toBigDecimal(x);
       return bx.add(BigDecimal.ONE);
     }
 
     @Override
     public boolean isNeg(Number x) {
-      BigDecimal bx = (BigDecimal) x;
+      BigDecimal bx = NumUtils.toBigDecimal(x);
       return bx.signum() < 0;
     }
 
     @Override
     public boolean isPos(Number x) {
-      BigDecimal bx = (BigDecimal) x;
+      BigDecimal bx = NumUtils.toBigDecimal(x);
       return bx.signum() > 0;
     }
 
     @Override
     public boolean isZero(Number x) {
-      BigDecimal bx = (BigDecimal) x;
+      BigDecimal bx = NumUtils.toBigDecimal(x);
       return bx.signum() == 0;
     }
 
@@ -197,7 +197,7 @@ public interface NumOps {
 
     @Override
     public final Number negate(Number x) {
-      return ((BigDecimal) x).negate();
+      return NumUtils.toBigDecimal(x).negate();
     }
 
     @Override

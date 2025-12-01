@@ -166,10 +166,6 @@ public interface Builtin {
       return obj.reset(val);
     }
 
-    //
-    // Checks
-    //
-
     @Module.Fn(name = "symbol", complete = true)
     public static Symbol symbol(String nsname) {
       return Symbol.create(nsname);
@@ -230,6 +226,101 @@ public interface Builtin {
     // Checks
     //
 
+  }
+
+  @Module.Ns(name = "global", tag = "ref")
+  public interface Ref {
+
+    //
+    // Atom
+    //
+
+    @Module.Fn(name = "compare:set!", protocol = true)
+    public static <V> boolean compareSet(Atom.Swap<Atom, V> atom, V oldVal, V newVal) {
+      return atom.cas(oldVal, newVal);
+    }
+
+    @Module.Fn(name = "swap!", vargs = true, protocol = true)
+    public static <V> V swap(Atom.Swap<Atom, V> atom, IFn f, Object... args) {
+      return (V)
+          atom.swap(
+              (java.util.function.BiFunction<V, Object[], V>)
+                  (v, a) -> {
+                    Object[] allArgs = new Object[a.length + 1];
+                    allArgs[0] = v;
+                    System.arraycopy(a, 0, allArgs, 1, a.length);
+                    return (V) f.apply(allArgs);
+                  },
+              args);
+    }
+
+    @Module.Fn(name = "watch:add", protocol = true)
+    public static <V> Atom.Standard<V> watchAdd(
+        Atom.Standard<V> atom, Object key, IFn<Object, IWatch.WatchEntry<Atom, V>, Object> f) {
+      atom.addWatch(key, (e) -> f.invoke(e.A(), e.B(), e.D(), e.E()));
+      return atom;
+    }
+
+    @Module.Fn(name = "watch:remove", protocol = true)
+    public static <V> Atom.Standard<V> watchRemove(Atom.Standard<V> atom, Object key) {
+      atom.removeWatch(key);
+      return atom;
+    }
+
+    @Module.Fn(name = "watch:list", protocol = true)
+    public static <V> Iterator watchList(Atom.Standard<V> atom) {
+      return atom.getWatches();
+    }
+
+    //
+    // Volatile
+    //
+
+    @Module.Fn(name = "vreset!", protocol = true)
+    public static <V> V vreset(hara.lang.base.primitive.Volatile<V> v, V val) {
+      return v.reset(val);
+    }
+
+    @Module.Fn(name = "vswap!", protocol = true, vargs = true)
+    public static <V> V vswap(hara.lang.base.primitive.Volatile<V> v, IFn f, Object... args) {
+      synchronized (v) {
+        Object[] allArgs = new Object[args.length + 1];
+        allArgs[0] = v.deref();
+        System.arraycopy(args, 0, allArgs, 1, args.length);
+        V newVal = (V) f.apply(allArgs);
+        v.reset(newVal);
+        return newVal;
+      }
+    }
+
+    //
+    // Counter
+    //
+
+    @Module.Fn(name = "counter:inc")
+    public static long counterInc(hara.lang.base.primitive.Counter c) {
+      return c.inc();
+    }
+
+    @Module.Fn(name = "counter:inc")
+    public static long counterInc(hara.lang.base.primitive.Counter c, long n) {
+      return c.inc((int) n);
+    }
+
+    @Module.Fn(name = "counter:dec")
+    public static long counterDec(hara.lang.base.primitive.Counter c) {
+      return c.dec();
+    }
+
+    @Module.Fn(name = "counter:dec")
+    public static long counterDec(hara.lang.base.primitive.Counter c, long n) {
+      return c.dec((int) n);
+    }
+
+    @Module.Fn(name = "counter:val")
+    public static long counterVal(hara.lang.base.primitive.Counter c) {
+      return c.deref();
+    }
   }
 
   @Module.Ns(name = "global", tag = "collection")
@@ -963,6 +1054,26 @@ public interface Builtin {
       return Num.minus(x, 1);
     }
 
+    @Module.Fn(name = "ceil")
+    public static Number ceil(Number x) {
+      return Math.ceil(x.doubleValue());
+    }
+
+    @Module.Fn(name = "floor")
+    public static Number floor(Number x) {
+      return Math.floor(x.doubleValue());
+    }
+
+    @Module.Fn(name = "round")
+    public static Number round(Number x) {
+      return Math.round(x.doubleValue());
+    }
+
+    @Module.Fn(name = "abs")
+    public static Number abs(Number x) {
+      return Num.isNeg(x) ? Num.minus(x) : x;
+    }
+
     @Module.Fn(name = "/")
     @Module.Reduce(type = ARRAY, init = ONE)
     public static Number divide(Number x, Number y) {
@@ -1041,6 +1152,33 @@ public interface Builtin {
     @Module.Reduce(type = INIT, init = ONE)
     public static Number multiply(Number x, Number y) {
       return Num.multiply(x, y);
+    }
+
+    @Module.Fn(name = "quot")
+    public static Number quot(Number x, Number y) {
+      return Num.quotient(x, y);
+    }
+
+    @Module.Fn(name = "rem")
+    public static Number rem(Number x, Number y) {
+      return Num.remainder(x, y);
+    }
+
+    @Module.Fn(name = "mod")
+    public static Number mod(Number x, Number y) {
+      return Num.remainder(x, y);
+    }
+
+    @Module.Fn(name = "min")
+    @Module.Reduce(type = ARRAY)
+    public static Object min(Object x, Object y) {
+      return hara.lang.base.primitive.Min.min(x, y);
+    }
+
+    @Module.Fn(name = "max")
+    @Module.Reduce(type = ARRAY)
+    public static Object max(Object x, Object y) {
+      return hara.lang.base.primitive.Max.max(x, y);
     }
 
     @Module.Fn(name = "not=")
@@ -1373,6 +1511,54 @@ public interface Builtin {
     @Module.Fn(name = "now", complete = true)
     public static long now() {
       return hara.lang.base.primitive.Clock.currentTimeNanos();
+    }
+  }
+
+  @Module.Ns(name = "global", tag = "ns")
+  public interface Namespace {
+
+    @Module.Fn(name = "ns:name")
+    public static Symbol nsName(hara.kernel.base.Namespace ns) {
+      return ns.name;
+    }
+
+    @Module.Fn(name = "ns:map")
+    public static IMapType nsMap(hara.kernel.base.Namespace ns) {
+      return new AsMap(ns.mappings);
+    }
+
+    @Module.Fn(name = "ns:aliases")
+    public static IMapType nsAliases(hara.kernel.base.Namespace ns) {
+      return new AsMap(ns.aliases);
+    }
+
+    @Module.Fn(name = "ns:imports")
+    public static IMapType nsImports(hara.kernel.base.Namespace ns) {
+      return new AsMap(ns.imports);
+    }
+
+    @Module.Fn(name = "ns:find", rt = true)
+    public static hara.kernel.base.Namespace nsFind(IRuntime rt, Symbol sym) {
+      if (rt instanceof RT.Instance) {
+        return ((RT.Instance) rt).getNamespace(sym);
+      }
+      return null;
+    }
+
+    @Module.Fn(name = "ns:list", rt = true)
+    public static Iterator<hara.kernel.base.Namespace> nsList(IRuntime rt) {
+      if (rt instanceof RT.Instance) {
+        return ((RT.Instance) rt)._userEnv._namespaces.values().iterator();
+      }
+      return null;
+    }
+
+    @Module.Fn(name = "ns:create", rt = true)
+    public static hara.kernel.base.Namespace nsCreate(IRuntime rt, Symbol sym) {
+      if (rt instanceof RT.Instance) {
+        return ((RT.Instance) rt).addNamespace(sym);
+      }
+      return null;
     }
   }
 
