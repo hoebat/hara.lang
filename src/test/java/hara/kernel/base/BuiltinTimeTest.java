@@ -15,7 +15,11 @@ public class BuiltinTimeTest {
     long now = Builtin.Time.now();
     long after = System.currentTimeMillis();
 
-    assertTrue("now() should return current time", now >= before && now <= after);
+    // Builtin.Time.now() returns nanos, but synced to epoch.
+    // So we compare it against epoch millis * 1,000,000
+    assertTrue(
+        "now() should return current time",
+        now >= before * 1_000_000 && now <= (after + 10) * 1_000_000);
   }
 
   @Test
@@ -32,9 +36,14 @@ public class BuiltinTimeTest {
                 }
                 return null;
               }
+
+              @Override
+              public Object invoke() {
+                return invoke(new Object[0]);
+              }
             });
 
-    // Should take at least 50ms
-    assertTrue("bench() should measure execution time accurately", duration >= 50);
+    // Should take at least 50ms (50 * 1,000,000 nanos)
+    assertTrue("bench() should measure execution time accurately", duration >= 50 * 1_000_000);
   }
 }

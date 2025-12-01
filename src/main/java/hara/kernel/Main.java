@@ -26,7 +26,7 @@ public class Main {
     var F = new Foundation();
     var redirect = new FileRedirect("log/in.txt", "log/out.txt");
     var server = new Server(F, "PRIMARY", Foundation.DEFAULT_PORT, redirect);
-    var rt = new RT.Instance(F, "ROOT");
+    var rt = new RT.Instance(F, "global");
 
     F.SERVERS.put(server._key, server);
     F.RTS.put(rt._key, rt);
@@ -44,8 +44,7 @@ public class Main {
           @Override
           public void complete(LineReader reader, ParsedLine line, List<Candidate> candidates) {
             String word = line.word();
-            var globals = rt.getEnv().getMap();
-            var it = globals.keys();
+            var it = rt.getEnv().keys();
             while (it.hasNext()) {
               String name = it.next().toString();
               if (name.startsWith(word)) {

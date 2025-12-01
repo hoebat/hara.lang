@@ -406,7 +406,11 @@ public interface RT {
       try {
         return _loader.loadClass(name, true);
       } catch (ClassNotFoundException t) {
-        return null;
+        try {
+          return _loader.loadClass("java.lang." + name, true);
+        } catch (ClassNotFoundException t2) {
+          return null;
+        }
       }
     }
 
