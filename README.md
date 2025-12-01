@@ -92,10 +92,3 @@ Porting these modules from `src-reference/std` to `src/main/java/hara` is a prio
 ### Refactoring
 *   **Foundation**: Improve command dispatch mechanism and extract `Foundation.Fn` static methods into dedicated classes.
 *   **Testing**: Improve test coverage for core components.
-
-### Code TODOs
-Specific areas in the codebase marked for improvement:
-
-*   `hara.kernel.command.Session`: Implement `INFO` command.
-*   `hara.lang.data.Cons`: Implement Iterator support.
-*   `hara.kernel.base.Read`: Add checks for duplicate keys in maps.
