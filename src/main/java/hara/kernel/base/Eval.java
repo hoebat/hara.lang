@@ -185,7 +185,7 @@ public interface Eval {
 
    public static void main(String [] args) {
   G.prn(eval(Parser.LispReader.readString("(class \"java.nio.file.Path\")", null),
-			new RT.RootEnv(null, new RT.Instance(null, "test"))));
+  	new RT.RootEnv(null, new RT.Instance(null, "test"))));
    }
    */
 }
