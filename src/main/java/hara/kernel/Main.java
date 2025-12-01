@@ -7,6 +7,7 @@ import hara.kernel.base.Reader;
 import hara.kernel.redirect.FileRedirect;
 import hara.lang.base.Ex;
 import hara.lang.base.G;
+import hara.lang.protocol.IDisplay;
 
 import java.io.FileNotFoundException;
 import java.util.List;
@@ -21,6 +22,90 @@ import org.jline.terminal.TerminalBuilder;
 
 @SuppressWarnings("rawtypes")
 public class Main {
+  static final String[] JAVA_LANG_CLASSES = {
+    "Boolean",
+    "Byte",
+    "Character",
+    "Class",
+    "ClassLoader",
+    "ClassValue",
+    "Compiler",
+    "Double",
+    "Enum",
+    "Float",
+    "InheritableThreadLocal",
+    "Integer",
+    "Long",
+    "Math",
+    "Number",
+    "Object",
+    "Package",
+    "Process",
+    "ProcessBuilder",
+    "Runtime",
+    "RuntimePermission",
+    "SecurityManager",
+    "Short",
+    "StackTraceElement",
+    "StrictMath",
+    "String",
+    "StringBuffer",
+    "StringBuilder",
+    "System",
+    "Thread",
+    "ThreadGroup",
+    "ThreadLocal",
+    "Throwable",
+    "Void",
+    "ArithmeticException",
+    "ArrayIndexOutOfBoundsException",
+    "ArrayStoreException",
+    "ClassCastException",
+    "ClassNotFoundException",
+    "CloneNotSupportedException",
+    "EnumConstantNotPresentException",
+    "Exception",
+    "IllegalAccessException",
+    "IllegalArgumentException",
+    "IllegalMonitorStateException",
+    "IllegalStateException",
+    "IllegalThreadStateException",
+    "IndexOutOfBoundsException",
+    "InstantiationException",
+    "InterruptedException",
+    "NegativeArraySizeException",
+    "NoSuchFieldException",
+    "NoSuchMethodException",
+    "NullPointerException",
+    "NumberFormatException",
+    "RuntimeException",
+    "SecurityException",
+    "StringIndexOutOfBoundsException",
+    "TypeNotPresentException",
+    "UnsupportedOperationException",
+    "AbstractMethodError",
+    "AssertionError",
+    "ClassCircularityError",
+    "ClassFormatError",
+    "Error",
+    "ExceptionInInitializerError",
+    "IllegalAccessError",
+    "IncompatibleClassChangeError",
+    "InstantiationError",
+    "InternalError",
+    "LinkageError",
+    "NoClassDefFoundError",
+    "NoSuchFieldError",
+    "NoSuchMethodError",
+    "OutOfMemoryError",
+    "StackOverflowError",
+    "ThreadDeath",
+    "UnknownError",
+    "UnsatisfiedLinkError",
+    "UnsupportedClassVersionError",
+    "VerifyError",
+    "VirtualMachineError"
+  };
 
   public static void main(String[] args) throws FileNotFoundException, java.io.IOException {
     var F = new Foundation();
@@ -46,7 +131,15 @@ public class Main {
             String word = line.word();
             var it = rt.getEnv().keys();
             while (it.hasNext()) {
-              String name = it.next().toString();
+              Object key = it.next();
+              String name = (key instanceof IDisplay) ? ((IDisplay) key).display() : key.toString();
+
+              if (name.startsWith(word)) {
+                candidates.add(new Candidate(name));
+              }
+            }
+
+            for (String name : JAVA_LANG_CLASSES) {
               if (name.startsWith(word)) {
                 candidates.add(new Candidate(name));
               }
