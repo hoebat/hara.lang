@@ -241,7 +241,7 @@ public interface Builtin {
     }
 
     @Module.Fn(name = "assoc", option = true)
-    public static <K, V> java.util.Map assoc(java.util.Map coll, K key, V val) {
+    public static <K, V> java.util.Map<K, V> assoc(java.util.Map<K, V> coll, K key, V val) {
       coll.put(key, val);
       return coll;
     }
@@ -253,19 +253,19 @@ public interface Builtin {
     }
 
     @Module.Fn(name = "conj", option = true)
-    public static <E> java.util.List conj(java.util.List coll, E e) {
+    public static <E> java.util.List<E> conj(java.util.List<E> coll, E e) {
       coll.add(e);
       return coll;
     }
 
     @Module.Fn(name = "conj", option = true)
-    public static <K, V> java.util.Map conj(java.util.Map coll, Entry<K, V> e) {
+    public static <K, V> java.util.Map<K, V> conj(java.util.Map<K, V> coll, Entry<K, V> e) {
       coll.put(e.getKey(), e.getValue());
       return coll;
     }
 
     @Module.Fn(name = "conj", option = true)
-    public static <E> java.util.Set conj(java.util.Set coll, E e) {
+    public static <E> java.util.Set<E> conj(java.util.Set<E> coll, E e) {
       coll.add(e);
       return coll;
     }
@@ -277,7 +277,7 @@ public interface Builtin {
     }
 
     @Module.Fn(name = "cons", option = true)
-    public static <E> java.util.List cons(java.util.List coll, E e) {
+    public static <E> java.util.List<E> cons(java.util.List<E> coll, E e) {
       coll.add(0, e);
       return coll;
     }
@@ -314,13 +314,13 @@ public interface Builtin {
     }
 
     @Module.Fn(name = "dissoc", option = true)
-    public static <K, V> java.util.Map dissoc(java.util.Map coll, K key) {
+    public static <K, V> java.util.Map<K, V> dissoc(java.util.Map coll, K key) {
       coll.remove(key);
       return coll;
     }
 
     @Module.Fn(name = "dissoc", option = true)
-    public static <K, V> java.util.Set dissoc(java.util.Set coll, K key) {
+    public static <K, V> java.util.Set<K> dissoc(java.util.Set<K> coll, K key) {
       coll.remove(key);
       return coll;
     }
@@ -331,7 +331,7 @@ public interface Builtin {
     }
 
     @Module.Fn(name = "empty", option = true)
-    public static java.util.Collection empty(java.util.Collection coll) {
+    public static <E> java.util.Collection<E> empty(java.util.Collection<E> coll) {
       coll.clear();
       return coll;
     }
@@ -417,17 +417,17 @@ public interface Builtin {
     }
 
     @Module.Fn(name = "into", option = true)
-    public static <ITR> java.util.List into(java.util.List coll, ITR source) {
+    public static <E, ITR> java.util.List<E> into(java.util.List coll, ITR source) {
       return Iter.reduceIn(Iter.iter(source), coll, Collection::conj);
     }
 
     @Module.Fn(name = "into", option = true)
-    public static <ITR> java.util.Map into(java.util.Map coll, ITR source) {
+    public static <K, V, ITR> java.util.Map<K, V> into(java.util.Map coll, ITR source) {
       return Iter.reduceIn((Iterator<Entry>) Iter.iter(source), coll, Collection::conj);
     }
 
     @Module.Fn(name = "into", option = true)
-    public static <ITR> java.util.Set into(java.util.Set coll, ITR source) {
+    public static <E, ITR> java.util.Set<E> into(java.util.Set coll, ITR source) {
       return Iter.reduceIn(Iter.iter(source), coll, Collection::conj);
     }
 
@@ -459,7 +459,7 @@ public interface Builtin {
     }
 
     @Module.Fn(name = "merge", option = true)
-    public static <ITR> java.util.Map merge(java.util.Map coll, ITR other) {
+    public static <K, V, ITR> java.util.Map<K, V> merge(java.util.Map coll, ITR other) {
       Iterator<Entry> it = Iter.iter(other);
       return Iter.reduce(
           it,
