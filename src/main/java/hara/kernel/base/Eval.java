@@ -20,7 +20,7 @@ import java.util.function.Function;
 
 import static hara.kernel.base.Builtin.Struct.*;
 
-@SuppressWarnings({"rawtypes", "unchecked"})
+@SuppressWarnings({ "rawtypes", "unchecked" })
 public interface Eval {
 
   // A simple environment for local bindings
@@ -132,7 +132,8 @@ public interface Eval {
   }
 
   public static Object evalList(List ast, IEnv env) {
-    if (ast.count() == 0) return ast;
+    if (ast.count() == 0)
+      return ast;
 
     var fst = ast.peekFirst();
 
@@ -181,11 +182,14 @@ public interface Eval {
   }
 
   /*
-   public static String PATHS = "(do (sys:add-paths [\"file:///Users/chris/.m2/repository/org/codehaus/janino/janino/3.1.2/janino-3.1.2.jar\" \"file:///Users/chris/.m2/repository/org/codehaus/janino/commons-compiler/3.1.2/commons-compiler-3.1.2.jar\"]) (class \"org.codehaus.janino.ExpressionEvaluator\"))";
-
-   public static void main(String [] args) {
-  G.prn(eval(Parser.LispReader.readString("(class \"java.nio.file.Path\")", null),
-  	new RT.RootEnv(null, new RT.Instance(null, "test"))));
-   }
+   * public static String PATHS =
+   * "(do (sys:add-paths [\"file:///Users/chris/.m2/repository/org/codehaus/janino/janino/3.1.2/janino-3.1.2.jar\" \"file:///Users/chris/.m2/repository/org/codehaus/janino/commons-compiler/3.1.2/commons-compiler-3.1.2.jar\"]) (class \"org.codehaus.janino.ExpressionEvaluator\"))"
+   * ;
+   * 
+   * public static void main(String [] args) {
+   * G.prn(eval(Parser.LispReader.readString("(class \"java.nio.file.Path\")",
+   * null),
+   * new RT.RootEnv(null, new RT.Instance(null, "test"))));
+   * }
    */
 }
