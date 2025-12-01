@@ -1,6 +1,5 @@
 package hara.kernel;
 
-import hara.kernel.base.RT;
 import hara.kernel.protocol.IRuntime;
 import hara.lang.base.Ex;
 import hara.lang.base.Iter;

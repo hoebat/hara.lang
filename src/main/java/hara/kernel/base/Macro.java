@@ -25,7 +25,6 @@ import static hara.kernel.base.Builtin.Basic.atomVolatile;
 import static hara.kernel.base.Builtin.Basic.symbol;
 import static hara.kernel.base.Builtin.Check.isTruthy;
 import static hara.kernel.base.Builtin.Struct.list;
-import static hara.kernel.base.Builtin.Struct.vector;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
 public interface Macro {

@@ -1,10 +1,14 @@
 package hara.lang.data;
 
+import hara.lang.data.Tuple.Tup0;
+import hara.lang.data.Tuple.Tup1;
+import hara.lang.data.Tuple.Tup2;
+import hara.lang.data.Tuple.Tup3;
 import org.junit.Test;
-import static org.junit.Assert.*;
-import hara.lang.data.Tuple.*;
+
 import java.util.Iterator;
-import hara.lang.base.Iter;
+
+import static org.junit.Assert.*;
 
 public class TupleTest {
 

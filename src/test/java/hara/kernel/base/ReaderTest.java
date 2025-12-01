@@ -1,8 +1,11 @@
 package hara.kernel.base;
 
 import org.junit.Test;
+
 import java.io.StringReader;
-import static org.junit.Assert.*;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 public class ReaderTest {
 

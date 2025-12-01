@@ -11,7 +11,6 @@ import hara.lang.protocol.Constant;
 import hara.lang.protocol.IMetadata;
 import hara.lang.protocol.IObjType;
 
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;

@@ -1,8 +1,9 @@
 package hara.kernel;
 
+import org.jline.reader.LineReader;
+
 import java.io.IOException;
 import java.io.Reader;
-import org.jline.reader.LineReader;
 
 public class JLineInputReader extends Reader {
   private final LineReader lineReader;
