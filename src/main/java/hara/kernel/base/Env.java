@@ -386,7 +386,8 @@ public interface Env {
             Array.objects(
                 keyword("name"), p.getKey(),
                 keyword("rt"), S.fnOpts(all.get(0)).rt(),
-                keyword("env"), S.fnOpts(all.get(0)).env()));
+                keyword("env"), S.fnOpts(all.get(0)).env(),
+                keyword("doc"), S.fnOpts(all.get(0)).doc()));
 
     Function<Method, ILinearType> toArgs =
         (m) -> {
