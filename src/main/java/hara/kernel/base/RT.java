@@ -373,7 +373,7 @@ public interface RT {
 
     @Override
     public AST readString(String input) {
-      return (AST) Read.LispReader.readString(input, null);
+      return (AST) Parser.LispReader.readString(input, null);
     }
 
     @Override

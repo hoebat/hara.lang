@@ -50,10 +50,22 @@ public class Cons<E> extends ObjPersistent implements ISequentialType<E>, ILinke
 
   @Override
   public Iterator<E> iterator() {
-    // Logic for iterator needs to be implemented or delegated.
-    // In Std.java it threw TODO. But we can probably implement a simple iterator.
-    // However, to keep identical behavior I will keep TODO.
-    throw new Ex.TODO();
+    return new Iterator<E>() {
+      ILinkedType<E> current = Cons.this;
+
+      @Override
+      public boolean hasNext() {
+        return current != null;
+      }
+
+      @Override
+      public E next() {
+        if (!hasNext()) throw new java.util.NoSuchElementException();
+        E val = current.peekFirst();
+        current = (ILinkedType<E>) current.popFirst();
+        return val;
+      }
+    };
   }
 
   @Override
