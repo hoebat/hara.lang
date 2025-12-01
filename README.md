@@ -2,6 +2,8 @@
 
 `hara.lang` is a Lisp-like language and runtime environment built on the Java Virtual Machine (JVM). It provides an interactive development experience through a TCP server, allowing developers to connect to a running instance, evaluate code, and inspect the system in real-time.
 
+For installation and usage instructions, please see the [Getting Started Guide](GETTING_STARTED.md).
+
 ## Motivation
 
 The primary motivation behind `hara.lang` is to provide a dynamic and interactive development environment on the JVM. Traditional Java development often involves a lengthy compile-run-debug cycle. `hara.lang` aims to shorten this feedback loop by allowing developers to connect to a running application, modify code on the fly, and inspect the state of the system without requiring a restart.
