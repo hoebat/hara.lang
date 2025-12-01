@@ -61,11 +61,13 @@ public class BuiltinInteropTest {
 
   @Test
   public void testInvokeGet() throws Exception {
-    String str = "hello";
-    Object result = Builtin.Interop.invokeGet(str, "length");
-    // String.length is a method, not a field, so this might throw or return the
-    // method
-    assertNotNull("invokeGet should return something", result);
+    TestClass obj = new TestClass();
+    Object result = Builtin.Interop.invokeGet(obj, "field");
+    assertEquals("value", result);
+  }
+
+  public static class TestClass {
+    public String field = "value";
   }
 
   @Test
