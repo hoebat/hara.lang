@@ -20,7 +20,7 @@ import java.util.function.Function;
 
 import static hara.kernel.base.Builtin.Struct.*;
 
-@SuppressWarnings({ "rawtypes", "unchecked" })
+@SuppressWarnings({"rawtypes", "unchecked"})
 public interface Eval {
 
   // A simple environment for local bindings
@@ -132,8 +132,7 @@ public interface Eval {
   }
 
   public static Object evalList(List ast, IEnv env) {
-    if (ast.count() == 0)
-      return ast;
+    if (ast.count() == 0) return ast;
 
     var fst = ast.peekFirst();
 

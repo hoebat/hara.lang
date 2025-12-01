@@ -1,7 +1,9 @@
 package hara.kernel.base;
 
-import static org.junit.Assert.*;
 import org.junit.Test;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 /** Simple tests for miscellaneous Builtin methods. */
 public class BuiltinBasicTest {

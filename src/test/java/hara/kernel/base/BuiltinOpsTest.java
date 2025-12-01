@@ -1,7 +1,8 @@
 package hara.kernel.base;
 
-import static org.junit.Assert.*;
 import org.junit.Test;
+
+import static org.junit.Assert.*;
 
 /**
  * Tests for numeric operations in {@link Builtin.Ops}. These tests target previously uncovered

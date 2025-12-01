@@ -1,10 +1,6 @@
 package hara.kernel.base;
 
-import hara.lang.data.Keyword;
-import hara.lang.data.List;
-import hara.lang.data.OrderedMap;
-import hara.lang.data.Symbol;
-import hara.lang.data.Vector;
+import hara.lang.data.*;
 import org.junit.Test;
 
 import java.math.BigDecimal;

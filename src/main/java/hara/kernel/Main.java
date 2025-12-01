@@ -1,23 +1,18 @@
 package hara.kernel;
 
 import hara.kernel.base.Builtin;
-import hara.kernel.base.RT;
 import hara.kernel.base.Parser;
+import hara.kernel.base.RT;
 import hara.kernel.base.Reader;
 import hara.kernel.redirect.FileRedirect;
 import hara.lang.base.Ex;
 import hara.lang.base.G;
+import org.jline.reader.*;
+import org.jline.terminal.Terminal;
+import org.jline.terminal.TerminalBuilder;
 
 import java.io.FileNotFoundException;
 import java.util.List;
-
-import org.jline.reader.Completer;
-import org.jline.reader.LineReader;
-import org.jline.reader.LineReaderBuilder;
-import org.jline.reader.Candidate;
-import org.jline.reader.ParsedLine;
-import org.jline.terminal.Terminal;
-import org.jline.terminal.TerminalBuilder;
 
 @SuppressWarnings("rawtypes")
 public class Main {

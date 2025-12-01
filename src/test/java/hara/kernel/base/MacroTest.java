@@ -1,20 +1,15 @@
 package hara.kernel.base;
 
-import hara.lang.data.List;
-import hara.lang.data.Symbol;
 import hara.lang.data.Keyword;
+import hara.lang.data.List;
 import hara.lang.data.Map;
-import hara.lang.data.Vector;
+import hara.lang.data.Symbol;
 import org.junit.Before;
 import org.junit.Test;
-import hara.lang.base.Ex;
 
 import java.math.BigInteger;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 public class MacroTest {
 
