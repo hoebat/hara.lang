@@ -16,6 +16,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
 import static hara.kernel.base.Builtin.Lambda.mapVals;
@@ -196,14 +197,33 @@ public interface RT {
     public Entry<Symbol, Object> find(Symbol sym) {
       if (sym.getNamespace() == null) {
         var s = sym.getName();
-        Class c = _alias.getOrDefault(s, null);
+        Class c = null;
+        if (_rt instanceof Instance) {
+          Namespace ns = ((Instance) _rt).getCurrentNs();
+          if (ns != null) c = ns.imports.get(Symbol.create(s));
+        }
+
+        if (c == null) {
+          c = _alias.getOrDefault(s, null);
+        }
+
         if (c == null) {
           c = _rt.classFor(s);
         }
         return (c != null) ? pair(sym, c) : null;
       } else {
         var s = sym.getNamespace();
-        Class c = _alias.getOrDefault(s, null);
+        Class c = null;
+
+        if (_rt instanceof Instance) {
+          Namespace ns = ((Instance) _rt).getCurrentNs();
+          if (ns != null) c = ns.imports.get(Symbol.create(s));
+        }
+
+        if (c == null) {
+          c = _alias.getOrDefault(s, null);
+        }
+
         if (c == null) {
           c = _rt.classFor(s);
         }
@@ -254,15 +274,17 @@ public interface RT {
   public class UserEnv<AST> implements IEnv<Symbol, Var> {
 
     final IEnv<Symbol, Var> _parent;
-    final ConcurrentHashMap<Symbol, Var> _methods;
+    final ConcurrentHashMap<Symbol, Namespace> _namespaces;
+    final AtomicReference<Namespace> _currentNs;
     public final ClassEnv _class;
-    public final ILookup<Symbol, Var> _facade;
 
     @SuppressWarnings("rawtypes")
     public UserEnv(IEnv<Symbol, Var> parent, IRuntime rt) {
       _parent = parent;
-      _methods = new ConcurrentHashMap<Symbol, Var>();
-      _facade = new AsMap<Symbol, Var>(_methods);
+      _namespaces = new ConcurrentHashMap<>();
+      Namespace userNs = new Namespace(Symbol.create("user"));
+      _namespaces.put(userNs.name, userNs);
+      _currentNs = new AtomicReference<>(userNs);
       _class = new ClassEnv(rt);
     }
 
@@ -278,35 +300,77 @@ public interface RT {
 
     @Override
     public ILookup<Symbol, Var> getMap() {
-      return _facade;
+      return new AsMap<>(_currentNs.get().mappings);
     }
 
     @Override
     public Iterator<Symbol> keys() {
-      return Iter.concat(Iter.map(_methods.entrySet().iterator(), e -> e.getKey()), _parent.keys());
+      return Iter.concat(
+          Iter.map(_currentNs.get().mappings.entrySet().iterator(), e -> e.getKey()),
+          _parent.keys());
     }
 
     @Override
     public Iterator<Var> vals() {
       return Iter.concat(
-          Iter.map(_methods.entrySet().iterator(), e -> e.getValue()), _parent.vals());
+          Iter.map(_currentNs.get().mappings.entrySet().iterator(), e -> e.getValue()),
+          _parent.vals());
     }
 
     @Override
     @SuppressWarnings("rawtypes")
     public Entry find(Symbol sym) {
-      Entry e = getMap().find(sym);
-      if (e == null) e = _class.find(sym);
+      if (sym.getNamespace() != null) {
+        String nsName = sym.getNamespace();
+        Namespace ns = _namespaces.get(Symbol.create(nsName));
+        if (ns == null) {
+          Namespace curr = _currentNs.get();
+          Namespace aliased = curr.aliases.get(Symbol.create(nsName));
+          if (aliased != null) ns = aliased;
+        }
+
+        if (ns != null) {
+          Var v = ns.mappings.get(Symbol.create(sym.getName()));
+          if (v != null) return pair(sym, v);
+        }
+      } else {
+        Var v = _currentNs.get().mappings.get(sym);
+        if (v != null) return pair(sym, v);
+      }
+
+      Entry e = _class.find(sym);
       if (e == null) e = _parent.find(sym);
       return e;
     }
 
     public Var getObj(Symbol key) {
-      return _methods.get(key);
+      if (key.getNamespace() != null) {
+        String nsName = key.getNamespace();
+        Namespace ns = _namespaces.get(Symbol.create(nsName));
+        if (ns == null) {
+          Namespace curr = _currentNs.get();
+          Namespace aliased = curr.aliases.get(Symbol.create(nsName));
+          if (aliased != null) ns = aliased;
+        }
+        if (ns != null) {
+          return ns.mappings.get(Symbol.create(key.getName()));
+        }
+        return null;
+      }
+      return _currentNs.get().mappings.get(key);
     }
 
     public Var setObj(Symbol key, Var val) {
-      _methods.put(key, val);
+      if (key.getNamespace() != null) {
+        String nsName = key.getNamespace();
+        Namespace ns = _namespaces.get(Symbol.create(nsName));
+        if (ns == null) {
+          throw new Ex.Runtime("Namespace not found: " + nsName);
+        }
+        ns.mappings.put(Symbol.create(key.getName()), val);
+      } else {
+        _currentNs.get().mappings.put(key, val);
+      }
       return val;
     }
   }
@@ -316,16 +380,16 @@ public interface RT {
     public final IContext _root;
     public final String _key;
     public final Loader _loader;
-    public final RootEnv _rootEnv;
-    public final UserEnv _userEnv;
+    public final RootEnv<AST> _rootEnv;
+    public final UserEnv<AST> _userEnv;
     public final ThreadLocal<List<IEnv<Symbol, Var>>> _stack;
 
     public Instance(IContext root, String key) {
       _root = root;
       _key = key;
       _loader = new Loader();
-      _rootEnv = new RootEnv(null, this);
-      _userEnv = new UserEnv(_rootEnv, this);
+      _rootEnv = new RootEnv<>(null, this);
+      _userEnv = new UserEnv<>(_rootEnv, this);
       _stack =
           new ThreadLocal() {
             @Override
@@ -333,6 +397,30 @@ public interface RT {
               return list(Array.objects(_userEnv));
             }
           };
+    }
+
+    public Namespace getCurrentNs() {
+      return _userEnv._currentNs.get();
+    }
+
+    public Namespace setCurrentNs(Symbol name) {
+      Namespace ns = _userEnv._namespaces.get(name);
+      if (ns == null) {
+        ns = new Namespace(name);
+        _userEnv._namespaces.put(name, ns);
+      }
+      _userEnv._currentNs.set(ns);
+      return ns;
+    }
+
+    public Namespace getNamespace(Symbol name) {
+      return _userEnv._namespaces.get(name);
+    }
+
+    public Namespace addNamespace(Symbol name) {
+      Namespace ns = new Namespace(name);
+      _userEnv._namespaces.putIfAbsent(name, ns);
+      return _userEnv._namespaces.get(name);
     }
 
     @Override
@@ -406,7 +494,11 @@ public interface RT {
       try {
         return _loader.loadClass(name, true);
       } catch (ClassNotFoundException t) {
-        return null;
+        try {
+          return _loader.loadClass("java.lang." + name, true);
+        } catch (ClassNotFoundException t2) {
+          return null;
+        }
       }
     }
 

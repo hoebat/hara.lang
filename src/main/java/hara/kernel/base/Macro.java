@@ -90,6 +90,18 @@ public interface Macro {
 
   public interface Control {
 
+    @Module.Fn(name = "ns", complete = true, env = true, vargs = true)
+    @Module.Var(macro = true)
+    public static Object nsExpr(IEnv env, Symbol name, Object args) {
+      if (env.getRuntime() instanceof RT.Instance) {
+        RT.Instance rt = (RT.Instance) env.getRuntime();
+        rt.setCurrentNs(name);
+        return null;
+      } else {
+        throw new Ex.Runtime("Runtime does not support namespaces");
+      }
+    }
+
     @Module.Fn(name = "quote")
     @Module.Var(control = true)
     public static Object quoteExpr(Object expr) {

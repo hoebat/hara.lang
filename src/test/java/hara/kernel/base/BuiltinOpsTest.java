@@ -13,37 +13,37 @@ public class BuiltinOpsTest {
   @Test
   public void testAdd() {
     Number result = Builtin.Ops.add(10, 5);
-    assertEquals(15L, result);
+    assertEquals(java.math.BigInteger.valueOf(15L), result);
   }
 
   @Test
   public void testMinus() {
     Number result = Builtin.Ops.minus(10, 5);
-    assertEquals(5L, result);
+    assertEquals(java.math.BigInteger.valueOf(5L), result);
   }
 
   @Test
   public void testMultiply() {
     Number result = Builtin.Ops.multiply(10, 5);
-    assertEquals(50L, result);
+    assertEquals(java.math.BigInteger.valueOf(50L), result);
   }
 
   @Test
   public void testDivide() {
     Number result = Builtin.Ops.divide(10, 5);
-    assertEquals(2L, result);
+    assertEquals(java.math.BigInteger.valueOf(2L), result);
   }
 
   @Test
   public void testInc() {
     Number result = Builtin.Ops.inc(5);
-    assertEquals(6L, result);
+    assertEquals(java.math.BigInteger.valueOf(6L), result);
   }
 
   @Test
   public void testDec() {
     Number result = Builtin.Ops.dec(5);
-    assertEquals(4L, result);
+    assertEquals(java.math.BigInteger.valueOf(4L), result);
   }
 
   @Test
@@ -125,12 +125,12 @@ public class BuiltinOpsTest {
   @Test
   public void testBitAnd() {
     Number result = Builtin.Ops.bitAnd(6, 3); // 110 & 011 = 010
-    assertEquals(2L, result);
+    assertEquals(java.math.BigInteger.valueOf(2L), result);
   }
 
   @Test
   public void testBitOr() {
     Number result = Builtin.Ops.bitOr(6, 3); // 110 | 011 = 111
-    assertEquals(7L, result);
+    assertEquals(java.math.BigInteger.valueOf(7L), result);
   }
 }
