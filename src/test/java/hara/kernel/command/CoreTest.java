@@ -1,12 +1,12 @@
 package hara.kernel.command;
 
-import org.junit.Test;
-import static org.junit.Assert.*;
 import hara.kernel.Foundation;
-import java.util.List;
+import org.junit.Test;
+
 import java.util.Arrays;
-import java.util.Map;
-import hara.lang.base.Iter;
+import java.util.List;
+
+import static org.junit.Assert.*;
 
 public class CoreTest {
 

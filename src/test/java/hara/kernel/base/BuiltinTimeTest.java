@@ -1,7 +1,8 @@
 package hara.kernel.base;
 
-import static org.junit.Assert.*;
 import org.junit.Test;
+
+import static org.junit.Assert.assertTrue;
 
 /**
  * Tests for time-related utility methods in {@link Builtin.Time}. These tests target previously

@@ -1,11 +1,11 @@
 package hara.lang.data;
 
-import org.junit.Test;
-import static org.junit.Assert.*;
-import hara.lang.base.Iter;
 import hara.lang.data.types.ILinkedType;
+import org.junit.Test;
+
 import java.util.Iterator;
-import java.util.ArrayList;
+
+import static org.junit.Assert.*;
 
 public class ConsTest {
 

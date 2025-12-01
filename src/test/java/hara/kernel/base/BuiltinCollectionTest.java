@@ -1,7 +1,8 @@
 package hara.kernel.base;
 
-import static org.junit.Assert.*;
 import org.junit.Test;
+
+import static org.junit.Assert.*;
 
 /**
  * Tests for collection operations in {@link Builtin.Collection}. These tests target previously

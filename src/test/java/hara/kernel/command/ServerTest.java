@@ -1,8 +1,9 @@
 package hara.kernel.command;
 
-import org.junit.Test;
-import static org.junit.Assert.*;
 import hara.kernel.Foundation;
+import org.junit.Test;
+
+import static org.junit.Assert.assertNull;
 
 public class ServerTest {
 

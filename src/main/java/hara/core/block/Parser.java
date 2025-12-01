@@ -1,7 +1,6 @@
 package hara.core.block;
 
 import hara.kernel.base.Reader;
-
 import hara.lang.data.Vector;
 
 import java.util.HashMap;

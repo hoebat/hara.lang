@@ -1,10 +1,9 @@
 package hara.kernel.command;
 
-import org.junit.Test;
-import static org.junit.Assert.*;
 import hara.kernel.Foundation;
 import hara.lang.base.Ex;
-import java.util.List;
+import org.junit.Test;
+
 import java.util.Arrays;
 
 public class MavenTest {

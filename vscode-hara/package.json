@@ -22,6 +22,22 @@
       {
         "command": "hara.evaluateSelection",
         "title": "Hara: Evaluate Selection"
+      },
+      {
+        "command": "hara.listSessions",
+        "title": "Hara: List Sessions"
+      },
+      {
+        "command": "hara.createSession",
+        "title": "Hara: Create Session"
+      },
+      {
+        "command": "hara.switchSession",
+        "title": "Hara: Switch Session"
+      },
+      {
+        "command": "hara.deleteSession",
+        "title": "Hara: Delete Session"
       }
     ],
     "configuration": {
