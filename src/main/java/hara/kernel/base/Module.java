@@ -47,6 +47,8 @@ public interface Module {
   public @interface Fn {
     String name() default "";
 
+    String doc() default "";
+
     boolean protocol() default false;
 
     String method() default "";
