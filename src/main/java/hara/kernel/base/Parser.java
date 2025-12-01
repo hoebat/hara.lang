@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.function.BiFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -601,7 +602,15 @@ public interface Parser {
           throw new Ex.Runtime(" literal must contain an even number of forms");
         }
 
-        // TODO: Check for same keys
+        HashSet<Object> keys = new HashSet<>();
+        for (int i = 0; i < list.size(); i += 2) {
+          Object key = list.get(i);
+          if (keys.contains(key)) {
+            throw new Ex.Runtime("Duplicate key: " + key);
+          }
+          keys.add(key);
+        }
+
         return orderedMap(list);
       }
     }
@@ -610,7 +619,15 @@ public interface Parser {
       @Override
       public OrderedSet apply(Reader r, Map opts) {
         ArrayList list = readDelimitedList('}', r, true, opts);
-        // TODO: Check for same entries
+
+        HashSet<Object> items = new HashSet<>();
+        for (Object item : list) {
+          if (items.contains(item)) {
+            throw new Ex.Runtime("Duplicate item: " + item);
+          }
+          items.add(item);
+        }
+
         return orderedSet(list);
       }
     }
