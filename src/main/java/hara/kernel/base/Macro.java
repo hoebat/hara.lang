@@ -115,31 +115,29 @@ public interface Macro {
       } else if (form instanceof ILinearType) {
         // Vectors, Tuples
         return sqExpandCollection(form);
+      } else if (form instanceof IMapType) {
+        return sqExpandMap((IMapType) form);
       } else if (form instanceof java.util.Map) {
         // Maps
-        return sqExpandMap((java.util.Map) form);
+        return sqExpandMap(((java.util.Map) form).entrySet());
       } else {
         return form;
       }
     }
 
-    public static Object sqExpandMap(java.util.Map form) {
+    public static Object sqExpandMap(Iterable<Entry> entries) {
       java.util.List<Object> args = new java.util.ArrayList<>();
       args.add(symbol("hash-map"));
 
-      Iterator<Entry> it = form.entrySet().iterator();
-      while(it.hasNext()){
-          Entry e = it.next();
-          args.add(sqExpand(e.getKey()));
-          args.add(sqExpand(e.getValue()));
+      Iterator<Entry> it = entries.iterator();
+      while (it.hasNext()) {
+        Entry e = it.next();
+        args.add(sqExpand(e.getKey()));
+        args.add(sqExpand(e.getValue()));
       }
 
-      // DEBUG
-      // System.out.println("DEBUG sqExpandMap args: " + args);
-      // for(Object o : args) { System.out.println("Item type: " + (o==null?"null":o.getClass().getName()) + " val: " + o); }
-
       // Use vector to preserve order (List.into reverses), then convert to list
-      return list(Array.objects(symbol("to:list"), vector(Iter.iter(args))));
+      return list(Iter.iter(args));
     }
 
     public static Object sqExpandCollection(Object form) {
