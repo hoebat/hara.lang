@@ -83,7 +83,7 @@ public interface Parser {
       return read(r, (opts == null) ? hashMap(new Object[] {}) : opts);
     }
 
-    static void unread(Reader r, int ch) {
+    public static void unread(Reader r, int ch) {
       if (ch != -1) r.unreadChar((char) ch);
     }
 

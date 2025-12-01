@@ -34,7 +34,10 @@ public interface Builtin {
   @Module.Ns(name = "global", tag = "basic")
   public interface Basic {
 
-    @Module.Fn(name = "atom", complete = true)
+    @Module.Fn(
+        name = "atom",
+        complete = true,
+        doc = "Creates a standard atom with the given value.")
     public static <V> Atom.Standard<V> atom(V val) {
       return new Atom.Standard<V>(val);
     }
@@ -70,7 +73,7 @@ public interface Builtin {
       return new hara.lang.base.primitive.Counter(start);
     }
 
-    @Module.Fn(name = "deref", protocol = true)
+    @Module.Fn(name = "deref", protocol = true, doc = "Dereferences the given reference object.")
     public static <V> V deref(IDeref<V> ref) {
       return ref.deref();
     }
@@ -154,7 +157,11 @@ public interface Builtin {
       return obj.isRealized();
     }
 
-    @Module.Fn(name = "reset!", protocol = true)
+    @Module.Fn(
+        name = "reset!",
+        protocol = true,
+        doc =
+            "Sets the value of atom to new value without regard for the current value. Returns the new value.")
     public static <V> V reset(IReset<V> obj, V val) {
       return obj.reset(val);
     }
@@ -1399,6 +1406,23 @@ public interface Builtin {
               return e.toString();
             }
           });
+    }
+
+    @Module.Fn(name = "doc", complete = true)
+    public static void doc(Object obj) {
+      if (obj instanceof IObjType) {
+        var meta = ((IObjType) obj).meta();
+        if (meta != null) {
+          var metaMap = (IMapType) meta;
+          var doc = metaMap.lookup(Basic.keyword("doc"));
+          if (doc != null) {
+            System.out.println("-------------------------");
+            System.out.println(metaMap.lookup(Basic.keyword("name")));
+            System.out.println(metaMap.lookup(Basic.keyword("arglists")));
+            System.out.println("  " + doc);
+          }
+        }
+      }
     }
   }
 }

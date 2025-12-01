@@ -78,6 +78,11 @@
 			<version>2.0.7</version>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>org.jline</groupId>
+			<artifactId>jline</artifactId>
+			<version>3.23.0</version>
+		</dependency>
 	</dependencies>
 	<build>
 		<plugins>
