@@ -178,4 +178,28 @@ public class ParserTest {
     assertEquals(Symbol.create("deref"), l.nth(0));
     assertEquals(Symbol.create("a"), l.nth(1));
   }
+
+  @Test
+  public void testMapDuplicateKey() {
+    try {
+      Parser.LispReader.readString("{:a 1 :a 2}", null);
+      fail("Expected RuntimeException for duplicate key");
+    } catch (Parser.LispReader.ReaderException e) {
+      assertTrue(e.getCause().getMessage().contains("Duplicate key"));
+    } catch (hara.lang.base.Ex.Runtime e) {
+      assertTrue(e.getMessage().contains("Duplicate key"));
+    }
+  }
+
+  @Test
+  public void testSetDuplicateItem() {
+    try {
+      Parser.LispReader.readString("#{1 1}", null);
+      fail("Expected RuntimeException for duplicate item");
+    } catch (Parser.LispReader.ReaderException e) {
+      assertTrue(e.getCause().getMessage().contains("Duplicate item"));
+    } catch (hara.lang.base.Ex.Runtime e) {
+      assertTrue(e.getMessage().contains("Duplicate item"));
+    }
+  }
 }
