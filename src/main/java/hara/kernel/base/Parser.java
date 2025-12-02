@@ -19,9 +19,9 @@ import java.util.function.BiFunction;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static hara.kernel.base.Builtin.Basic.keyword;
-import static hara.kernel.base.Builtin.Collection.merge;
-import static hara.kernel.base.Builtin.Struct.*;
+import static hara.kernel.builtin.BuiltinBasic.keyword;
+import static hara.kernel.builtin.BuiltinCollection.merge;
+import static hara.kernel.builtin.BuiltinStruct.*;
 
 public interface Parser {
 

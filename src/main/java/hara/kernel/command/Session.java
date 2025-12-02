@@ -21,7 +21,7 @@ public class Session {
   @Command.Sub(name = "EXISTS")
   public static Object exists(Foundation F, List<Object> args) {
     List<String> sArgs = Foundation.toStringList(args);
-    RT.Instance s = (RT.Instance) F.RTS.get(sArgs.get(0));
+    RT.Instance<?> s = (RT.Instance<?>) F.RTS.get(sArgs.get(0));
     return s != null;
   }
 
@@ -41,7 +41,7 @@ public class Session {
   public static Object path(Foundation F, List<Object> args) {
     List<String> sArgs = Foundation.toStringList(args);
     String key = sArgs.get(0);
-    RT.Instance rt = (RT.Instance) F.RTS.get(key);
+    RT.Instance<?> rt = (RT.Instance<?>) F.RTS.get(key);
     if (rt == null) {
       throw new Ex.Runtime("No Session: " + key);
     }
@@ -76,7 +76,7 @@ public class Session {
   public static Object kill(Foundation F, List<Object> args) {
     List<String> sArgs = Foundation.toStringList(args);
     String key = sArgs.get(0);
-    RT.Instance rt = (RT.Instance) F.RTS.get(key);
+    RT.Instance<?> rt = (RT.Instance<?>) F.RTS.get(key);
     if (rt == null) {
       throw new Ex.Runtime("No Session: " + key);
     }
@@ -88,7 +88,7 @@ public class Session {
   public static Object info(Foundation F, List<Object> args) {
     List<String> sArgs = Foundation.toStringList(args);
     String key = sArgs.get(0);
-    RT.Instance rt = (RT.Instance) F.RTS.get(key);
+    RT.Instance<?> rt = (RT.Instance<?>) F.RTS.get(key);
     if (rt == null) {
       throw new Ex.Runtime("No Session: " + key);
     }

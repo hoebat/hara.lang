@@ -1,6 +1,7 @@
 package hara.kernel.redirect;
 
-import hara.kernel.base.Builtin;
+import hara.lang.base.Ex;
+import hara.kernel.builtin.BuiltinUtil;
 import hara.kernel.protocol.IRedirect;
 import hara.lang.data.Vector;
 import hara.lang.protocol.IDisplay;
@@ -55,7 +56,7 @@ public class FileRedirect implements IRedirect {
             vec.conj(item.toString());
           }
         }
-        output = Builtin.Util.prStr(vec.toPersistent());
+        output = BuiltinUtil.prStr(vec.toPersistent());
       } else {
         output = obj.toString();
       }
@@ -69,7 +70,7 @@ public class FileRedirect implements IRedirect {
     if (this.logOut != null) {
       String output;
       if (obj instanceof IDisplay) {
-        output = Builtin.Util.prStr(obj);
+        output = BuiltinUtil.prStr(obj);
       } else if (obj instanceof byte[]) {
         StringBuilder sb = new StringBuilder();
         for (byte b : (byte[]) obj) {

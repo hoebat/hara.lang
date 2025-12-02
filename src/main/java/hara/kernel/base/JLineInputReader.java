@@ -1,4 +1,4 @@
-package hara.kernel;
+package hara.kernel.base;
 
 import org.jline.reader.LineReader;
 

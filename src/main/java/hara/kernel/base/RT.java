@@ -1,5 +1,6 @@
 package hara.kernel.base;
 
+import hara.kernel.builtin.BuiltinInterop;
 import hara.kernel.protocol.IEnv;
 import hara.kernel.protocol.IRuntime;
 import hara.lang.base.Ex;
@@ -19,10 +20,9 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
-import static hara.kernel.base.Builtin.Lambda.mapVals;
-import static hara.kernel.base.Builtin.Lambda.partial;
-import static hara.kernel.base.Builtin.Struct.list;
-import static hara.kernel.base.Builtin.Struct.pair;
+import hara.kernel.builtin.BuiltinInterop;
+import hara.kernel.builtin.BuiltinLambda;
+import hara.kernel.builtin.BuiltinStruct;
 
 @SuppressWarnings("unchecked")
 public interface RT {
@@ -144,12 +144,12 @@ public interface RT {
 
     @SuppressWarnings("rawtypes")
     public Map<Symbol, Var> loadMethods(IRuntime<AST, Symbol, Var> rt) {
-      return mapVals(
+      return BuiltinLambda.mapVals(
           (Function)
               (obj) -> {
                 var v = (Var) obj;
                 if ((Boolean) Keyword.create("rt").invoke(v.meta())) {
-                  v.reset(partial(v.deref(), Array.objects(rt)));
+                  v.reset(BuiltinLambda.partial(v.deref(), Array.objects(rt)));
                 }
                 return v;
               },
@@ -210,7 +210,7 @@ public interface RT {
         if (c == null) {
           c = _rt.classFor(s);
         }
-        return (c != null) ? pair(sym, c) : null;
+        return (c != null) ? BuiltinStruct.pair(sym, c) : null;
       } else {
         var s = sym.getNamespace();
         Class c = null;
@@ -231,12 +231,12 @@ public interface RT {
         if (c != null) {
 
           try {
-            return pair(sym, Builtin.Interop.invokeGetStatic(c, sym.getName()));
+            return BuiltinStruct.pair(sym, BuiltinInterop.invokeGetStatic(c, sym.getName()));
           } catch (Throwable t) {
           }
 
           try {
-            return pair(sym, Builtin.Interop.invokeFn(c, sym.getName()));
+            return BuiltinStruct.pair(sym, BuiltinInterop.invokeFn(c, sym.getName()));
           } catch (Throwable t) {
           }
 
@@ -331,11 +331,11 @@ public interface RT {
 
         if (ns != null) {
           Var v = ns.mappings.get(Symbol.create(sym.getName()));
-          if (v != null) return pair(sym, v);
+          if (v != null) return BuiltinStruct.pair(sym, v);
         }
       } else {
         Var v = _currentNs.get().mappings.get(sym);
-        if (v != null) return pair(sym, v);
+        if (v != null) return BuiltinStruct.pair(sym, v);
       }
 
       Entry e = _class.find(sym);
@@ -394,7 +394,7 @@ public interface RT {
           new ThreadLocal() {
             @Override
             protected List<IEnv<Symbol, Var>> initialValue() {
-              return list(Array.objects(_userEnv));
+              return BuiltinStruct.list(Array.objects(_userEnv));
             }
           };
     }

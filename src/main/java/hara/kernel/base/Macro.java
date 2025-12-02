@@ -21,10 +21,11 @@ import hara.lang.protocol.IPair;
 import java.util.Iterator;
 import java.util.Map.Entry;
 
-import static hara.kernel.base.Builtin.Basic.atomVolatile;
-import static hara.kernel.base.Builtin.Basic.symbol;
-import static hara.kernel.base.Builtin.Check.isTruthy;
-import static hara.kernel.base.Builtin.Struct.list;
+import static hara.kernel.builtin.BuiltinBasic.atomVolatile;
+import static hara.kernel.builtin.BuiltinBasic.symbol;
+import static hara.kernel.builtin.BuiltinCheck.isTruthy;
+import static hara.kernel.builtin.BuiltinCollection.*;
+import static hara.kernel.builtin.BuiltinStruct.list;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
 public interface Macro {
@@ -56,11 +57,11 @@ public interface Macro {
         if (o.getClass().isArray()) {
           return (R) ((Object[]) o)[(int) idx];
         } else if (o instanceof ILookup) {
-          return (R) Builtin.Collection.get((ILookup) o, idx);
+          return (R) BuiltinCollection.get((ILookup) o, idx);
         } else if (o instanceof Iterable) {
-          return (R) Builtin.Collection.nth((Iterable) o, (long) idx);
+          return (R) BuiltinCollection.nth((Iterable) o, (long) idx);
         } else if (o instanceof String) {
-          return (R) Builtin.Collection.nth((String) o, (long) idx);
+          return (R) BuiltinCollection.nth((String) o, (long) idx);
         }
       }
       throw new Ex.Unsupported();
@@ -187,7 +188,11 @@ public interface Macro {
       }
 
       for (Object part : parts) {
-        current = list(Array.objects(symbol("into"), current, part));
+        List lt =
+            list(
+                Array.objects(
+                    hara.kernel.builtin.BuiltinStruct.symbol("inst"),
+                    hara.kernel.builtin.BuiltinStruct.symbol("m")));
       }
 
       if (!isVector) {

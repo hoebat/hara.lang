@@ -35,11 +35,11 @@ public class ControlPlaneTest {
 
     // Test invoking ctl via Builtin (mimicking Lisp call)
     // (ctl :ping)
-    Object res = Builtin.Runtime.ctl(rt, Arrays.asList("PING"));
+    Object res = BuiltinRuntime.ctl(rt, Arrays.asList("PING"));
     assertEquals("PONG", res);
 
     // (ctl :echo "foo")
-    Object resEcho = Builtin.Runtime.ctl(rt, Arrays.asList("ECHO", "foo"));
+    Object resEcho = BuiltinRuntime.ctl(rt, Arrays.asList("ECHO", "foo"));
     assertEquals(Arrays.asList("foo"), resEcho);
   }
 

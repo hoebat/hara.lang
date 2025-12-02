@@ -15,7 +15,7 @@ public class BuiltinCollectionTest {
     java.util.Map<String, Integer> map = new java.util.HashMap<>();
     map.put("a", 1);
 
-    java.util.Map<String, Integer> result = Builtin.Collection.assoc(map, "b", 2);
+    java.util.Map<String, Integer> result = BuiltinCollection.assoc(map, "b", 2);
 
     assertEquals(Integer.valueOf(1), result.get("a"));
     assertEquals(Integer.valueOf(2), result.get("b"));
@@ -27,7 +27,7 @@ public class BuiltinCollectionTest {
     list.add(1);
     list.add(2);
 
-    java.util.List<Integer> result = Builtin.Collection.conj(list, 3);
+    java.util.List<Integer> result = BuiltinCollection.conj(list, 3);
 
     assertEquals(3, result.size());
     assertEquals(Integer.valueOf(3), result.get(2));
@@ -39,7 +39,7 @@ public class BuiltinCollectionTest {
     set.add(1);
     set.add(2);
 
-    java.util.Set<Integer> result = Builtin.Collection.conj(set, 3);
+    java.util.Set<Integer> result = BuiltinCollection.conj(set, 3);
 
     assertEquals(3, result.size());
     assertTrue(result.contains(3));
@@ -51,7 +51,7 @@ public class BuiltinCollectionTest {
     list.add(2);
     list.add(3);
 
-    java.util.List<Integer> result = Builtin.Collection.cons(list, 1);
+    java.util.List<Integer> result = BuiltinCollection.cons(list, 1);
 
     assertEquals(3, result.size());
     assertEquals(Integer.valueOf(1), result.get(0));
@@ -60,20 +60,20 @@ public class BuiltinCollectionTest {
   @Test
   public void testCountWithArray() {
     Object[] arr = {1, 2, 3, 4};
-    long count = Builtin.Collection.count(arr);
+    long count = BuiltinCollection.count(arr);
     assertEquals(4L, count);
   }
 
   @Test
   public void testCountWithString() {
-    long count = Builtin.Collection.count("hello");
+    long count = BuiltinCollection.count("hello");
     assertEquals(5L, count);
   }
 
   @Test
   public void testCountWithCollection() {
     java.util.List<Integer> list = java.util.Arrays.asList(1, 2, 3);
-    long count = Builtin.Collection.count(list);
+    long count = BuiltinCollection.count(list);
     assertEquals(3L, count);
   }
 
@@ -83,7 +83,7 @@ public class BuiltinCollectionTest {
     map.put("a", 1);
     map.put("b", 2);
 
-    java.util.Map<String, Integer> result = Builtin.Collection.dissoc(map, "a");
+    java.util.Map<String, Integer> result = BuiltinCollection.dissoc(map, "a");
 
     assertEquals(1, result.size());
     assertFalse(result.containsKey("a"));
@@ -97,7 +97,7 @@ public class BuiltinCollectionTest {
     set.add(2);
     set.add(3);
 
-    java.util.Set<Integer> result = Builtin.Collection.dissoc(set, 2);
+    java.util.Set<Integer> result = BuiltinCollection.dissoc(set, 2);
 
     assertEquals(2, result.size());
     assertFalse(result.contains(2));
@@ -109,7 +109,7 @@ public class BuiltinCollectionTest {
     list.add(1);
     list.add(2);
 
-    java.util.Collection<Integer> result = Builtin.Collection.empty(list);
+    java.util.Collection<Integer> result = BuiltinCollection.empty(list);
 
     assertEquals(0, result.size());
   }
@@ -119,7 +119,7 @@ public class BuiltinCollectionTest {
     java.util.Map<String, Integer> map = new java.util.HashMap<>();
     map.put("key", 42);
 
-    Object result = Builtin.Collection.get(map, "key");
+    Object result = BuiltinCollection.get(map, "key");
     assertEquals(42, result);
   }
 
@@ -127,7 +127,7 @@ public class BuiltinCollectionTest {
   public void testGetWithMapAndDefault() {
     java.util.Map<String, Integer> map = new java.util.HashMap<>();
 
-    Object result = Builtin.Collection.get(map, "missing", 99);
+    Object result = BuiltinCollection.get(map, "missing", 99);
     assertEquals(99, result);
   }
 
@@ -136,8 +136,8 @@ public class BuiltinCollectionTest {
     java.util.Map<String, Integer> map = new java.util.HashMap<>();
     map.put("key", 42);
 
-    assertTrue(Builtin.Collection.has(map, "key"));
-    assertFalse(Builtin.Collection.has(map, "missing"));
+    assertTrue(BuiltinCollection.has(map, "key"));
+    assertFalse(BuiltinCollection.has(map, "missing"));
   }
 
   @Test
@@ -146,8 +146,8 @@ public class BuiltinCollectionTest {
     set.add(1);
     set.add(2);
 
-    assertTrue(Builtin.Collection.has(set, 1));
-    assertFalse(Builtin.Collection.has(set, 3));
+    assertTrue(BuiltinCollection.has(set, 1));
+    assertFalse(BuiltinCollection.has(set, 3));
   }
 
   @Test
@@ -155,7 +155,7 @@ public class BuiltinCollectionTest {
     java.util.List<Integer> list = new java.util.ArrayList<>();
     list.add(1);
 
-    java.util.List<Integer> result = Builtin.Collection.into(list, java.util.Arrays.asList(2, 3));
+    java.util.List<Integer> result = BuiltinCollection.into(list, java.util.Arrays.asList(2, 3));
 
     assertEquals(3, result.size());
   }
@@ -166,7 +166,7 @@ public class BuiltinCollectionTest {
     map.put("a", 1);
     map.put("b", 2);
 
-    java.util.Iterator<String> keys = Builtin.Collection.keys(map);
+    java.util.Iterator<String> keys = BuiltinCollection.keys(map);
 
     int count = 0;
     while (keys.hasNext()) {
@@ -182,7 +182,7 @@ public class BuiltinCollectionTest {
     map.put("a", 1);
     map.put("b", 2);
 
-    java.util.Iterator<Integer> vals = Builtin.Collection.vals(map);
+    java.util.Iterator<Integer> vals = BuiltinCollection.vals(map);
 
     int count = 0;
     while (vals.hasNext()) {

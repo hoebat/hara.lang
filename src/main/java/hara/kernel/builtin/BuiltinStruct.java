@@ -1,0 +1,212 @@
+package hara.kernel.builtin;
+
+import hara.kernel.base.Module;
+import hara.lang.base.G;
+import hara.lang.base.Iter;
+import hara.lang.base.primitive.Array;
+import hara.lang.data.*;
+import hara.lang.data.Tuple.*;
+import hara.lang.data.types.ILinearType;
+import hara.lang.data.types.IMapType;
+import hara.lang.protocol.IPair;
+import hara.lang.base.Ex;
+
+import java.util.Iterator;
+import java.util.Map.Entry;
+
+@SuppressWarnings({"unchecked", "rawtypes"})
+@Module.Ns(name = "global", tag = "structure")
+public interface BuiltinStruct {
+  //
+  // Coll
+  //
+
+  @Module.Fn(name = "hash-map", vargs = true, complete = true)
+  public static <ITR, K, V> Map.Standard<K, V> hashMap(ITR elements) {
+    return Map.Standard.into(Iter.partitionPair(Iter.iter(elements)));
+  }
+
+  @Module.Fn(name = "hash-set", vargs = true, complete = true)
+  public static <ITR, E> Set.Standard<E> hashSet(ITR elements) {
+    return Set.Standard.into(Iter.iter(elements));
+  }
+
+  @Module.Fn(name = "j:arr", complete = true)
+  public static <ITR, E> E[] jArr(Class<E> type, ITR vargs) {
+    return (E[]) Iter.toArray(Iter.iter(vargs), type);
+  }
+
+  @Module.Fn(name = "j:objs", vargs = true, complete = true)
+  public static <ITR> Object[] jArr(ITR vargs) {
+    return Array.toArray(vargs);
+  }
+
+  @Module.Fn(name = "j:hash-map", vargs = true, complete = true)
+  public static <ITR> java.util.HashMap jHashMap(ITR vargs) {
+    var m = new java.util.HashMap();
+    Iter.each(
+        Iter.partitionPair(Iter.iter(vargs)),
+        (p) -> m.put(((Entry) p).getKey(), ((Entry) p).getValue()));
+    return m;
+  }
+
+  @Module.Fn(name = "j:hash-set", vargs = true, complete = true)
+  public static <ITR> java.util.HashSet jHashSet(ITR vargs) {
+    var s = new java.util.HashSet();
+    Iter.each(Iter.iter(vargs), (e) -> s.add(e));
+    return s;
+  }
+
+  //
+  // Checks
+  //
+
+  @Module.Fn(name = "j:list", vargs = true, complete = true)
+  public static <ITR> java.util.ArrayList jList(ITR vargs) {
+    return Iter.toArrayList(Iter.iter(vargs));
+  }
+
+  @Module.Fn(name = "list", vargs = true, complete = true)
+  public static <ITR, E> List.Standard<E> list(ITR elements) {
+    return List.Standard.into(Iter.iter(elements));
+  }
+
+  @Module.Fn(name = "mut:hash-map", vargs = true, complete = true)
+  public static <ITR, K, V> Map.Mutable<K, V> mutHashMap(ITR elements) {
+    return Map.Mutable.into(Iter.partitionPair(Iter.iter(elements)));
+  }
+
+  @Module.Fn(name = "mut:hash-set", vargs = true, complete = true)
+  public static <ITR, E> Set.Mutable<E> mutHashSet(ITR elements) {
+    return Set.Mutable.into(Iter.iter(elements));
+  }
+
+  @Module.Fn(name = "mut:list", vargs = true, complete = true)
+  public static <ITR, E> List.Mutable<E> mutList(ITR elements) {
+    return List.Mutable.into(Iter.iter(elements));
+  }
+
+  @Module.Fn(name = "mut:ordered-map", vargs = true, complete = true)
+  public static <ITR, K, V> OrderedMap.Mutable<K, V> mutOrderedMap(ITR elements) {
+    return OrderedMap.Mutable.into(Iter.partitionPair(Iter.iter(elements)));
+  }
+
+  @Module.Fn(name = "mut:ordered-set", vargs = true, complete = true)
+  public static <ITR, E> OrderedSet.Mutable<E> mutOrderedSet(ITR elements) {
+    return OrderedSet.Mutable.into(Iter.iter(elements));
+  }
+
+  @Module.Fn(name = "mut:queue", vargs = true, complete = true)
+  public static <ITR, E> Queue.Mutable<E> mutQueue(ITR elements) {
+    return Queue.Mutable.into(Iter.iter(elements));
+  }
+
+  @Module.Fn(name = "mut:sorted-map", vargs = true, complete = true)
+  public static <ITR, K, V> SortedMap.Mutable<K, V> mutSortedMap(ITR elements) {
+    return SortedMap.Mutable.into(Iter.partitionPair(Iter.iter(elements)));
+  }
+
+  @Module.Fn(name = "mut:sorted-set", vargs = true, complete = true)
+  public static <ITR, E> SortedSet.Mutable<E> mutSortedSet(ITR elements) {
+    return SortedSet.Mutable.into(Iter.iter(elements));
+  }
+
+  @Module.Fn(name = "mut:vector", vargs = true, complete = true)
+  public static <ITR, E> Vector.Mutable<E> mutVector(ITR elements) {
+    return Vector.Mutable.into(Iter.iter(elements));
+  }
+
+  @Module.Fn(name = "ordered-map", vargs = true, complete = true)
+  public static <ITR, K, V> OrderedMap.Standard<K, V> orderedMap(ITR elements) {
+    return OrderedMap.Standard.into(Iter.partitionPair(Iter.iter(elements)));
+  }
+
+  @Module.Fn(name = "ordered-set", vargs = true, complete = true)
+  public static <ITR, E> OrderedSet.Standard<E> orderedSet(ITR elements) {
+    return OrderedSet.Standard.into(Iter.iter(elements));
+  }
+
+  @Module.Fn(name = "pair", complete = true)
+  public static <K, V> IPair<K, V> pair(K key, V val) {
+    return new Tuple.Tup2.L(null, key, val);
+  }
+
+  @Module.Fn(name = "queue", vargs = true, complete = true)
+  public static <ITR, E> Queue.Standard<E> queue(ITR elements) {
+    return Queue.Standard.into(Iter.iter(elements));
+  }
+
+  @Module.Fn(name = "sorted-map", vargs = true, complete = true)
+  public static <ITR, K, V> SortedMap.Standard<K, V> sortedMap(ITR elements) {
+    return SortedMap.Standard.into(Iter.partitionPair(Iter.iter(elements)));
+  }
+
+  @Module.Fn(name = "sorted-set", vargs = true, complete = true)
+  public static <ITR, E> SortedSet.Standard<E> sortedSet(ITR elements) {
+    return SortedSet.Standard.into(Iter.iter(elements));
+  }
+
+  @Module.Fn(name = "to:facade", complete = true)
+  public static <E> ILinearType<E> toFacade(java.util.List<E> l) {
+    return new AsList<E>(l);
+  }
+
+  @Module.Fn(name = "to:facade", complete = true)
+  public static <K, V> IMapType<K, V> toFacade(java.util.Map<K, V> m) {
+    return new AsMap<K, V>(m);
+  }
+
+  @Module.Fn(name = "tup", complete = true)
+  public static Tup0 tup() {
+    return Tup0.EMPTY;
+  }
+
+  @Module.Fn(name = "tup", complete = true)
+  public static Tup1.L tup(Object a) {
+    return new Tup1.L(null, a);
+  }
+
+  @Module.Fn(name = "tup", complete = true)
+  public static Tup2.L tup(Object a, Object b) {
+    return new Tup2.L(null, a, b);
+  }
+
+  @Module.Fn(name = "tup", complete = true)
+  public static Tup3.L tup(Object a, Object b, Object c) {
+    return new Tup3.L(null, a, b, c);
+  }
+
+  @Module.Fn(name = "tup", complete = true)
+  public static Tup4.L tup(Object a, Object b, Object c, Object d) {
+    return new Tup4.L(null, a, b, c, d);
+  }
+
+  @Module.Fn(name = "tup", complete = true)
+  public static Tup5.L tup(Object a, Object b, Object c, Object d, Object e) {
+    return new Tup5.L(null, a, b, c, d, e);
+  }
+
+  public static ILinearType tuple(Object[] xs) {
+    switch (xs.length) {
+      case 0:
+        return Tup0.EMPTY;
+      case 1:
+        return new Tup1.L(null, xs[0]);
+      case 2:
+        return new Tup2.L(null, xs[0], xs[1]);
+      case 3:
+        return new Tup3.L(null, xs[0], xs[1], xs[2]);
+      case 4:
+        return new Tup4.L(null, xs[0], xs[1], xs[2], xs[3]);
+      case 5:
+        return new Tup5.L(null, xs[0], xs[1], xs[2], xs[3], xs[4]);
+      default:
+        throw new Ex.Arity(xs.length, "");
+    }
+  }
+
+  @Module.Fn(name = "vector", vargs = true, complete = true)
+  public static <ITR, E> Vector.Standard<E> vector(ITR elements) {
+    return Vector.Standard.into(Iter.iter(elements));
+  }
+}

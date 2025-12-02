@@ -30,13 +30,14 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
-import static hara.kernel.base.Builtin.Basic.keyword;
-import static hara.kernel.base.Builtin.Basic.symbol;
-import static hara.kernel.base.Builtin.Collection.zipmap;
-import static hara.kernel.base.Builtin.Lambda.groupBy;
-import static hara.kernel.base.Builtin.Lambda.mapEntries;
-import static hara.kernel.base.Builtin.Struct.hashMap;
-import static hara.kernel.base.Builtin.Struct.pair;
+import static hara.kernel.builtin.BuiltinBasic.keyword;
+import static hara.kernel.builtin.BuiltinBasic.symbol;
+import static hara.kernel.builtin.BuiltinCollection.zipmap;
+import static hara.kernel.builtin.BuiltinLambda.groupBy;
+import static hara.kernel.builtin.BuiltinLambda.mapEntries;
+import static hara.kernel.builtin.BuiltinStruct.hashMap;
+import static hara.kernel.builtin.BuiltinStruct.pair;
+import hara.kernel.builtin.BuiltinStruct;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 public interface Env {
@@ -350,7 +351,7 @@ public interface Env {
         Iter.keep(
             (m) -> {
               Module.Fn v = S.fnOpts((Method) m);
-              return (v != null && !v.helper()) ? Builtin.Struct.pair(v.name(), m) : null;
+              return (v != null && !v.helper()) ? BuiltinStruct.pair(v.name(), m) : null;
             });
 
     return Iter.groupBy(
@@ -437,7 +438,23 @@ public interface Env {
 
     var raw = new HashMap();
 
-    Array.reduce((map, cls) -> getMethods(cls, map), raw, Builtin.class.getDeclaredClasses());
+    Array.reduce(
+        (map, cls) -> getMethods(cls, map),
+        raw,
+        new Class[] {
+          hara.kernel.builtin.BuiltinBasic.class,
+          hara.kernel.builtin.BuiltinCheck.class,
+          hara.kernel.builtin.BuiltinRef.class,
+          hara.kernel.builtin.BuiltinCollection.class,
+          hara.kernel.builtin.BuiltinInterop.class,
+          hara.kernel.builtin.BuiltinLambda.class,
+          hara.kernel.builtin.BuiltinOps.class,
+          hara.kernel.builtin.BuiltinRuntime.class,
+          hara.kernel.builtin.BuiltinStruct.class,
+          hara.kernel.builtin.BuiltinTime.class,
+          hara.kernel.builtin.BuiltinNamespace.class,
+          hara.kernel.builtin.BuiltinUtil.class
+        });
 
     Array.reduce((map, cls) -> getMethods(cls, map), raw, Macro.class.getDeclaredClasses());
 
@@ -456,9 +473,9 @@ public interface Env {
   }
 
   /*
-  public static void main(String[] args) {
-  	var map = loadStatic();
-  	G.prn(map);
-  }
-  */
+   * public static void main(String[] args) {
+   * var map = loadStatic();
+   * G.prn(map);
+   * }
+   */
 }

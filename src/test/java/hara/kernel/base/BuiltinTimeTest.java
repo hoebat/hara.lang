@@ -13,10 +13,10 @@ public class BuiltinTimeTest {
   @Test
   public void testNowReturnsCurrentTime() {
     long before = System.currentTimeMillis();
-    long now = Builtin.Time.now();
+    long now = BuiltinTime.now();
     long after = System.currentTimeMillis();
 
-    // Builtin.Time.now() returns nanos, but synced to epoch.
+    // BuiltinTime.now() returns nanos, but synced to epoch.
     // So we compare it against epoch millis * 1,000,000
     assertTrue(
         "now() should return current time",
@@ -26,7 +26,7 @@ public class BuiltinTimeTest {
   @Test
   public void testBenchMeasuresExecutionTime() {
     long duration =
-        Builtin.Time.bench(
+        BuiltinTime.bench(
             new hara.lang.protocol.IFn() {
               @Override
               public Object invoke(Object... args) {

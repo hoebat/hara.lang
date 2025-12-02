@@ -15,7 +15,7 @@ public class NamespaceTest {
     // Let's create a minimal RT.Instance if possible, or mock IRuntime.
 
     // Using a real RT.Instance might be complex due to dependencies.
-    // Let's try to mock IRuntime for now, but Builtin.Namespace.nsFind casts to RT.Instance.
+    // Let's try to mock IRuntime for now, but BuiltinNamespace.nsFind casts to RT.Instance.
     // So we must use RT.Instance or a subclass.
 
     // RT.Instance constructor: public Instance(IContext root, String key)
@@ -31,25 +31,25 @@ public class NamespaceTest {
     RT.Instance rt = new RT.Instance(dummyContext, "test");
 
     // Initially, there is a "user" namespace.
-    Namespace userNs = Builtin.Namespace.nsFind(rt, Symbol.create("user"));
+    Namespace userNs = BuiltinNamespace.nsFind(rt, Symbol.create("user"));
     assertNotNull(userNs);
     assertEquals("user", userNs.name.getName());
 
     // Create a new namespace
-    Namespace newNs = Builtin.Namespace.nsCreate(rt, Symbol.create("new.ns"));
+    Namespace newNs = BuiltinNamespace.nsCreate(rt, Symbol.create("new.ns"));
     assertNotNull(newNs);
     assertEquals("new.ns", newNs.name.getName());
 
     // Find it
-    Namespace foundNs = Builtin.Namespace.nsFind(rt, Symbol.create("new.ns"));
+    Namespace foundNs = BuiltinNamespace.nsFind(rt, Symbol.create("new.ns"));
     assertEquals(newNs, foundNs);
 
     // Check ns:map (mappings)
-    IMapType mappings = Builtin.Namespace.nsMap(newNs);
+    IMapType mappings = BuiltinNamespace.nsMap(newNs);
     assertNotNull(mappings);
 
     // Check ns:list
-    java.util.Iterator<Namespace> it = Builtin.Namespace.nsList(rt);
+    java.util.Iterator<Namespace> it = BuiltinNamespace.nsList(rt);
     int count = 0;
     while (it.hasNext()) {
       it.next();
