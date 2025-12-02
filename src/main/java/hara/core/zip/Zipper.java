@@ -32,14 +32,17 @@ public class Zipper implements IObjType {
   }
 
   public Object currentNode() {
+    if (this.right.count() == 0) return null;
     return this.right.peekFirst();
   }
 
   public Object leftElement() {
+    if (this.left.count() == 0) return null;
     return this.left.peekFirst();
   }
 
   public Object rightElement() {
+    if (this.right.count() == 0) return null;
     return this.right.peekFirst();
   }
 

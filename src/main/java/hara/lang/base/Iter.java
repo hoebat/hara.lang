@@ -556,10 +556,6 @@ public interface Iter {
     return concat((Iterator) map(it, Iterable::iterator));
   }
 
-  public static <E> Iterator<E> flatten(Iterator<? extends Iterable<E>> it) {
-    return concat((Iterator) map(it, Iterable::iterator));
-  }
-
   public static <E> Function<Iterator<E>, Iterator<E>> drop(int n) {
     return (it) -> drop(it, n);
   }

@@ -54,9 +54,11 @@ public class ParserTest {
   @Test
   public void testReadStringVector() {
     Object result = Parser.LispReader.readString("[1 2 3]", null);
-    // Vectors <= 5 elements might be Tuples if not handled carefully, but Parser.VectorReader
+    // Vectors <= 5 elements might be Tuples if not handled carefully, but
+    // Parser.VectorReader
     // checks size > 5
-    // Parser.java: if (list.size() > 5) return vector(list); else return tuple(list.toArray());
+    // Parser.java: if (list.size() > 5) return vector(list); else return
+    // tuple(list.toArray());
     // So [1 2 3] is a Tuple.
     assertTrue(result instanceof hara.lang.data.types.ILinearType);
     hara.lang.data.types.ILinearType v = (hara.lang.data.types.ILinearType) result;
@@ -146,7 +148,8 @@ public class ParserTest {
   public void testReadInvalidNumber() {
     try {
       // "123a" - Parser splits at macro/whitespace. 'a' is not macro/whitespace.
-      // Wait, 123a is read as a token? No, readNumber reads until macro or whitespace.
+      // Wait, 123a is read as a token? No, readNumber reads until macro or
+      // whitespace.
       // If 1 starts, it calls readNumber.
       // readNumber loops until macro or whitespace. 'a' is neither.
       // So it reads "123a" and tries to matchNumber("123a").
@@ -197,5 +200,67 @@ public class ParserTest {
     } catch (hara.lang.base.Ex.Runtime e) {
       assertTrue(e.getMessage().contains("Duplicate item"));
     }
+  }
+
+  @Test
+  public void testDiscardReader() {
+    // #_ ignores the next form
+    assertEquals(1L, Parser.LispReader.readString("#_ 2 1", null));
+  }
+
+  @Test
+  public void testQueueReader() {
+    Object result = Parser.LispReader.readString("#[1 2]", null);
+    assertTrue(result instanceof Queue);
+    Queue q = (Queue) result;
+    assertEquals(2, q.count());
+    assertEquals(1L, q.peekFirst());
+  }
+
+  @Test
+  public void testRegexReader() {
+    Object result = Parser.LispReader.readString("#\"abc\"", null);
+    assertTrue(result instanceof java.util.regex.Pattern);
+    java.util.regex.Pattern p = (java.util.regex.Pattern) result;
+    assertEquals("abc", p.pattern());
+  }
+
+  @Test
+  public void testUnquoteReader() {
+    // Unquote is usually only valid inside syntax-quote, but the reader just
+    // produces a symbol wrapping
+    Object result = Parser.LispReader.readString("~a", null);
+    assertTrue(result instanceof List);
+    List l = (List) result;
+    assertEquals(Symbol.create("unquote"), l.nth(0));
+    assertEquals(Symbol.create("a"), l.nth(1));
+
+    Object resultSplice = Parser.LispReader.readString("~@a", null);
+    assertTrue(resultSplice instanceof List);
+    List lSplice = (List) resultSplice;
+    assertEquals(Symbol.create("unquote-splicing"), lSplice.nth(0));
+    assertEquals(Symbol.create("a"), lSplice.nth(1));
+  }
+
+  @Test
+  public void testCharacterReaderExtended() {
+    assertEquals('\u0000', Parser.LispReader.readString("\\u0000", null));
+    assertEquals('\uFFFF', Parser.LispReader.readString("\\uFFFF", null));
+    assertEquals('\t', Parser.LispReader.readString("\\tab", null));
+    assertEquals('\b', Parser.LispReader.readString("\\backspace", null));
+    assertEquals('\f', Parser.LispReader.readString("\\formfeed", null));
+    assertEquals('\r', Parser.LispReader.readString("\\return", null));
+
+    // Octal
+    assertEquals('\007', Parser.LispReader.readString("\\o007", null));
+    assertEquals('\377', Parser.LispReader.readString("\\o377", null));
+  }
+
+  @Test
+  public void testStringReaderExtended() {
+    assertEquals(
+        "\t\r\n\b\f\\\"", Parser.LispReader.readString("\"\\t\\r\\n\\b\\f\\\\\\\"\"", null));
+    assertEquals("\u0000", Parser.LispReader.readString("\"\\u0000\"", null));
+    assertEquals("\7", Parser.LispReader.readString("\"\\7\"", null)); // Octal in string
   }
 }

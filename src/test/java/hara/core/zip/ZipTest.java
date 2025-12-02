@@ -167,4 +167,67 @@ public class ZipTest {
     assertEquals(4, zipper.currentNode());
     assertNull(Zip.stepNext(zipper)); // Should be at the end
   }
+
+  @Test
+  public void testBaseHandler() {
+    BaseHandler handler = new BaseHandler();
+    Zipper zipper = Zip.zipper(Vector.Standard.from(null, 1));
+
+    assertSame(zipper, handler.onStepAtLeftMost(zipper));
+    assertSame(zipper, handler.onStepAtRightMost(zipper));
+    assertSame(zipper, handler.onStepAtInsideMost(zipper));
+    assertSame(zipper, handler.onStepAtInsideMostLeft(zipper));
+    assertSame(zipper, handler.onStepAtOutsideMost(zipper));
+    assertSame(zipper, handler.onDeleteAtLeftMost(zipper));
+    assertSame(zipper, handler.onDeleteAtRightMost(zipper));
+  }
+
+  @Test
+  public void testFindLeft() {
+    Vector root = Vector.Standard.from(null, 1, 2, 3);
+    Zipper zipper = Zip.zipper(root);
+    zipper = Zip.stepInside(zipper); // at 1
+    zipper = Zip.stepRight(zipper); // at 2
+    zipper = Zip.stepRight(zipper); // at 3
+
+    Zipper found = Zip.findLeft(zipper, z -> z.currentNode().equals(1));
+    assertEquals(1, found.currentNode());
+
+    Zipper notFound = Zip.findLeft(zipper, z -> z.currentNode().equals(99));
+    assertNull(notFound);
+  }
+
+  @Test
+  public void testFindRight() {
+    Vector root = Vector.Standard.from(null, 1, 2, 3);
+    Zipper zipper = Zip.zipper(root);
+    zipper = Zip.stepInside(zipper); // at 1
+
+    Zipper found = Zip.findRight(zipper, z -> z.currentNode().equals(3));
+    assertEquals(3, found.currentNode());
+
+    Zipper notFound = Zip.findRight(zipper, z -> z.currentNode().equals(99));
+    assertNull(notFound);
+  }
+
+  @Test
+  public void testStepInsideLeft() {
+    // Root: [[1 2] 3]
+    Vector inner = Vector.Standard.from(null, 1, 2);
+    Vector root = Vector.Standard.from(null, inner, 3);
+    Zipper zipper = Zip.zipper(root);
+
+    zipper = Zip.stepInside(zipper); // at inner [1 2]
+    zipper = Zip.stepRight(zipper); // at 3. Left is inner.
+
+    Zipper insideLeft = Zip.stepInsideLeft(zipper);
+
+    // insideLeft should be inside 'inner', at the end.
+    // right is empty.
+    assertNull(insideLeft.currentNode());
+
+    // Move left to see 2
+    Zipper at2 = Zip.stepLeft(insideLeft);
+    assertEquals(2, at2.currentNode());
+  }
 }

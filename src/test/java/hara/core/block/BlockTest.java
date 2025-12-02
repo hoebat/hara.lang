@@ -143,4 +143,88 @@ public class BlockTest {
         new Block.Container("vector", children, new Block.Container.Props("[", "]"));
     assertEquals(2, container.height());
   }
+
+  @Test
+  public void testModifierMethods() {
+    Block.Modifier modifier = new Block.Modifier("uneval", "#_", (acc, input) -> input);
+
+    assertEquals(2, modifier.width());
+    assertEquals(0, modifier.height());
+    assertEquals(0, modifier.prefixed());
+    assertEquals(0, modifier.suffixed());
+    assertTrue(modifier.verify());
+    assertEquals("#_", modifier.toString());
+    assertEquals("#_", modifier.display());
+    assertEquals(hara.lang.protocol.Constant.ObjType.CLASS, modifier.getObjType());
+    assertEquals("BLOCK", modifier.getObjName());
+    assertNull(modifier.meta());
+    assertSame(modifier, modifier.withMeta(null));
+    assertEquals(0, modifier.hashCalc(null));
+
+    Object result = modifier.modify(null, "test");
+    assertEquals("test", result);
+  }
+
+  @Test
+  public void testContainerMethods() {
+    Vector<Block.IBlock> children =
+        Vector.Standard.from(null, new Block.Token("number", "1", 1, "1", 1, 0));
+    Block.Container container =
+        new Block.Container("vector", children, new Block.Container.Props("[", "]"));
+
+    assertEquals("collection", container.type());
+    assertEquals("vector", container.tag());
+    assertEquals(1, container.prefixed());
+    assertEquals(1, container.suffixed());
+    assertTrue(container.verify());
+    assertNull(container.value());
+    assertEquals("[1]", container.string());
+    assertEquals(3, container.length());
+    assertEquals("[1]", container.toString());
+    assertEquals("[1]", container.display());
+    assertEquals(hara.lang.protocol.Constant.ObjType.CLASS, container.getObjType());
+    assertEquals("BLOCK", container.getObjName());
+    assertNull(container.meta());
+    assertSame(container, container.withMeta(null));
+    assertEquals(0, container.hashCalc(null));
+  }
+
+  @Test
+  public void testContainerReplaceChildren() {
+    Vector<Block.IBlock> children = Vector.Standard.from(null);
+    Block.Container container =
+        new Block.Container("vector", children, new Block.Container.Props("[", "]"));
+
+    Vector<Block.IBlock> newChildren =
+        Vector.Standard.from(null, new Block.Token("number", "1", 1, "1", 1, 0));
+    Block.IContainer newContainer = container.replaceChildren(newChildren);
+
+    assertEquals(1, newContainer.children().count());
+    assertEquals(children, container.children());
+  }
+
+  @Test
+  public void testContainerValueString() {
+    Vector<Block.IBlock> children =
+        Vector.Standard.from(
+            null,
+            new Block.Token("number", "1", 1, "1", 1, 0),
+            new Block.Void("linespace", ' ', 1, 0),
+            new Block.Token("number", "2", 2, "2", 1, 0));
+    Block.Container container =
+        new Block.Container("vector", children, new Block.Container.Props("[", "]"));
+
+    assertEquals("[1 2]", container.valueString());
+  }
+
+  @Test
+  public void testCompare() {
+    Block.Token t1 = new Block.Token("a", "a", "a", "a", 1, 0);
+    Block.Token t2 = new Block.Token("b", "b", "b", "b", 1, 0);
+    Block.Token t3 = new Block.Token("a", "a", "a", "a", 1, 0);
+
+    assertTrue(t1.compareTo(t2) < 0);
+    assertTrue(t2.compareTo(t1) > 0);
+    assertEquals(0, t1.compareTo(t3));
+  }
 }
