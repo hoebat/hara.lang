@@ -48,3 +48,4 @@ form-init*
 .cpcache
 *_temp
 *.~undo-tree~
+parse_jacoco.py
