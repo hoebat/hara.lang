@@ -1,5 +1,6 @@
 package hara.kernel.base;
 
+import hara.kernel.builtin.BuiltinInterop;
 import org.junit.Before;
 import org.junit.Test;
 

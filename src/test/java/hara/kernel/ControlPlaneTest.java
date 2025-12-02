@@ -1,6 +1,6 @@
 package hara.kernel;
 
-import hara.kernel.base.Builtin;
+import hara.kernel.builtin.BuiltinRuntime;
 import hara.kernel.base.RT;
 import hara.kernel.protocol.IRuntime;
 import org.junit.Test;

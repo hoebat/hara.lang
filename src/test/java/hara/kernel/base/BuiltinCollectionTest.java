@@ -1,5 +1,6 @@
 package hara.kernel.base;
 
+import hara.kernel.builtin.BuiltinCollection;
 import org.junit.Test;
 
 import static org.junit.Assert.*;

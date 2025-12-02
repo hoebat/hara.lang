@@ -4,8 +4,8 @@ import hara.kernel.base.Module;
 import hara.lang.base.G;
 import hara.lang.base.Iter;
 import hara.lang.data.types.IMapType;
-import hara.lang.data.types.IObjType;
 import hara.lang.protocol.IDisplay;
+import hara.lang.protocol.IObjType;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
 @Module.Ns(name = "global", tag = "lambda")

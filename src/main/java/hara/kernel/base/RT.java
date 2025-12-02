@@ -373,6 +373,10 @@ public interface RT {
       }
       return val;
     }
+
+    public ConcurrentHashMap<Symbol, Namespace> getNamespaces() {
+      return _namespaces;
+    }
   }
 
   @SuppressWarnings("rawtypes")

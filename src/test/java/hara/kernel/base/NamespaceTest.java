@@ -1,5 +1,6 @@
 package hara.kernel.base;
 
+import hara.kernel.builtin.BuiltinNamespace;
 import hara.kernel.protocol.IRuntime;
 import hara.lang.data.Symbol;
 import hara.lang.data.types.IMapType;

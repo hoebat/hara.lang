@@ -26,6 +26,8 @@ import static hara.kernel.builtin.BuiltinBasic.symbol;
 import static hara.kernel.builtin.BuiltinCheck.isTruthy;
 import static hara.kernel.builtin.BuiltinCollection.*;
 import static hara.kernel.builtin.BuiltinStruct.list;
+import hara.kernel.builtin.BuiltinCollection;
+import hara.kernel.builtin.BuiltinStruct;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
 public interface Macro {
@@ -188,11 +190,7 @@ public interface Macro {
       }
 
       for (Object part : parts) {
-        List lt =
-            list(
-                Array.objects(
-                    hara.kernel.builtin.BuiltinStruct.symbol("inst"),
-                    hara.kernel.builtin.BuiltinStruct.symbol("m")));
+        List lt = list(Array.objects(BuiltinStruct.symbol("inst"), BuiltinStruct.symbol("m")));
       }
 
       if (!isVector) {

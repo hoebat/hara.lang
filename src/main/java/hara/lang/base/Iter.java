@@ -818,4 +818,38 @@ public interface Iter {
       }
     };
   }
+
+  public static <E> Iterator<E> flatten(Iterator<E> it) {
+    return new Iterator<E>() {
+      Iterator<E> _curr = null;
+
+      @SuppressWarnings("unchecked")
+      private void advance() {
+        while ((_curr == null || !_curr.hasNext()) && it.hasNext()) {
+          Object next = it.next();
+          if (next instanceof Iterator) {
+            _curr = (Iterator<E>) next;
+          } else if (next instanceof Iterable) {
+            _curr = ((Iterable<E>) next).iterator();
+          } else {
+            // Treat single element as iterator of one
+            _curr = Arrays.asList((E) next).iterator();
+          }
+        }
+      }
+
+      @Override
+      public boolean hasNext() {
+        if (_curr != null && _curr.hasNext()) return true;
+        advance();
+        return _curr != null && _curr.hasNext();
+      }
+
+      @Override
+      public E next() {
+        if (!hasNext()) throw new NoSuchElementException();
+        return _curr.next();
+      }
+    };
+  }
 }
