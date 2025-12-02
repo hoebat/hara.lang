@@ -6,8 +6,13 @@ import hara.kernel.base.completion.ClasspathScanner;
 import hara.kernel.base.completion.PackageTree;
 import hara.lang.base.Ex;
 import hara.lang.base.G;
+import hara.lang.data.Keyword;
+import hara.lang.data.Symbol;
+import hara.lang.protocol.IMetadata;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
+import org.jline.reader.Reference;
+import org.jline.reader.Widget;
 import org.jline.reader.impl.DefaultParser;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
@@ -53,6 +58,12 @@ public class Repl {
                 Paths.get(System.getProperty("user.home"), ".hara_history"))
             .option(LineReader.Option.HISTORY_INCREMENTAL, true)
             .build();
+
+    // Register "Show Doc" widget
+    this.lineReader.getWidgets().put("show-doc", new DocWidget());
+    // Bind to Shift+Enter (commonly \033[13;2u in xterm/vscode, or \033OM)
+    this.lineReader.getKeyMaps().get(LineReader.MAIN).bind(new Reference("show-doc"), "\033[13;2u");
+    this.lineReader.getKeyMaps().get(LineReader.MAIN).bind(new Reference("show-doc"), "\033OM");
 
     this.inputReader = new JLineInputReader(lineReader);
     this.reader = new Reader(inputReader);
@@ -119,6 +130,53 @@ public class Repl {
           || c == '{'
           || c == '}'
           || Character.isWhitespace(c);
+    }
+  }
+
+  /** Widget to display documentation and arguments for the current symbol. */
+  public class DocWidget implements Widget {
+    @Override
+    public boolean apply() {
+        var buffer = lineReader.getBuffer().toString();
+        var cursor = lineReader.getBuffer().cursor();
+        var word = ReplCompleter.extractWord(buffer, cursor);
+
+        if (word == null || word.isEmpty()) return true;
+
+        try {
+            Symbol sym = Symbol.create(word);
+            // Look up Var in the environment
+            Var v = rt.getObj(sym);
+            if (v != null) {
+                IMetadata meta = v.meta();
+                if (meta != null) {
+                    Object doc = Keyword.create("doc").invoke(meta);
+                    Object arglists = Keyword.create("arglists").invoke(meta);
+
+                    if (doc != null || arglists != null) {
+                         // Print info below the prompt
+                         lineReader.callWidget(LineReader.CLEAR);
+
+                         // We use the terminal writer directly to print above the prompt
+                         var writer = lineReader.getTerminal().writer();
+                         writer.println();
+
+                         if (arglists != null) {
+                             writer.println("Arglists: " + G.display(arglists));
+                         }
+                         if (doc != null) {
+                             writer.println("Doc: " + doc);
+                         }
+                         // Force redraw to restore prompt and buffer
+                         lineReader.callWidget(LineReader.REDRAW_LINE);
+                         lineReader.callWidget(LineReader.REDISPLAY);
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            // ignore
+        }
+        return true;
     }
   }
 }
