@@ -12,6 +12,8 @@ public interface IStringType extends IHash {
         return (hashSeed() + "|" + toString()).hashCode();
       case RAPID:
         return hara.lang.base.primitive.RapidHash.hash(hashSeed() + "|" + toString());
+      case MURMUR3:
+        return hara.lang.base.primitive.Murmur3.hashChars(hashSeed() + "|" + toString());
       case SIP:
         break;
       default:

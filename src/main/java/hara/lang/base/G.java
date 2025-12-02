@@ -92,6 +92,16 @@ public interface G {
     }
   }
 
+  public static long hashMurmur(Object o) {
+    if (o instanceof IHash) {
+      return ((IHash) o).hashGet(Constant.HashType.MURMUR3);
+    } else if (o == null) {
+      return 0;
+    } else {
+      return o.hashCode();
+    }
+  }
+
   public static long hashSip(Object o) {
     if (o == null) return 0;
     return o.hashCode();
@@ -102,6 +112,8 @@ public interface G {
     switch (t) {
       case RAPID:
         return item -> Long.valueOf(hashRapid(item));
+      case MURMUR3:
+        return item -> Long.valueOf(hashMurmur(item));
       case SIP:
         return item -> Long.valueOf(hashSip(item));
       case SYSTEM:
