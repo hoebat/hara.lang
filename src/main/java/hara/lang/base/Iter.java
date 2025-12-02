@@ -556,9 +556,9 @@ public interface Iter {
     return concat((Iterator) map(it, Iterable::iterator));
   }
 
-  //
-  // Combinators
-  //
+  public static <E> Iterator<E> flatten(Iterator<? extends Iterable<E>> it) {
+    return concat((Iterator) map(it, Iterable::iterator));
+  }
 
   public static <E> Function<Iterator<E>, Iterator<E>> drop(int n) {
     return (it) -> drop(it, n);
@@ -819,40 +819,6 @@ public interface Iter {
           return pair;
         }
         throw new Ex.NoSuchElement();
-      }
-    };
-  }
-
-  public static <E> Iterator<E> flatten(Iterator<E> it) {
-    return new Iterator<E>() {
-      Iterator<E> _curr = null;
-
-      @SuppressWarnings("unchecked")
-      private void advance() {
-        while ((_curr == null || !_curr.hasNext()) && it.hasNext()) {
-          Object next = it.next();
-          if (next instanceof Iterator) {
-            _curr = (Iterator<E>) next;
-          } else if (next instanceof Iterable) {
-            _curr = ((Iterable<E>) next).iterator();
-          } else {
-            // Treat single element as iterator of one
-            _curr = Arrays.asList((E) next).iterator();
-          }
-        }
-      }
-
-      @Override
-      public boolean hasNext() {
-        if (_curr != null && _curr.hasNext()) return true;
-        advance();
-        return _curr != null && _curr.hasNext();
-      }
-
-      @Override
-      public E next() {
-        if (!hasNext()) throw new NoSuchElementException();
-        return _curr.next();
       }
     };
   }

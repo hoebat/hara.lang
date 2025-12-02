@@ -8,6 +8,38 @@ import static org.junit.Assert.*;
 public class BlockTest {
 
   @Test
+  public void testIsComment() {
+    assertTrue(Block.isComment("; a comment"));
+    assertTrue(Block.isComment(";; another comment"));
+    assertFalse(Block.isComment("not a comment"));
+    assertFalse(Block.isComment(""));
+    assertFalse(Block.isComment(null));
+  }
+
+  @Test
+  public void testVoidTag() {
+    assertEquals("eof", Block.voidTag(null));
+    assertEquals("linebreak", Block.voidTag('\n'));
+    assertEquals("linebreak", Block.voidTag('\r'));
+    assertEquals("linebreak", Block.voidTag('\f'));
+    assertEquals("linespace", Block.voidTag(' '));
+    assertEquals("linespace", Block.voidTag('\t'));
+    assertNull(Block.voidTag('a'));
+    assertNull(Block.voidTag('1'));
+  }
+
+  @Test
+  public void testTokenTag() {
+    assertEquals("string", Block.tokenTag("hello"));
+    assertEquals("number", Block.tokenTag(123));
+    assertEquals("number", Block.tokenTag(123.45));
+    assertEquals("boolean", Block.tokenTag(true));
+    assertEquals("character", Block.tokenTag('c'));
+    assertEquals("object", Block.tokenTag(new Object()));
+    assertEquals("object", Block.tokenTag(null)); // null is not a specific token type
+  }
+
+  @Test
   public void testVoidBlockCreation() {
     Block.Void voidBlock = new Block.Void("linespace", ' ', 1, 0);
 
