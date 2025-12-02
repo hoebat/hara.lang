@@ -552,7 +552,7 @@ public interface Iter {
     return new ConcatIterator(all);
   }
 
-  public static <E> Iterator<E> flatten(Iterator<? extends Iterable<E>> it) {
+  public static <E> Iterator<E> flattenIterables(Iterator<? extends Iterable<E>> it) {
     return concat((Iterator) map(it, Iterable::iterator));
   }
 
