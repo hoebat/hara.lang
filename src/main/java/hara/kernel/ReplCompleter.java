@@ -58,7 +58,7 @@ public class ReplCompleter implements Completer {
    * Extract word for Lisp-style completion (handles parens, brackets, etc.) Scans backwards from
    * cursor to find the start of the current word.
    */
-  private String extractWord(String buffer, int cursor) {
+  String extractWord(String buffer, int cursor) {
     if (buffer == null || cursor <= 0) return "";
 
     // Find the start of the current word by looking backwards

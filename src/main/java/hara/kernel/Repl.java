@@ -8,6 +8,7 @@ import hara.lang.base.Ex;
 import hara.lang.base.G;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
+import org.jline.reader.impl.DefaultParser;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 
@@ -46,6 +47,7 @@ public class Repl {
         LineReaderBuilder.builder()
             .terminal(terminal)
             .completer(completer)
+            .parser(new LispParser())
             .variable(
                 LineReader.HISTORY_FILE,
                 Paths.get(System.getProperty("user.home"), ".hara_history"))
@@ -82,12 +84,41 @@ public class Repl {
         Object res = rt.eval(form);
         System.out.println(G.display(res));
       } catch (Throwable t) {
-        if (t instanceof Ex.Runtime) {
-          System.out.println("Error: " + t.getMessage());
+        Throwable cause = t;
+        while (cause instanceof java.lang.reflect.InvocationTargetException
+            || cause instanceof java.util.concurrent.ExecutionException
+            || (cause instanceof RuntimeException
+                && cause.getCause() != null
+                && cause.getMessage() == null)) {
+          if (cause.getCause() != null) {
+            cause = cause.getCause();
+          } else {
+            break;
+          }
+        }
+
+        if (cause instanceof Ex.Runtime
+            || cause instanceof Ex.Unsupported
+            || cause instanceof Ex.Arity) {
+          System.out.println("Error: " + cause.getMessage());
         } else {
           t.printStackTrace();
         }
       }
+    }
+  }
+
+  public static class LispParser extends DefaultParser {
+    @Override
+    public boolean isDelimiterChar(CharSequence buffer, int pos) {
+      char c = buffer.charAt(pos);
+      return c == '('
+          || c == ')'
+          || c == '['
+          || c == ']'
+          || c == '{'
+          || c == '}'
+          || Character.isWhitespace(c);
     }
   }
 }
