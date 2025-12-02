@@ -131,6 +131,11 @@ public interface BuiltinStruct {
     return new Tuple.Tup2.L(null, key, val);
   }
 
+  @Module.Fn(name = "symbol", complete = true)
+  public static hara.lang.data.Symbol symbol(String name) {
+    return hara.lang.data.Symbol.create(name);
+  }
+
   @Module.Fn(name = "queue", vargs = true, complete = true)
   public static <ITR, E> Queue.Standard<E> queue(ITR elements) {
     return Queue.Standard.into(Iter.iter(elements));

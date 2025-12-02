@@ -45,7 +45,7 @@ public interface BuiltinNamespace {
   @Module.Fn(name = "ns:list", rt = true)
   public static Iterator<hara.kernel.base.Namespace> nsList(IRuntime rt) {
     if (rt instanceof RT.Instance) {
-      return ((RT.Instance) rt)._userEnv._namespaces.values().iterator();
+      return ((RT.Instance) rt)._userEnv.getNamespaces().values().iterator();
     }
     return null;
   }

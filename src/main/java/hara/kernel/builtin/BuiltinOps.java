@@ -68,7 +68,7 @@ public interface BuiltinOps {
   @Module.Fn(name = "=")
   @Module.Reduce(type = COMPARE, init = TRUE)
   public static Boolean equivalent(Object k1, Object k2) {
-    return Eq.eq(k1, k2);
+    return hara.lang.base.Eq.eq(k1, k2);
   }
 
   @Module.Fn(name = ">")
@@ -163,6 +163,6 @@ public interface BuiltinOps {
   @Module.Fn(name = "not=")
   @Module.Reduce(type = COMPARE, init = FALSE)
   public static Boolean notEquivalent(Object k1, Object k2) {
-    return !Eq.eq(k1, k2);
+    return !hara.lang.base.Eq.eq(k1, k2);
   }
 }
