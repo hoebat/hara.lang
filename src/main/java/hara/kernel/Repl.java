@@ -64,6 +64,10 @@ public class Repl {
     // Bind to Shift+Enter (commonly \033[13;2u in xterm/vscode, or \033OM)
     this.lineReader.getKeyMaps().get(LineReader.MAIN).bind(new Reference("show-doc"), "\033[13;2u");
     this.lineReader.getKeyMaps().get(LineReader.MAIN).bind(new Reference("show-doc"), "\033OM");
+    // Bind to Alt+q (Meta-q)
+    this.lineReader.getKeyMaps().get(LineReader.MAIN).bind(new Reference("show-doc"), "\033q");
+    // Bind to F1
+    this.lineReader.getKeyMaps().get(LineReader.MAIN).bind(new Reference("show-doc"), "\033OP");
 
     this.inputReader = new JLineInputReader(lineReader);
     this.reader = new Reader(inputReader);
@@ -137,46 +141,46 @@ public class Repl {
   public class DocWidget implements Widget {
     @Override
     public boolean apply() {
-        var buffer = lineReader.getBuffer().toString();
-        var cursor = lineReader.getBuffer().cursor();
-        var word = ReplCompleter.extractWord(buffer, cursor);
+      var buffer = lineReader.getBuffer().toString();
+      var cursor = lineReader.getBuffer().cursor();
+      var word = ReplCompleter.extractWord(buffer, cursor);
 
-        if (word == null || word.isEmpty()) return true;
+      if (word == null || word.isEmpty()) return true;
 
-        try {
-            Symbol sym = Symbol.create(word);
-            // Look up Var in the environment
-            Var v = rt.getObj(sym);
-            if (v != null) {
-                IMetadata meta = v.meta();
-                if (meta != null) {
-                    Object doc = Keyword.create("doc").invoke(meta);
-                    Object arglists = Keyword.create("arglists").invoke(meta);
+      try {
+        Symbol sym = Symbol.create(word);
+        // Look up Var in the environment
+        Var v = rt.getObj(sym);
+        if (v != null) {
+          IMetadata meta = v.meta();
+          if (meta != null) {
+            Object doc = Keyword.create("doc").invoke(meta);
+            Object arglists = Keyword.create("arglists").invoke(meta);
 
-                    if (doc != null || arglists != null) {
-                         // Print info below the prompt
-                         lineReader.callWidget(LineReader.CLEAR);
+            if (doc != null || arglists != null) {
+              // Print info below the prompt
+              lineReader.callWidget(LineReader.CLEAR);
 
-                         // We use the terminal writer directly to print above the prompt
-                         var writer = lineReader.getTerminal().writer();
-                         writer.println();
+              // We use the terminal writer directly to print above the prompt
+              var writer = lineReader.getTerminal().writer();
+              writer.println();
 
-                         if (arglists != null) {
-                             writer.println("Arglists: " + G.display(arglists));
-                         }
-                         if (doc != null) {
-                             writer.println("Doc: " + doc);
-                         }
-                         // Force redraw to restore prompt and buffer
-                         lineReader.callWidget(LineReader.REDRAW_LINE);
-                         lineReader.callWidget(LineReader.REDISPLAY);
-                    }
-                }
+              if (arglists != null) {
+                writer.println("Arglists: " + G.display(arglists));
+              }
+              if (doc != null) {
+                writer.println("Doc: " + doc);
+              }
+              // Force redraw to restore prompt and buffer
+              lineReader.callWidget(LineReader.REDRAW_LINE);
+              lineReader.callWidget(LineReader.REDISPLAY);
             }
-        } catch (Throwable t) {
-            // ignore
+          }
         }
-        return true;
+      } catch (Throwable t) {
+        // ignore
+      }
+      return true;
     }
   }
 }

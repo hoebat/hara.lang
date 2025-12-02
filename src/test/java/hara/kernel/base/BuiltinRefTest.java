@@ -1,5 +1,7 @@
 package hara.kernel.base;
 
+import hara.kernel.builtin.BuiltinBasic;
+import hara.kernel.builtin.BuiltinRef;
 import hara.lang.data.Symbol;
 import hara.lang.data.Atom;
 import hara.lang.base.primitive.Volatile;

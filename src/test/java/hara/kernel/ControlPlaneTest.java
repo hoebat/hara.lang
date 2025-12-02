@@ -1,5 +1,6 @@
 package hara.kernel;
 
+import hara.kernel.builtin.BuiltinRuntime;
 import hara.kernel.base.RT;
 import hara.kernel.protocol.IRuntime;
 import hara.kernel.builtin.BuiltinRuntime;

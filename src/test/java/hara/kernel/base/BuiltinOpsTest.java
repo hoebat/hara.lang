@@ -4,8 +4,6 @@ import hara.kernel.builtin.BuiltinOps;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
-import static org.junit.Assert.*;
-
 /**
  * Tests for numeric operations in {@link Builtin.Ops}. These tests target previously uncovered
  * arithmetic and comparison methods.
