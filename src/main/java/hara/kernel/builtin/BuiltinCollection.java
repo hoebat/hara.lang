@@ -287,7 +287,7 @@ public interface BuiltinCollection {
   @Module.Fn(name = "to:list", complete = true)
   public static <ITR> List.Standard toList(ITR source) {
     return List.Standard.into(
-        Iter.flatten(Iter.map(Iter.iter(source), (e) -> BuiltinStruct.list(e))));
+        Iter.flattenIterables(Iter.map(Iter.iter(source), (e) -> BuiltinStruct.list(e))));
   }
 
   @Module.Fn(name = "to:map", complete = true)
