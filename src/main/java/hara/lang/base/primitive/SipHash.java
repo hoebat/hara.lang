@@ -125,9 +125,24 @@ public interface SipHash {
     }
 
     m = 0;
-    for (i = data.length - 1; i >= last; --i) {
-      m <<= 8;
-      m |= (data[i] & 0xffL);
+    int remaining = data.length - last;
+    switch (remaining) {
+      case 7:
+        m |= ((long) data[last + 6] & 0xff) << 48;
+      case 6:
+        m |= ((long) data[last + 5] & 0xff) << 40;
+      case 5:
+        m |= ((long) data[last + 4] & 0xff) << 32;
+      case 4:
+        m |= ((long) data[last + 3] & 0xff) << 24;
+      case 3:
+        m |= ((long) data[last + 2] & 0xff) << 16;
+      case 2:
+        m |= ((long) data[last + 1] & 0xff) << 8;
+      case 1:
+        m |= ((long) data[last + 0] & 0xff);
+      case 0:
+        break;
     }
     m |= (long) data.length << 56;
 
