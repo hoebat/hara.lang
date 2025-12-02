@@ -22,47 +22,48 @@ public class ProtocolTest {
 
   @Test
   public void testICollDefaults() {
-    IColl<String> coll = new IColl<String>() {
-      @Override
-      public Iterator<String> iterator() {
-        return java.util.Arrays.asList("a", "b").iterator();
-      }
+    IColl<String> coll =
+        new IColl<String>() {
+          @Override
+          public Iterator<String> iterator() {
+            return java.util.Arrays.asList("a", "b").iterator();
+          }
 
-      @Override
-      public boolean equality(Object o) {
-        return false;
-      }
+          @Override
+          public boolean equality(Object o) {
+            return false;
+          }
 
-      @Override
-      public IColl<String> conj(String s) {
-        return null;
-      }
+          @Override
+          public IColl<String> conj(String s) {
+            return null;
+          }
 
-      @Override
-      public IColl<String> empty() {
-        return null;
-      }
+          @Override
+          public IColl<String> empty() {
+            return null;
+          }
 
-      @Override
-      public long count() {
-        return 2;
-      }
+          @Override
+          public long count() {
+            return 2;
+          }
 
-      @Override
-      public long hashCalc(Constant.HashType type) {
-        return 0;
-      }
+          @Override
+          public long hashCalc(Constant.HashType type) {
+            return 0;
+          }
 
-      @Override
-      public String startString() {
-        return "[";
-      }
+          @Override
+          public String startString() {
+            return "[";
+          }
 
-      @Override
-      public String endString() {
-        return "]";
-      }
-    };
+          @Override
+          public String endString() {
+            return "]";
+          }
+        };
 
     assertEquals(" ", coll.sepString());
     assertEquals("[\"a\" \"b\"]", coll.display());
@@ -70,37 +71,38 @@ public class ProtocolTest {
 
   @Test
   public void testIComponentDefaults() {
-    IComponent comp = new IComponent() {
-      @Override
-      public IMetadata getProps() {
-        return null;
-      }
+    IComponent comp =
+        new IComponent() {
+          @Override
+          public IMetadata getProps() {
+            return null;
+          }
 
-      @Override
-      public IMetadata getStatus() {
-        return null;
-      }
+          @Override
+          public IMetadata getStatus() {
+            return null;
+          }
 
-      @Override
-      public boolean isStarted() {
-        return false;
-      }
+          @Override
+          public boolean isStarted() {
+            return false;
+          }
 
-      @Override
-      public boolean isStopped() {
-        return true;
-      }
+          @Override
+          public boolean isStopped() {
+            return true;
+          }
 
-      @Override
-      public IComponent start() {
-        return this;
-      }
+          @Override
+          public IComponent start() {
+            return this;
+          }
 
-      @Override
-      public IComponent stop() {
-        return this;
-      }
-    };
+          @Override
+          public IComponent stop() {
+            return this;
+          }
+        };
 
     assertFalse(comp.isRemote());
     assertEquals(comp, comp.kill()); // kill calls stop
@@ -108,16 +110,17 @@ public class ProtocolTest {
 
   @Test
   public void testIFnDefaults() {
-    IFn<String, String, String> fn = new IFn<String, String, String>() {
-      @Override
-      public String invoke(String s) {
-        return "invoked " + s;
-      }
+    IFn<String, String, String> fn =
+        new IFn<String, String, String>() {
+          @Override
+          public String invoke(String s) {
+            return "invoked " + s;
+          }
 
-      public java.util.function.Function<String, String> getArg1() {
-        return this::invoke;
-      }
-    };
+          public java.util.function.Function<String, String> getArg1() {
+            return this::invoke;
+          }
+        };
 
     assertEquals("invoked a", fn.invoke("a"));
 
@@ -125,29 +128,29 @@ public class ProtocolTest {
     assertEquals("invoked a", fn.apply(java.util.Arrays.asList("a")));
 
     // Test apply with array
-    assertEquals("invoked a", fn.apply(new Object[] { "a" }));
+    assertEquals("invoked a", fn.apply(new Object[] {"a"}));
   }
 
   @Test
   public void testILookupDefaults() {
-    ILookup<String, String> lookup = new ILookup<String, String>() {
-      @Override
-      public Map.Entry<String, String> find(String key) {
-        if ("a".equals(key))
-          return new java.util.AbstractMap.SimpleEntry<>("a", "1");
-        return null;
-      }
+    ILookup<String, String> lookup =
+        new ILookup<String, String>() {
+          @Override
+          public Map.Entry<String, String> find(String key) {
+            if ("a".equals(key)) return new java.util.AbstractMap.SimpleEntry<>("a", "1");
+            return null;
+          }
 
-      @Override
-      public Iterator<String> keys() {
-        return null;
-      }
+          @Override
+          public Iterator<String> keys() {
+            return null;
+          }
 
-      @Override
-      public Iterator<String> vals() {
-        return null;
-      }
-    };
+          @Override
+          public Iterator<String> vals() {
+            return null;
+          }
+        };
 
     assertEquals("1", lookup.lookup("a"));
     assertNull(lookup.lookup("b"));
@@ -156,28 +159,30 @@ public class ProtocolTest {
 
   @Test(expected = Ex.Unsupported.class)
   public void testIPairDefaults() {
-    IPair<String, String> pair = new IPair<String, String>() {
-      @Override
-      public String getKey() {
-        return "k";
-      }
+    IPair<String, String> pair =
+        new IPair<String, String>() {
+          @Override
+          public String getKey() {
+            return "k";
+          }
 
-      @Override
-      public String getValue() {
-        return "v";
-      }
-    };
+          @Override
+          public String getValue() {
+            return "v";
+          }
+        };
     pair.setValue("new");
   }
 
   @Test
   public void testIValidateDefaults() {
-    IValidate<String> valid = new IValidate<String>() {
-      @Override
-      public Predicate<String> getValidator() {
-        return s -> s.length() > 0;
-      }
-    };
+    IValidate<String> valid =
+        new IValidate<String>() {
+          @Override
+          public Predicate<String> getValidator() {
+            return s -> s.length() > 0;
+          }
+        };
     assertTrue(valid.validate("a"));
 
     try {
@@ -187,23 +192,24 @@ public class ProtocolTest {
       assertTrue(e.getMessage().contains("Validator rejected value"));
     }
 
-    IValidate<String> noValidator = new IValidate<String>() {
-    };
+    IValidate<String> noValidator = new IValidate<String>() {};
     assertTrue(noValidator.validate("anything"));
   }
 
   @Test
   public void testIWatchDefaults() {
     AtomicReference<String> notified = new AtomicReference<>();
-    IWatch<Object, String> watch = new IWatch<Object, String>() {
-      @Override
-      public Iterator<Map.Entry<Object, Consumer<WatchEntry<Object, String>>>> getWatches() {
-        Consumer<WatchEntry<Object, String>> consumer = e -> notified.set(e.oldVal() + "->" + e.newVal());
-        Map.Entry<Object, Consumer<WatchEntry<Object, String>>> entry = new java.util.AbstractMap.SimpleEntry<>("key",
-            consumer);
-        return java.util.Collections.singletonList(entry).iterator();
-      }
-    };
+    IWatch<Object, String> watch =
+        new IWatch<Object, String>() {
+          @Override
+          public Iterator<Map.Entry<Object, Consumer<WatchEntry<Object, String>>>> getWatches() {
+            Consumer<WatchEntry<Object, String>> consumer =
+                e -> notified.set(e.oldVal() + "->" + e.newVal());
+            Map.Entry<Object, Consumer<WatchEntry<Object, String>>> entry =
+                new java.util.AbstractMap.SimpleEntry<>("key", consumer);
+            return java.util.Collections.singletonList(entry).iterator();
+          }
+        };
 
     watch.notifyWatches("old", "new");
     assertEquals("old->new", notified.get());
