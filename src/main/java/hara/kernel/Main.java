@@ -42,34 +42,36 @@ public class Main {
     ClasspathScanner scanner = new ClasspathScanner(packageTree);
     scanner.scanBackground();
 
-    Completer completer = new Completer() {
-      @Override
-      public void complete(LineReader reader, ParsedLine line, List<Candidate> candidates) {
-        // Update classpath from RT before completion
-        scanner.scan(rt.classLoader().getURLs());
+    Completer completer =
+        new Completer() {
+          @Override
+          public void complete(LineReader reader, ParsedLine line, List<Candidate> candidates) {
+            // Update classpath from RT before completion
+            scanner.scan(rt.classLoader().getURLs());
 
-        String word = line.word();
+            String word = line.word();
 
-        // 1. Symbol Completion
-        var it = rt.getEnv().keys();
-        while (it.hasNext()) {
-          Object key = it.next();
-          String name = (key instanceof IDisplay) ? ((IDisplay) key).display() : key.toString();
+            // 1. Symbol Completion
+            var it = rt.getEnv().keys();
+            while (it.hasNext()) {
+              Object key = it.next();
+              String name = (key instanceof IDisplay) ? ((IDisplay) key).display() : key.toString();
 
-          if (name.startsWith(word)) {
-            candidates.add(new Candidate(name));
+              if (name.startsWith(word)) {
+                candidates.add(new Candidate(name));
+              }
+            }
+
+            // 2. Package/Class Completion
+            List<String> suggestions = packageTree.suggest(word);
+            for (String s : suggestions) {
+              candidates.add(new Candidate(s));
+            }
           }
-        }
+        };
 
-        // 2. Package/Class Completion
-        List<String> suggestions = packageTree.suggest(word);
-        for (String s : suggestions) {
-          candidates.add(new Candidate(s));
-        }
-      }
-    };
-
-    LineReader lineReader = LineReaderBuilder.builder().terminal(terminal).completer(completer).build();
+    LineReader lineReader =
+        LineReaderBuilder.builder().terminal(terminal).completer(completer).build();
 
     JLineInputReader inputReader = new JLineInputReader(lineReader);
     Reader r = new Reader(inputReader);
@@ -83,8 +85,7 @@ public class Main {
         inputReader.resetPrompt();
         Object form = Parser.LispReader.read(r, false, EOF_SENTINEL, false, opts);
 
-        if (form == EOF_SENTINEL)
-          break;
+        if (form == EOF_SENTINEL) break;
 
         Object res = rt.eval(form);
         G.prn(res);
