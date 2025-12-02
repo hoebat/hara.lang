@@ -274,7 +274,7 @@ public interface RT {
   public class UserEnv<AST> implements IEnv<Symbol, Var> {
 
     final IEnv<Symbol, Var> _parent;
-    final ConcurrentHashMap<Symbol, Namespace> _namespaces;
+    public final ConcurrentHashMap<Symbol, Namespace> _namespaces;
     final AtomicReference<Namespace> _currentNs;
     public final ClassEnv _class;
 

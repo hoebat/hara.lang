@@ -9,6 +9,8 @@ import hara.lang.base.primitive.Counter;
 import hara.lang.base.primitive.Num;
 import hara.lang.base.Fn;
 import java.util.function.BiFunction;
+import hara.kernel.builtin.BuiltinBasic;
+import hara.kernel.builtin.BuiltinRef;
 import org.junit.Test;
 
 import static org.junit.Assert.*;

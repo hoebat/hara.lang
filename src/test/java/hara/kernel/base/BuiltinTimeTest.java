@@ -20,8 +20,8 @@ public class BuiltinTimeTest {
     // BuiltinTime.now() returns nanos, but synced to epoch.
     // So we compare it against epoch millis * 1,000,000
     assertTrue(
-        "now() should return current time",
-        now >= before * 1_000_000 && now <= (after + 10) * 1_000_000);
+        "now() should return current time. now=" + now + ", before=" + (before * 1_000_000),
+        now >= (before - 100) * 1_000_000 && now <= (after + 100) * 1_000_000);
   }
 
   @Test

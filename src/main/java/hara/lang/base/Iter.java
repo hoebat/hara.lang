@@ -476,10 +476,10 @@ public interface Iter {
   }
 
   /*
-  public static void prString(Iterator<?> it, ) {
-  	System.out.println(toString(it));
-  }
-  */
+   * public static void prString(Iterator<?> it, ) {
+   * System.out.println(toString(it));
+   * }
+   */
 
   @SuppressWarnings({"unchecked", "rawtypes"})
   public static void pr(Iterator it) {
@@ -550,6 +550,10 @@ public interface Iter {
   @SuppressWarnings({"unchecked", "rawtypes"})
   public static Iterator concat(Iterator<Iterator> all) {
     return new ConcatIterator(all);
+  }
+
+  public static <E> Iterator<E> flatten(Iterator<? extends Iterable<E>> it) {
+    return concat((Iterator) map(it, Iterable::iterator));
   }
 
   //

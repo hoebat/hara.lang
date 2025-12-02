@@ -3,6 +3,7 @@ package hara.kernel;
 import hara.kernel.builtin.BuiltinRuntime;
 import hara.kernel.base.RT;
 import hara.kernel.protocol.IRuntime;
+import hara.kernel.builtin.BuiltinRuntime;
 import org.junit.Test;
 
 import java.util.Arrays;
@@ -23,6 +24,21 @@ public class ControlPlaneTest {
     // Test sub-commands
     Object jvmVersion = f.call("JVM", "VERSION");
     assertNotNull(jvmVersion);
+  }
+
+  @Test
+  public void testCtlNoArgs() {
+    Foundation f = new Foundation();
+    String sessionKey = "test-session";
+    f.RTS.put(sessionKey, new RT.Instance(f, sessionKey));
+    IRuntime rt = f.RTS.get(sessionKey);
+
+    // Test invoking ctl with no arguments
+    // (ctl) -> should list commands
+    Object res = BuiltinRuntime.ctl(rt, java.util.Collections.emptyList());
+    assertTrue(res instanceof java.util.Collection);
+    assertTrue(((java.util.Collection) res).contains("PING"));
+    assertTrue(((java.util.Collection) res).contains("JVM"));
   }
 
   @Test
@@ -57,8 +73,10 @@ public class ControlPlaneTest {
     // Test INFO (Capabilities)
     List info = (List) f.call("INFO");
     // Check structure: [key1, val1, key2, val2...] due to mapToList
-    // But mapToList creates [[k,v], [k,v]...] or similar depending on implementation
-    // Let's just check it returns *something* non-null for now as exact format depends on mapToList
+    // But mapToList creates [[k,v], [k,v]...] or similar depending on
+    // implementation
+    // Let's just check it returns *something* non-null for now as exact format
+    // depends on mapToList
     assertNotNull(info);
 
     // Test PEER (Service Discovery)

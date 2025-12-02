@@ -1,6 +1,7 @@
 package hara.kernel.builtin;
 
 import hara.kernel.base.Module;
+import hara.lang.base.Eq;
 import hara.lang.base.primitive.Num;
 
 import static hara.kernel.base.Module.ReduceInit.*;

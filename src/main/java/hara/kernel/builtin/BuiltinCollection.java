@@ -339,4 +339,9 @@ public interface BuiltinCollection {
   public static <ITR> Map.Standard zipmap(ITR keys, ITR vals) {
     return toMap(Iter.zipPair(Iter.iter(keys), Iter.iter(vals)));
   }
+
+  @Module.Fn(name = "concat", complete = true, vargs = true)
+  public static Iterator concat(Object args) {
+    return Iter.concat(Iter.map(Iter.iter(args), Iter::iter));
+  }
 }
