@@ -18,24 +18,20 @@ public class ReplCompleterTest {
 
   @Test
   public void testExtractWord() {
-    IContext dummyContext =
-        new IContext() {
-          public Object call(Object... args) {
-            return null;
-          }
-        };
-    RT.Instance rt = new RT.Instance(dummyContext, "test");
-    PackageTree packageTree = new PackageTree();
-    ClasspathScanner scanner = new ClasspathScanner(packageTree);
-    ReplCompleter completer = new ReplCompleter(rt, scanner, packageTree);
+    // Test cases using static method
+    assertEquals("ca", ReplCompleter.extractWord("(ca", 3));
+    assertEquals("hara.", ReplCompleter.extractWord("(hara.", 6));
+    assertEquals("java.lang.", ReplCompleter.extractWord("java.lang.", 10));
+    assertEquals("concat", ReplCompleter.extractWord("(concat", 7));
+    assertEquals("foo", ReplCompleter.extractWord("foo", 3));
+    assertEquals("bar", ReplCompleter.extractWord("(foo bar", 8));
 
-    // Test cases
-    assertEquals("ca", completer.extractWord("(ca", 3));
-    assertEquals("hara.", completer.extractWord("(hara.", 6));
-    assertEquals("java.lang.", completer.extractWord("java.lang.", 10));
-    assertEquals("concat", completer.extractWord("(concat", 7));
-    assertEquals("foo", completer.extractWord("foo", 3));
-    assertEquals("bar", completer.extractWord("(foo bar", 8));
+    // Additional cases
+    assertEquals("abc", ReplCompleter.extractWord("abc", 3));
+    assertEquals("xyz", ReplCompleter.extractWord("[xyz]", 4));
+    assertEquals("", ReplCompleter.extractWord("(", 1));
+    assertEquals("some-symbol", ReplCompleter.extractWord("some-symbol", 11));
+    assertEquals("ns/name", ReplCompleter.extractWord("(ns/name", 8));
   }
 
   @Test
@@ -196,18 +192,5 @@ public class ReplCompleterTest {
       }
     }
     assertTrue("Should find 'hara.kernel.Main'", foundMain);
-  }
-
-  // Helper class to expose extractWord
-  static class TestableReplCompleter extends ReplCompleter {
-    public TestableReplCompleter(
-        RT.Instance<?> rt, ClasspathScanner scanner, PackageTree packageTree) {
-      super(rt, scanner, packageTree);
-    }
-
-    // We need to change visibility of extractWord in ReplCompleter.java first to be
-    // protected or package-private.
-    // For now, let's assume we will modify ReplCompleter.java to make it
-    // package-private.
   }
 }
