@@ -1,5 +1,7 @@
 package hara.lang.base.primitive;
 
+import java.nio.charset.StandardCharsets;
+
 /**
  * rapidhash - Very fast, high quality, platform-independent hashing algorithm.
  *
@@ -41,6 +43,10 @@ public interface RapidHash {
     return ((data[offset] & 0xFFL) << 56)
         | ((data[offset + (k >> 1)] & 0xFFL) << 32)
         | (data[offset + k - 1] & 0xFFL);
+  }
+
+  static long hash(String s) {
+    return hash(s.getBytes(StandardCharsets.UTF_8));
   }
 
   static long hash(byte[] data) {
