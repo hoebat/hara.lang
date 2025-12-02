@@ -1,6 +1,8 @@
 package hara.kernel.base;
 
 import hara.lang.data.Atom;
+import hara.kernel.builtin.BuiltinBasic;
+import hara.kernel.builtin.BuiltinCheck;
 import org.junit.Test;
 
 import static org.junit.Assert.*;

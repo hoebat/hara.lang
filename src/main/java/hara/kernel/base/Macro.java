@@ -21,6 +21,7 @@ import hara.lang.protocol.IPair;
 import java.util.Iterator;
 import java.util.Map.Entry;
 
+import hara.kernel.builtin.BuiltinCollection;
 import static hara.kernel.builtin.BuiltinBasic.atomVolatile;
 import static hara.kernel.builtin.BuiltinBasic.symbol;
 import static hara.kernel.builtin.BuiltinCheck.isTruthy;
@@ -162,12 +163,6 @@ public interface Macro {
         isVector = true;
       }
 
-      Object concatForm = list(Array.objects(symbol("into")));
-      Object target =
-          isVector ? list(Array.objects(symbol("vector"))) : list(Array.objects(symbol("list")));
-
-      Object current = list(Array.objects(symbol("vector")));
-
       java.util.List<Object> parts = new java.util.ArrayList<>();
 
       while (it.hasNext()) {
@@ -187,19 +182,26 @@ public interface Macro {
         parts.add(list(Array.objects(symbol("list"), sqExpand(item))));
       }
 
+      Object concatExpr = list(Array.objects(symbol("concat")));
       for (Object part : parts) {
-        List lt =
-            list(
-                Array.objects(
-                    hara.kernel.builtin.BuiltinStruct.symbol("inst"),
-                    hara.kernel.builtin.BuiltinStruct.symbol("m")));
+        concatExpr = ((List) concatExpr).conj(part);
       }
+      // List.conj adds to the front, so we need to reverse or use a different
+      // approach.
+      // Actually, List.Standard.conj adds to the front.
+      // So if we iterate parts and conj, we get (concat partN ... part1).
+      // We want (concat part1 ... partN).
+      // So we should iterate parts in reverse or just build the list from array.
 
-      if (!isVector) {
-        return list(Array.objects(symbol("to:list"), current));
-      } else {
-        return current;
-      }
+      java.util.List<Object> concatArgs = new java.util.ArrayList<>();
+      concatArgs.add(symbol("concat"));
+      concatArgs.addAll(parts);
+      concatExpr = list(Iter.iter(concatArgs));
+
+      Object target =
+          isVector ? list(Array.objects(symbol("vector"))) : list(Array.objects(symbol("list")));
+
+      return list(Array.objects(symbol("into"), target, concatExpr));
     }
 
     @Module.Fn(name = "def", complete = true, env = true)

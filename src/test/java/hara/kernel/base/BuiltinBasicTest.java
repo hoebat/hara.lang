@@ -1,5 +1,8 @@
 package hara.kernel.base;
 
+import hara.kernel.builtin.BuiltinLambda;
+import hara.kernel.builtin.BuiltinOps;
+import hara.kernel.builtin.BuiltinStruct;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;

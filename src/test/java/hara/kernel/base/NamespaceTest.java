@@ -1,7 +1,9 @@
 package hara.kernel.base;
 
 import hara.kernel.protocol.IRuntime;
+import hara.kernel.builtin.BuiltinNamespace;
 import hara.lang.data.Symbol;
+import hara.kernel.base.Var;
 import hara.lang.data.types.IMapType;
 import org.junit.Test;
 import static org.junit.Assert.*;
@@ -15,7 +17,8 @@ public class NamespaceTest {
     // Let's create a minimal RT.Instance if possible, or mock IRuntime.
 
     // Using a real RT.Instance might be complex due to dependencies.
-    // Let's try to mock IRuntime for now, but BuiltinNamespace.nsFind casts to RT.Instance.
+    // Let's try to mock IRuntime for now, but BuiltinNamespace.nsFind casts to
+    // RT.Instance.
     // So we must use RT.Instance or a subclass.
 
     // RT.Instance constructor: public Instance(IContext root, String key)

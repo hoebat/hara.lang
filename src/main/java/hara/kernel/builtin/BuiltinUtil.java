@@ -4,7 +4,7 @@ import hara.kernel.base.Module;
 import hara.lang.base.G;
 import hara.lang.base.Iter;
 import hara.lang.data.types.IMapType;
-import hara.lang.data.types.IObjType;
+import hara.lang.protocol.IObjType;
 import hara.lang.protocol.IDisplay;
 
 @SuppressWarnings({"unchecked", "rawtypes"})
