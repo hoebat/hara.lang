@@ -20,7 +20,7 @@ public interface G {
     }
   }
 
-  public static final Constant.HashType DEFAULT_HASH = Constant.HashType.MURMUR3;
+  public static final Constant.HashType DEFAULT_HASH = Constant.HashType.RAPID;
 
   @SuppressWarnings({"rawtypes", "unchecked"})
   public static String displayList(java.util.List l) {
@@ -82,6 +82,16 @@ public interface G {
     System.out.println(getLineNumber() + ":\n" + Array.display(arr));
   }
 
+  public static long hashRapid(Object o) {
+    if (o instanceof IHash) {
+      return ((IHash) o).hashGet(Constant.HashType.RAPID);
+    } else if (o == null) {
+      return 0;
+    } else {
+      return o.hashCode();
+    }
+  }
+
   public static long hashMurmur(Object o) {
     if (o instanceof IHash) {
       return ((IHash) o).hashGet(Constant.HashType.MURMUR3);
@@ -100,6 +110,8 @@ public interface G {
   public static Function<Object, Long> hashFn(Constant.HashType t) {
 
     switch (t) {
+      case RAPID:
+        return item -> Long.valueOf(hashRapid(item));
       case MURMUR3:
         return item -> Long.valueOf(hashMurmur(item));
       case SIP:

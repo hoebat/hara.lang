@@ -16,6 +16,7 @@ public class ProtocolTest {
   @Test
   public void testConstantEnums() {
     assertEquals(Constant.MetaType.OBJECT, Constant.MetaType.valueOf("OBJECT"));
+    assertEquals(Constant.HashType.RAPID, Constant.HashType.valueOf("RAPID"));
     assertEquals(Constant.HashType.MURMUR3, Constant.HashType.valueOf("MURMUR3"));
     assertEquals(Constant.ObjType.STRING, Constant.ObjType.valueOf("STRING"));
   }

@@ -166,7 +166,7 @@ public interface Map<K, V> extends IMapType<K, V> {
               mergeTwoKeyValuePairs(
                   edit,
                   (shift + 5),
-                  (int) G.hashMurmur(current_key),
+                  (int) G.hashRapid(current_key),
                   current_key,
                   current_val,
                   hash,
@@ -587,7 +587,7 @@ public interface Map<K, V> extends IMapType<K, V> {
 
     @Override
     default IPair<K, V> find(K key) {
-      return _root().find(0, (int) G.hashMurmur(key), key);
+      return _root().find(0, (int) G.hashRapid(key), key);
     }
 
     @SuppressWarnings("unchecked")
@@ -658,7 +658,7 @@ public interface Map<K, V> extends IMapType<K, V> {
       _leafFlag.reset(0);
 
       var n0 = ((_root == null) ? DataNode.EMPTY : _root);
-      var n1 = n0.assoc(_edit, 0, (int) G.hashMurmur(key), key, val, _leafFlag);
+      var n1 = n0.assoc(_edit, 0, (int) G.hashRapid(key), key, val, _leafFlag);
       if (n1 != _root) {
         _root = n1;
       }
@@ -670,7 +670,7 @@ public interface Map<K, V> extends IMapType<K, V> {
     public Mutable<K, V> dissoc(K key) {
       if (_root == null) return this;
       _leafFlag.reset(0);
-      var n = _root.without(_edit, 0, (int) G.hashMurmur(key), key, _leafFlag);
+      var n = _root.without(_edit, 0, (int) G.hashRapid(key), key, _leafFlag);
       if (n != _root) {
         _root = n;
       }
@@ -735,7 +735,7 @@ public interface Map<K, V> extends IMapType<K, V> {
     public Standard<K, V> assoc(K key, V val) {
       var added_leaf = new Counter(0);
       var n0 = _root == null ? DataNode.EMPTY : _root;
-      var n1 = n0.assoc(null, 0, (int) G.hashMurmur(key), key, val, added_leaf);
+      var n1 = n0.assoc(null, 0, (int) G.hashRapid(key), key, val, added_leaf);
 
       return (n1 == _root) ? this : new Standard<K, V>(meta(), _size + added_leaf.deref(), n1);
     }
@@ -745,7 +745,7 @@ public interface Map<K, V> extends IMapType<K, V> {
       if (_root == null) {
         return this;
       }
-      Node<K, V> new_root = _root.without(null, 0, (int) G.hashMurmur(key), key, new Counter(0));
+      Node<K, V> new_root = _root.without(null, 0, (int) G.hashRapid(key), key, new Counter(0));
       if (new_root == _root) {
         return this;
       }

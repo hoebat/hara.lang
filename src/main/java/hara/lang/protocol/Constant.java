@@ -14,6 +14,7 @@ public interface Constant {
 
   public enum HashType {
     SYSTEM,
+    RAPID,
     MURMUR3,
     SIP
   };

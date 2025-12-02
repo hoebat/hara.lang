@@ -6,14 +6,14 @@ public interface IHash {
 
   default long hashCalc() {
     // return hashCalc(hashType());
-    return hashCalc(Constant.HashType.MURMUR3);
+    return hashCalc(Constant.HashType.RAPID);
   }
 
   long hashCalc(Constant.HashType t);
 
   default long hashGet() {
     // return hashCalc(hashType());
-    return hashCalc(Constant.HashType.MURMUR3);
+    return hashCalc(Constant.HashType.RAPID);
   }
 
   default long hashGet(Constant.HashType t) {
@@ -26,6 +26,6 @@ public interface IHash {
 
   default Constant.HashType hashType() {
     // return G.DEFAULT_HASH;
-    return Constant.HashType.MURMUR3;
+    return Constant.HashType.RAPID;
   }
 }
