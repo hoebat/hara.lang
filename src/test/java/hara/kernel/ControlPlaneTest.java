@@ -26,6 +26,21 @@ public class ControlPlaneTest {
   }
 
   @Test
+  public void testCtlNoArgs() {
+    Foundation f = new Foundation();
+    String sessionKey = "test-session";
+    f.RTS.put(sessionKey, new RT.Instance(f, sessionKey));
+    IRuntime rt = f.RTS.get(sessionKey);
+
+    // Test invoking ctl with no arguments
+    // (ctl) -> should list commands
+    Object res = BuiltinRuntime.ctl(rt, java.util.Collections.emptyList());
+    assertTrue(res instanceof java.util.Collection);
+    assertTrue(((java.util.Collection) res).contains("PING"));
+    assertTrue(((java.util.Collection) res).contains("JVM"));
+  }
+
+  @Test
   public void testLispCtl() {
     // Setup a minimal runtime environment
     Foundation f = new Foundation();

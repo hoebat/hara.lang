@@ -145,7 +145,7 @@ public class Foundation implements IContext {
   @SuppressWarnings("unchecked")
   public static Object runCommand(Foundation F, java.util.List<Object> args) {
     if (args.isEmpty()) {
-      throw new Ex.Runtime("No command specified");
+      return Iter.toArrayList(Array.toIter(F.REGISTRY.keySet().toArray()));
     }
 
     Object cmdObj = args.get(0);
