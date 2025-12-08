@@ -43,29 +43,26 @@ public interface BuiltinUtil {
   public static void println(Object args) {
     var current = hara.kernel.base.RT.Instance.CURRENT.get();
     var out = (current != null) ? current.out : System.out;
-    String prefix = (current != null) ? "[" + current._key + "] " : "";
     out.println(
-        prefix
-            + Iter.toString(
-                Iter.iter(args),
-                "",
-                "",
-                " ",
-                (e) -> {
-                  if (e == null) {
-                    return "nil";
-                  } else {
-                    return String.valueOf(e);
-                  }
-                }));
+        Iter.toString(
+            Iter.iter(args),
+            "",
+            "",
+            " ",
+            (e) -> {
+              if (e == null) {
+                return "nil";
+              } else {
+                return String.valueOf(e);
+              }
+            }));
   }
 
   @Module.Fn(name = "prn", vargs = true, complete = true)
   public static void prn(Object args) {
     var current = hara.kernel.base.RT.Instance.CURRENT.get();
     var out = (current != null) ? current.out : System.out;
-    String prefix = (current != null) ? "[" + current._key + "] " : "";
-    out.println(prefix + Iter.toString(Iter.iter(args), "", "", " ", G::display));
+    out.println(Iter.toString(Iter.iter(args), "", "", " ", G::display));
   }
 
   @Module.Fn(name = "doc", complete = true)
