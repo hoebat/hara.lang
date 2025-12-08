@@ -1,16 +1,37 @@
 package hara.kernel;
 
 import hara.kernel.base.RT;
-import hara.kernel.redirect.FileRedirect;
-
 import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.util.Arrays;
 
 public class Main {
 
-  public static void main(String[] args) throws FileNotFoundException, java.io.IOException {
+  public static void main(String[] args) throws FileNotFoundException, IOException {
+    if (args.length > 0) {
+      String command = args[0];
+      String[] restArgs = Arrays.copyOfRange(args, 1, args.length);
+
+      switch (command) {
+        case "new":
+          Project.create(restArgs.length > 0 ? restArgs[0] : null);
+          return;
+        case "run":
+          Project.run();
+          return;
+        case "repl":
+          Project.repl();
+          return;
+        default:
+          System.out.println("Unknown command: " + command);
+          System.out.println("Available commands: new, run, repl");
+          return;
+      }
+    }
+
+    // Default behavior: Start standalone REPL (as before)
     var F = new Foundation();
-    var redirect = new FileRedirect("log/in.txt", "log/out.txt");
-    var server = new Server(F, "PRIMARY", Foundation.DEFAULT_PORT, redirect);
+    var server = new Server(F, "PRIMARY", Foundation.DEFAULT_PORT, null);
     var rt = new RT.Instance<>(F, "ROOT");
 
     F.SERVERS.put(server._key, server);

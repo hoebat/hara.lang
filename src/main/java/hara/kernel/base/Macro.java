@@ -7,6 +7,7 @@ import hara.lang.base.Ex;
 import hara.lang.base.G;
 import hara.lang.base.Iter;
 import hara.lang.base.primitive.Array;
+import hara.lang.data.Keyword;
 import hara.lang.data.List;
 import hara.lang.data.Symbol;
 import hara.lang.data.Tuple;
@@ -18,8 +19,11 @@ import hara.lang.protocol.ILookup;
 import hara.lang.protocol.INth;
 import hara.lang.protocol.IPair;
 
+import java.io.InputStream;
+import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map.Entry;
+import java.nio.charset.StandardCharsets;
 
 import hara.kernel.builtin.BuiltinCollection;
 import static hara.kernel.builtin.BuiltinBasic.atomVolatile;
@@ -100,9 +104,127 @@ public interface Macro {
       if (env.getRuntime() instanceof RT.Instance) {
         RT.Instance rt = (RT.Instance) env.getRuntime();
         rt.setCurrentNs(name);
+
+        Iterator it = Iter.iter(args);
+        while (it.hasNext()) {
+          Object arg = it.next();
+          if (arg instanceof List) {
+            List l = (List) arg;
+            Object head = l.peekFirst();
+            if (head instanceof Keyword) {
+              String kwName = ((Keyword) head).getName();
+              if ("import".equals(kwName)) {
+                processImport(rt, l);
+              } else if ("require".equals(kwName)) {
+                processRequire(rt, l);
+              } else {
+                throw new Ex.Runtime("Unsupported ns option: " + kwName);
+              }
+            }
+          }
+        }
         return null;
       } else {
         throw new Ex.Runtime("Runtime does not support namespaces");
+      }
+    }
+
+    public static void processImport(RT.Instance rt, List l) {
+      Iterator it = Iter.drop(l.iterator(), 1);
+      while (it.hasNext()) {
+        Object spec = it.next();
+        if (spec instanceof Symbol) {
+          // Single class import: java.util.Date
+          Symbol sym = (Symbol) spec;
+          Class cls = rt.classFor(sym.getName());
+          if (cls == null) throw new Ex.Runtime("Class not found: " + sym.getName());
+          rt.aliasAdd(Symbol.create(cls.getSimpleName()), cls);
+        } else if (spec instanceof Iterable) {
+          // Package import: [java.util Date List]
+          Iterator specIt = Iter.iter(spec);
+          if (!specIt.hasNext()) continue;
+          Object pkgObj = specIt.next();
+          String pkg = pkgObj.toString();
+          while (specIt.hasNext()) {
+            Object clsObj = specIt.next();
+            String clsName = pkg + "." + clsObj.toString();
+            Class cls = rt.classFor(clsName);
+            if (cls == null) throw new Ex.Runtime("Class not found: " + clsName);
+            rt.aliasAdd(Symbol.create(cls.getSimpleName()), cls);
+          }
+        }
+      }
+    }
+
+    public static void processRequire(RT.Instance rt, List l) {
+      Iterator it = Iter.drop(l.iterator(), 1);
+      while (it.hasNext()) {
+        Object spec = it.next();
+        Symbol nsName = null;
+        Symbol alias = null;
+
+        if (spec instanceof Symbol) {
+          // [my.lib] or just my.lib (if it works like that, usually vector)
+          nsName = (Symbol) spec;
+        } else if (spec instanceof Iterable) {
+          // [my.lib :as l]
+          Iterator specIt = Iter.iter(spec);
+          if (specIt.hasNext()) {
+            Object first = specIt.next();
+            if (first instanceof Symbol) {
+              nsName = (Symbol) first;
+            }
+            while (specIt.hasNext()) {
+              Object next = specIt.next();
+              if (next instanceof Keyword && ((Keyword) next).getName().equals("as")) {
+                if (specIt.hasNext()) {
+                  Object aliasObj = specIt.next();
+                  if (aliasObj instanceof Symbol) {
+                    alias = (Symbol) aliasObj;
+                  }
+                }
+              }
+            }
+          }
+        }
+
+        if (nsName != null) {
+          loadNamespace(rt, nsName);
+          if (alias != null) {
+            Namespace ns = rt.getNamespace(nsName);
+            if (ns != null) {
+              rt.getCurrentNs().aliases.put(alias, ns);
+            }
+          }
+        }
+      }
+    }
+
+    public static void loadNamespace(RT.Instance rt, Symbol nsName) {
+      if (rt.getNamespace(nsName) != null) {
+        return; // Already loaded
+      }
+
+      String path = nsName.getName().replace('.', '/') + ".hrl";
+      InputStream is = rt.classLoader().getResourceAsStream(path);
+
+      if (is == null) {
+        throw new Ex.Runtime("Could not find namespace: " + nsName + " (file: " + path + ")");
+      }
+
+      try (is) {
+        String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        hara.kernel.base.Reader rdr =
+            new hara.kernel.base.Reader(new java.io.StringReader(content));
+        Object EOF = new Object();
+
+        while (true) {
+          Object form = Parser.LispReader.read(rdr, false, EOF, false, null);
+          if (form == EOF) break;
+          rt.eval(form);
+        }
+      } catch (IOException e) {
+        throw Ex.Sneaky(e);
       }
     }
 
