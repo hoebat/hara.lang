@@ -391,10 +391,12 @@ public interface RT {
     public final RootEnv<AST> _rootEnv;
     public final UserEnv<AST> _userEnv;
     public final ThreadLocal<List<IEnv<Symbol, Var>>> _stack;
+    public final java.io.PrintStream out;
 
     public Instance(IContext root, String key) {
       _root = root;
       _key = key;
+      this.out = System.out;
       _loader = new Loader();
       _rootEnv = new RootEnv<>(null, this);
       _userEnv = new UserEnv<>(_rootEnv, this);
