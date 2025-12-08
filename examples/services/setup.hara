@@ -1,0 +1,3 @@
+{:runtimes
+ {:api    {:src "src/api.hrl"}
+  :worker {:src "src/worker.hrl"}}}
