@@ -22,9 +22,12 @@ public class Main {
         case "repl":
           Project.repl();
           return;
+        case "setup":
+          Project.setup(restArgs);
+          return;
         default:
           System.out.println("Unknown command: " + command);
-          System.out.println("Available commands: new, run, repl");
+          System.out.println("Available commands: new, run, repl, setup");
           return;
       }
     }

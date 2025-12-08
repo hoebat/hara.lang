@@ -382,6 +382,9 @@ public interface RT {
 
   @SuppressWarnings("rawtypes")
   public class Instance<AST> implements IRuntime<AST, Symbol, Var> {
+
+    public static final ThreadLocal<Instance> CURRENT = new ThreadLocal<>();
+
     public final IContext _root;
     public final String _key;
     public final Loader _loader;
@@ -450,8 +453,14 @@ public interface RT {
 
     @Override
     public Object eval(AST input) {
-      Thread.currentThread().setContextClassLoader(_loader);
-      return Eval.eval(input, _stack.get().peekFirst());
+      Instance prev = CURRENT.get();
+      CURRENT.set(this);
+      try {
+        Thread.currentThread().setContextClassLoader(_loader);
+        return Eval.eval(input, _stack.get().peekFirst());
+      } finally {
+        CURRENT.set(prev);
+      }
     }
 
     @Override
