@@ -381,6 +381,25 @@ public interface RT {
   }
 
   @SuppressWarnings("rawtypes")
+  public static class PrefixStream extends java.io.PrintStream {
+    public final String prefix;
+
+    public PrefixStream(java.io.OutputStream out, String prefix) {
+      super(out);
+      this.prefix = prefix;
+    }
+
+    @Override
+    public void println(String x) {
+      super.println(prefix + x);
+    }
+
+    @Override
+    public void println(Object x) {
+      super.println(prefix + x);
+    }
+  }
+
   public class Instance<AST> implements IRuntime<AST, Symbol, Var> {
 
     public static final ThreadLocal<Instance> CURRENT = new ThreadLocal<>();
@@ -391,10 +410,12 @@ public interface RT {
     public final RootEnv<AST> _rootEnv;
     public final UserEnv<AST> _userEnv;
     public final ThreadLocal<List<IEnv<Symbol, Var>>> _stack;
+    public final java.io.PrintStream out;
 
     public Instance(IContext root, String key) {
       _root = root;
       _key = key;
+      this.out = new PrefixStream(System.out, "[" + key + "] ");
       _loader = new Loader();
       _rootEnv = new RootEnv<>(null, this);
       _userEnv = new UserEnv<>(_rootEnv, this);

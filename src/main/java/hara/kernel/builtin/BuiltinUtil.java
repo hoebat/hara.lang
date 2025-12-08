@@ -42,42 +42,43 @@ public interface BuiltinUtil {
   @Module.Fn(name = "println", vargs = true, complete = true)
   public static void println(Object args) {
     var current = hara.kernel.base.RT.Instance.CURRENT.get();
-    String prefix = (current != null) ? "[" + current._key + "] " : "";
-    System.out.println(
-        prefix
-            + Iter.toString(
-                Iter.iter(args),
-                "",
-                "",
-                " ",
-                (e) -> {
-                  if (e == null) {
-                    return "nil";
-                  } else {
-                    return String.valueOf(e);
-                  }
-                }));
+    var out = (current != null) ? current.out : System.out;
+    out.println(
+        Iter.toString(
+            Iter.iter(args),
+            "",
+            "",
+            " ",
+            (e) -> {
+              if (e == null) {
+                return "nil";
+              } else {
+                return String.valueOf(e);
+              }
+            }));
   }
 
   @Module.Fn(name = "prn", vargs = true, complete = true)
   public static void prn(Object args) {
     var current = hara.kernel.base.RT.Instance.CURRENT.get();
-    String prefix = (current != null) ? "[" + current._key + "] " : "";
-    System.out.println(prefix + Iter.toString(Iter.iter(args), "", "", " ", G::display));
+    var out = (current != null) ? current.out : System.out;
+    out.println(Iter.toString(Iter.iter(args), "", "", " ", G::display));
   }
 
   @Module.Fn(name = "doc", complete = true)
   public static void doc(Object obj) {
+    var current = hara.kernel.base.RT.Instance.CURRENT.get();
+    var out = (current != null) ? current.out : System.out;
     if (obj instanceof IObjType) {
       var meta = ((IObjType) obj).meta();
       if (meta != null) {
         var metaMap = (IMapType) meta;
         var doc = metaMap.lookup(BuiltinBasic.keyword("doc"));
         if (doc != null) {
-          System.out.println("-------------------------");
-          System.out.println(metaMap.lookup(BuiltinBasic.keyword("name")));
-          System.out.println(metaMap.lookup(BuiltinBasic.keyword("arglists")));
-          System.out.println("  " + doc);
+          out.println("-------------------------");
+          out.println(metaMap.lookup(BuiltinBasic.keyword("name")));
+          out.println(metaMap.lookup(BuiltinBasic.keyword("arglists")));
+          out.println("  " + doc);
         }
       }
     }
