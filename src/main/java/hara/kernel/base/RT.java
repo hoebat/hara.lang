@@ -108,6 +108,7 @@ public interface RT {
 
     @Override
     public void addURL(URL url) {
+      super.addURL(url);
       _urls.add(url);
     }
 
