@@ -12,7 +12,7 @@
 	<url>http://maven.apache.org</url>
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<jar.mainClass>hara.kernel.Main</jar.mainClass>
+		<mainclass>hara.kernel.Main</mainclass>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -102,7 +102,7 @@
 				<configuration>
 					<archive>
 						<manifest>
-							<mainClass>${jar.mainClass}</mainClass>
+							<mainClass>${mainclass}</mainClass>
 						</manifest>
 					</archive>
 				</configuration>
@@ -189,7 +189,7 @@
 		<profile>
 			<id>native</id>
 			<properties>
-				<jar.mainClass>hara.kernel.NativeMain</jar.mainClass>
+				<mainclass>hara.kernel.NativeMain</mainclass>
 			</properties>
 		</profile>
 	</profiles>

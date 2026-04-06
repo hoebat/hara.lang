@@ -46,8 +46,8 @@ public class NativeMain {
     }
 
     if ("repl".equals(command)) {
-      new Repl(createRuntime()).run();
-      return;
+      System.err.println(NativeMode.unsupported("interactive REPL").getMessage());
+      System.exit(1);
     }
 
     Path implicitFile = Path.of(command);

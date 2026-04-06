@@ -85,15 +85,18 @@ public class Project {
       if (depsObj instanceof Iterable) {
         Iterable deps = (Iterable) depsObj;
         Iterator it = deps.iterator();
-        if (NativeMode.enabled() && it.hasNext()) {
-          throw NativeMode.unsupported("dynamic Maven dependency loading from project.hara");
-        }
-        while (it.hasNext()) {
-          Object dep = it.next();
-          if (dep instanceof String) {
-            String coordinate = (String) dep;
-            System.out.println("Loading dependency: " + coordinate);
-            Maven.load.invoke(rt, coordinate);
+        if (NativeMode.enabled()) {
+          if (it.hasNext()) {
+            throw NativeMode.unsupported("dynamic Maven dependency loading from project.hara");
+          }
+        } else {
+          while (it.hasNext()) {
+            Object dep = it.next();
+            if (dep instanceof String) {
+              String coordinate = (String) dep;
+              System.out.println("Loading dependency: " + coordinate);
+              Maven.load.invoke(rt, coordinate);
+            }
           }
         }
       }

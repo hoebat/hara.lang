@@ -34,6 +34,7 @@ public final class NativeMode {
   }
 
   public static List<Class<?>> commandClasses() {
+    // Native mode intentionally exposes only the statically linked command set.
     List<Class<?>> classes =
         new ArrayList<>(
             Arrays.asList(
