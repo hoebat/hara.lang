@@ -28,10 +28,6 @@ public class NativeMain {
       return;
     }
 
-    if ("repl".equals(command)) {
-      throw NativeMode.unsupported("interactive REPL");
-    }
-
     if ("eval".equals(command)) {
       requireArg(command, restArgs, "<code>");
       printResult(evalString(restArgs[0]));
@@ -46,6 +42,11 @@ public class NativeMain {
     if ("run".equals(command)) {
       requireArg(command, restArgs, "<file>");
       printResult(evalFile(Path.of(restArgs[0])));
+      return;
+    }
+
+    if ("repl".equals(command)) {
+      new Repl(createRuntime()).run();
       return;
     }
 

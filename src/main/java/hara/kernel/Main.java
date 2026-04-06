@@ -36,6 +36,7 @@ public class Main {
     }
 
     if (NativeMode.enabled()) {
+      System.out.println("Native mode enabled; starting the native CLI entrypoint.");
       NativeMain.main(args);
       return;
     }

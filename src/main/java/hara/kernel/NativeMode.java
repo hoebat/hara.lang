@@ -30,7 +30,7 @@ public final class NativeMode {
     return new Ex.Unsupported(
         "Native mode does not support "
             + feature
-            + ". Use the JVM runtime for dynamic compilation, classpath mutation, Maven loading, or the TCP server.");
+            + ". Use the default JVM runtime for features that depend on dynamic runtime behavior.");
   }
 
   public static List<Class<?>> commandClasses() {
