@@ -4,6 +4,7 @@ import hara.compiler.Compiler;
 import hara.compiler.DynamicClassLoader;
 import hara.kernel.Command;
 import hara.kernel.Foundation;
+import hara.kernel.NativeMode;
 import hara.kernel.base.Parser;
 import hara.kernel.base.RT;
 import hara.lang.base.Ex;
@@ -70,6 +71,7 @@ public class Core {
 
   @Command.Fn(name = "COMPILE")
   public static Object runCompile(Foundation F, List<Object> args) {
+    NativeMode.requireDisabled("runtime compilation");
     try {
       hara.lang.data.List expression =
           (hara.lang.data.List) Parser.LispReader.readString(args.get(0).toString(), null);

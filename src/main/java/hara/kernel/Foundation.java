@@ -43,15 +43,7 @@ public class Foundation implements IContext {
   public final ConcurrentHashMap<String, Command.Type> REGISTRY = new ConcurrentHashMap<>();
 
   public Foundation() {
-    loadCommands(
-        Arrays.asList(
-            hara.kernel.command.Core.class,
-            hara.kernel.command.Jvm.class,
-            hara.kernel.command.Os.class,
-            hara.kernel.command.Server.class,
-            hara.kernel.command.Session.class,
-            hara.kernel.command.Peer.class,
-            hara.kernel.command.Maven.class));
+    loadCommands(NativeMode.commandClasses());
   }
 
   public void register(String name, Command.Type cmd) {

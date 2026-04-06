@@ -35,6 +35,7 @@ public class Repl {
   private final Reader reader;
 
   public Repl(RT.Instance rt) throws IOException {
+    NativeMode.requireDisabled("interactive REPL");
     this.rt = rt;
 
     // Initialize Terminal

@@ -13,6 +13,9 @@ public class Main {
       String[] restArgs = Arrays.copyOfRange(args, 1, args.length);
 
       switch (command) {
+        case "native":
+          NativeMain.main(restArgs);
+          return;
         case "new":
           Project.create(restArgs.length > 0 ? restArgs[0] : null);
           return;
@@ -27,9 +30,14 @@ public class Main {
           return;
         default:
           System.out.println("Unknown command: " + command);
-          System.out.println("Available commands: new, run, repl, setup");
+          System.out.println("Available commands: native, new, run, repl, setup");
           return;
       }
+    }
+
+    if (NativeMode.enabled()) {
+      NativeMain.main(args);
+      return;
     }
 
     // Default behavior: Start standalone REPL (as before)
