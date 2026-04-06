@@ -102,7 +102,7 @@
 				<configuration>
 					<archive>
 						<manifest>
-							<mainClass>hara.kernel.Main</mainClass>
+							<mainClass>${mainclass}</mainClass>
 						</manifest>
 					</archive>
 				</configuration>
@@ -185,4 +185,12 @@
 			</plugin>
 		</plugins>
 	</build>
+	<profiles>
+		<profile>
+			<id>native</id>
+			<properties>
+				<mainclass>hara.kernel.NativeMain</mainclass>
+			</properties>
+		</profile>
+	</profiles>
 </project>

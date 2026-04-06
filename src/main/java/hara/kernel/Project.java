@@ -72,7 +72,7 @@ public class Project {
 
       // Add src directory to classpath
       File srcDir = new File(SRC_DIR);
-      if (srcDir.exists()) {
+      if (srcDir.exists() && !NativeMode.enabled()) {
         java.net.URL srcUrl = srcDir.toURI().toURL();
         rt.pathAdd(srcUrl);
       }
@@ -85,12 +85,19 @@ public class Project {
       if (depsObj instanceof Iterable) {
         Iterable deps = (Iterable) depsObj;
         Iterator it = deps.iterator();
-        while (it.hasNext()) {
-          Object dep = it.next();
-          if (dep instanceof String) {
-            String coordinate = (String) dep;
-            System.out.println("Loading dependency: " + coordinate);
-            Maven.load.invoke(rt, coordinate);
+        if (NativeMode.enabled()) {
+          // Empty dependency lists remain valid in native mode so bare projects can still run.
+          if (it.hasNext()) {
+            throw NativeMode.unsupported("dynamic Maven dependency loading from project.hara");
+          }
+        } else {
+          while (it.hasNext()) {
+            Object dep = it.next();
+            if (dep instanceof String) {
+              String coordinate = (String) dep;
+              System.out.println("Loading dependency: " + coordinate);
+              Maven.load.invoke(rt, coordinate);
+            }
           }
         }
       }
@@ -133,6 +140,7 @@ public class Project {
   }
 
   public static void repl() throws IOException {
+    NativeMode.requireDisabled("project REPL");
     RT.Instance rt = loadContext();
 
     Foundation F = (Foundation) rt.getRoot();
@@ -146,6 +154,7 @@ public class Project {
   }
 
   public static void setup(String[] args) throws IOException {
+    NativeMode.requireDisabled("project setup");
     if (args.length == 0) {
       System.err.println("Usage: hara setup <config-file> [--wait | --repl <runtime-name>]");
       return;

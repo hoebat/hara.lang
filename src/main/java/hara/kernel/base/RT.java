@@ -1,5 +1,6 @@
 package hara.kernel.base;
 
+import hara.kernel.NativeMode;
 import hara.kernel.builtin.BuiltinInterop;
 import hara.kernel.protocol.IEnv;
 import hara.kernel.protocol.IRuntime;
@@ -20,7 +21,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
-import hara.kernel.builtin.BuiltinInterop;
 import hara.kernel.builtin.BuiltinLambda;
 import hara.kernel.builtin.BuiltinStruct;
 
@@ -108,6 +108,7 @@ public interface RT {
 
     @Override
     public void addURL(URL url) {
+      NativeMode.requireDisabled("classpath mutation");
       super.addURL(url);
       _urls.add(url);
     }
@@ -545,6 +546,7 @@ public interface RT {
 
     @Override
     public IColl<URL> pathAdd(String[] paths) {
+      NativeMode.requireDisabled("classpath mutation");
       Array.toIter(paths)
           .forEachRemaining(
               (path) -> {
@@ -559,6 +561,7 @@ public interface RT {
 
     @Override
     public IColl<URL> pathRemove(String[] paths) {
+      NativeMode.requireDisabled("classpath mutation");
       Array.toIter(paths)
           .forEachRemaining(
               (path) -> {
