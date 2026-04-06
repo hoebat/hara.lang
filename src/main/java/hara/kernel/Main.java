@@ -35,11 +35,6 @@ public class Main {
       }
     }
 
-    if (NativeMode.enabled()) {
-      NativeMain.main(args);
-      return;
-    }
-
     // Default behavior: Start standalone REPL (as before)
     var F = new Foundation();
     var server = new Server(F, "PRIMARY", Foundation.DEFAULT_PORT, null);

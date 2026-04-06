@@ -86,6 +86,7 @@ public class Project {
         Iterable deps = (Iterable) depsObj;
         Iterator it = deps.iterator();
         if (NativeMode.enabled()) {
+          // Empty dependency lists remain valid in native mode so bare projects can still run.
           if (it.hasNext()) {
             throw NativeMode.unsupported("dynamic Maven dependency loading from project.hara");
           }
