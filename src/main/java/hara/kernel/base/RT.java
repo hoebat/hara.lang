@@ -21,7 +21,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 
-import hara.kernel.builtin.BuiltinInterop;
 import hara.kernel.builtin.BuiltinLambda;
 import hara.kernel.builtin.BuiltinStruct;
 

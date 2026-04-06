@@ -8,6 +8,29 @@ For installation and usage instructions, please see the [Getting Started Guide](
 
 The primary motivation behind `hara.lang` is to provide a dynamic and interactive development environment on the JVM. Traditional Java development often involves a lengthy compile-run-debug cycle. `hara.lang` aims to shorten this feedback loop by allowing developers to connect to a running application, modify code on the fly, and inspect the state of the system without requiring a restart.
 
+## Native Mode
+
+`hara.lang` now includes an experimental native-oriented runtime target intended as the first step toward a babashka-style executable.
+
+This mode is deliberately interpreter-first and disables JVM-dynamic features that do not map cleanly to native-image:
+
+* runtime bytecode compilation (`COMPILE`)
+* dynamic Maven dependency loading
+* mutable runtime classpaths and classloader scanning
+* the server-backed interactive REPL and project setup flows
+
+Use the native CLI entrypoint for small scripts:
+
+* `hara native eval "(+ 1 2)"`
+* `hara native run path/to/script.hrl`
+* `hara native stdin`
+
+For packaging, the Maven build now supports a `native` profile that switches the jar entrypoint to `hara.kernel.NativeMain`:
+
+* `mvn -Pnative package`
+
+This is groundwork for a native target, not full GraalVM compatibility. The full JVM runtime remains the supported mode for dynamic loading, multi-tenant sessions, and runtime compilation.
+
 
 ## Design
 
