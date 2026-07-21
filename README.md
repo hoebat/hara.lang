@@ -31,6 +31,26 @@ For packaging, the Maven build now supports a `native` profile that switches the
 
 This is groundwork for a native target, not full GraalVM compatibility. The full JVM runtime remains the supported mode for dynamic loading, multi-tenant sessions, and runtime compilation.
 
+## Truffle Runtime
+
+The experimental Truffle runtime has a separate CLI and does not replace the existing interpreter.
+
+Build and run the bundled JVM artifact:
+
+```shell
+mvn -Ptruffle package
+java -jar target/hara-truffle.jar eval '(let [x 19] (+ x 23))'
+```
+
+Build and run a native executable with GraalVM Native Image:
+
+```shell
+scripts/build-truffle-native
+target/hara-truffle eval '(let [x 19] (+ x 23))'
+```
+
+The CLI also accepts `run <file>`, `stdin`, and `help`. This first slice supports literals, `quote`, `do`, `if`, parallel `let`, fixed-arity non-capturing `fn`, invocation, and binary `+`.
+
 
 ## Design
 

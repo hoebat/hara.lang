@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DEPENDENCIES="$ROOT/target/truffle-dependencies"
+
+cd "$ROOT"
+
+mvn -Ptruffle -DskipTests compile dependency:copy-dependencies \
+  -DincludeScope=runtime \
+  -DoutputDirectory="$DEPENDENCIES"
+
+native-image \
+  --no-fallback \
+  -cp "$ROOT/target/classes:$DEPENDENCIES/*" \
+  -H:Class=hara.truffle.Main \
+  --initialize-at-build-time=hara.truffle.HaraFunctionGen,hara.truffle.HaraBoxGen,hara.truffle.HaraNullGen \
+  -o "$ROOT/target/hara-truffle"
+
+echo "Built $ROOT/target/hara-truffle"
