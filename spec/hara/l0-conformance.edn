@@ -47,6 +47,11 @@
    :source "(protocol-call ILookup lookup (protocol-call IObjType meta (protocol-call IObjType with-meta (Person \"Ada\") {:doc \"person\"})) :doc)"
    :setup "(defstruct Person [name])"
    :expect {:value "person" :type :string}}
+  {:id :runtime/dynamic-binding
+   :class :runtime
+   :source "(binding [*answer* 42] *answer*)"
+   :setup "(def ^:dynamic *answer* 1)"
+   :expect {:value 42 :type :integer}}
   {:id :collection/bytes
    :class :collection
    :source "(protocol-call INth nth (bytes 1 2 -3) 2)"
