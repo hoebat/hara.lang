@@ -54,6 +54,10 @@
    :class :runtime
    :source "(cond (= 1 2) 0 (= 2 2) 42 :else 99)"
    :expect {:value 42 :type :integer}}
+  {:id :runtime/threading
+   :class :runtime
+   :source "(->> 3 (+ 2) (* 3))"
+   :expect {:value 15 :type :integer}}
   {:id :runtime/destructuring
    :class :runtime
    :source "(let [{:keys [age]} {:age 41}] (+ age 1))"

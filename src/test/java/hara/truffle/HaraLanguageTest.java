@@ -102,6 +102,16 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void expandsThreadFirstAndThreadLastForms() {
+    try (Context context = context()) {
+      assertEquals(15, context.eval(HaraLanguage.ID, "(-> 3 (+ 2) (* 3))").asLong());
+      assertEquals(15, context.eval(HaraLanguage.ID, "(->> 3 (+ 2) (* 3))").asLong());
+      assertEquals(6, context.eval(HaraLanguage.ID, "(-> 1 (+ 2 3))").asLong());
+      assertEquals(6, context.eval(HaraLanguage.ID, "(->> 1 (+ 2 3))").asLong());
+    }
+  }
+
+  @Test
   public void evaluatesSpecializedArithmeticOperations() {
     try (Context context = context()) {
       assertEquals(0, context.eval(HaraLanguage.ID, "(+)").asLong());

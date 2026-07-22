@@ -1502,8 +1502,39 @@ final class HaraAnalyzer {
     if (operator.getNamespace() != null || "defmacro".equals(operator.getName())) {
       return form;
     }
+    if ("->".equals(operator.getName())) return expandThread(list, false);
+    if ("->>".equals(operator.getName())) return expandThread(list, true);
     HaraMacro macro = context.resolveMacro(operator);
     return macro == null ? form : macro.expand(list);
+  }
+
+  private Object expandThread(List<?> form, boolean last) {
+    if (form.count() < 2) {
+      throw error((last ? "->>" : "->") + " expects an initial form");
+    }
+    Object result = form.nth(1);
+    for (int i = 2; i < form.count(); i++) {
+      Object step = form.nth(i);
+      if (step instanceof List<?>) {
+        List<?> stepList = (List<?>) step;
+        if (stepList.count() == 0) {
+          throw error((last ? "->>" : "->") + " cannot thread into an empty list");
+        }
+        Object[] values = new Object[(int) stepList.count() + 1];
+        if (last) {
+          for (int j = 0; j < stepList.count(); j++) values[j] = stepList.nth(j);
+          values[values.length - 1] = result;
+        } else {
+          values[0] = stepList.nth(0);
+          values[1] = result;
+          for (int j = 1; j < stepList.count(); j++) values[j + 1] = stepList.nth(j);
+        }
+        result = List.Standard.from(null, values);
+      } else {
+        result = List.Standard.from(null, step, result);
+      }
+    }
+    return result;
   }
 
   private HaraExpressionNode analyzeInvocation(List<?> form) {
