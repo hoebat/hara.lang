@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
@@ -18,6 +19,7 @@ public final class HaraContext {
   private final Map<String, Map<String, HaraMacro>> macros = new ConcurrentHashMap<>();
   private final Map<String, Map<String, String>> aliases = new ConcurrentHashMap<>();
   private final Map<String, ModuleRecord> modules = new ConcurrentHashMap<>();
+  private final Set<String> loadingModules = ConcurrentHashMap.newKeySet();
   private volatile HaraNamespace currentNamespace;
   private final HaraProtocol ifnProtocol;
 
@@ -176,7 +178,15 @@ public final class HaraContext {
     }
     Path path = canonicalPath((String) value);
     if (!modules.containsKey(path.toString())) {
-      loadFile(path.toString());
+      String key = path.toString();
+      if (!loadingModules.add(key)) {
+        throw new HaraException("Cyclic module require: " + key);
+      }
+      try {
+        loadFile(key);
+      } finally {
+        loadingModules.remove(key);
+      }
     }
     return null;
   }

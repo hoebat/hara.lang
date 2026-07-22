@@ -337,6 +337,40 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void requireRejectsCyclesAndRollsBackPartialModules() throws Exception {
+    try (Context context = context()) {
+      Path directory = Files.createTempDirectory("hara-l0-cycle-");
+      Path first = directory.resolve("first.hara");
+      Path second = directory.resolve("second.hara");
+      try {
+        String firstPath = first.toString().replace("\\", "\\\\").replace("\"", "\\\"");
+        String secondPath = second.toString().replace("\\", "\\\\").replace("\"", "\\\"");
+        Files.writeString(first, "(def first-value 1) (require \"" + secondPath + "\")");
+        Files.writeString(second, "(def second-value 2) (require \"" + firstPath + "\")");
+        PolyglotException cycle =
+            assertThrows(
+                PolyglotException.class,
+                () -> context.eval(HaraLanguage.ID, "(require \"" + firstPath + "\")"));
+        assertTrue(cycle.getMessage().contains("Cyclic module require"));
+        assertTrue(
+            assertThrows(
+                    PolyglotException.class, () -> context.eval(HaraLanguage.ID, "first-value"))
+                .getMessage()
+                .contains("Unbound symbol"));
+        assertTrue(
+            assertThrows(
+                    PolyglotException.class, () -> context.eval(HaraLanguage.ID, "second-value"))
+                .getMessage()
+                .contains("Unbound symbol"));
+      } finally {
+        Files.deleteIfExists(first);
+        Files.deleteIfExists(second);
+        Files.deleteIfExists(directory);
+      }
+    }
+  }
+
+  @Test
   public void evaluatesMultipleTopLevelFormsAndNamespaces() {
     try (Context context = context()) {
       assertEquals(3, context.eval(HaraLanguage.ID, "(def x 1) (+ x 2)").asLong());
