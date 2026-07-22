@@ -41,6 +41,8 @@ jobs:
 
   native-image-smoke:
     runs-on: ubuntu-latest
+    env:
+      HARA_NATIVE_USE_FALLBACK_RUNTIME: 'true'
 
     steps:
     - uses: actions/checkout@v4
@@ -56,6 +58,7 @@ jobs:
       run: |
         {
           echo "native_image_version=$(native-image --version)"
+          echo "native_runtime_mode=fallback"
           echo "binary_bytes=$(stat -c '%s' target/hara-truffle)"
           /usr/bin/time -f 'startup_seconds=%e' target/hara-truffle eval 'nil' >/dev/null
           echo "reachability_manifest=$(find target/classes/META-INF/native-image -type f -print | sort | tr '\n' ',')"
