@@ -580,6 +580,27 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void reloadingARequiredMacroModuleRefreshesNewCompilations() throws Exception {
+    try (Context context = context()) {
+      Path file = Files.createTempFile("hara-l0-macro-reload-", ".hara");
+      try {
+        Files.writeString(file, "(ns reload-macros) (defmacro answer [] 41)");
+        String path = file.toString().replace("\\", "\\\\").replace("\"", "\\\"");
+        context.eval(HaraLanguage.ID, "(require \"" + path + "\" {:refer-macros [answer]})");
+        assertEquals(41, context.eval(HaraLanguage.ID, "(answer)").asLong());
+        Files.writeString(file, "(ns reload-macros) (defmacro answer [] 42)");
+        context.eval(
+            HaraLanguage.ID, "(require \"" + path + "\" {:reload true :refer-macros [answer]})");
+        assertEquals("42", context.eval(HaraLanguage.ID, "(macroexpand '(answer))").toString());
+        // Existing Truffle call targets are immutable; a newly compiled source sees the reload.
+        assertEquals(42, context.eval(HaraLanguage.ID, "(answer )").asLong());
+      } finally {
+        Files.deleteIfExists(file);
+      }
+    }
+  }
+
+  @Test
   public void requireRejectsCyclesAndRollsBackPartialModules() throws Exception {
     try (Context context = context()) {
       Path directory = Files.createTempDirectory("hara-l0-cycle-");
