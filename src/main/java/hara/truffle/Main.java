@@ -8,6 +8,13 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import hara.kernel.base.Parser;
+import hara.lang.base.G;
+import hara.lang.data.Keyword;
+import hara.lang.data.types.ILinearType;
+import hara.lang.data.types.IMapType;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
@@ -34,6 +41,9 @@ public final class Main {
 
     if ("repl".equals(args[0])) {
       return runRepl(input, output, error, input == System.in && System.console() != null);
+    }
+    if ("conformance".equals(args[0])) {
+      return runConformance(output, error);
     }
 
     try {
@@ -73,6 +83,78 @@ public final class Main {
     } catch (IOException exception) {
       error.println(exception.getMessage());
       return 1;
+    }
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private static int runConformance(PrintStream output, PrintStream error) {
+    try (InputStream resource =
+        Main.class.getClassLoader().getResourceAsStream("spec/hara/l0-conformance.edn")) {
+      if (resource == null) {
+        error.println("Missing packaged L0 conformance manifest");
+        return 1;
+      }
+      String source = new String(resource.readAllBytes(), StandardCharsets.UTF_8);
+      IMapType manifest = (IMapType) Parser.LispReader.readString(source, null);
+      ILinearType<?> cases = (ILinearType<?>) manifest.lookup(Keyword.create("cases"));
+      int completed = 0;
+      for (Object item : cases) {
+        IMapType testCase = (IMapType) item;
+        String id = ((Keyword) testCase.lookup(Keyword.create("id"))).getName();
+        String form = (String) testCase.lookup(Keyword.create("source"));
+        String className = ((Keyword) testCase.lookup(Keyword.create("class"))).getName();
+        IMapType expected = (IMapType) testCase.lookup(Keyword.create("expect"));
+        if ("reader".equals(className)) {
+          Object actual = Parser.LispReader.readString(form, null);
+          Object expectedForm = expected.lookup(Keyword.create("form"));
+          if (expectedForm != null && !expectedForm.toString().equals(G.display(actual))) {
+            throw new IllegalStateException(
+                id + " expected " + expectedForm + ", got " + G.display(actual));
+          }
+        } else {
+          String setup = (String) testCase.lookup(Keyword.create("setup"));
+          Object expectedError = expected.lookup(Keyword.create("error"));
+          try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+            if (setup != null) context.eval(HaraLanguage.ID, setup);
+            Value actual = context.eval(HaraLanguage.ID, form);
+            if (expectedError != null) {
+              throw new IllegalStateException(id + " expected an error");
+            }
+            assertConformanceValue(id, actual, expected.lookup(Keyword.create("value")));
+          } catch (PolyglotException guestError) {
+            if (expectedError == null) throw guestError;
+          }
+        }
+        completed++;
+      }
+      output.println("L0 conformance passed: " + completed + " cases");
+      return 0;
+    } catch (Exception failure) {
+      error.println("L0 conformance failed: " + failure.getMessage());
+      return 1;
+    }
+  }
+
+  private static void assertConformanceValue(String id, Value actual, Object expected) {
+    if (expected == null) {
+      if (!actual.isNull()) throw new IllegalStateException(id + " expected nil");
+    } else if (expected instanceof Boolean) {
+      if (actual.asBoolean() != (Boolean) expected)
+        throw new IllegalStateException(id + " boolean mismatch");
+    } else if (expected instanceof String) {
+      if (!actual.asString().equals(expected))
+        throw new IllegalStateException(id + " string mismatch");
+    } else if (expected instanceof BigInteger) {
+      if (!actual.as(BigInteger.class).equals(expected))
+        throw new IllegalStateException(id + " bigint mismatch");
+    } else if (expected instanceof BigDecimal) {
+      if (!actual.as(BigDecimal.class).equals(expected))
+        throw new IllegalStateException(id + " bigdec mismatch");
+    } else if (expected instanceof Number) {
+      if (actual.asLong() != ((Number) expected).longValue())
+        throw new IllegalStateException(id + " number mismatch");
+    } else {
+      throw new IllegalStateException(id + " has unsupported expected value " + expected);
     }
   }
 
@@ -168,6 +250,7 @@ public final class Main {
     output.println("hara-truffle run <file>");
     output.println("hara-truffle stdin");
     output.println("hara-truffle repl");
+    output.println("hara-truffle conformance");
     output.println("hara-truffle help");
   }
 }

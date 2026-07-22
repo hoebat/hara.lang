@@ -27,6 +27,22 @@ public class MainTest {
   }
 
   @Test
+  public void runsThePackagedL0ConformanceCorpus() {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    ByteArrayOutputStream error = new ByteArrayOutputStream();
+
+    int status =
+        Main.run(
+            new String[] {"conformance"},
+            new PrintStream(output, true, StandardCharsets.UTF_8),
+            new PrintStream(error, true, StandardCharsets.UTF_8));
+
+    assertEquals(0, status);
+    assertTrue(output.toString(StandardCharsets.UTF_8).contains("L0 conformance passed:"));
+    assertEquals("", error.toString(StandardCharsets.UTF_8));
+  }
+
+  @Test
   public void reportsGuestErrorsWithoutAJavaStackTrace() {
     ByteArrayOutputStream output = new ByteArrayOutputStream();
     ByteArrayOutputStream error = new ByteArrayOutputStream();
