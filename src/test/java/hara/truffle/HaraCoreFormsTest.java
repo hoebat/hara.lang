@@ -51,6 +51,28 @@ public class HaraCoreFormsTest {
   }
 
   @Test
+  public void varsSupportMetadataAndProtocolRootReset() {
+    try (Context context = context()) {
+      assertEquals(
+          42,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(def ^:dynamic answer 41) "
+                      + "(protocol-call IReset reset (var answer) 42) "
+                      + "(deref (var answer))")
+              .asLong());
+      assertTrue(
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(protocol-call ILookup lookup "
+                      + "(protocol-call IObjType meta (var answer)) :dynamic)")
+              .asBoolean());
+    }
+  }
+
+  @Test
   public void varAndDerefFailuresAreDeterministic() {
     try (Context context = context()) {
       assertTrue(

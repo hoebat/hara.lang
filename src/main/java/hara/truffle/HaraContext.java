@@ -4,6 +4,7 @@ import com.oracle.truffle.api.TruffleLanguage;
 import com.oracle.truffle.api.source.Source;
 import hara.lang.data.Symbol;
 import hara.lang.protocol.IFn;
+import hara.lang.protocol.IMetadata;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -79,7 +80,7 @@ public final class HaraContext {
     if (symbol.getNamespace() != null && !symbol.getNamespace().equals(currentNamespace.name())) {
       throw new HaraException("Cannot define a var in another namespace: " + symbol.display());
     }
-    return currentNamespace.define(symbol.getName(), value);
+    return currentNamespace.define(symbol.getName(), value, symbol.meta());
   }
 
   public HaraProtocol ifnProtocol() {
@@ -375,11 +376,15 @@ public final class HaraContext {
     }
 
     private HaraVar define(String symbolName, Object value) {
+      return define(symbolName, value, null);
+    }
+
+    private HaraVar define(String symbolName, Object value, IMetadata metadata) {
       return vars.compute(
           symbolName,
           (ignored, existing) -> {
             if (existing == null) {
-              return new HaraVar(name, symbolName, value);
+              return new HaraVar(name, symbolName, value, metadata);
             }
             existing.set(value);
             return existing;
