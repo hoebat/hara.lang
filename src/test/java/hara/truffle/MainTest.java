@@ -96,4 +96,24 @@ public class MainTest {
     assertTrue(output.toString(StandardCharsets.UTF_8).contains("42\n"));
     assertEquals("Unbound symbol: missing\n", error.toString(StandardCharsets.UTF_8));
   }
+
+  @Test
+  public void replRetainsCompletedFormHistory() {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    ByteArrayOutputStream error = new ByteArrayOutputStream();
+    byte[] input = "(def answer 40)\nmissing\n:history\n:quit\n".getBytes(StandardCharsets.UTF_8);
+
+    int status =
+        Main.run(
+            new String[] {"repl"},
+            new ByteArrayInputStream(input),
+            new PrintStream(output, true, StandardCharsets.UTF_8),
+            new PrintStream(error, true, StandardCharsets.UTF_8));
+
+    assertEquals(0, status);
+    String history = output.toString(StandardCharsets.UTF_8);
+    assertTrue(history.contains("1: (def answer 40)"));
+    assertTrue(history.contains("2: missing"));
+    assertEquals("Unbound symbol: missing\n", error.toString(StandardCharsets.UTF_8));
+  }
 }

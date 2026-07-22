@@ -15,6 +15,8 @@ import hara.lang.data.types.ILinearType;
 import hara.lang.data.types.IMapType;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.List;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
@@ -164,6 +166,7 @@ public final class Main {
         BufferedReader reader =
             new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8))) {
       StringBuilder source = new StringBuilder();
+      List<String> history = new ArrayList<>();
       String line;
       boolean continuation = false;
       while (true) {
@@ -185,6 +188,13 @@ public final class Main {
         if (source.length() == 0 && ":help".equals(line.trim())) {
           output.println(":quit          exit the REPL");
           output.println(":help          show this help");
+          output.println(":history       show evaluated forms");
+          continue;
+        }
+        if (source.length() == 0 && ":history".equals(line.trim())) {
+          for (int i = 0; i < history.size(); i++) {
+            output.println((i + 1) + ": " + history.get(i));
+          }
           continue;
         }
 
@@ -194,6 +204,7 @@ public final class Main {
           continue;
         }
 
+        history.add(source.toString().stripTrailing());
         try {
           Value result = context.eval(HaraLanguage.ID, source.toString());
           output.println(result.isNull() ? "nil" : result.toString());
