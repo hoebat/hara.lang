@@ -116,6 +116,7 @@ public final class Main {
         } else {
           String setup = (String) testCase.lookup(Keyword.create("setup"));
           Object expectedError = expected.lookup(Keyword.create("error"));
+          Object expectedMessage = expected.lookup(Keyword.create("message"));
           try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
             if (setup != null) context.eval(HaraLanguage.ID, setup);
             Value actual = context.eval(HaraLanguage.ID, form);
@@ -125,6 +126,11 @@ public final class Main {
             assertConformanceValue(id, actual, expected.lookup(Keyword.create("value")));
           } catch (PolyglotException guestError) {
             if (expectedError == null) throw guestError;
+            if (expectedMessage != null
+                && !guestError.getMessage().contains(expectedMessage.toString())) {
+              throw new IllegalStateException(
+                  id + " error mismatch: expected message containing " + expectedMessage);
+            }
           }
         }
         completed++;

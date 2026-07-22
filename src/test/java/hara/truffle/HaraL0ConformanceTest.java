@@ -40,7 +40,7 @@ public class HaraL0ConformanceTest {
       if ("reader".equals(className)) {
         assertReaderCase(id, form, expected);
       } else if (expected.lookup(key("error")) != null) {
-        assertErrorCase(id, form, (String) testCase.lookup(key("setup")));
+        assertErrorCase(id, form, (String) testCase.lookup(key("setup")), expected);
       } else {
         assertValueCase(id, form, (String) testCase.lookup(key("setup")), expected);
       }
@@ -65,16 +65,26 @@ public class HaraL0ConformanceTest {
     }
   }
 
-  private void assertErrorCase(String id, String form, String setup) {
+  private void assertErrorCase(String id, String form, String setup, IMapType expected) {
     try (Context context = context()) {
       if (setup != null) context.eval(HaraLanguage.ID, setup);
       try {
         context.eval(HaraLanguage.ID, form);
         fail(id + " should fail");
-      } catch (PolyglotException expected) {
-        assertTrue(id + " should report an error", expected.isGuestException());
+      } catch (PolyglotException error) {
+        assertTrue(id + " should report an error", error.isGuestException());
+        Object message = expectedMessage(expected);
+        if (message != null) {
+          assertTrue(
+              id + " should contain its specified error",
+              error.getMessage().contains(message.toString()));
+        }
       }
     }
+  }
+
+  private Object expectedMessage(IMapType expected) {
+    return expected.lookup(key("message"));
   }
 
   private void assertValueCase(String id, String form, String setup, IMapType expected) {

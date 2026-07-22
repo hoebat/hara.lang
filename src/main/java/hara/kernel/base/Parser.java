@@ -278,6 +278,9 @@ public interface Parser {
       }
 
       String s = sb.toString();
+      if (s.matches("[-+]?\\d+/\\d+")) {
+        throw new Ex.Unsupported("Ratios are not supported");
+      }
       Object n = matchNumber(s);
       if (n == null) throw new NumberFormatException("Invalid number: " + s);
       return n;

@@ -197,4 +197,5 @@
   {:id :unsupported/ratio
    :class :unsupported
    :source "1/2"
-   :expect {:error :ratio-not-supported}}]}
+   :expect {:error :ratio-not-supported
+            :message "Ratios are not supported"}}]}

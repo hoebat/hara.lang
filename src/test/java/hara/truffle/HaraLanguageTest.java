@@ -225,6 +225,15 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void ratioLiteralsAreRejectedAsAnExplicitUnsupportedBoundary() {
+    try (Context context = context()) {
+      PolyglotException ratio =
+          assertThrows(PolyglotException.class, () -> context.eval(HaraLanguage.ID, "1/2"));
+      assertTrue(ratio.getMessage(), ratio.getMessage().contains("Ratios are not supported"));
+    }
+  }
+
+  @Test
   public void numericSpecialValuesHaveStableComparisonBehavior() {
     try (Context context = context()) {
       assertTrue(context.eval(HaraLanguage.ID, "(= ##NaN ##NaN)").asBoolean());
