@@ -170,6 +170,40 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void cachesProtocolDispatchByReceiverShapeAndInvalidatesExtensions() {
+    try (Context context = context()) {
+      assertEquals(
+          "Ada",
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(defprotocol Describable (describe [self])) "
+                      + "(defstruct Person [name]) "
+                      + "(defstruct NumberValue [value]) "
+                      + "(extend-type Person Describable "
+                      + "  (describe [self] (field self :name))) "
+                      + "(extend-type NumberValue Describable "
+                      + "  (describe [self] (field self :value))) "
+                      + "(def describe-value "
+                      + "  (fn [value] (protocol-call Describable describe value))) "
+                      + "(describe-value (Person \"Ada\"))")
+              .asString());
+      assertEquals(
+          42,
+          context.eval(HaraLanguage.ID, "(describe-value (NumberValue 42))").asLong());
+
+      assertEquals(
+          2,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(extend-type Person Describable (describe [self] 2)) "
+                      + "(describe-value (Person \"Ada\"))")
+              .asLong());
+    }
+  }
+
+  @Test
   public void gatesExplicitHostInterop() {
     try (Context context = context()) {
       PolyglotException error =
