@@ -201,6 +201,46 @@ public final class HaraContext {
     target.define("module-revision", new UnaryBuiltin("module-revision", this::moduleRevision));
     target.define(
         "module-dependencies", new UnaryBuiltin("module-dependencies", this::moduleDependencies));
+    target.define(
+        "count",
+        new UnaryBuiltin("count", value -> protocolCall("ICount", "count", new Object[] {value})));
+    target.define(
+        "get", new VariadicBuiltin("get", values -> protocolCall("ILookup", "lookup", values)));
+    target.define(
+        "assoc", new VariadicBuiltin("assoc", values -> protocolCall("IAssoc", "assoc", values)));
+    target.define(
+        "conj", new VariadicBuiltin("conj", values -> protocolCall("IConj", "conj", values)));
+    target.define(
+        "cons",
+        new VariadicBuiltin(
+            "cons",
+            values -> {
+              if (values.length != 2) {
+                throw new HaraException("cons expects an item and a collection");
+              }
+              return protocolCall("ICons", "cons", new Object[] {values[1], values[0]});
+            }));
+    target.define("nth", new VariadicBuiltin("nth", values -> protocolCall("INth", "nth", values)));
+    target.define(
+        "empty",
+        new UnaryBuiltin("empty", value -> protocolCall("IEmpty", "empty", new Object[] {value})));
+  }
+
+  private Object protocolCall(String protocolName, String methodName, Object[] values) {
+    if (values.length == 0) {
+      throw new HaraException(methodName + " expects a collection value");
+    }
+    HaraVar variable = resolve(Symbol.create(protocolName));
+    if (variable == null || !(variable.get() instanceof HaraProtocol)) {
+      throw new HaraException("Missing protocol: " + protocolName);
+    }
+    Object receiver = HaraBox.unwrap(values[0]);
+    if (isHostObject(receiver)) {
+      receiver = asHostObject(receiver);
+    }
+    Object[] arguments = new Object[values.length - 1];
+    System.arraycopy(values, 1, arguments, 0, arguments.length);
+    return ((HaraProtocol) variable.get()).invoke(methodName, receiver, arguments);
   }
 
   private Object loadString(Object value) {

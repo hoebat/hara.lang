@@ -42,6 +42,13 @@ The core special forms are `quote`, `if`, `do`, `when`, `when-not`, `and`,
 `defstruct`, `defprotocol`, `extend-type`, `protocol-call`, `field`, and
 `apply`. `defn` is the only function-definition form; there is no `defn.xt`.
 
+The ordinary collection functions `count`, `get`, `assoc`, `conj`, `cons`,
+`nth`, and `empty` are protocol-backed language functions. `cons` follows the
+public `(cons item collection)` argument order; the other update/lookup
+functions place the collection first. These functions use the same context-
+local protocol registry as `protocol-call`, so language-defined extensions are
+visible without requiring Java interface implementation.
+
 `let` initializers are evaluated in parallel against the enclosing lexical
 environment. `letfn` installs all local function bindings before evaluating
 the body, so self-recursion and mutual recursion work. Closures capture the
