@@ -62,7 +62,7 @@ jobs:
         } 2>&1 | tee target/native-image-metrics.txt
     - name: Run a Native Image smoke test
       run: |
-        test "$(target/hara-truffle conformance)" = "L0 conformance passed: 39 cases"
+        test "$(target/hara-truffle conformance)" = "L0 conformance passed: 40 cases"
         test "$(target/hara-truffle eval '(+ 19 23)')" = "42"
         test "$(target/hara-truffle eval '(protocol-call ICount count (bytes 1 2 3))')" = "3"
         test "$(target/hara-truffle eval '(let [a (x:array 1 2)] (x:set a 1 7) (x:get a 1))')" = "7"

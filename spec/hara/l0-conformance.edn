@@ -3,6 +3,7 @@
  :intentional-differences
  #{:no-iseq-requirement
    :no-ratios
+   :ratio-free-unary-division
    :no-transducers
    :no-transduce
    :no-eduction
@@ -152,6 +153,10 @@
    :class :numeric
    :source "(= 1.0M 1.00M)"
    :expect {:value true :type :boolean}}
+  {:id :numeric/unary-division
+   :class :numeric
+   :source "(/ 2)"
+   :expect {:value 0 :type :integer}}
   {:id :protocol/struct-extension
    :class :protocol
    :source "(protocol-call ICount count (Box 4))"
