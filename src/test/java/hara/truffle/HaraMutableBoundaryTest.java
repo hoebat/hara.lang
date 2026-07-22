@@ -73,6 +73,33 @@ public class HaraMutableBoundaryTest {
     }
   }
 
+  @Test
+  public void iteratorFormsAreLazyAndExplicitlyClosable() {
+    try (Context context = context()) {
+      assertEquals(
+          1, context.eval(HaraLanguage.ID, "(let [it (iter [1 2])] (iter-next it))").asLong());
+      assertEquals(
+          2,
+          context
+              .eval(HaraLanguage.ID, "(let [it (iter [1 2])] (iter-next it) (iter-next it))")
+              .asLong());
+      assertTrue(
+          !context
+              .eval(
+                  HaraLanguage.ID,
+                  "(let [it (iter [1 2])] (iter-next it) (iter-next it) (iter-has? it))")
+              .asBoolean());
+      assertTrue(
+          assertThrows(
+                  PolyglotException.class,
+                  () ->
+                      context.eval(HaraLanguage.ID, "(iter-next (iter [1])) (iter-next (iter []))"))
+              .getMessage()
+              .contains("reached the end"));
+      context.eval(HaraLanguage.ID, "(iter-close (iter \"abc\"))");
+    }
+  }
+
   private static Context context() {
     return Context.newBuilder(HaraLanguage.ID).build();
   }

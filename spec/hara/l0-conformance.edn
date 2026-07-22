@@ -56,6 +56,10 @@
    :class :runtime
    :source "(do (def answer 1) (set! answer 42) answer)"
    :expect {:value 42 :type :integer}}
+  {:id :iterator/core
+   :class :iterator
+   :source "(let [it (iter [1 2])] (iter-next it))"
+   :expect {:value 1 :type :integer}}
   {:id :collection/bytes
    :class :collection
    :source "(protocol-call INth nth (bytes 1 2 -3) 2)"

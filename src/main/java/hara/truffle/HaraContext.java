@@ -3,6 +3,7 @@ package hara.truffle;
 import com.oracle.truffle.api.TruffleLanguage;
 import com.oracle.truffle.api.source.Source;
 import hara.kernel.builtin.BuiltinStruct;
+import hara.lang.base.Iter;
 import hara.lang.data.Symbol;
 import hara.lang.data.Keyword;
 import hara.lang.data.types.IMapType;
@@ -16,6 +17,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Deque;
 import java.util.ArrayDeque;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
@@ -153,6 +155,10 @@ public final class HaraContext {
     target.define("refer", new UnaryBuiltin("refer", this::referNamespace));
     target.define("in-ns", new UnaryBuiltin("in-ns", this::inNamespace));
     target.define("use", new UnaryBuiltin("use", this::useNamespace));
+    target.define("iter", new UnaryBuiltin("iter", this::iterValue));
+    target.define("iter-has?", new UnaryBuiltin("iter-has?", this::iterHasNext));
+    target.define("iter-next", new UnaryBuiltin("iter-next", this::iterNext));
+    target.define("iter-close", new UnaryBuiltin("iter-close", this::iterClose));
     target.define("module-revision", new UnaryBuiltin("module-revision", this::moduleRevision));
     target.define(
         "module-dependencies", new UnaryBuiltin("module-dependencies", this::moduleDependencies));
@@ -288,6 +294,41 @@ public final class HaraContext {
       return referNamespace(((Symbol) value).getName());
     }
     return referNamespace(value);
+  }
+
+  private Object iterValue(Object value) {
+    Object target = HaraBox.unwrap(value);
+    if (target instanceof String) return Iter.chars(((String) target).toCharArray());
+    try {
+      return Iter.iter(target);
+    } catch (RuntimeException error) {
+      throw new HaraException("iter does not support value: " + target);
+    }
+  }
+
+  private Object iterHasNext(Object value) {
+    Iterator<?> iterator = requireIterator(value, "iter-has?");
+    return iterator.hasNext();
+  }
+
+  private Object iterNext(Object value) {
+    Iterator<?> iterator = requireIterator(value, "iter-next");
+    if (!iterator.hasNext()) throw new HaraException("iter-next reached the end of the iterator");
+    return iterator.next();
+  }
+
+  private Object iterClose(Object value) {
+    Iterator<?> iterator = requireIterator(value, "iter-close");
+    Iter.close(iterator);
+    return null;
+  }
+
+  private Iterator<?> requireIterator(Object value, String operation) {
+    Object target = HaraBox.unwrap(value);
+    if (!(target instanceof Iterator<?>)) {
+      throw new HaraException(operation + " expects an iterator");
+    }
+    return (Iterator<?>) target;
   }
 
   private Path canonicalPath(String value) {
