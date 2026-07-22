@@ -368,6 +368,18 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void destructuringTreatsMissingValuesAndNilSourcesAsNil() {
+    try (Context context = context()) {
+      assertEquals(
+          41,
+          context.eval(HaraLanguage.ID, "(let [[a b] [1]] (+ (if a 1 0) (if b 40 40)))").asLong());
+      assertEquals(2, context.eval(HaraLanguage.ID, "(let [{:keys [a]} nil] (if a 1 2))").asLong());
+      assertEquals(
+          2, context.eval(HaraLanguage.ID, "(let [[a & rest] nil] (if rest 1 2))").asLong());
+    }
+  }
+
+  @Test
   public void definesOrdinaryFunctionsWithOptionalDocumentationAndAttributes() {
     try (Context context = context()) {
       assertEquals(

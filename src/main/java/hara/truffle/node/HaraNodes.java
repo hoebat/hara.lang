@@ -405,17 +405,29 @@ public final class HaraNodes {
     @Override
     public Object execute(VirtualFrame frame) {
       Object value = target.execute(frame);
+      if (value == null) return null;
       if (key instanceof Number && value instanceof hara.lang.data.types.ILinearType<?>) {
-        return ((hara.lang.data.types.ILinearType<?>) value).nth(((Number) key).longValue());
+        long index = ((Number) key).longValue();
+        hara.lang.data.types.ILinearType<?> linear = (hara.lang.data.types.ILinearType<?>) value;
+        return index < 0 || index >= linear.count() ? null : linear.nth(index);
       }
       if (value instanceof String) {
-        return ((String) value).charAt(((Number) key).intValue());
+        int index = ((Number) key).intValue();
+        return index < 0 || index >= ((String) value).length()
+            ? null
+            : ((String) value).charAt(index);
       }
       if (value instanceof java.util.List<?>) {
-        return ((java.util.List<?>) value).get(((Number) key).intValue());
+        int index = ((Number) key).intValue();
+        return index < 0 || index >= ((java.util.List<?>) value).size()
+            ? null
+            : ((java.util.List<?>) value).get(index);
       }
       if (value != null && value.getClass().isArray()) {
-        return java.lang.reflect.Array.get(value, ((Number) key).intValue());
+        int index = ((Number) key).intValue();
+        return index < 0 || index >= java.lang.reflect.Array.getLength(value)
+            ? null
+            : java.lang.reflect.Array.get(value, index);
       }
       if (value instanceof hara.lang.data.types.IMapType<?, ?>) {
         return ((hara.lang.data.types.IMapType<Object, Object>) value).lookup(key);
@@ -455,6 +467,7 @@ public final class HaraNodes {
     @Override
     public Object execute(VirtualFrame frame) {
       Object value = target.execute(frame);
+      if (value == null) return null;
       if (value instanceof hara.lang.data.types.ILinearType<?>) {
         hara.lang.data.types.ILinearType<?> linear = (hara.lang.data.types.ILinearType<?>) value;
         if (start > linear.count()) {

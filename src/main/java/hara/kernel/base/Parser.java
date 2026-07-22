@@ -104,12 +104,15 @@ public interface Parser {
 
     @SuppressWarnings("unchecked")
     public static Object read(Reader r, Map opts) {
+      if (opts == null) opts = hashMap(new Object[] {});
       return read(r, !opts.has(EOF), opts.lookup(EOF), false, opts);
     }
 
     @SuppressWarnings("unchecked")
     public static Object read(
         Reader r, boolean eofIsError, Object eofValue, boolean isRecursive, Map opts) {
+
+      if (opts == null) opts = hashMap(new Object[] {});
 
       try {
         for (; ; ) {
