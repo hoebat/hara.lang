@@ -80,6 +80,10 @@
    :class :module
    :source "(load-resource \"hara/l0-core.hara\") ((comp2 inc inc) 40)"
    :expect {:value 42 :type :integer}}
+  {:id :module/classpath-require
+   :class :module
+   :source "(require \"hara/l0-core.hara\") ((comp2 inc inc) 40)"
+   :expect {:value 42 :type :integer}}
   {:id :collection/bytes
    :class :collection
    :source "(protocol-call INth nth (bytes 1 2 -3) 2)"

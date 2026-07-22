@@ -234,8 +234,11 @@ public final class HaraContext {
     }
     String callerNamespace = currentNamespace.name();
     try {
-      Path path = canonicalPath((String) arguments[0]);
-      String key = path.toString();
+      String requested = (String) arguments[0];
+      boolean classpath = requested.startsWith("classpath:") || getResource(requested) != null;
+      String resourceName =
+          requested.startsWith("classpath:") ? requested.substring(10) : requested;
+      String key = classpath ? "classpath:" + resourceName : canonicalPath(requested).toString();
       boolean reload =
           arguments.length == 2 && requireOption(arguments[1], "reload") == Boolean.TRUE;
       if (!loadingStack.isEmpty()) {
@@ -249,7 +252,12 @@ public final class HaraContext {
         }
         try {
           loadingStack.addLast(key);
-          loadFile(key);
+          if (classpath) {
+            loadResource(resourceName);
+            registerResource(resourceName);
+          } else {
+            loadFile(key);
+          }
         } finally {
           loadingStack.removeLastOccurrence(key);
           loadingModules.remove(key);
@@ -292,7 +300,14 @@ public final class HaraContext {
     if (!(value instanceof String)) {
       throw new HaraException("module-revision expects a path string");
     }
-    ModuleRecord module = modules.get(canonicalPath((String) value).toString());
+    String requested = (String) value;
+    String key =
+        requested.startsWith("classpath:")
+            ? requested
+            : (getResource(requested) == null
+                ? canonicalPath(requested).toString()
+                : "classpath:" + requested);
+    ModuleRecord module = modules.get(key);
     return module == null ? 0L : module.revision;
   }
 
@@ -300,8 +315,14 @@ public final class HaraContext {
     if (!(value instanceof String)) {
       throw new HaraException("module-dependencies expects a path string");
     }
-    Set<String> dependencies =
-        moduleDependencies.getOrDefault(canonicalPath((String) value).toString(), Set.of());
+    String requested = (String) value;
+    String key =
+        requested.startsWith("classpath:")
+            ? requested
+            : (getResource(requested) == null
+                ? canonicalPath(requested).toString()
+                : "classpath:" + requested);
+    Set<String> dependencies = moduleDependencies.getOrDefault(key, Set.of());
     return BuiltinStruct.vector(new LinkedHashSet<>(dependencies).toArray());
   }
 
@@ -572,6 +593,19 @@ public final class HaraContext {
     modules.put(
         key, new ModuleRecord(key, namespaceName, previous == null ? 1L : previous.revision + 1L));
     moduleDependencies.computeIfAbsent(key, ignored -> ConcurrentHashMap.newKeySet());
+  }
+
+  private void registerResource(String resourceName) {
+    String key = "classpath:" + resourceName;
+    ModuleRecord previous = modules.get(key);
+    String namespaceName = currentNamespace.name();
+    modules.put(
+        key, new ModuleRecord(key, namespaceName, previous == null ? 1L : previous.revision + 1L));
+    moduleDependencies.computeIfAbsent(key, ignored -> ConcurrentHashMap.newKeySet());
+  }
+
+  private java.net.URL getResource(String resourceName) {
+    return HaraContext.class.getClassLoader().getResource(resourceName);
   }
 
   private ContextSnapshot snapshot() {

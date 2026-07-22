@@ -39,6 +39,25 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void requiresPackagedCoreBootstrapAsAClasspathModule() {
+    try (Context context = context()) {
+      assertEquals(
+          42,
+          context
+              .eval(HaraLanguage.ID, "(require \"hara/l0-core.hara\") ((comp2 inc inc) 40)")
+              .asLong());
+      assertEquals(
+          1, context.eval(HaraLanguage.ID, "(module-revision \"hara/l0-core.hara\")").asLong());
+      context.eval(HaraLanguage.ID, "(require \"hara/l0-core.hara\" {:reload true})");
+      assertEquals(
+          2,
+          context
+              .eval(HaraLanguage.ID, "(module-revision \"classpath:hara/l0-core.hara\")")
+              .asLong());
+    }
+  }
+
+  @Test
   public void dispatchesDefmultiAndDefmethodByArbitraryValues() {
     try (Context context = context()) {
       context.eval(HaraLanguage.ID, "(defmulti kind (fn [x] (if (= x 1) :one :other)))");
