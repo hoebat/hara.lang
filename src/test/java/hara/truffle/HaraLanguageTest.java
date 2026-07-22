@@ -28,6 +28,7 @@ public class HaraLanguageTest {
     try (Context context = context()) {
       assertEquals(7, context.eval(HaraLanguage.ID, "(- 10 3)").asLong());
       assertEquals(42, context.eval(HaraLanguage.ID, "(* 6 7)").asLong());
+      assertEquals(2, context.eval(HaraLanguage.ID, "(/ 5 2)").asLong());
     }
   }
 

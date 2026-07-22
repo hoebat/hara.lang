@@ -16,6 +16,7 @@ public class ParserTest {
     assertEquals(123.45, Parser.LispReader.readString("123.45", null));
     assertEquals(BigInteger.valueOf(123), Parser.LispReader.readString("123N", null));
     assertEquals(new BigDecimal("123.45"), Parser.LispReader.readString("123.45M", null));
+    assertEquals(BigDecimal.ONE, Parser.LispReader.readString("1.00M", null));
     assertEquals(0xFFL, Parser.LispReader.readString("0xFF", null));
   }
 

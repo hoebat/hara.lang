@@ -1,10 +1,10 @@
 package hara.lang.base;
 
 import hara.lang.base.primitive.Num;
-import hara.lang.base.primitive.Ratio;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.math.MathContext;
 
 public interface NumOps {
   public Number add(Number x, Number y);
@@ -52,8 +52,6 @@ public interface NumOps {
   NumOps opsWith(DoubleOps x);
 
   NumOps opsWith(LongOps x);
-
-  NumOps opsWith(RatioOps x);
 
   public Number quotient(Number x, Number y);
 
@@ -127,7 +125,7 @@ public interface NumOps {
 
     @Override
     public final Number add(Number x, Number y) {
-      return NumUtils.toBigDecimal(x).add(NumUtils.toBigDecimal(y));
+      return NumUtils.normalizeDecimal(NumUtils.toBigDecimal(x).add(NumUtils.toBigDecimal(y)));
     }
 
     @Override
@@ -138,12 +136,13 @@ public interface NumOps {
     @Override
     public Number dec(Number x) {
       BigDecimal bx = NumUtils.toBigDecimal(x);
-      return bx.subtract(BigDecimal.ONE);
+      return NumUtils.normalizeDecimal(bx.subtract(BigDecimal.ONE));
     }
 
     @Override
     public Number divide(Number x, Number y) {
-      return NumUtils.toBigDecimal(x).divide(NumUtils.toBigDecimal(y));
+      return NumUtils.normalizeDecimal(
+          NumUtils.toBigDecimal(x).divide(NumUtils.toBigDecimal(y), MathContext.DECIMAL128));
     }
 
     @Override
@@ -159,7 +158,7 @@ public interface NumOps {
     @Override
     public Number inc(Number x) {
       BigDecimal bx = NumUtils.toBigDecimal(x);
-      return bx.add(BigDecimal.ONE);
+      return NumUtils.normalizeDecimal(bx.add(BigDecimal.ONE));
     }
 
     @Override
@@ -192,12 +191,12 @@ public interface NumOps {
 
     @Override
     public final Number multiply(Number x, Number y) {
-      return NumUtils.toBigDecimal(x).multiply(NumUtils.toBigDecimal(y));
+      return NumUtils.normalizeDecimal(NumUtils.toBigDecimal(x).multiply(NumUtils.toBigDecimal(y)));
     }
 
     @Override
     public final Number negate(Number x) {
-      return NumUtils.toBigDecimal(x).negate();
+      return NumUtils.normalizeDecimal(NumUtils.toBigDecimal(x).negate());
     }
 
     @Override
@@ -221,18 +220,15 @@ public interface NumOps {
     }
 
     @Override
-    public final NumOps opsWith(RatioOps x) {
-      return this;
-    }
-
-    @Override
     public Number quotient(Number x, Number y) {
-      return NumUtils.toBigDecimal(x).divideToIntegralValue(NumUtils.toBigDecimal(y));
+      return NumUtils.normalizeDecimal(
+          NumUtils.toBigDecimal(x).divideToIntegralValue(NumUtils.toBigDecimal(y)));
     }
 
     @Override
     public Number remainder(Number x, Number y) {
-      return NumUtils.toBigDecimal(x).remainder(NumUtils.toBigDecimal(y));
+      return NumUtils.normalizeDecimal(
+          NumUtils.toBigDecimal(x).remainder(NumUtils.toBigDecimal(y)));
     }
   }
 
@@ -333,11 +329,6 @@ public interface NumOps {
     }
 
     @Override
-    public final NumOps opsWith(RatioOps x) {
-      return NumUtils.RATIO_OPS;
-    }
-
-    @Override
     public Number quotient(Number x, Number y) {
       return NumUtils.toBigInteger(x).divide(NumUtils.toBigInteger(y));
     }
@@ -349,8 +340,16 @@ public interface NumOps {
   }
 
   public static class DoubleOps extends BaseOps {
+    private static void requireNoDecimal(Number x, Number y) {
+      if (x instanceof BigDecimal || y instanceof BigDecimal) {
+        throw new IllegalArgumentException(
+            "BigDecimal and floating-point values require an explicit conversion");
+      }
+    }
+
     @Override
     public final Number add(Number x, Number y) {
+      requireNoDecimal(x, y);
       return Double.valueOf(x.doubleValue() + y.doubleValue());
     }
 
@@ -366,16 +365,19 @@ public interface NumOps {
 
     @Override
     public Number divide(Number x, Number y) {
+      requireNoDecimal(x, y);
       return Double.valueOf(x.doubleValue() / y.doubleValue());
     }
 
     @Override
     public boolean eq(Number x, Number y) {
+      requireNoDecimal(x, y);
       return x.doubleValue() == y.doubleValue();
     }
 
     @Override
     public boolean gte(Number x, Number y) {
+      requireNoDecimal(x, y);
       return x.doubleValue() >= y.doubleValue();
     }
 
@@ -401,16 +403,19 @@ public interface NumOps {
 
     @Override
     public boolean lt(Number x, Number y) {
+      requireNoDecimal(x, y);
       return x.doubleValue() < y.doubleValue();
     }
 
     @Override
     public boolean lte(Number x, Number y) {
+      requireNoDecimal(x, y);
       return x.doubleValue() <= y.doubleValue();
     }
 
     @Override
     public final Number multiply(Number x, Number y) {
+      requireNoDecimal(x, y);
       return Double.valueOf(x.doubleValue() * y.doubleValue());
     }
 
@@ -440,17 +445,14 @@ public interface NumOps {
     }
 
     @Override
-    public final NumOps opsWith(RatioOps x) {
-      return this;
-    }
-
-    @Override
     public Number quotient(Number x, Number y) {
+      requireNoDecimal(x, y);
       return Num.quotient(x.doubleValue(), y.doubleValue());
     }
 
     @Override
     public Number remainder(Number x, Number y) {
+      requireNoDecimal(x, y);
       return Num.remainder(x.doubleValue(), y.doubleValue());
     }
   }
@@ -490,18 +492,12 @@ public interface NumOps {
     @Override
     public Number divide(Number x, Number y) {
       long n = x.longValue();
-      long val = y.longValue();
-      long gcd = NumUtils.gcd(n, val);
-      if (gcd == 0) return Num.num(0);
-
-      n = n / gcd;
-      long d = val / gcd;
-      if (d == 1) return Num.num(n);
-      if (d < 0) {
-        n = -n;
-        d = -d;
+      long d = y.longValue();
+      if (d == 0) throw new ArithmeticException("Divide by zero");
+      if (n == Long.MIN_VALUE && d == -1) {
+        return BigInteger.valueOf(n).negate();
       }
-      return new Ratio(BigInteger.valueOf(n), BigInteger.valueOf(d));
+      return Num.num(n / d);
     }
 
     @Override
@@ -600,11 +596,6 @@ public interface NumOps {
     }
 
     @Override
-    public final NumOps opsWith(RatioOps x) {
-      return NumUtils.RATIO_OPS;
-    }
-
-    @Override
     public Number quotient(Number x, Number y) {
       return Num.num(x.longValue() / y.longValue());
     }
@@ -640,152 +631,6 @@ public interface NumOps {
     public final Number unchecked_negate(Number x) {
       long val = x.longValue();
       return Num.num(NumUtils.unchecked_minus(val));
-    }
-  }
-
-  public static class RatioOps extends BaseOps {
-    static Number normalizeRet(Number ret, Number x, Number y) {
-      return ret;
-    }
-
-    @Override
-    public final Number add(Number x, Number y) {
-      Ratio rx = NumUtils.toRatio(x);
-      Ratio ry = NumUtils.toRatio(y);
-      Number ret =
-          divide(
-              ry.numerator.multiply(rx.denominator).add(rx.numerator.multiply(ry.denominator)),
-              ry.denominator.multiply(rx.denominator));
-      return normalizeRet(ret, x, y);
-    }
-
-    @Override
-    public NumOps combine(NumOps y) {
-      return y.opsWith(this);
-    }
-
-    @Override
-    public Number dec(Number x) {
-      return Num.add(x, -1);
-    }
-
-    @Override
-    public Number divide(Number x, Number y) {
-      Ratio rx = NumUtils.toRatio(x);
-      Ratio ry = NumUtils.toRatio(y);
-      Number ret =
-          Num.divide(ry.denominator.multiply(rx.numerator), ry.numerator.multiply(rx.denominator));
-      return normalizeRet(ret, x, y);
-    }
-
-    @Override
-    public boolean eq(Number x, Number y) {
-      Ratio rx = NumUtils.toRatio(x);
-      Ratio ry = NumUtils.toRatio(y);
-      return rx.numerator.equals(ry.numerator) && rx.denominator.equals(ry.denominator);
-    }
-
-    @Override
-    public boolean gte(Number x, Number y) {
-      Ratio rx = NumUtils.toRatio(x);
-      Ratio ry = NumUtils.toRatio(y);
-      return Num.gte(rx.numerator.multiply(ry.denominator), ry.numerator.multiply(rx.denominator));
-    }
-
-    @Override
-    public Number inc(Number x) {
-      return Num.add(x, 1);
-    }
-
-    @Override
-    public boolean isNeg(Number x) {
-      Ratio r = (Ratio) x;
-      return r.numerator.signum() < 0;
-    }
-
-    @Override
-    public boolean isPos(Number x) {
-      Ratio r = (Ratio) x;
-      return r.numerator.signum() > 0;
-    }
-
-    @Override
-    public boolean isZero(Number x) {
-      Ratio r = (Ratio) x;
-      return r.numerator.signum() == 0;
-    }
-
-    @Override
-    public boolean lt(Number x, Number y) {
-      Ratio rx = NumUtils.toRatio(x);
-      Ratio ry = NumUtils.toRatio(y);
-      return Num.lt(rx.numerator.multiply(ry.denominator), ry.numerator.multiply(rx.denominator));
-    }
-
-    @Override
-    public boolean lte(Number x, Number y) {
-      Ratio rx = NumUtils.toRatio(x);
-      Ratio ry = NumUtils.toRatio(y);
-      return Num.lte(rx.numerator.multiply(ry.denominator), ry.numerator.multiply(rx.denominator));
-    }
-
-    @Override
-    public final Number multiply(Number x, Number y) {
-      Ratio rx = NumUtils.toRatio(x);
-      Ratio ry = NumUtils.toRatio(y);
-      Number ret =
-          Num.divide(ry.numerator.multiply(rx.numerator), ry.denominator.multiply(rx.denominator));
-      return normalizeRet(ret, x, y);
-    }
-
-    @Override
-    public final Number negate(Number x) {
-      Ratio r = (Ratio) x;
-      return new Ratio(r.numerator.negate(), r.denominator);
-    }
-
-    @Override
-    public final NumOps opsWith(BigDecimalOps x) {
-      return NumUtils.BIGDECIMAL_OPS;
-    }
-
-    @Override
-    public final NumOps opsWith(BigIntegerOps x) {
-      return this;
-    }
-
-    @Override
-    public final NumOps opsWith(DoubleOps x) {
-      return NumUtils.DOUBLE_OPS;
-    }
-
-    @Override
-    public final NumOps opsWith(LongOps x) {
-      return this;
-    }
-
-    @Override
-    public final NumOps opsWith(RatioOps x) {
-      return this;
-    }
-
-    @Override
-    public Number quotient(Number x, Number y) {
-      Ratio rx = NumUtils.toRatio(x);
-      Ratio ry = NumUtils.toRatio(y);
-      BigInteger q =
-          rx.numerator.multiply(ry.denominator).divide(rx.denominator.multiply(ry.numerator));
-      return normalizeRet(q, x, y);
-    }
-
-    @Override
-    public Number remainder(Number x, Number y) {
-      Ratio rx = NumUtils.toRatio(x);
-      Ratio ry = NumUtils.toRatio(y);
-      BigInteger q =
-          rx.numerator.multiply(ry.denominator).divide(rx.denominator.multiply(ry.numerator));
-      Number ret = Num.minus(x, Num.multiply(q, y));
-      return normalizeRet(ret, x, y);
     }
   }
 }

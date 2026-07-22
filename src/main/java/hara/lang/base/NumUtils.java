@@ -1,8 +1,5 @@
 package hara.lang.base;
 
-import hara.lang.base.primitive.Num;
-import hara.lang.base.primitive.Ratio;
-
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
@@ -12,41 +9,29 @@ public class NumUtils {
   public static final NumOps.BigIntegerOps BIGINT_OPS = new NumOps.BigIntegerOps();
   public static final NumOps.DoubleOps DOUBLE_OPS = new NumOps.DoubleOps();
   public static final NumOps.LongOps LONG_OPS = new NumOps.LongOps();
-  public static final NumOps.RatioOps RATIO_OPS = new NumOps.RatioOps();
 
   public static enum Category {
     DECIMAL,
     FLOATING,
-    INTEGER,
-    RATIO
+    INTEGER
+  }
+
+  public static BigDecimal normalizeDecimal(BigDecimal value) {
+    return value.signum() == 0 ? BigDecimal.ZERO : value.stripTrailingZeros();
   }
 
   public static BigDecimal toBigDecimal(Object x) {
-    if (x instanceof BigDecimal) return (BigDecimal) x;
+    if (x instanceof BigDecimal) return normalizeDecimal((BigDecimal) x);
     else if (x instanceof BigInteger) return new BigDecimal((BigInteger) x);
-    else if (x instanceof Double) return new BigDecimal(((Number) x).doubleValue());
-    else if (x instanceof Float) return new BigDecimal(((Number) x).doubleValue());
-    else if (x instanceof Ratio) {
-      Ratio r = (Ratio) x;
-      return (BigDecimal) Num.divide(new BigDecimal(r.numerator), r.denominator);
-    } else return BigDecimal.valueOf(((Number) x).longValue());
+    else if (x instanceof Double || x instanceof Float)
+      throw new IllegalArgumentException(
+          "BigDecimal and floating-point values require an explicit conversion");
+    else return BigDecimal.valueOf(((Number) x).longValue());
   }
 
   public static BigInteger toBigInteger(Object x) {
     if (x instanceof BigInteger) return (BigInteger) x;
     else return BigInteger.valueOf(((Number) x).longValue());
-  }
-
-  public static Ratio toRatio(Object x) {
-    if (x instanceof Ratio) return (Ratio) x;
-    else if (x instanceof BigDecimal) {
-      BigDecimal bx = (BigDecimal) x;
-      BigInteger bv = bx.unscaledValue();
-      int scale = bx.scale();
-      if (scale < 0) return new Ratio(bv.multiply(BigInteger.TEN.pow(-scale)), BigInteger.ONE);
-      else return new Ratio(bv, BigInteger.TEN.pow(scale));
-    }
-    return new Ratio(toBigInteger(x), BigInteger.ONE);
   }
 
   public static int throwIntOverflow() {

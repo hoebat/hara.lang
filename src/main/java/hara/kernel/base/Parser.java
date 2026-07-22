@@ -36,7 +36,6 @@ public interface Parser {
     static Pattern intPat =
         Pattern.compile(
             "([-+]?)(?:(0)|([1-9][0-9]*)|0[xX]([0-9A-Fa-f]+)|0([0-7]+)|([1-9][0-9]?)[rR]([0-9A-Za-z]+)|0[0-9]+)(N)?");
-    static Pattern ratioPat = Pattern.compile("([-+]?[0-9]+)/([0-9]+)");
     static Pattern floatPat = Pattern.compile("([-+]?[0-9]+(\\.[0-9]*)?([eE][-+]?[0-9]+)?)(M)?");
 
     static {
@@ -301,7 +300,7 @@ public interface Parser {
       }
       m = floatPat.matcher(s);
       if (m.matches()) {
-        if (m.group(4) != null) return new BigDecimal(m.group(1));
+        if (m.group(4) != null) return Num.canonicalDecimal(new BigDecimal(m.group(1)));
         return Double.parseDouble(s);
       }
       return null;

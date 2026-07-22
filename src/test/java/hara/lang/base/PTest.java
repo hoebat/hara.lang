@@ -339,41 +339,4 @@ public class PTest {
     assertFalse(a1.equals(b));
     assertEquals(a1.hashCode(), a2.hashCode());
   }
-
-  // Ratio Tests
-  @Test
-  public void testRatioConversions() {
-    Ratio r = new Ratio(BigInteger.valueOf(3), BigInteger.valueOf(2));
-    assertEquals(1, r.intValue());
-    assertEquals(1L, r.longValue());
-    assertEquals(1.5f, r.floatValue(), 0.0f);
-    assertEquals(1.5, r.doubleValue(), 0.0);
-  }
-
-  @Test
-  public void testRatioEqualsAndHashCode() {
-    Ratio r1 = new Ratio(BigInteger.valueOf(1), BigInteger.valueOf(2));
-    Ratio r2 = new Ratio(BigInteger.valueOf(1), BigInteger.valueOf(2));
-    Ratio r3 = new Ratio(BigInteger.valueOf(2), BigInteger.valueOf(3));
-
-    assertTrue(r1.equals(r2));
-    assertFalse(r1.equals(r3));
-    assertEquals(r1.hashCode(), r2.hashCode());
-  }
-
-  @Test
-  public void testRatioToString() {
-    Ratio r = new Ratio(BigInteger.valueOf(5), BigInteger.valueOf(4));
-    assertEquals("5/4", r.toString());
-  }
-
-  @Test
-  public void testRatioCompareTo() {
-    Ratio r1 = new Ratio(BigInteger.valueOf(1), BigInteger.valueOf(2));
-    Ratio r2 = new Ratio(BigInteger.valueOf(3), BigInteger.valueOf(4));
-    assertEquals(-1, r1.compareTo(r2));
-    assertEquals(1, r2.compareTo(r1));
-    assertEquals(0, r1.compareTo(new Ratio(BigInteger.valueOf(1), BigInteger.valueOf(2))));
-    assertEquals(0, r1.compareTo(0.5));
-  }
 }

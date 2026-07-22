@@ -8,6 +8,14 @@ import java.math.BigInteger;
 
 public interface Num {
 
+  static double asDouble(Object value) {
+    if (value instanceof BigDecimal) {
+      throw new IllegalArgumentException(
+          "BigDecimal and floating-point values require an explicit conversion");
+    }
+    return ((Number) value).doubleValue();
+  }
+
   public static double add(double x, double y) {
     return x + y;
   }
@@ -17,7 +25,7 @@ public interface Num {
   }
 
   public static double add(double x, Object y) {
-    return add(x, ((Number) y).doubleValue());
+    return add(x, asDouble(y));
   }
 
   public static double add(long x, double y) {
@@ -33,7 +41,7 @@ public interface Num {
   }
 
   public static double add(Object x, double y) {
-    return add(((Number) x).doubleValue(), y);
+    return add(asDouble(x), y);
   }
 
   public static Number add(Object x, long y) {
@@ -53,7 +61,7 @@ public interface Num {
   }
 
   public static double addP(double x, Object y) {
-    return addP(x, ((Number) y).doubleValue());
+    return addP(x, asDouble(y));
   }
 
   public static double addP(long x, double y) {
@@ -71,7 +79,7 @@ public interface Num {
   }
 
   public static double addP(Object x, double y) {
-    return addP(((Number) x).doubleValue(), y);
+    return addP(asDouble(x), y);
   }
 
   public static Number addP(Object x, long y) {
@@ -131,7 +139,6 @@ public interface Num {
     else if (xc == Double.class) return NumUtils.Category.FLOATING;
     else if (xc == Long.class) return NumUtils.Category.INTEGER;
     else if (xc == Float.class) return NumUtils.Category.FLOATING;
-    else if (xc == Ratio.class) return NumUtils.Category.RATIO;
     else if (xc == BigDecimal.class) return NumUtils.Category.DECIMAL;
     else return NumUtils.Category.INTEGER;
   }
@@ -191,13 +198,25 @@ public interface Num {
 
   public static Number divide(BigInteger n, BigInteger d) {
     if (d.equals(BigInteger.ZERO)) throw new ArithmeticException("Divide by zero");
-    BigInteger gcd = n.gcd(d);
-    if (gcd.equals(BigInteger.ZERO)) return BigInteger.ZERO;
-    n = n.divide(gcd);
-    d = d.divide(gcd);
-    if (d.equals(BigInteger.ONE)) return n;
-    else if (d.equals(BigInteger.ONE.negate())) return n.negate();
-    return new Ratio((d.signum() < 0 ? n.negate() : n), (d.signum() < 0 ? d.negate() : d));
+    return n.divide(d);
+  }
+
+  public static BigDecimal canonicalDecimal(BigDecimal value) {
+    return NumUtils.normalizeDecimal(value);
+  }
+
+  public static BigInteger toBigInteger(Number value) {
+    if (value instanceof BigDecimal) return ((BigDecimal) value).toBigInteger();
+    if (value instanceof BigInteger) return (BigInteger) value;
+    return BigInteger.valueOf(value.longValue());
+  }
+
+  public static BigDecimal toBigDecimal(Number value) {
+    if (value instanceof BigDecimal) return canonicalDecimal((BigDecimal) value);
+    if (value instanceof BigInteger) return canonicalDecimal(new BigDecimal((BigInteger) value));
+    if (value instanceof Double || value instanceof Float)
+      return canonicalDecimal(BigDecimal.valueOf(value.doubleValue()));
+    return canonicalDecimal(BigDecimal.valueOf(value.longValue()));
   }
 
   public static double divide(double x, double y) {
@@ -209,7 +228,7 @@ public interface Num {
   }
 
   public static double divide(double x, Object y) {
-    return x / ((Number) y).doubleValue();
+    return x / asDouble(y);
   };
 
   public static double divide(long x, double y) {
@@ -225,7 +244,7 @@ public interface Num {
   }
 
   public static double divide(Object x, double y) {
-    return ((Number) x).doubleValue() / y;
+    return asDouble(x) / y;
   }
 
   public static Number divide(Object x, long y) {
@@ -257,7 +276,7 @@ public interface Num {
   }
 
   public static boolean eq(double x, Object y) {
-    return x == ((Number) y).doubleValue();
+    return x == asDouble(y);
   }
 
   public static boolean eq(long x, double y) {
@@ -277,7 +296,7 @@ public interface Num {
   }
 
   public static boolean eq(Object x, double y) {
-    return ((Number) x).doubleValue() == y;
+    return asDouble(x) == y;
   }
 
   public static boolean eq(Object x, long y) {
@@ -322,7 +341,7 @@ public interface Num {
   }
 
   public static boolean gt(double x, Object y) {
-    return x > ((Number) y).doubleValue();
+    return x > asDouble(y);
   }
 
   public static boolean gt(long x, double y) {
@@ -338,7 +357,7 @@ public interface Num {
   }
 
   public static boolean gt(Object x, double y) {
-    return ((Number) x).doubleValue() > y;
+    return asDouble(x) > y;
   }
 
   public static boolean gt(Object x, long y) {
@@ -358,7 +377,7 @@ public interface Num {
   }
 
   public static boolean gte(double x, Object y) {
-    return x >= ((Number) y).doubleValue();
+    return x >= asDouble(y);
   }
 
   public static boolean gte(long x, double y) {
@@ -374,7 +393,7 @@ public interface Num {
   }
 
   public static boolean gte(Object x, double y) {
-    return ((Number) x).doubleValue() >= y;
+    return asDouble(x) >= y;
   }
 
   public static boolean gte(Object x, long y) {
@@ -470,7 +489,7 @@ public interface Num {
   }
 
   public static boolean lt(double x, Object y) {
-    return x < ((Number) y).doubleValue();
+    return x < asDouble(y);
   }
 
   public static boolean lt(long x, double y) {
@@ -486,7 +505,7 @@ public interface Num {
   }
 
   public static boolean lt(Object x, double y) {
-    return ((Number) x).doubleValue() < y;
+    return asDouble(x) < y;
   }
 
   public static boolean lt(Object x, long y) {
@@ -506,7 +525,7 @@ public interface Num {
   }
 
   public static boolean lte(double x, Object y) {
-    return x <= ((Number) y).doubleValue();
+    return x <= asDouble(y);
   }
 
   public static boolean lte(long x, double y) {
@@ -522,7 +541,7 @@ public interface Num {
   }
 
   public static boolean lte(Object x, double y) {
-    return ((Number) x).doubleValue() <= y;
+    return asDouble(x) <= y;
   }
 
   public static boolean lte(Object x, long y) {
@@ -546,7 +565,7 @@ public interface Num {
   }
 
   public static double minus(double x, Object y) {
-    return minus(x, ((Number) y).doubleValue());
+    return minus(x, asDouble(y));
   }
 
   public static long minus(long x) {
@@ -570,7 +589,7 @@ public interface Num {
   }
 
   public static double minus(Object x, double y) {
-    return minus(((Number) x).doubleValue(), y);
+    return minus(asDouble(x), y);
   }
 
   public static Number minus(Object x, long y) {
@@ -595,7 +614,7 @@ public interface Num {
   }
 
   public static double minusP(double x, Object y) {
-    return minus(x, ((Number) y).doubleValue());
+    return minus(x, asDouble(y));
   }
 
   public static Number minusP(long x) {
@@ -622,7 +641,7 @@ public interface Num {
   }
 
   public static double minusP(Object x, double y) {
-    return minus(((Number) x).doubleValue(), y);
+    return minus(asDouble(x), y);
   }
 
   public static Number minusP(Object x, long y) {
@@ -645,7 +664,7 @@ public interface Num {
   }
 
   public static double multiply(double x, Object y) {
-    return multiply(x, ((Number) y).doubleValue());
+    return multiply(x, asDouble(y));
   }
 
   public static double multiply(long x, double y) {
@@ -661,7 +680,7 @@ public interface Num {
   }
 
   public static double multiply(Object x, double y) {
-    return multiply(((Number) x).doubleValue(), y);
+    return multiply(asDouble(x), y);
   }
 
   public static Number multiply(Object x, long y) {
@@ -681,7 +700,7 @@ public interface Num {
   }
 
   public static double multiplyP(double x, Object y) {
-    return multiplyP(x, ((Number) y).doubleValue());
+    return multiplyP(x, asDouble(y));
   }
 
   public static double multiplyP(long x, double y) {
@@ -700,7 +719,7 @@ public interface Num {
   }
 
   public static double multiplyP(Object x, double y) {
-    return multiplyP(((Number) x).doubleValue(), y);
+    return multiplyP(asDouble(x), y);
   }
 
   public static Number multiplyP(Object x, long y) {
@@ -738,12 +757,10 @@ public interface Num {
   static NumOps ops(Object x) {
     Class<? extends Object> xc = x.getClass();
 
-    if (xc == Long.class) return NumUtils.BIGINT_OPS;
-    else if (xc == Double.class) return NumUtils.BIGDECIMAL_OPS;
-    else if (xc == Integer.class) return NumUtils.BIGINT_OPS;
-    else if (xc == Float.class) return NumUtils.BIGDECIMAL_OPS;
+    if (xc == Long.class || xc == Integer.class || xc == Short.class || xc == Byte.class)
+      return NumUtils.LONG_OPS;
+    else if (xc == Double.class || xc == Float.class) return NumUtils.DOUBLE_OPS;
     else if (xc == BigInteger.class) return NumUtils.BIGINT_OPS;
-    else if (xc == Ratio.class) return NumUtils.RATIO_OPS;
     else if (xc == BigDecimal.class) return NumUtils.BIGDECIMAL_OPS;
     else return NumUtils.BIGINT_OPS;
   }
@@ -812,14 +829,8 @@ public interface Num {
   // @WarnBoxedMath(false)
   public static Number rationalize(Number x) {
     if (x instanceof Float || x instanceof Double)
-      return rationalize(BigDecimal.valueOf(x.doubleValue()));
-    else if (x instanceof BigDecimal) {
-      BigDecimal bx = (BigDecimal) x;
-      BigInteger bv = bx.unscaledValue();
-      int scale = bx.scale();
-      if (scale < 0) return bv.multiply(BigInteger.TEN.pow(-scale));
-      else return divide(bv, BigInteger.TEN.pow(scale));
-    }
+      return canonicalDecimal(BigDecimal.valueOf(x.doubleValue()));
+    else if (x instanceof BigDecimal) return canonicalDecimal((BigDecimal) x);
     return x;
   }
 

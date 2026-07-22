@@ -1,6 +1,8 @@
 package hara.lang.base;
 
 import hara.lang.base.primitive.Num;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
@@ -12,6 +14,8 @@ public class NumTest {
     assertEquals(5L, Num.add(2, 3));
     assertEquals(5.0, (double) Num.add(2.0, 3.0), 0.0);
     assertEquals(5L, Num.add(2L, 3L));
+    assertEquals(5L, Num.add((Object) 2L, (Object) 3L));
+    assertEquals(5.0, Num.add((Object) 2.0, (Object) 3.0).doubleValue(), 0.0);
   }
 
   @Test
@@ -31,6 +35,31 @@ public class NumTest {
   @Test
   public void testDivide() {
     assertEquals(2.0, (double) Num.divide(6.0, 3.0), 0.0);
+    assertEquals(2L, Num.divide(5L, 2L));
+    assertEquals(BigInteger.valueOf(2), Num.divide(BigInteger.valueOf(5), BigInteger.valueOf(2)));
+    assertEquals(
+        new BigDecimal("0.3333333333333333333333333333333333"),
+        Num.divide(BigDecimal.ONE, BigDecimal.valueOf(3)));
+  }
+
+  @Test
+  public void testCanonicalDecimalsAndPromotion() {
+    BigDecimal first = Num.canonicalDecimal(new BigDecimal("1.0"));
+    BigDecimal second = Num.canonicalDecimal(new BigDecimal("1.00"));
+    assertEquals(first, second);
+    assertEquals(first.hashCode(), second.hashCode());
+    assertEquals(
+        BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.ONE), Num.addP(Long.MAX_VALUE, 1L));
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testDecimalAndFloatingPointRequireExplicitConversion() {
+    Num.add(new BigDecimal("1.5"), 2.0);
+  }
+
+  @Test(expected = IllegalArgumentException.class)
+  public void testFloatingPointAndDecimalRequireExplicitConversion() {
+    Num.multiply(2.0, new BigDecimal("1.5"));
   }
 
   @Test

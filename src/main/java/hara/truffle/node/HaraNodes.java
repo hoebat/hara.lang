@@ -408,7 +408,7 @@ public final class HaraNodes {
       Object leftValue = left.execute(frame);
       Object rightValue = right.execute(frame);
       if (isLongLike(leftValue) && isLongLike(rightValue)) {
-        return Num.add(asLong(leftValue), asLong(rightValue));
+        return Num.addP(asLong(leftValue), asLong(rightValue));
       }
       if (leftValue instanceof Number && rightValue instanceof Number) {
         CompilerDirectives.transferToInterpreterAndInvalidate();
@@ -459,9 +459,9 @@ public final class HaraNodes {
       private Number applyLong(long left, long right) {
         switch (this) {
           case SUBTRACT:
-            return Num.minus(left, right);
+            return Num.minusP(left, right);
           case MULTIPLY:
-            return Num.multiply(left, right);
+            return Num.multiplyP(left, right);
           case DIVIDE:
             return Num.divide(left, right);
           default:
