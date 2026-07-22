@@ -16,30 +16,47 @@ final class HaraMacro {
 
   private final Symbol name;
   private final Symbol[] parameters;
+  private final Symbol restParameter;
   private final Object[] body;
   private final Map<InvocationKey, Object> expansionCache = new ConcurrentHashMap<>();
 
   HaraMacro(Symbol name, ILinearType<?> parameters, Object[] body) {
     this.name = name;
-    this.parameters = new Symbol[(int) parameters.count()];
+    ArrayList<Symbol> fixed = new ArrayList<>();
+    Symbol variadic = null;
     for (int i = 0; i < parameters.count(); i++) {
       Object parameter = parameters.nth(i);
+      if (Symbol.create("&").equals(parameter)) {
+        if (variadic != null || i != parameters.count() - 2) {
+          throw new HaraException("defmacro rest marker must be followed by one final parameter");
+        }
+        Object rest = parameters.nth(i + 1);
+        if (!(rest instanceof Symbol) || Symbol.create("&").equals(rest)) {
+          throw new HaraException("defmacro rest parameter must be a symbol");
+        }
+        variadic = (Symbol) rest;
+        break;
+      }
       if (!(parameter instanceof Symbol)) {
         throw new HaraException("defmacro parameter must be a symbol");
       }
-      this.parameters[i] = (Symbol) parameter;
+      fixed.add((Symbol) parameter);
     }
+    this.parameters = fixed.toArray(new Symbol[0]);
+    this.restParameter = variadic;
     this.body = body;
   }
 
   Object expand(List<?> invocation) {
-    if (invocation.count() - 1 != parameters.length) {
+    long argumentCount = invocation.count() - 1;
+    if (argumentCount < parameters.length
+        || (restParameter == null && argumentCount != parameters.length)) {
       throw new HaraException(
           name.display()
               + " expects "
-              + parameters.length
+              + (restParameter == null ? parameters.length : "at least " + parameters.length)
               + " arguments, received "
-              + (invocation.count() - 1));
+              + argumentCount);
     }
 
     InvocationKey cacheKey = new InvocationKey(invocation);
@@ -51,6 +68,13 @@ final class HaraMacro {
     Map<Symbol, Object> environment = new HashMap<>();
     for (int i = 0; i < parameters.length; i++) {
       environment.put(parameters[i], invocation.nth(i + 1L));
+    }
+    if (restParameter != null) {
+      Object[] rest = new Object[(int) argumentCount - parameters.length];
+      for (int i = parameters.length + 1; i < invocation.count(); i++) {
+        rest[i - parameters.length - 1] = invocation.nth(i);
+      }
+      environment.put(restParameter, Vector.Standard.from(null, rest));
     }
 
     Object result = null;

@@ -112,6 +112,24 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void supportsVariadicMacrosAndSyntaxQuoteSplicing() {
+    try (Context context = context()) {
+      assertEquals(
+          3,
+          context
+              .eval(
+                  HaraLanguage.ID, "(do (defmacro do-all [& forms] `(do ~@forms)) (do-all 1 2 3))")
+              .asLong());
+      assertEquals(
+          9,
+          context
+              .eval(
+                  HaraLanguage.ID, "(do (defmacro wrap [x & forms] `(do ~x ~@forms)) (wrap 4 5 9))")
+              .asLong());
+    }
+  }
+
+  @Test
   public void evaluatesSpecializedArithmeticOperations() {
     try (Context context = context()) {
       assertEquals(0, context.eval(HaraLanguage.ID, "(+)").asLong());

@@ -58,6 +58,10 @@
    :class :runtime
    :source "(->> 3 (+ 2) (* 3))"
    :expect {:value 15 :type :integer}}
+  {:id :compiler/variadic-macro
+   :class :compiler
+   :source "(do (defmacro do-all [& forms] `(do ~@forms)) (do-all 1 2 3))"
+   :expect {:value 3 :type :integer}}
   {:id :runtime/destructuring
    :class :runtime
    :source "(let [{:keys [age]} {:age 41}] (+ age 1))"
