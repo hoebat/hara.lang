@@ -371,6 +371,31 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void requireRecordsDeterministicModuleDependencies() throws Exception {
+    try (Context context = context()) {
+      Path directory = Files.createTempDirectory("hara-l0-deps-");
+      Path child = directory.resolve("child.hara");
+      Path parent = directory.resolve("parent.hara");
+      try {
+        String childPath = child.toString().replace("\\", "\\\\").replace("\"", "\\\"");
+        String parentPath = parent.toString().replace("\\", "\\\\").replace("\"", "\\\"");
+        Files.writeString(child, "(def child-value 7)");
+        Files.writeString(parent, "(require \"" + childPath + "\") (def parent-value 8)");
+        context.eval(HaraLanguage.ID, "(require \"" + parentPath + "\")");
+        assertEquals(
+            child.toAbsolutePath().normalize().toString(),
+            context
+                .eval(HaraLanguage.ID, "(x:get (module-dependencies \"" + parentPath + "\") 0)")
+                .asString());
+      } finally {
+        Files.deleteIfExists(parent);
+        Files.deleteIfExists(child);
+        Files.deleteIfExists(directory);
+      }
+    }
+  }
+
+  @Test
   public void evaluatesMultipleTopLevelFormsAndNamespaces() {
     try (Context context = context()) {
       assertEquals(3, context.eval(HaraLanguage.ID, "(def x 1) (+ x 2)").asLong());

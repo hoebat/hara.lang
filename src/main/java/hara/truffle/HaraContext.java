@@ -2,6 +2,7 @@ package hara.truffle;
 
 import com.oracle.truffle.api.TruffleLanguage;
 import com.oracle.truffle.api.source.Source;
+import hara.kernel.builtin.BuiltinStruct;
 import hara.lang.data.Symbol;
 import hara.lang.protocol.IFn;
 import hara.lang.protocol.IMetadata;
@@ -11,6 +12,9 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.Deque;
+import java.util.ArrayDeque;
+import java.util.LinkedHashSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
@@ -20,7 +24,9 @@ public final class HaraContext {
   private final Map<String, Map<String, HaraMacro>> macros = new ConcurrentHashMap<>();
   private final Map<String, Map<String, String>> aliases = new ConcurrentHashMap<>();
   private final Map<String, ModuleRecord> modules = new ConcurrentHashMap<>();
+  private final Map<String, Set<String>> moduleDependencies = new ConcurrentHashMap<>();
   private final Set<String> loadingModules = ConcurrentHashMap.newKeySet();
+  private final Deque<String> loadingStack = new ArrayDeque<>();
   private volatile HaraNamespace currentNamespace;
   private final HaraProtocol ifnProtocol;
 
@@ -146,6 +152,8 @@ public final class HaraContext {
     target.define("in-ns", new UnaryBuiltin("in-ns", this::inNamespace));
     target.define("use", new UnaryBuiltin("use", this::useNamespace));
     target.define("module-revision", new UnaryBuiltin("module-revision", this::moduleRevision));
+    target.define(
+        "module-dependencies", new UnaryBuiltin("module-dependencies", this::moduleDependencies));
   }
 
   private Object loadString(Object value) {
@@ -183,14 +191,21 @@ public final class HaraContext {
       throw new HaraException("require expects a path string");
     }
     Path path = canonicalPath((String) value);
-    if (!modules.containsKey(path.toString())) {
-      String key = path.toString();
+    String key = path.toString();
+    if (!loadingStack.isEmpty()) {
+      moduleDependencies
+          .computeIfAbsent(loadingStack.peekLast(), ignored -> ConcurrentHashMap.newKeySet())
+          .add(key);
+    }
+    if (!modules.containsKey(key)) {
       if (!loadingModules.add(key)) {
         throw new HaraException("Cyclic module require: " + key);
       }
       try {
+        loadingStack.addLast(key);
         loadFile(key);
       } finally {
+        loadingStack.removeLastOccurrence(key);
         loadingModules.remove(key);
       }
     }
@@ -203,6 +218,15 @@ public final class HaraContext {
     }
     ModuleRecord module = modules.get(canonicalPath((String) value).toString());
     return module == null ? 0L : module.revision;
+  }
+
+  private Object moduleDependencies(Object value) {
+    if (!(value instanceof String)) {
+      throw new HaraException("module-dependencies expects a path string");
+    }
+    Set<String> dependencies =
+        moduleDependencies.getOrDefault(canonicalPath((String) value).toString(), Set.of());
+    return BuiltinStruct.vector(new LinkedHashSet<>(dependencies).toArray());
   }
 
   private Object referNamespace(Object value) {
@@ -250,6 +274,7 @@ public final class HaraContext {
     String namespaceName = currentNamespace.name();
     modules.put(
         key, new ModuleRecord(key, namespaceName, previous == null ? 1L : previous.revision + 1L));
+    moduleDependencies.computeIfAbsent(key, ignored -> ConcurrentHashMap.newKeySet());
   }
 
   private ContextSnapshot snapshot() {
@@ -269,8 +294,17 @@ public final class HaraContext {
     for (Map.Entry<String, Map<String, String>> entry : aliases.entrySet()) {
       aliasValues.put(entry.getKey(), new LinkedHashMap<>(entry.getValue()));
     }
+    Map<String, Set<String>> dependencyValues = new LinkedHashMap<>();
+    for (Map.Entry<String, Set<String>> entry : moduleDependencies.entrySet()) {
+      dependencyValues.put(entry.getKey(), new LinkedHashSet<>(entry.getValue()));
+    }
     return new ContextSnapshot(
-        currentNamespace.name(), values, macroValues, aliasValues, new LinkedHashMap<>(modules));
+        currentNamespace.name(),
+        values,
+        macroValues,
+        aliasValues,
+        new LinkedHashMap<>(modules),
+        dependencyValues);
   }
 
   private void restore(ContextSnapshot snapshot) {
@@ -292,6 +326,11 @@ public final class HaraContext {
     }
     modules.clear();
     modules.putAll(snapshot.modules);
+    moduleDependencies.clear();
+    for (Map.Entry<String, Set<String>> entry : snapshot.moduleDependencies.entrySet()) {
+      moduleDependencies.put(entry.getKey(), ConcurrentHashMap.newKeySet());
+      moduleDependencies.get(entry.getKey()).addAll(entry.getValue());
+    }
   }
 
   private static final class ContextSnapshot {
@@ -300,18 +339,21 @@ public final class HaraContext {
     private final Map<String, Map<String, HaraMacro>> macros;
     private final Map<String, Map<String, String>> aliases;
     private final Map<String, ModuleRecord> modules;
+    private final Map<String, Set<String>> moduleDependencies;
 
     private ContextSnapshot(
         String currentNamespace,
         Map<String, Map<String, Object>> values,
         Map<String, Map<String, HaraMacro>> macros,
         Map<String, Map<String, String>> aliases,
-        Map<String, ModuleRecord> modules) {
+        Map<String, ModuleRecord> modules,
+        Map<String, Set<String>> moduleDependencies) {
       this.currentNamespace = currentNamespace;
       this.values = values;
       this.macros = macros;
       this.aliases = aliases;
       this.modules = modules;
+      this.moduleDependencies = moduleDependencies;
     }
   }
 
