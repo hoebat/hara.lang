@@ -143,6 +143,36 @@ public class HaraMutableBoundaryTest {
     }
   }
 
+  @Test
+  public void iteratorCombinatorsRemainLazyAndUseHaraFunctions() {
+    try (Context context = context()) {
+      assertEquals(
+          4,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(let [it (iter-map (fn [x] (* x 2)) [1 2])] (iter-next it) (iter-next it))")
+              .asLong());
+      assertEquals(
+          2,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(let [it (iter-filter (fn [x] (= x 2)) [1 2 3])] (iter-next it))")
+              .asLong());
+      assertEquals(
+          2,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(let [it (iter-drop 1 (iter-take 3 [1 2 3 4]))] (iter-next it))")
+              .asLong());
+      assertEquals(
+          3,
+          context.eval(HaraLanguage.ID, "(x:get (iter-next (iter-zip [1 2] [3 4])) 1)").asLong());
+    }
+  }
+
   private static Context context() {
     return Context.newBuilder(HaraLanguage.ID).build();
   }

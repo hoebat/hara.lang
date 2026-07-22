@@ -161,6 +161,11 @@ public final class HaraContext {
     target.define("iter-next", new UnaryBuiltin("iter-next", this::iterNext));
     target.define("iter-close", new UnaryBuiltin("iter-close", this::iterClose));
     target.define("concat", new VariadicBuiltin("concat", this::concatIterators));
+    target.define("iter-map", new VariadicBuiltin("iter-map", this::iterMap));
+    target.define("iter-filter", new VariadicBuiltin("iter-filter", this::iterFilter));
+    target.define("iter-take", new VariadicBuiltin("iter-take", this::iterTake));
+    target.define("iter-drop", new VariadicBuiltin("iter-drop", this::iterDrop));
+    target.define("iter-zip", new VariadicBuiltin("iter-zip", this::iterZip));
     target.define("alter-var-root", new VariadicBuiltin("alter-var-root", this::alterVarRoot));
     target.define("apply", new VariadicBuiltin("apply", this::applyFunction));
     target.define("module-revision", new UnaryBuiltin("module-revision", this::moduleRevision));
@@ -340,6 +345,64 @@ public final class HaraContext {
   @SuppressWarnings({"rawtypes", "unchecked"})
   private Object concatIterators(Object[] values) {
     return Iter.concat((Iterator) Iter.map(Iter.objects(values), value -> Iter.iter(value)));
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private Object iterMap(Object[] values) {
+    requireIteratorArity(values, 2, "iter-map");
+    Iterator source = (Iterator) iterValue(values[1]);
+    Object function = values[0];
+    return Iter.map(source, value -> invokeCallable(function, new Object[] {value}));
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private Object iterFilter(Object[] values) {
+    requireIteratorArity(values, 2, "iter-filter");
+    Iterator source = (Iterator) iterValue(values[1]);
+    Object function = values[0];
+    return Iter.filter(source, value -> truthy(invokeCallable(function, new Object[] {value})));
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private Object iterTake(Object[] values) {
+    requireIteratorArity(values, 2, "iter-take");
+    return Iter.take((Iterator) iterValue(values[1]), iterationCount(values[0], "iter-take"));
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private Object iterDrop(Object[] values) {
+    requireIteratorArity(values, 2, "iter-drop");
+    return Iter.drop((Iterator) iterValue(values[1]), iterationCount(values[0], "iter-drop"));
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private Object iterZip(Object[] values) {
+    if (values.length == 0) {
+      throw new HaraException("iter-zip expects at least one source");
+    }
+    Iterator sources = Iter.map(Iter.objects(values), value -> (Iterator) iterValue(value));
+    return Iter.zip((Iterator) sources);
+  }
+
+  private static void requireIteratorArity(Object[] values, int expected, String name) {
+    if (values.length != expected) {
+      throw new HaraException(name + " expects " + (expected - 1) + " arguments");
+    }
+  }
+
+  private static int iterationCount(Object value, String name) {
+    if (!(value instanceof Number)) {
+      throw new HaraException(name + " expects a numeric count");
+    }
+    long count = ((Number) value).longValue();
+    if (count < 0 || count > Integer.MAX_VALUE) {
+      throw new HaraException(name + " count is out of bounds: " + count);
+    }
+    return (int) count;
+  }
+
+  private static boolean truthy(Object value) {
+    return value != null && !Boolean.FALSE.equals(value);
   }
 
   private Object alterVarRoot(Object[] values) {

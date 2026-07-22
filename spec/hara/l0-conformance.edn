@@ -64,6 +64,10 @@
    :class :iterator
    :source "(let [it (concat [1] [2])] (iter-next it) (iter-next it))"
    :expect {:value 2 :type :integer}}
+  {:id :iterator/combinators
+   :class :iterator
+   :source "(let [it (iter-map (fn [x] (* x 2)) [1 2])] (iter-next it))"
+   :expect {:value 2 :type :integer}}
   {:id :function/apply
    :class :function
    :source "(defn sum3 [a b c] (+ a b c)) (apply sum3 1 [2 3])"
