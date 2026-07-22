@@ -221,11 +221,11 @@ final class HaraAnalyzer {
         case "+":
           return analyzeAdd(list);
         case "-":
-          return analyzeNumeric(list, HaraNodes.Numeric.Operator.SUBTRACT, "-");
+          return analyzeVariadicNumeric(list, HaraNodes.Numeric.Operator.SUBTRACT, "-", 0L);
         case "*":
-          return analyzeNumeric(list, HaraNodes.Numeric.Operator.MULTIPLY, "*");
+          return analyzeVariadicNumeric(list, HaraNodes.Numeric.Operator.MULTIPLY, "*", 1L);
         case "/":
-          return analyzeNumeric(list, HaraNodes.Numeric.Operator.DIVIDE, "/");
+          return analyzeVariadicNumeric(list, HaraNodes.Numeric.Operator.DIVIDE, "/", 1L);
         case "mod":
           return analyzeNumeric(list, HaraNodes.Numeric.Operator.REMAINDER, "mod");
         case "bytes":
@@ -941,14 +941,42 @@ final class HaraAnalyzer {
   }
 
   private HaraExpressionNode analyzeAdd(List<?> form) {
-    requireCount(form, 3, "+");
-    return new HaraNodes.Add(analyze(form.nth(1)), analyze(form.nth(2)));
+    if (form.count() == 1) return new HaraNodes.Literal(0L);
+    HaraExpressionNode result = analyze(form.nth(1));
+    for (int i = 2; i < form.count(); i++) {
+      result = new HaraNodes.Add(result, analyze(form.nth(i)));
+    }
+    return result;
   }
 
   private HaraExpressionNode analyzeNumeric(
       List<?> form, HaraNodes.Numeric.Operator operator, String name) {
     requireCount(form, 3, name);
     return new HaraNodes.Numeric(operator, analyze(form.nth(1)), analyze(form.nth(2)));
+  }
+
+  private HaraExpressionNode analyzeVariadicNumeric(
+      List<?> form, HaraNodes.Numeric.Operator operator, String name, Long identity) {
+    int argumentCount = (int) form.count() - 1;
+    if (argumentCount == 0) {
+      if (identity == null || operator == HaraNodes.Numeric.Operator.SUBTRACT) {
+        throw error(name + " expects at least one argument");
+      }
+      return new HaraNodes.Literal(identity);
+    }
+    HaraExpressionNode result;
+    int start;
+    if (argumentCount == 1 && operator != HaraNodes.Numeric.Operator.MULTIPLY) {
+      result =
+          new HaraNodes.Numeric(operator, new HaraNodes.Literal(identity), analyze(form.nth(1)));
+      return result;
+    }
+    result = analyze(form.nth(1));
+    start = 2;
+    for (int i = start; i < form.count(); i++) {
+      result = new HaraNodes.Numeric(operator, result, analyze(form.nth(i)));
+    }
+    return result;
   }
 
   private HaraExpressionNode analyzeCompare(

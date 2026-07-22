@@ -29,9 +29,15 @@ public class HaraLanguageTest {
   @Test
   public void evaluatesSpecializedArithmeticOperations() {
     try (Context context = context()) {
+      assertEquals(0, context.eval(HaraLanguage.ID, "(+)").asLong());
+      assertEquals(6, context.eval(HaraLanguage.ID, "(+ 1 2 3)").asLong());
       assertEquals(7, context.eval(HaraLanguage.ID, "(- 10 3)").asLong());
+      assertEquals(-10, context.eval(HaraLanguage.ID, "(- 10)").asLong());
+      assertEquals(1, context.eval(HaraLanguage.ID, "(*)").asLong());
       assertEquals(42, context.eval(HaraLanguage.ID, "(* 6 7)").asLong());
+      assertEquals(24, context.eval(HaraLanguage.ID, "(* 2 3 4)").asLong());
       assertEquals(2, context.eval(HaraLanguage.ID, "(/ 5 2)").asLong());
+      assertEquals(0, context.eval(HaraLanguage.ID, "(/ 2)").asLong());
     }
   }
 
