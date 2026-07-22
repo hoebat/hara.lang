@@ -53,8 +53,12 @@ public class HaraLanguageTest {
       assertTrue(context.eval(HaraLanguage.ID, "(not= 1 2)").asBoolean());
       assertEquals(1, context.eval(HaraLanguage.ID, "(mod 7 3)").asLong());
       assertTrue(context.eval(HaraLanguage.ID, "(< 1N 2N)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(< 1 2 3)").asBoolean());
+      assertTrue(!context.eval(HaraLanguage.ID, "(< 1 3 2)").asBoolean());
       assertTrue(context.eval(HaraLanguage.ID, "(< 1N 1.1M)").asBoolean());
       assertTrue(context.eval(HaraLanguage.ID, "(= 1N 1.0M)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(= 1 1 1)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(not= 1 1 2)").asBoolean());
       assertTrue(context.eval(HaraLanguage.ID, "(< 1.2M 1.3M)").asBoolean());
     }
   }

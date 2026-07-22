@@ -1080,6 +1080,53 @@ public final class HaraNodes {
     }
   }
 
+  public static final class CompareChain extends HaraExpressionNode {
+    @Children private final HaraExpressionNode[] values;
+    private final Compare.Operator operator;
+
+    public CompareChain(Compare.Operator operator, HaraExpressionNode[] values) {
+      this.operator = operator;
+      this.values = values;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      Object previous = values[0].execute(frame);
+      for (int i = 1; i < values.length; i++) {
+        Object current = values[i].execute(frame);
+        boolean matches;
+        if (operator == Compare.Operator.EQUAL || operator == Compare.Operator.NOT_EQUAL) {
+          boolean equal = Eq.eq(previous, current);
+          matches = operator == Compare.Operator.EQUAL ? equal : !equal;
+        } else {
+          if (!(previous instanceof Number) || !(current instanceof Number)) {
+            throw new HaraException("comparison expects two numbers", this);
+          }
+          int comparison = Num.compare((Number) previous, (Number) current);
+          switch (operator) {
+            case LESS:
+              matches = comparison < 0;
+              break;
+            case LESS_OR_EQUAL:
+              matches = comparison <= 0;
+              break;
+            case GREATER:
+              matches = comparison > 0;
+              break;
+            case GREATER_OR_EQUAL:
+              matches = comparison >= 0;
+              break;
+            default:
+              throw new AssertionError(operator);
+          }
+        }
+        if (!matches) return operator == Compare.Operator.NOT_EQUAL;
+        previous = current;
+      }
+      return operator != Compare.Operator.NOT_EQUAL;
+    }
+  }
+
   public static final class FunctionLiteral extends HaraExpressionNode {
     private final RootCallTarget callTarget;
     private final int minimumArity;

@@ -981,8 +981,13 @@ final class HaraAnalyzer {
 
   private HaraExpressionNode analyzeCompare(
       List<?> form, HaraNodes.Compare.Operator operator, String name) {
-    requireCount(form, 3, name);
-    return new HaraNodes.Compare(operator, analyze(form.nth(1)), analyze(form.nth(2)));
+    if (form.count() < 3) throw error(name + " expects at least two arguments");
+    if (form.count() == 3) {
+      return new HaraNodes.Compare(operator, analyze(form.nth(1)), analyze(form.nth(2)));
+    }
+    HaraExpressionNode[] values = new HaraExpressionNode[(int) form.count() - 1];
+    for (int i = 1; i < form.count(); i++) values[i - 1] = analyze(form.nth(i));
+    return new HaraNodes.CompareChain(operator, values);
   }
 
   private HaraExpressionNode analyzeBytes(List<?> form) {
