@@ -120,19 +120,73 @@ public final class HaraContext {
     if (!(value instanceof String)) {
       throw new HaraException("load-string expects a string");
     }
-    return parseAndExecute((String) value, "<string>");
+    ContextSnapshot snapshot = snapshot();
+    try {
+      return parseAndExecute((String) value, "<string>");
+    } catch (RuntimeException error) {
+      restore(snapshot);
+      throw error;
+    }
   }
 
   private Object loadFile(Object value) {
     if (!(value instanceof String)) {
       throw new HaraException("load-file expects a path string");
     }
+    ContextSnapshot snapshot = snapshot();
     try {
       Path path = Path.of((String) value);
       return parseAndExecute(Files.readString(path), path.toString());
     } catch (IOException | RuntimeException error) {
+      restore(snapshot);
       throw new HaraException(
           "Unable to load Hara file: " + value + " (" + error.getMessage() + ")");
+    }
+  }
+
+  private ContextSnapshot snapshot() {
+    Map<String, Map<String, Object>> values = new LinkedHashMap<>();
+    for (Map.Entry<String, HaraNamespace> namespace : namespaces.entrySet()) {
+      Map<String, Object> namespaceValues = new LinkedHashMap<>();
+      for (Map.Entry<String, HaraVar> var : namespace.getValue().vars.entrySet()) {
+        namespaceValues.put(var.getKey(), var.getValue().get());
+      }
+      values.put(namespace.getKey(), namespaceValues);
+    }
+    Map<String, Map<String, HaraMacro>> macroValues = new LinkedHashMap<>();
+    for (Map.Entry<String, Map<String, HaraMacro>> entry : macros.entrySet()) {
+      macroValues.put(entry.getKey(), new LinkedHashMap<>(entry.getValue()));
+    }
+    return new ContextSnapshot(currentNamespace.name(), values, macroValues);
+  }
+
+  private void restore(ContextSnapshot snapshot) {
+    namespaces.clear();
+    for (Map.Entry<String, Map<String, Object>> entry : snapshot.values.entrySet()) {
+      HaraNamespace namespace = namespace(entry.getKey());
+      for (Map.Entry<String, Object> value : entry.getValue().entrySet()) {
+        namespace.define(value.getKey(), value.getValue());
+      }
+    }
+    currentNamespace = namespace(snapshot.currentNamespace);
+    macros.clear();
+    for (Map.Entry<String, Map<String, HaraMacro>> entry : snapshot.macros.entrySet()) {
+      macros.put(entry.getKey(), new ConcurrentHashMap<>(entry.getValue()));
+    }
+  }
+
+  private static final class ContextSnapshot {
+    private final String currentNamespace;
+    private final Map<String, Map<String, Object>> values;
+    private final Map<String, Map<String, HaraMacro>> macros;
+
+    private ContextSnapshot(
+        String currentNamespace,
+        Map<String, Map<String, Object>> values,
+        Map<String, Map<String, HaraMacro>> macros) {
+      this.currentNamespace = currentNamespace;
+      this.values = values;
+      this.macros = macros;
     }
   }
 

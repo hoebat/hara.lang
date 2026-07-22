@@ -271,6 +271,42 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void failedModuleEvaluationRollsBackVarsMacrosAndNamespace() throws Exception {
+    try (Context context = context()) {
+      context.eval(HaraLanguage.ID, "(def stable 7)");
+      PolyglotException stringFailure =
+          assertThrows(
+              PolyglotException.class,
+              () ->
+                  context.eval(
+                      HaraLanguage.ID,
+                      "(load-string \"(ns transient) (def leaked 9) (throw :failed)\")"));
+      assertTrue(stringFailure.getMessage().contains("Unable to evaluate Hara source"));
+      assertEquals(7, context.eval(HaraLanguage.ID, "stable").asLong());
+      assertTrue(
+          assertThrows(PolyglotException.class, () -> context.eval(HaraLanguage.ID, "leaked"))
+              .getMessage()
+              .contains("Unbound symbol"));
+
+      Path file = Files.createTempFile("hara-l0-failing-", ".hara");
+      try {
+        Files.writeString(file, "(def file-leaked 10) (throw :failed-file)");
+        String path = file.toString().replace("\\", "\\\\").replace("\"", "\\\"");
+        assertThrows(
+            PolyglotException.class,
+            () -> context.eval(HaraLanguage.ID, "(load-file \"" + path + "\")"));
+        assertTrue(
+            assertThrows(
+                    PolyglotException.class, () -> context.eval(HaraLanguage.ID, "file-leaked"))
+                .getMessage()
+                .contains("Unbound symbol"));
+      } finally {
+        Files.deleteIfExists(file);
+      }
+    }
+  }
+
+  @Test
   public void evaluatesMultipleTopLevelFormsAndNamespaces() {
     try (Context context = context()) {
       assertEquals(3, context.eval(HaraLanguage.ID, "(def x 1) (+ x 2)").asLong());
