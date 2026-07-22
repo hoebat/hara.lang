@@ -170,6 +170,12 @@ public class HaraMutableBoundaryTest {
       assertEquals(
           3,
           context.eval(HaraLanguage.ID, "(x:get (iter-next (iter-zip [1 2] [3 4])) 1)").asLong());
+      assertTrue(
+          !context
+              .eval(
+                  HaraLanguage.ID,
+                  "(let [it (iter-map (fn [x] x) [1 2])] (iter-close it) (iter-has? it))")
+              .asBoolean());
     }
   }
 

@@ -4,6 +4,7 @@ import com.oracle.truffle.api.TruffleLanguage;
 import com.oracle.truffle.api.source.Source;
 import hara.kernel.builtin.BuiltinStruct;
 import hara.lang.base.Iter;
+import hara.lang.base.iter.CloseableIterator;
 import hara.lang.data.Symbol;
 import hara.lang.data.Keyword;
 import hara.lang.data.types.IMapType;
@@ -19,6 +20,7 @@ import java.util.Deque;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.LinkedHashSet;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
@@ -352,7 +354,8 @@ public final class HaraContext {
     requireIteratorArity(values, 2, "iter-map");
     Iterator source = (Iterator) iterValue(values[1]);
     Object function = values[0];
-    return Iter.map(source, value -> invokeCallable(function, new Object[] {value}));
+    return closeable(
+        Iter.map(source, value -> invokeCallable(function, new Object[] {value})), source);
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})
@@ -360,19 +363,23 @@ public final class HaraContext {
     requireIteratorArity(values, 2, "iter-filter");
     Iterator source = (Iterator) iterValue(values[1]);
     Object function = values[0];
-    return Iter.filter(source, value -> truthy(invokeCallable(function, new Object[] {value})));
+    return closeable(
+        Iter.filter(source, value -> truthy(invokeCallable(function, new Object[] {value}))),
+        source);
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})
   private Object iterTake(Object[] values) {
     requireIteratorArity(values, 2, "iter-take");
-    return Iter.take((Iterator) iterValue(values[1]), iterationCount(values[0], "iter-take"));
+    Iterator source = (Iterator) iterValue(values[1]);
+    return closeable(Iter.take(source, iterationCount(values[0], "iter-take")), source);
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})
   private Object iterDrop(Object[] values) {
     requireIteratorArity(values, 2, "iter-drop");
-    return Iter.drop((Iterator) iterValue(values[1]), iterationCount(values[0], "iter-drop"));
+    Iterator source = (Iterator) iterValue(values[1]);
+    return closeable(Iter.drop(source, iterationCount(values[0], "iter-drop")), source);
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})
@@ -403,6 +410,32 @@ public final class HaraContext {
 
   private static boolean truthy(Object value) {
     return value != null && !Boolean.FALSE.equals(value);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Iterator<?> closeable(Iterator<?> iterator, Iterator<?>... sources) {
+    return new CloseableIterator<Object>() {
+      private boolean closed;
+
+      @Override
+      public boolean hasNext() {
+        return !closed && iterator.hasNext();
+      }
+
+      @Override
+      public Object next() {
+        if (!hasNext()) throw new NoSuchElementException();
+        return iterator.next();
+      }
+
+      @Override
+      public void close() {
+        if (closed) return;
+        closed = true;
+        for (Iterator<?> source : sources) Iter.close(source);
+        Iter.close(iterator);
+      }
+    };
   }
 
   private Object alterVarRoot(Object[] values) {
