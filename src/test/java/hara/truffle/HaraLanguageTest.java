@@ -204,6 +204,22 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void extendsStructsWithCoreAdapterProtocols() {
+    try (Context context = context()) {
+      assertEquals(
+          41,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(defstruct Box [size]) "
+                      + "(extend-type Box ICount "
+                      + "  (count [self] (field self :size))) "
+                      + "(protocol-call ICount count (Box 41))")
+              .asLong());
+    }
+  }
+
+  @Test
   public void gatesExplicitHostInterop() {
     try (Context context = context()) {
       PolyglotException error =
