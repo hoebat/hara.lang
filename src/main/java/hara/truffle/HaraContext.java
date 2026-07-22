@@ -4,6 +4,8 @@ import com.oracle.truffle.api.TruffleLanguage;
 import com.oracle.truffle.api.source.Source;
 import hara.kernel.builtin.BuiltinStruct;
 import hara.lang.data.Symbol;
+import hara.lang.data.Keyword;
+import hara.lang.data.types.IMapType;
 import hara.lang.protocol.IFn;
 import hara.lang.protocol.IMetadata;
 import java.io.IOException;
@@ -147,7 +149,7 @@ public final class HaraContext {
         "not", new UnaryBuiltin("not", value -> value == null || Boolean.FALSE.equals(value)));
     target.define("load-string", new UnaryBuiltin("load-string", this::loadString));
     target.define("load-file", new UnaryBuiltin("load-file", this::loadFile));
-    target.define("require", new UnaryBuiltin("require", this::requireModule));
+    target.define("require", new VariadicBuiltin("require", this::requireModule));
     target.define("refer", new UnaryBuiltin("refer", this::referNamespace));
     target.define("in-ns", new UnaryBuiltin("in-ns", this::inNamespace));
     target.define("use", new UnaryBuiltin("use", this::useNamespace));
@@ -186,30 +188,54 @@ public final class HaraContext {
     }
   }
 
-  private Object requireModule(Object value) {
-    if (!(value instanceof String)) {
+  private Object requireModule(Object[] arguments) {
+    if (arguments.length < 1 || arguments.length > 2 || !(arguments[0] instanceof String)) {
       throw new HaraException("require expects a path string");
     }
-    Path path = canonicalPath((String) value);
-    String key = path.toString();
-    if (!loadingStack.isEmpty()) {
-      moduleDependencies
-          .computeIfAbsent(loadingStack.peekLast(), ignored -> ConcurrentHashMap.newKeySet())
-          .add(key);
-    }
-    if (!modules.containsKey(key)) {
-      if (!loadingModules.add(key)) {
-        throw new HaraException("Cyclic module require: " + key);
+    String callerNamespace = currentNamespace.name();
+    try {
+      Path path = canonicalPath((String) arguments[0]);
+      String key = path.toString();
+      if (!loadingStack.isEmpty()) {
+        moduleDependencies
+            .computeIfAbsent(loadingStack.peekLast(), ignored -> ConcurrentHashMap.newKeySet())
+            .add(key);
       }
-      try {
-        loadingStack.addLast(key);
-        loadFile(key);
-      } finally {
-        loadingStack.removeLastOccurrence(key);
-        loadingModules.remove(key);
+      if (!modules.containsKey(key)) {
+        if (!loadingModules.add(key)) {
+          throw new HaraException("Cyclic module require: " + key);
+        }
+        try {
+          loadingStack.addLast(key);
+          loadFile(key);
+        } finally {
+          loadingStack.removeLastOccurrence(key);
+          loadingModules.remove(key);
+        }
       }
+      currentNamespace = namespace(callerNamespace);
+      installNumericBuiltins(currentNamespace);
+      if (arguments.length == 2) {
+        applyRequireOptions(arguments[1], modules.get(key));
+      }
+      return null;
+    } finally {
+      currentNamespace = namespace(callerNamespace);
+      installNumericBuiltins(currentNamespace);
     }
-    return null;
+  }
+
+  private void applyRequireOptions(Object options, ModuleRecord module) {
+    if (!(options instanceof IMapType<?, ?>) || module == null) {
+      throw new HaraException("require options expect a map");
+    }
+    @SuppressWarnings("rawtypes")
+    Object alias = ((IMapType) options).lookup(Keyword.create("as"));
+    if (alias == null) return;
+    if (!(alias instanceof Symbol) || ((Symbol) alias).getNamespace() != null) {
+      throw new HaraException("require :as expects an unqualified symbol");
+    }
+    defineAlias((Symbol) alias, Symbol.create(module.namespace));
   }
 
   private Object moduleRevision(Object value) {
@@ -393,6 +419,36 @@ public final class HaraContext {
     @Override
     public Function<Object, Object> getArg1() {
       return implementation;
+    }
+
+    @Override
+    public String toString() {
+      return "#<builtin " + name + ">";
+    }
+  }
+
+  private static final class VariadicBuiltin implements IFn<Object, Object, Object> {
+    private final String name;
+    private final Function<Object[], Object> implementation;
+
+    private VariadicBuiltin(String name, Function<Object[], Object> implementation) {
+      this.name = name;
+      this.implementation = implementation;
+    }
+
+    @Override
+    public Function<Object, Object> getArg1() {
+      return value -> implementation.apply(new Object[] {value});
+    }
+
+    @Override
+    public java.util.function.BiFunction<Object, Object, Object> getArg2() {
+      return (first, second) -> implementation.apply(new Object[] {first, second});
+    }
+
+    @Override
+    public Function<Object, Object> getArgN() {
+      return values -> implementation.apply((Object[]) values);
     }
 
     @Override

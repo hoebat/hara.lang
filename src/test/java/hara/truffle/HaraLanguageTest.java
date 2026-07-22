@@ -337,6 +337,28 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void requirePreservesCallerNamespaceAndSupportsAliases() throws Exception {
+    try (Context context = context()) {
+      Path file = Files.createTempFile("hara-l0-alias-", ".hara");
+      try {
+        Files.writeString(file, "(ns library) (def answer 42)");
+        String path = file.toString().replace("\\", "\\\\").replace("\"", "\\\"");
+        assertEquals(
+            42,
+            context
+                .eval(HaraLanguage.ID, "(require \"" + path + "\" {:as 'lib}) lib/answer")
+                .asLong());
+        assertEquals(
+            1, context.eval(HaraLanguage.ID, "(module-revision \"" + path + "\")").asLong());
+        context.eval(HaraLanguage.ID, "(def caller-value 7)");
+        assertEquals(7, context.eval(HaraLanguage.ID, "caller-value").asLong());
+      } finally {
+        Files.deleteIfExists(file);
+      }
+    }
+  }
+
+  @Test
   public void requireRejectsCyclesAndRollsBackPartialModules() throws Exception {
     try (Context context = context()) {
       Path directory = Files.createTempDirectory("hara-l0-cycle-");
