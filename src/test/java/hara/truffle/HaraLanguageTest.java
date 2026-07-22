@@ -130,6 +130,26 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void supportsDeclarationsAndPrivateDefinitions() {
+    try (Context context = context()) {
+      assertEquals(
+          42,
+          context.eval(HaraLanguage.ID, "(do (declare answer) (def answer 42) answer)").asLong());
+      assertEquals(
+          7,
+          context
+              .eval(HaraLanguage.ID, "(do (defn- private-answer [] 7) (private-answer))")
+              .asLong());
+      assertTrue(
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(protocol-call ILookup lookup (protocol-call IObjType meta (var private-answer)) :private)")
+              .asBoolean());
+    }
+  }
+
+  @Test
   public void evaluatesSpecializedArithmeticOperations() {
     try (Context context = context()) {
       assertEquals(0, context.eval(HaraLanguage.ID, "(+)").asLong());

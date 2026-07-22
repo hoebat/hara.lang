@@ -924,6 +924,21 @@ public final class HaraNodes {
     }
   }
 
+  public static final class Declare extends HaraExpressionNode {
+    private final Symbol[] symbols;
+
+    public Declare(Symbol[] symbols) {
+      this.symbols = symbols;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      HaraContext context = HaraLanguage.currentContext();
+      for (Symbol symbol : symbols) context.define(symbol, null);
+      return null;
+    }
+  }
+
   public static final class DefineMulti extends HaraExpressionNode {
     private final Symbol symbol;
     @Child private HaraExpressionNode dispatch;

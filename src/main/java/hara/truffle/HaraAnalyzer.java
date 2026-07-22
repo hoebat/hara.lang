@@ -218,6 +218,10 @@ final class HaraAnalyzer {
           return analyzeFunction(list);
         case "defn":
           return analyzeDefn(list);
+        case "defn-":
+          return analyzeDefn(list, true);
+        case "declare":
+          return analyzeDeclare(list);
         case "defmulti":
           return analyzeDefMulti(list);
         case "defmethod":
@@ -687,6 +691,10 @@ final class HaraAnalyzer {
   }
 
   private HaraExpressionNode analyzeDefn(List<?> form) {
+    return analyzeDefn(form, false);
+  }
+
+  private HaraExpressionNode analyzeDefn(List<?> form, boolean privateDefinition) {
     if (form.count() < 4) {
       throw error("defn expects a name, parameter vector, and body");
     }
@@ -749,7 +757,26 @@ final class HaraAnalyzer {
       }
       function = new HaraNodes.MultiFunction(alternatives);
     }
-    return new HaraNodes.DefineGlobal(symbol, function);
+    Symbol definitionSymbol = symbol;
+    if (privateDefinition) {
+      definitionSymbol =
+          symbol.withMeta(
+              hara.lang.data.Map.Standard.EMPTY.assoc(Keyword.create("private"), Boolean.TRUE));
+    }
+    return new HaraNodes.DefineGlobal(definitionSymbol, function);
+  }
+
+  private HaraExpressionNode analyzeDeclare(List<?> form) {
+    if (form.count() < 2) throw error("declare expects at least one symbol");
+    Symbol[] symbols = new Symbol[(int) form.count() - 1];
+    for (int i = 1; i < form.count(); i++) {
+      Object value = form.nth(i);
+      if (!(value instanceof Symbol) || ((Symbol) value).getNamespace() != null) {
+        throw error("declare expects unqualified symbols");
+      }
+      symbols[i - 1] = (Symbol) value;
+    }
+    return new HaraNodes.Declare(symbols);
   }
 
   private HaraExpressionNode analyzeDefMulti(List<?> form) {
