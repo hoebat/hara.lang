@@ -368,6 +368,8 @@ public final class Main {
     }
 
     private static String extractWord(String buffer, int cursor) {
+      if (buffer == null || buffer.isEmpty() || cursor <= 0) return "";
+      cursor = Math.min(cursor, buffer.length());
       int start = Math.max(0, cursor - 1);
       while (start >= 0) {
         char c = buffer.charAt(start);
