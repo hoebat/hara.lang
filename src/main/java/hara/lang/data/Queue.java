@@ -52,21 +52,20 @@ public interface Queue<E> extends IColl<E>, ILinearType<E>, ISequentialLookupTyp
       }
     }
 
-    @SuppressWarnings({"rawtypes", "unchecked"})
+    @SuppressWarnings("unchecked")
     @Override
     default Iterator<E> iterator() {
       if (_size() == 0) {
         return (Iterator<E>) Iter.emptyIterator();
       }
-      ;
-      ArrayList<Iterator> all = new ArrayList<Iterator>();
+      ArrayList<Iterator<E>> all = new ArrayList<>();
       all.add(_head().iterator());
       Iter.reduce(
           _buffer().iterator(),
           all,
           (arr, v) -> {
             arr.add(v.iterator());
-            return all;
+            return arr;
           });
       all.add(_tail().iterator());
       return Iter.concat(all.iterator());
