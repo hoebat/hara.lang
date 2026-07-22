@@ -220,6 +220,12 @@ public final class HaraContext {
     target.define("iter-cycle", new UnaryBuiltin("iter-cycle", this::iterCycle));
     target.define(
         "iter-partition-pair", new UnaryBuiltin("iter-partition-pair", this::iterPartitionPair));
+    target.define(
+        "iter-partition-all",
+        new VariadicBuiltin("iter-partition-all", values -> iterPartition(values, true)));
+    target.define(
+        "iter-partition",
+        new VariadicBuiltin("iter-partition", values -> iterPartition(values, false)));
     target.define("iter-range", new VariadicBuiltin("iter-range", this::iterRange));
     target.define("iter-constantly", new UnaryBuiltin("iter-constantly", Iter::constantly));
     target.define("iter-repeatedly", new UnaryBuiltin("iter-repeatedly", this::iterRepeatedly));
@@ -935,6 +941,68 @@ public final class HaraContext {
     Iterator<Map.Entry<Object, Object>> pairs = Iter.partitionPair(source);
     return Iter.map(
         pairs, pair -> BuiltinStruct.vector(new Object[] {pair.getKey(), pair.getValue()}));
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private Object iterPartition(Object[] values, boolean includePartial) {
+    requireIteratorArity(values, 2, includePartial ? "iter-partition-all" : "iter-partition");
+    int size = iterationCount(values[0], includePartial ? "iter-partition-all" : "iter-partition");
+    if (size == 0) {
+      throw new HaraException(
+          (includePartial ? "iter-partition-all" : "iter-partition") + " expects a positive count");
+    }
+    Iterator source = (Iterator) iterValue(values[1]);
+    return closeable(
+        new CloseableIterator<Object>() {
+          private boolean done;
+          private boolean ready;
+          private Object next;
+
+          private void prime() {
+            if (done || ready) return;
+            if (!source.hasNext()) {
+              done = true;
+              Iter.close(source);
+              return;
+            }
+            ArrayList<Object> chunk = new ArrayList<>(size);
+            while (chunk.size() < size && source.hasNext()) {
+              chunk.add(source.next());
+            }
+            if (!includePartial && chunk.size() < size) {
+              done = true;
+              Iter.close(source);
+              return;
+            }
+            next = BuiltinStruct.vector(chunk.toArray());
+            ready = true;
+          }
+
+          @Override
+          public boolean hasNext() {
+            prime();
+            return ready;
+          }
+
+          @Override
+          public Object next() {
+            prime();
+            if (!ready) throw new NoSuchElementException();
+            Object result = next;
+            next = null;
+            ready = false;
+            return result;
+          }
+
+          @Override
+          public void close() {
+            done = true;
+            ready = false;
+            next = null;
+            Iter.close(source);
+          }
+        },
+        source);
   }
 
   private Object iterRange(Object[] values) {

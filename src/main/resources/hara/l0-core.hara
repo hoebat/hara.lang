@@ -71,6 +71,8 @@
 (defn iterate [function seed] (iter-iterate function seed))
 (defn take-while [predicate value] (iter-take-while predicate value))
 (defn drop-while [predicate value] (iter-drop-while predicate value))
+(defn partition-all [amount value] (iter-partition-all amount value))
+(defn partition [amount value] (iter-partition amount value))
 (defn map [function value] (iter-map function value))
 (defn filter [predicate value] (iter-filter predicate value))
 (defn take [amount value] (iter-take amount value))

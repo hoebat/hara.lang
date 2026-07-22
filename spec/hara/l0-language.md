@@ -123,6 +123,10 @@ lazy until consumed by `take`, `iter-next`, or another iterator operation.
 predicates only as demand advances and close their source when it is exhausted
 or the stopping predicate is reached.
 
+`partition-all` emits lazy persistent vector chunks and retains a final partial
+chunk; `partition` emits only complete chunks and discards an unmatched tail.
+Both require a positive chunk size.
+
 Hara is iterator-first. It does not require Clojure `ISeq`/`Seq` semantics.
 The core iterator forms are:
 

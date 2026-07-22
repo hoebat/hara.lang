@@ -102,6 +102,13 @@ public class HaraLanguageTest {
           context
               .eval(HaraLanguage.ID, "(iter-next (drop-while (fn [x] (< x 3)) [1 2 3]))")
               .asLong());
+      assertEquals(
+          2,
+          context
+              .eval(HaraLanguage.ID, "(x:get (iter-next (partition-all 2 [1 2 3])) 1)")
+              .asLong());
+      assertEquals(
+          2, context.eval(HaraLanguage.ID, "(x:get (iter-next (partition 2 [1 2 3])) 1)").asLong());
       assertTrue(context.eval(HaraLanguage.ID, "(next [1 2])").hasIterator());
       assertTrue(context.eval(HaraLanguage.ID, "(not-empty [1])").hasArrayElements());
       assertTrue(context.eval(HaraLanguage.ID, "(not-empty [])").isNull());
