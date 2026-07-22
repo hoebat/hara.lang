@@ -589,6 +589,25 @@ public final class HaraNodes {
     }
   }
 
+  public static final class SetVar extends HaraExpressionNode {
+    private final Symbol symbol;
+    @Child private HaraExpressionNode value;
+
+    public SetVar(Symbol symbol, HaraExpressionNode value) {
+      this.symbol = symbol;
+      this.value = value;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      HaraVar var = HaraLanguage.currentContext().resolve(symbol);
+      if (var == null) {
+        throw new HaraException("Unbound var: " + symbol.display(), this);
+      }
+      return var.reset(value.execute(frame));
+    }
+  }
+
   public static final class Do extends HaraExpressionNode {
     @Children private final HaraExpressionNode[] expressions;
 

@@ -204,6 +204,8 @@ final class HaraAnalyzer {
           return analyzeVar(list);
         case "deref":
           return analyzeDeref(list);
+        case "set!":
+          return analyzeSetVar(list);
         case "defstruct":
           return analyzeDefStruct(list);
         case "defprotocol":
@@ -1089,6 +1091,15 @@ final class HaraAnalyzer {
   private HaraExpressionNode analyzeDeref(List<?> form) {
     requireCount(form, 2, "deref");
     return new HaraNodes.Deref(analyze(form.nth(1)));
+  }
+
+  private HaraExpressionNode analyzeSetVar(List<?> form) {
+    requireCount(form, 3, "set!");
+    Object name = form.nth(1);
+    if (!(name instanceof Symbol)) {
+      throw error("set! expects a Var symbol");
+    }
+    return new HaraNodes.SetVar((Symbol) name, analyze(form.nth(2)));
   }
 
   private HaraExpressionNode analyzeDefStruct(List<?> form) {

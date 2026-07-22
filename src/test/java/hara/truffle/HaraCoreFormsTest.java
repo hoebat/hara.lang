@@ -110,6 +110,25 @@ public class HaraCoreFormsTest {
   }
 
   @Test
+  public void setBangRebindsAvarRootWithoutChangingItsIdentity() {
+    try (Context context = context()) {
+      assertEquals(
+          42,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(def answer 1) "
+                      + "(let [v (var answer)] (set! answer 42) (if (= v (var answer)) answer 0))")
+              .asLong());
+      assertTrue(
+          assertThrows(
+                  PolyglotException.class, () -> context.eval(HaraLanguage.ID, "(set! missing 1)"))
+              .getMessage()
+              .contains("Unbound var"));
+    }
+  }
+
+  @Test
   public void varAndDerefFailuresAreDeterministic() {
     try (Context context = context()) {
       assertTrue(
