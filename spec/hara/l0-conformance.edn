@@ -105,6 +105,10 @@
    :class :iterator
    :source "(let [it (iter-cycle [1 2])] (+ (iter-next it) (iter-next it) (iter-next it) (x:get (iter-next (iter-partition-pair [4 5])) 1)))"
    :expect {:value 9 :type :integer}}
+  {:id :iterator/mapcat-keep
+   :class :iterator
+   :source "(let [it (iter-mapcat (fn [x] [x (+ x 10)]) [1 2])] (+ (iter-next it) (iter-next it) (iter-next it) (iter-next (iter-keep (fn [x] (if (= x 2) x nil)) [1 2 3]))))"
+   :expect {:value 16 :type :integer}}
   {:id :function/apply
    :class :function
    :source "(defn sum3 [a b c] (+ a b c)) (apply sum3 1 [2 3])"

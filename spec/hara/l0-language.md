@@ -89,7 +89,8 @@ The core iterator forms are:
 
 * `iter`, `iter-has?`, `iter-next`, and `iter-close`;
 * lazy `concat`, `iter-map`, `iter-filter`, `iter-take`, `iter-drop`, and
-  `iter-zip`, `iter-cycle`, and `iter-partition-pair`.
+  `iter-zip`, `iter-cycle`, `iter-partition-pair`, `iter-mapcat`, and
+  `iter-keep`.
 
 `iter-cycle` re-acquires a replayable source only after its current iteration
 is exhausted. `iter-partition-pair` emits two-element persistent vectors and

@@ -193,6 +193,8 @@ public final class HaraContext {
     target.define("concat", new VariadicBuiltin("concat", this::concatIterators));
     target.define("iter-map", new VariadicBuiltin("iter-map", this::iterMap));
     target.define("iter-filter", new VariadicBuiltin("iter-filter", this::iterFilter));
+    target.define("iter-mapcat", new VariadicBuiltin("iter-mapcat", this::iterMapcat));
+    target.define("iter-keep", new VariadicBuiltin("iter-keep", this::iterKeep));
     target.define("iter-take", new VariadicBuiltin("iter-take", this::iterTake));
     target.define("iter-drop", new VariadicBuiltin("iter-drop", this::iterDrop));
     target.define("iter-zip", new VariadicBuiltin("iter-zip", this::iterZip));
@@ -506,6 +508,7 @@ public final class HaraContext {
 
   private Object iterValue(Object value) {
     Object target = HaraBox.unwrap(value);
+    if (target == null || target == HaraNull.SINGLETON) return Iter.emptyIterator();
     if (target instanceof String) return Iter.chars(((String) target).toCharArray());
     try {
       return Iter.iter(target);
@@ -552,6 +555,32 @@ public final class HaraContext {
     Object function = values[0];
     return closeable(
         Iter.filter(source, value -> truthy(invokeCallable(function, new Object[] {value}))),
+        source);
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private Object iterMapcat(Object[] values) {
+    requireIteratorArity(values, 2, "iter-mapcat");
+    Iterator source = (Iterator) iterValue(values[1]);
+    Object function = values[0];
+    Iterator result =
+        Iter.mapcat(
+            source, value -> (Iterator) iterValue(invokeCallable(function, new Object[] {value})));
+    return closeable(result, source);
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private Object iterKeep(Object[] values) {
+    requireIteratorArity(values, 2, "iter-keep");
+    Iterator source = (Iterator) iterValue(values[1]);
+    Object function = values[0];
+    return closeable(
+        Iter.keep(
+            source,
+            value -> {
+              Object result = HaraBox.unwrap(invokeCallable(function, new Object[] {value}));
+              return result == HaraNull.SINGLETON ? null : result;
+            }),
         source);
   }
 

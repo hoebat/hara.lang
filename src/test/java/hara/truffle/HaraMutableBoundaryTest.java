@@ -251,6 +251,25 @@ public class HaraMutableBoundaryTest {
     }
   }
 
+  @Test
+  public void mapcatAndKeepRemainLazyIteratorCombinators() {
+    try (Context context = context()) {
+      assertEquals(
+          2,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(let [it (iter-mapcat (fn [x] [x (+ x 10)]) [1 2])] "
+                      + "(iter-next it) (iter-next it) (iter-next it))")
+              .asLong());
+      assertEquals(
+          2,
+          context
+              .eval(HaraLanguage.ID, "(iter-next (iter-keep (fn [x] (if (= x 2) x nil)) [1 2 3]))")
+              .asLong());
+    }
+  }
+
   private static Context context() {
     return Context.newBuilder(HaraLanguage.ID).build();
   }

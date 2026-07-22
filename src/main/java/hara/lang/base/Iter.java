@@ -261,11 +261,13 @@ public interface Iter {
 
       @Override
       public boolean hasNext() {
-        boolean _nxt;
-        while (!(_nxt = _curr.hasNext()) && _it.hasNext()) {
+        while (!_curr.hasNext()) {
+          if (!_it.hasNext()) {
+            return false;
+          }
           _curr = f.apply(_it.next());
         }
-        return _nxt;
+        return true;
       }
 
       @SuppressWarnings("unchecked")
