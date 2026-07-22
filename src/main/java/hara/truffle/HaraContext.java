@@ -4,6 +4,7 @@ import com.oracle.truffle.api.TruffleLanguage;
 import com.oracle.truffle.api.source.Source;
 import hara.kernel.builtin.BuiltinStruct;
 import hara.lang.base.Iter;
+import hara.lang.base.Eq;
 import hara.lang.base.primitive.Num;
 import hara.lang.base.iter.CloseableIterator;
 import hara.lang.data.Symbol;
@@ -180,6 +181,12 @@ public final class HaraContext {
     target.define("*", new VariadicBuiltin("*", values -> arithmetic("*", values)));
     target.define("/", new VariadicBuiltin("/", values -> arithmetic("/", values)));
     target.define("mod", new VariadicBuiltin("mod", values -> arithmetic("mod", values)));
+    target.define("=", new VariadicBuiltin("=", values -> compare("=", values)));
+    target.define("not=", new VariadicBuiltin("not=", values -> compare("not=", values)));
+    target.define("<", new VariadicBuiltin("<", values -> compare("<", values)));
+    target.define("<=", new VariadicBuiltin("<=", values -> compare("<=", values)));
+    target.define(">", new VariadicBuiltin(">", values -> compare(">", values)));
+    target.define(">=", new VariadicBuiltin(">=", values -> compare(">=", values)));
     target.define("bigint", new UnaryBuiltin("bigint", HaraNumericConversions::toBigInteger));
     target.define("bigdec", new UnaryBuiltin("bigdec", HaraNumericConversions::toBigDecimal));
     target.define("double", new UnaryBuiltin("double", HaraNumericConversions::toDouble));
@@ -270,6 +277,35 @@ public final class HaraContext {
       }
     }
     return result;
+  }
+
+  private Object compare(String operator, Object[] values) {
+    if (values.length < 2) {
+      throw new HaraException(operator + " expects at least two arguments");
+    }
+    Object previous = HaraBox.unwrap(values[0]);
+    for (int i = 1; i < values.length; i++) {
+      Object current = HaraBox.unwrap(values[i]);
+      boolean matches;
+      if (operator.equals("=") || operator.equals("not=")) {
+        boolean equal = Eq.eq(previous, current);
+        if (operator.equals("not=") && !equal) return true;
+        matches = equal;
+      } else {
+        if (!(previous instanceof Number) || !(current instanceof Number)) {
+          throw new HaraException("comparison expects two numbers");
+        }
+        int comparison = Num.compare((Number) previous, (Number) current);
+        if (operator.equals("<")) matches = comparison < 0;
+        else if (operator.equals("<=")) matches = comparison <= 0;
+        else if (operator.equals(">")) matches = comparison > 0;
+        else if (operator.equals(">=")) matches = comparison >= 0;
+        else throw new HaraException("Unknown comparison operator: " + operator);
+      }
+      if (!matches) return false;
+      previous = current;
+    }
+    return !operator.equals("not=");
   }
 
   private Object protocolCall(String protocolName, String methodName, Object[] values) {

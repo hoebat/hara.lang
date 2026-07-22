@@ -159,6 +159,10 @@ normalize equivalent integral/decimal representations, decimal scale, and
 signed zero according to the conformance cases. NaN and infinities are valid
 floating values with the specified comparison behavior.
 
+The comparison and equality operators `<`, `<=`, `>`, `>=`, `=`, and `not=` are
+also callable Vars. They require at least two arguments and apply pairwise from
+left to right, so they can be passed to iterator consumers such as `reduce`.
+
 Ratios, implicit complex numbers, and an implicit irrational-number tower are
 not L0 numeric categories. They may be explicit library or host values later.
 

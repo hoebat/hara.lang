@@ -266,6 +266,11 @@ public class HaraLanguageTest {
       assertTrue(context.eval(HaraLanguage.ID, "(= 1 1 1)").asBoolean());
       assertTrue(context.eval(HaraLanguage.ID, "(not= 1 1 2)").asBoolean());
       assertTrue(context.eval(HaraLanguage.ID, "(< 1.2M 1.3M)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(< 1 2)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(apply < [1 2 3])").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(reduce < [1 2])").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(apply = [4 4])").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(reduce not= [4 5])").asBoolean());
     }
   }
 

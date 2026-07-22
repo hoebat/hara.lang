@@ -145,6 +145,10 @@
    :class :iterator
    :source "(+ (reduce + [1 2 3]) (reduce + 10 [1 2 3]))"
    :expect {:value 22 :type :integer}}
+  {:id :iterator/comparison-functions
+   :class :iterator
+   :source "(+ (if (apply < [1 2 3]) 1 0) (if (apply = [4 4]) 2 0) (if (reduce not= [4 5]) 4 0))"
+   :expect {:value 7 :type :integer}}
   {:id :module/classpath-require
    :class :module
    :source "(require \"hara/l0-core.hara\") ((comp2 inc inc) 40)"
