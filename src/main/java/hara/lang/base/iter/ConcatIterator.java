@@ -1,16 +1,18 @@
 package hara.lang.base.iter;
 
 import hara.lang.base.Ex;
+import hara.lang.base.Iter;
 
 import java.util.ArrayDeque;
 import java.util.Iterator;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
-public final class ConcatIterator<E> implements java.util.Iterator<E> {
+public final class ConcatIterator<E> implements CloseableIterator<E> {
 
   private final Iterator<? extends Iterator<? extends E>> sources;
   private final ArrayDeque<Iterator<? extends E>> appended = new ArrayDeque<>();
   private Iterator<? extends E> current;
+  private boolean closed;
 
   public ConcatIterator(java.util.Iterator<? extends java.util.Iterator<? extends E>> iterators) {
     this.sources = iterators;
@@ -18,6 +20,9 @@ public final class ConcatIterator<E> implements java.util.Iterator<E> {
 
   @Override
   public boolean hasNext() {
+    if (closed) {
+      return false;
+    }
     while (current == null || !current.hasNext()) {
       if (sources.hasNext()) {
         current = sources.next();
@@ -40,7 +45,25 @@ public final class ConcatIterator<E> implements java.util.Iterator<E> {
   }
 
   public Iterator<E> concat(java.util.Iterator<? extends E> that) {
+    if (closed) {
+      throw new IllegalStateException("Iterator is closed");
+    }
     appended.addLast(that);
     return this;
+  }
+
+  @Override
+  public void close() {
+    if (closed) {
+      return;
+    }
+    closed = true;
+    Iter.close(current);
+    Iter.close(sources);
+    for (Iterator<? extends E> iterator : appended) {
+      Iter.close(iterator);
+    }
+    appended.clear();
+    current = null;
   }
 }

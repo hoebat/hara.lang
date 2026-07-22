@@ -845,4 +845,15 @@ public interface Iter {
       }
     };
   }
+
+  /** Closes an iterator when its source exposes lifecycle semantics. */
+  public static void close(Iterator<?> iterator) {
+    if (iterator instanceof AutoCloseable) {
+      try {
+        ((AutoCloseable) iterator).close();
+      } catch (Exception error) {
+        throw Ex.Sneaky(error);
+      }
+    }
+  }
 }

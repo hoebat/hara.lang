@@ -27,7 +27,7 @@ jobs:
             tests: hara.truffle.HaraInteropTest,hara.truffle.HaraJavaAdaptersTest,hara.kernel.builtin.BuiltinInteropTest,hara.kernel.builtin.BuiltinCollectionTest
           - id: iterator-laziness
             name: Iterator and lazy operations
-            tests: hara.lang.base.IterTest,hara.lang.data.ConsTest,hara.core.zip.ZipTest
+            tests: hara.lang.base.IterTest,hara.lang.base.CloseableIteratorTest,hara.lang.data.ConsTest,hara.core.zip.ZipTest
           - id: struct-callability
             name: HaraStruct and IFn behavior
             tests: hara.kernel.builtin.BuiltinStructTest,hara.truffle.HaraLanguageTest
