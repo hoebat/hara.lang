@@ -56,7 +56,7 @@ The CLI also accepts `run <file>`, `stdin`, `repl`, and `help`. The `repl` comma
 Collection protocol tests are split into the same slices used by GitHub Actions so failures can be diagnosed without rerunning the entire suite:
 
 ```shell
-mvn -Ptruffle -Dtest='hara.lang.data.CollectionsTest,hara.lang.data.ListTest,hara.lang.data.VectorTest,hara.lang.data.QueueTest,hara.lang.data.TupleTest,hara.lang.data.OrderedCollectionsTest,hara.lang.data.SortedCollectionsTest' test
+mvn -Ptruffle -Dtest='hara.lang.data.CollectionsTest,hara.lang.data.ListTest,hara.lang.data.VectorTest,hara.lang.data.QueueTest,hara.lang.data.TupleTest,hara.lang.data.OrderedCollectionsTest,hara.lang.data.SortedCollectionsTest,hara.truffle.CollectionProtocolConformanceTest' test
 mvn -Ptruffle -Dtest='hara.lang.protocol.ProtocolTest,hara.truffle.HaraProtocolTest' test
 mvn -Ptruffle -Dtest='hara.truffle.HaraInteropTest,hara.truffle.HaraJavaAdaptersTest,hara.kernel.builtin.BuiltinInteropTest,hara.kernel.builtin.BuiltinCollectionTest' test
 mvn -Ptruffle -Dtest='hara.lang.base.IterTest,hara.lang.data.ConsTest,hara.core.zip.ZipTest' test

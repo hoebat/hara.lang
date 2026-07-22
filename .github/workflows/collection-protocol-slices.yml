@@ -18,7 +18,7 @@ jobs:
         include:
           - id: core-collections
             name: Core collection behavior
-            tests: hara.lang.data.CollectionsTest,hara.lang.data.ListTest,hara.lang.data.VectorTest,hara.lang.data.QueueTest,hara.lang.data.TupleTest,hara.lang.data.OrderedCollectionsTest,hara.lang.data.SortedCollectionsTest
+            tests: hara.lang.data.CollectionsTest,hara.lang.data.ListTest,hara.lang.data.VectorTest,hara.lang.data.QueueTest,hara.lang.data.TupleTest,hara.lang.data.OrderedCollectionsTest,hara.lang.data.SortedCollectionsTest,hara.truffle.CollectionProtocolConformanceTest
           - id: protocol-dispatch
             name: Protocol dispatch and extension
             tests: hara.lang.protocol.ProtocolTest,hara.truffle.HaraProtocolTest
