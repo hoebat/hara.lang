@@ -2,6 +2,7 @@ package hara.truffle;
 
 import hara.lang.data.types.ISequentialLookupType;
 import hara.lang.data.types.ISetType;
+import hara.lang.data.List;
 import hara.lang.protocol.*;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -83,6 +84,14 @@ public final class HaraJavaAdapters {
           return lookupValue((ILookup<?, ?>) receiver, arguments);
         });
     protocol.extend(byte[].class, "lookup", HaraJavaAdapters::lookupBytes);
+    protocol.extendNil(
+        "lookup",
+        (receiver, arguments) -> {
+          if (arguments.length < 1 || arguments.length > 2) {
+            throw new HaraException("ILookup/lookup expects one or two arguments");
+          }
+          return arguments.length == 2 ? arguments[1] : null;
+        });
   }
 
   public static void installAssoc(HaraProtocol protocol) {
@@ -97,11 +106,13 @@ public final class HaraJavaAdapters {
   public static void installCount(HaraProtocol protocol) {
     protocol.extend(ICount.class, "count", (receiver, arguments) -> ((ICount) receiver).count());
     protocol.extend(byte[].class, "count", (receiver, arguments) -> ((byte[]) receiver).length);
+    protocol.extendNil("count", (receiver, arguments) -> 0L);
   }
 
   public static void installConj(HaraProtocol protocol) {
     protocol.extend(
         IConj.class, "conj", (receiver, arguments) -> conjValue((IConj<?>) receiver, arguments[0]));
+    protocol.extendNil("conj", (receiver, arguments) -> List.Standard.from(null, arguments[0]));
   }
 
   public static void installFind(HaraProtocol protocol) {
@@ -172,6 +183,7 @@ public final class HaraJavaAdapters {
 
   public static void installEmpty(HaraProtocol protocol) {
     protocol.extend(IEmpty.class, "empty", (receiver, arguments) -> ((IEmpty) receiver).empty());
+    protocol.extendNil("empty", (receiver, arguments) -> null);
   }
 
   public static void installDisplay(HaraProtocol protocol) {
@@ -193,6 +205,7 @@ public final class HaraJavaAdapters {
   public static void installCons(HaraProtocol protocol) {
     protocol.extend(
         ICons.class, "cons", (receiver, arguments) -> consValue((ICons<?>) receiver, arguments[0]));
+    protocol.extendNil("cons", (receiver, arguments) -> List.Standard.from(null, arguments[0]));
   }
 
   public static void installDissoc(HaraProtocol protocol) {
