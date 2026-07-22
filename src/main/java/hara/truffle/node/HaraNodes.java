@@ -531,6 +531,27 @@ public final class HaraNodes {
     }
   }
 
+  public static final class ShortCircuit extends HaraExpressionNode {
+    private final boolean all;
+    @Children private final HaraExpressionNode[] expressions;
+
+    public ShortCircuit(boolean all, HaraExpressionNode[] expressions) {
+      this.all = all;
+      this.expressions = expressions;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      Object result = all ? Boolean.TRUE : null;
+      for (HaraExpressionNode expression : expressions) {
+        result = expression.execute(frame);
+        boolean truthy = result != null && !Boolean.FALSE.equals(result);
+        if (all ? !truthy : truthy) return result;
+      }
+      return result;
+    }
+  }
+
   public static final class Let extends HaraExpressionNode {
     private final int[] slots;
     @Children private final HaraExpressionNode[] initializers;

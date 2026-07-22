@@ -78,6 +78,10 @@ public class HaraLanguageTest {
       assertTrue(context.eval(HaraLanguage.ID, "(not false)").asBoolean());
       assertTrue(!context.eval(HaraLanguage.ID, "(not true)").asBoolean());
       assertTrue(context.eval(HaraLanguage.ID, "(not nil)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(and true 7)").asLong() == 7);
+      assertTrue(context.eval(HaraLanguage.ID, "(or false 8)").asLong() == 8);
+      assertTrue(context.eval(HaraLanguage.ID, "(and false (/ 1 0))").asBoolean() == false);
+      assertTrue(context.eval(HaraLanguage.ID, "(or true (/ 1 0))").asBoolean());
     }
   }
 

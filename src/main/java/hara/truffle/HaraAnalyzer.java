@@ -174,6 +174,10 @@ final class HaraAnalyzer {
           return analyzeDo(list, 1);
         case "if":
           return analyzeIf(list);
+        case "and":
+          return analyzeAnd(list);
+        case "or":
+          return analyzeOr(list);
         case "let":
           return analyzeLet(list);
         case "loop":
@@ -323,6 +327,20 @@ final class HaraAnalyzer {
     HaraExpressionNode alternative =
         form.count() == 4 ? analyze(form.nth(3)) : new HaraNodes.Literal(null);
     return new HaraNodes.If(analyze(form.nth(1)), analyze(form.nth(2)), alternative);
+  }
+
+  private HaraExpressionNode analyzeAnd(List<?> form) {
+    if (form.count() == 1) return new HaraNodes.Literal(true);
+    HaraExpressionNode[] expressions = new HaraExpressionNode[(int) form.count() - 1];
+    for (int i = 1; i < form.count(); i++) expressions[i - 1] = analyze(form.nth(i));
+    return new HaraNodes.ShortCircuit(true, expressions);
+  }
+
+  private HaraExpressionNode analyzeOr(List<?> form) {
+    if (form.count() == 1) return new HaraNodes.Literal(null);
+    HaraExpressionNode[] expressions = new HaraExpressionNode[(int) form.count() - 1];
+    for (int i = 1; i < form.count(); i++) expressions[i - 1] = analyze(form.nth(i));
+    return new HaraNodes.ShortCircuit(false, expressions);
   }
 
   private HaraExpressionNode analyzeLet(List<?> form) {
