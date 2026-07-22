@@ -67,6 +67,15 @@ public class HaraLanguageTest {
       assertEquals(1, context.eval(HaraLanguage.ID, "(first [1 2])").asLong());
       assertEquals(2, context.eval(HaraLanguage.ID, "(second [1 2])").asLong());
       assertEquals(2, context.eval(HaraLanguage.ID, "(iter-next (rest [1 2]))").asLong());
+      assertEquals(42, context.eval(HaraLanguage.ID, "(get-in {:a {:b 42}} [:a :b])").asLong());
+      assertEquals(
+          42, context.eval(HaraLanguage.ID, "(get-in (assoc-in {} [:a :b] 42) [:a :b])").asLong());
+      assertEquals(2, context.eval(HaraLanguage.ID, "(get (update {:a 1} :a inc) :a)").asLong());
+      assertEquals(
+          4,
+          context
+              .eval(HaraLanguage.ID, "(get-in (update-in {:a {:b 2}} [:a :b] + 2) [:a :b])")
+              .asLong());
       assertTrue(context.eval(HaraLanguage.ID, "(next [1 2])").hasIterator());
       assertTrue(context.eval(HaraLanguage.ID, "(not-empty [1])").hasArrayElements());
       assertTrue(context.eval(HaraLanguage.ID, "(not-empty [])").isNull());

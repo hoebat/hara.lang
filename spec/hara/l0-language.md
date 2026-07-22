@@ -73,6 +73,10 @@ consumes explicit iterators according to the rules above. Predicate reductions
 `every?`, `any?`, and `some` consume an iterator lazily until their result is
 known; `some` returns the first matching source value or nil.
 
+The bootstrap also provides `get-in`, `assoc-in`, `update`, and `update-in` for
+persistent nested values. These are ordinary `.hara` functions built on the
+collection protocol functions; they do not introduce mutable update semantics.
+
 `reduce` eagerly consumes an iterator with either `(reduce function value)`
 or `(reduce function initial value)`. The two-argument form uses the first
 source element as its accumulator and rejects an empty source; the three-
