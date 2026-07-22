@@ -12,3 +12,17 @@
 (defn neg? [value] (< value 0))
 (defn even? [value] (= (mod value 2) 0))
 (defn odd? [value] (not (even? value)))
+(defn nil? [value] (= value nil))
+(defn some? [value] (not (nil? value)))
+(defn false? [value] (= value false))
+(defn true? [value] (= value true))
+(defn empty? [value] (not (iter-has? (iter value))))
+(defn first [value]
+  (let [it (iter value)]
+    (if (iter-has? it) (iter-next it) nil)))
+(defn second [value] (first (rest value)))
+(defn rest [value] (iter-drop 1 value))
+(defn next [value]
+  (let [it (rest value)]
+    (if (iter-has? it) it nil)))
+(defn not-empty [value] (if (empty? value) nil value))

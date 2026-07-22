@@ -61,6 +61,15 @@ public class HaraLanguageTest {
       assertTrue(context.eval(HaraLanguage.ID, "(even? 4)").asBoolean());
       assertTrue(context.eval(HaraLanguage.ID, "(odd? 5)").asBoolean());
       assertEquals(9, context.eval(HaraLanguage.ID, "((constantly 9) nil)").asLong());
+      assertTrue(context.eval(HaraLanguage.ID, "(nil? nil)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(some? 1)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(empty? [])").asBoolean());
+      assertEquals(1, context.eval(HaraLanguage.ID, "(first [1 2])").asLong());
+      assertEquals(2, context.eval(HaraLanguage.ID, "(second [1 2])").asLong());
+      assertEquals(2, context.eval(HaraLanguage.ID, "(iter-next (rest [1 2]))").asLong());
+      assertTrue(context.eval(HaraLanguage.ID, "(next [1 2])").hasIterator());
+      assertTrue(context.eval(HaraLanguage.ID, "(not-empty [1])").hasArrayElements());
+      assertTrue(context.eval(HaraLanguage.ID, "(not-empty [])").isNull());
     }
   }
 
