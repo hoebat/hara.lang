@@ -552,7 +552,7 @@ public final class HaraNodes {
       if (var == null) {
         throw new HaraException("Unbound symbol: " + symbol.display(), this);
       }
-      return var.get();
+      return var.deref();
     }
   }
 
@@ -671,6 +671,46 @@ public final class HaraNodes {
         frame.setObject(slots[i], values[i]);
       }
       return body.execute(frame);
+    }
+  }
+
+  public static final class Binding extends HaraExpressionNode {
+    private final Symbol[] symbols;
+    @Children private final HaraExpressionNode[] initializers;
+    @Child private HaraExpressionNode body;
+
+    public Binding(Symbol[] symbols, HaraExpressionNode[] initializers, HaraExpressionNode body) {
+      this.symbols = symbols;
+      this.initializers = initializers;
+      this.body = body;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      Object[] values = new Object[initializers.length];
+      for (int i = 0; i < initializers.length; i++) {
+        values[i] = initializers[i].execute(frame);
+      }
+      HaraVar[] vars = new HaraVar[symbols.length];
+      int bound = 0;
+      try {
+        for (int i = 0; i < symbols.length; i++) {
+          HaraVar var = HaraLanguage.currentContext().resolve(symbols[i]);
+          if (var == null) {
+            throw new HaraException("Unbound dynamic var: " + symbols[i].display(), this);
+          }
+          if (!var.isDynamic()) {
+            throw new HaraException(
+                "binding requires a dynamic Var: " + symbols[i].display(), this);
+          }
+          vars[i] = var;
+          var.bind(values[i]);
+          bound++;
+        }
+        return body.execute(frame);
+      } finally {
+        for (int i = bound - 1; i >= 0; i--) vars[i].unbind();
+      }
     }
   }
 

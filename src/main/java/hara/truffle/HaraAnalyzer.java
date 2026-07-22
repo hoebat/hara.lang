@@ -184,6 +184,8 @@ final class HaraAnalyzer {
           return analyzeOr(list);
         case "let":
           return analyzeLet(list);
+        case "binding":
+          return analyzeBinding(list);
         case "loop":
           return analyzeLoop(list);
         case "recur":
@@ -414,6 +416,28 @@ final class HaraAnalyzer {
       body = new HaraNodes.Let(patternSlots.get(i), patternInitializers.get(i), body);
     }
     return new HaraNodes.Let(rawSlots, initializers, body);
+  }
+
+  private HaraExpressionNode analyzeBinding(List<?> form) {
+    if (form.count() < 3 || !isBindingVector(form.nth(1))) {
+      throw error("binding expects a binding vector and a body");
+    }
+    ILinearType<?> bindings = (ILinearType<?>) form.nth(1);
+    if (bindings.count() % 2 != 0) {
+      throw error("binding expects an even number of binding forms");
+    }
+    int count = (int) bindings.count() / 2;
+    Symbol[] symbols = new Symbol[count];
+    HaraExpressionNode[] initializers = new HaraExpressionNode[count];
+    for (int i = 0; i < count; i++) {
+      Object name = bindings.nth(i * 2L);
+      if (!(name instanceof Symbol)) {
+        throw error("binding names must be symbols");
+      }
+      symbols[i] = (Symbol) name;
+      initializers[i] = analyze(bindings.nth(i * 2L + 1));
+    }
+    return new HaraNodes.Binding(symbols, initializers, analyzeDo(form, 2));
   }
 
   private HaraExpressionNode analyzeFunction(List<?> form) {

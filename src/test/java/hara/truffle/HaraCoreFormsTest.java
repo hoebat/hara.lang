@@ -73,6 +73,43 @@ public class HaraCoreFormsTest {
   }
 
   @Test
+  public void bindingTemporarilyShadowsDynamicVarsAndRestoresOnThrow() {
+    try (Context context = context()) {
+      assertEquals(
+          42,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(def ^:dynamic *answer* 1) " + "(binding [*answer* 42] *answer*)")
+              .asLong());
+      assertEquals(1, context.eval(HaraLanguage.ID, "*answer*").asLong());
+      assertThrows(
+          PolyglotException.class,
+          () -> context.eval(HaraLanguage.ID, "(binding [*answer* 9] (throw :failed))"));
+      assertEquals(1, context.eval(HaraLanguage.ID, "*answer*").asLong());
+    }
+  }
+
+  @Test
+  public void bindingRejectsNonDynamicAndMissingVars() {
+    try (Context context = context()) {
+      context.eval(HaraLanguage.ID, "(def answer 1)");
+      assertTrue(
+          assertThrows(
+                  PolyglotException.class,
+                  () -> context.eval(HaraLanguage.ID, "(binding [answer 2] answer)"))
+              .getMessage()
+              .contains("requires a dynamic Var"));
+      assertTrue(
+          assertThrows(
+                  PolyglotException.class,
+                  () -> context.eval(HaraLanguage.ID, "(binding [*missing* 2] *missing*)"))
+              .getMessage()
+              .contains("Unbound dynamic var"));
+    }
+  }
+
+  @Test
   public void varAndDerefFailuresAreDeterministic() {
     try (Context context = context()) {
       assertTrue(

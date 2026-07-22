@@ -14,6 +14,8 @@ import hara.lang.protocol.Constant;
 import hara.lang.protocol.ILookup;
 import hara.lang.data.Map;
 import hara.lang.data.types.IVarType;
+import java.util.ArrayDeque;
+import java.util.Deque;
 
 @ExportLibrary(InteropLibrary.class)
 public final class HaraVar
@@ -22,6 +24,9 @@ public final class HaraVar
   private final String name;
   private final IMetadata metadata;
   private volatile Object value;
+  private final ThreadLocal<Deque<Object>> dynamicBindings =
+      ThreadLocal.withInitial(ArrayDeque::new);
+  private static final Object NIL_BINDING = new Object();
 
   HaraVar(String namespace, String name, Object value) {
     this(namespace, name, value, Map.Standard.EMPTY);
@@ -40,13 +45,27 @@ public final class HaraVar
 
   @Override
   public Object deref() {
-    return get();
+    Deque<Object> bindings = dynamicBindings.get();
+    if (bindings.isEmpty()) return get();
+    Object value = bindings.peekLast();
+    return value == NIL_BINDING ? null : value;
   }
 
   @Override
   public Object reset(Object value) {
     set(value);
     return value;
+  }
+
+  public void bind(Object value) {
+    dynamicBindings.get().addLast(value == null ? NIL_BINDING : value);
+  }
+
+  public void unbind() {
+    Deque<Object> bindings = dynamicBindings.get();
+    if (bindings.isEmpty()) throw new IllegalStateException("Var has no dynamic binding");
+    bindings.removeLast();
+    if (bindings.isEmpty()) dynamicBindings.remove();
   }
 
   @Override
