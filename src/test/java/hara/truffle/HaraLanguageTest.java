@@ -83,6 +83,8 @@ public class HaraLanguageTest {
     try (Context context = context()) {
       assertTrue(context.eval(HaraLanguage.ID, "(= ##NaN ##NaN)").asBoolean());
       assertTrue(context.eval(HaraLanguage.ID, "(not= ##NaN 1)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(= -0.0 0.0)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(= 1.0M 1.00M)").asBoolean());
       assertTrue(context.eval(HaraLanguage.ID, "(= ##Inf ##Inf)").asBoolean());
       assertTrue(context.eval(HaraLanguage.ID, "(< 1 ##Inf)").asBoolean());
       assertTrue(context.eval(HaraLanguage.ID, "(not= ##Inf 1)").asBoolean());
