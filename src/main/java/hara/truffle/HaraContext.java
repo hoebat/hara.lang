@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Deque;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.concurrent.ConcurrentHashMap;
@@ -161,6 +162,7 @@ public final class HaraContext {
     target.define("iter-close", new UnaryBuiltin("iter-close", this::iterClose));
     target.define("concat", new VariadicBuiltin("concat", this::concatIterators));
     target.define("alter-var-root", new VariadicBuiltin("alter-var-root", this::alterVarRoot));
+    target.define("apply", new VariadicBuiltin("apply", this::applyFunction));
     target.define("module-revision", new UnaryBuiltin("module-revision", this::moduleRevision));
     target.define(
         "module-dependencies", new UnaryBuiltin("module-dependencies", this::moduleDependencies));
@@ -339,18 +341,39 @@ public final class HaraContext {
     Object[] arguments = new Object[values.length - 1];
     arguments[0] = var.deref();
     System.arraycopy(values, 2, arguments, 1, values.length - 2);
-    Object updated;
+    Object updated = invokeCallable(function, arguments);
+    return var.reset(updated);
+  }
+
+  private Object applyFunction(Object[] values) {
+    if (values.length < 2) {
+      throw new HaraException("apply expects a function and a final sequential value");
+    }
+    ArrayList<Object> arguments = new ArrayList<>();
+    for (int i = 1; i < values.length - 1; i++) {
+      arguments.add(values[i]);
+    }
+    Iterator<?> tail = (Iterator<?>) iterValue(values[values.length - 1]);
+    while (tail.hasNext()) {
+      arguments.add(tail.next());
+    }
+    return invokeCallable(values[0], arguments.toArray());
+  }
+
+  private Object invokeCallable(Object value, Object[] arguments) {
+    Object function = HaraBox.unwrap(value);
     if (function instanceof HaraFunction) {
       HaraFunction haraFunction = (HaraFunction) function;
       HaraFunction selected = haraFunction.resolveArity(arguments.length);
       if (selected == null) {
-        throw new HaraException("alter-var-root function has no matching arity");
+        throw new HaraException("function has no matching arity: " + arguments.length);
       }
-      updated = HaraBox.export(selected.callTarget().call(selected.callArguments(arguments)));
-    } else {
-      updated = ifnProtocol.invoke("invoke", function, arguments);
+      return HaraBox.export(selected.callTarget().call(selected.callArguments(arguments)));
     }
-    return var.reset(updated);
+    if (function instanceof HaraStruct || function instanceof IFn) {
+      return ifnProtocol.invoke("invoke", function, arguments);
+    }
+    throw new HaraException("value is not callable: " + function);
   }
 
   private Iterator<?> requireIterator(Object value, String operation) {

@@ -64,6 +64,10 @@
    :class :iterator
    :source "(let [it (concat [1] [2])] (iter-next it) (iter-next it))"
    :expect {:value 2 :type :integer}}
+  {:id :function/apply
+   :class :function
+   :source "(defn sum3 [a b c] (+ a b c)) (apply sum3 1 [2 3])"
+   :expect {:value 6 :type :integer}}
   {:id :collection/bytes
    :class :collection
    :source "(protocol-call INth nth (bytes 1 2 -3) 2)"

@@ -483,6 +483,22 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void appliesFunctionsWithAFinalSequentialArgument() {
+    try (Context context = context()) {
+      assertEquals(
+          6,
+          context
+              .eval(HaraLanguage.ID, "(defn sum3 [a b c] (+ a b c)) (apply sum3 1 [2 3])")
+              .asLong());
+      assertEquals(
+          1,
+          context
+              .eval(HaraLanguage.ID, "(defn first-rest [x & xs] x) (apply first-rest [1 2 3 4])")
+              .asLong());
+    }
+  }
+
+  @Test
   public void supportsInNsAndUseAsOrdinaryRuntimeForms() {
     try (Context context = context()) {
       assertEquals(
