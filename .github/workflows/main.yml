@@ -55,3 +55,6 @@ jobs:
         test "$(target/hara-truffle eval '(def answer 1) (set! answer 42) answer')" = "42"
         test "$(target/hara-truffle eval '(let [it (concat [1] [2])] (iter-next it) (iter-next it))')" = "2"
         test "$(target/hara-truffle eval '(def answer 1) (defn add [x y] (+ x y)) (alter-var-root (var answer) add 41) answer')" = "42"
+        test "$(target/hara-truffle eval '(defn sum3 [a b c] (+ a b c)) (apply sum3 1 [2 3])')" = "6"
+        test "$(target/hara-truffle eval '(defstruct Problem [value]) (try (throw (Problem 7)) (catch Other error 0) (catch Problem error (field error :value)))')" = "7"
+        test "$(target/hara-truffle eval '(ns source) (def answer 1) (ns user) (refer \"source\") (in-ns '\\''source) (set! answer 2) (in-ns '\\''user) answer')" = "2"
