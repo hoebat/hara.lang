@@ -250,7 +250,7 @@ public final class Main {
           LineReaderBuilder.builder()
               .terminal(terminal)
               .parser(new LispLineParser())
-              .completer(new HaraCompleter())
+              .completer(new HaraCompleter(context))
               .variable(
                   LineReader.HISTORY_FILE,
                   Paths.get(System.getProperty("user.home"), ".hara_truffle_history"))
@@ -357,13 +357,27 @@ public final class Main {
   }
 
   private static final class HaraCompleter implements Completer {
+    private final Context context;
+
+    private HaraCompleter(Context context) {
+      this.context = context;
+    }
+
     @Override
     public void complete(LineReader reader, ParsedLine line, List<Candidate> candidates) {
       String prefix = extractWord(line.line(), line.cursor());
-      List<String> names = new ArrayList<>(HaraLanguage.currentContext().currentSymbolNames());
-      Collections.sort(names);
-      for (String name : names) {
-        if (name.startsWith(prefix)) candidates.add(new Candidate(name));
+      try {
+        Value symbols = context.eval(HaraLanguage.ID, "(current-symbols)");
+        List<String> names = new ArrayList<>();
+        for (long i = 0; i < symbols.getArraySize(); i++) {
+          names.add(symbols.getArrayElement(i).asString());
+        }
+        Collections.sort(names);
+        for (String name : names) {
+          if (name.startsWith(prefix)) candidates.add(new Candidate(name));
+        }
+      } catch (RuntimeException ignored) {
+        // Completion must never disrupt the REPL when the context is unavailable.
       }
     }
 

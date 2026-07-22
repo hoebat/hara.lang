@@ -203,6 +203,9 @@ public final class HaraContext {
     target.define("require", new VariadicBuiltin("require", this::requireModule));
     target.define("refer", new UnaryBuiltin("refer", this::referNamespace));
     target.define("in-ns", new UnaryBuiltin("in-ns", this::inNamespace));
+    target.define(
+        "current-symbols",
+        new VariadicBuiltin("current-symbols", ignored -> currentSymbolNames().toArray()));
     target.define("use", new UnaryBuiltin("use", this::useNamespace));
     target.define("iter", new UnaryBuiltin("iter", this::iterValue));
     target.define("iter-has?", new UnaryBuiltin("iter-has?", this::iterHasNext));
