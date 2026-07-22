@@ -7,3 +7,8 @@
 (defn comp2 [f g] (fn [value] (f (g value))))
 (defn comp3 [f g h] (fn [value] (f (g (h value)))))
 (defn complement [predicate] (fn [value] (not (predicate value))))
+(defn zero? [value] (= value 0))
+(defn pos? [value] (> value 0))
+(defn neg? [value] (< value 0))
+(defn even? [value] (= (mod value 2) 0))
+(defn odd? [value] (not (even? value)))

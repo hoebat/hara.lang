@@ -36,6 +36,11 @@ public class HaraLanguageTest {
               .asLong());
       assertEquals(42, context.eval(HaraLanguage.ID, "((comp3 inc inc inc) 39)").asLong());
       assertTrue(context.eval(HaraLanguage.ID, "((complement (fn [x] (= x 1))) 2)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(zero? 0)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(pos? 2)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(neg? -2)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(even? 4)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(odd? 5)").asBoolean());
       assertEquals(9, context.eval(HaraLanguage.ID, "((constantly 9) nil)").asLong());
     }
   }
