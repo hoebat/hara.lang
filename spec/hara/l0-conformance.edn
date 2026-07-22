@@ -76,6 +76,10 @@
    :class :module
    :source "(load-resource \"hara/l0-resource.hara\")"
    :expect {:value 42 :type :integer}}
+  {:id :module/core-bootstrap
+   :class :module
+   :source "(load-resource \"hara/l0-core.hara\") ((comp2 inc inc) 40)"
+   :expect {:value 42 :type :integer}}
   {:id :collection/bytes
    :class :collection
    :source "(protocol-call INth nth (bytes 1 2 -3) 2)"

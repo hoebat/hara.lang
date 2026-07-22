@@ -1,0 +1,7 @@
+; The first language-level bootstrap substrate for Hara L0.
+; Keep this layer free of host interop and Java-specific values.
+(defn identity [value] value)
+(defn inc [value] (+ value 1))
+(defn dec [value] (- value 1))
+(defn constantly [value] (fn [ignored & rest] value))
+(defn comp2 [f g] (fn [value] (f (g value))))
