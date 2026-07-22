@@ -54,22 +54,22 @@ public final class HaraJavaAdapters {
   }
 
   public static void installIFn(HaraProtocol protocol) {
-    protocol.extend(
-        IFn.class,
-        "invoke",
-        (receiver, arguments) -> {
-          IFn<?, ?, ?> function = (IFn<?, ?, ?>) receiver;
-          if (function instanceof ILookup) {
-            return lookupValue((ILookup<?, ?>) function, arguments);
-          }
-          if (function instanceof ISequentialLookupType && arguments.length == 1) {
-            return ((ISequentialLookupType<?>) function).nth(((Number) arguments[0]).longValue());
-          }
-          if (function instanceof ISetType) {
-            return setValue((ISetType<?>) function, arguments);
-          }
-          return applyFunction(function, arguments);
-        });
+    protocol.extend(IFn.class, "invoke", HaraJavaAdapters::invokeFunction);
+  }
+
+  /** Invokes an existing Java IFn using the same collection lookup semantics as protocol calls. */
+  public static Object invokeFunction(Object receiver, Object[] arguments) {
+    IFn<?, ?, ?> function = (IFn<?, ?, ?>) receiver;
+    if (function instanceof ILookup) {
+      return lookupValue((ILookup<?, ?>) function, arguments);
+    }
+    if (function instanceof ISequentialLookupType && arguments.length == 1) {
+      return ((ISequentialLookupType<?>) function).nth(((Number) arguments[0]).longValue());
+    }
+    if (function instanceof ISetType) {
+      return setValue((ISetType<?>) function, arguments);
+    }
+    return applyFunction(function, arguments);
   }
 
   public static void installLookup(HaraProtocol protocol) {

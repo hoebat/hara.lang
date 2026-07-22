@@ -13,6 +13,7 @@ import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import com.oracle.truffle.api.interop.UnsupportedTypeException;
 import com.oracle.truffle.api.nodes.DirectCallNode;
 import com.oracle.truffle.api.nodes.IndirectCallNode;
+import hara.kernel.builtin.BuiltinStruct;
 import hara.lang.base.primitive.Num;
 import hara.lang.data.Symbol;
 import hara.lang.protocol.IFn;
@@ -38,6 +39,64 @@ public final class HaraNodes {
     @Override
     public Object execute(VirtualFrame frame) {
       return value;
+    }
+  }
+
+  /** Evaluates the contents of a reader collection and rebuilds its Java-backed value. */
+  public static final class CollectionLiteral extends HaraExpressionNode {
+    public enum Kind {
+      TUPLE,
+      VECTOR,
+      QUEUE,
+      MAP,
+      ORDERED_MAP,
+      SORTED_MAP,
+      SET,
+      ORDERED_SET,
+      SORTED_SET
+    }
+
+    private final Kind kind;
+    @Children private final HaraExpressionNode[] elements;
+
+    public CollectionLiteral(Kind kind, HaraExpressionNode[] elements) {
+      this.kind = kind;
+      this.elements = elements;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      Object[] values = new Object[elements.length];
+      for (int i = 0; i < elements.length; i++) {
+        values[i] = elements[i].execute(frame);
+      }
+      return construct(kind, values);
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static Object construct(Kind kind, Object[] values) {
+      switch (kind) {
+        case TUPLE:
+          return BuiltinStruct.tuple(values);
+        case VECTOR:
+          return BuiltinStruct.vector(values);
+        case QUEUE:
+          return BuiltinStruct.queue(values);
+        case MAP:
+          return BuiltinStruct.hashMap(values);
+        case ORDERED_MAP:
+          return BuiltinStruct.orderedMap(values);
+        case SORTED_MAP:
+          return BuiltinStruct.sortedMap(values);
+        case SET:
+          return BuiltinStruct.hashSet(values);
+        case ORDERED_SET:
+          return BuiltinStruct.orderedSet(values);
+        case SORTED_SET:
+          return BuiltinStruct.sortedSet(values);
+        default:
+          throw new IllegalStateException("Unknown collection literal: " + kind);
+      }
     }
   }
 

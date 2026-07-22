@@ -6,12 +6,16 @@ import com.oracle.truffle.api.source.SourceSection;
 import hara.lang.data.Keyword;
 import hara.lang.data.List;
 import hara.lang.data.Symbol;
+import hara.lang.data.types.IMapType;
 import hara.lang.data.types.ILinearType;
+import hara.lang.data.types.ISetType;
 import hara.truffle.node.HaraExpressionNode;
 import hara.truffle.node.HaraNodes;
 import hara.truffle.node.HaraRootNode;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -85,6 +89,10 @@ final class HaraAnalyzer {
       return new HaraNodes.ReadLocal(slot);
     }
     if (!(form instanceof List<?>)) {
+      HaraExpressionNode collection = analyzeCollectionLiteral(form);
+      if (collection != null) {
+        return collection;
+      }
       return new HaraNodes.Literal(form);
     }
     List<?> list = (List<?>) form;
@@ -141,6 +149,60 @@ final class HaraAnalyzer {
       }
     }
     return analyzeInvocation(list);
+  }
+
+  private HaraExpressionNode analyzeCollectionLiteral(Object form) {
+    if (form instanceof IMapType<?, ?>) {
+      IMapType<?, ?> map = (IMapType<?, ?>) form;
+      ArrayList<HaraExpressionNode> elements = new ArrayList<>();
+      Iterator<?> iterator = map.iterator();
+      while (iterator.hasNext()) {
+        Object entry = iterator.next();
+        if (!(entry instanceof java.util.Map.Entry<?, ?>)) {
+          throw error("map literal contains a non-entry value");
+        }
+        java.util.Map.Entry<?, ?> pair = (java.util.Map.Entry<?, ?>) entry;
+        elements.add(analyze(pair.getKey()));
+        elements.add(analyze(pair.getValue()));
+      }
+      HaraNodes.CollectionLiteral.Kind kind = HaraNodes.CollectionLiteral.Kind.MAP;
+      if (form instanceof hara.lang.data.OrderedMap) {
+        kind = HaraNodes.CollectionLiteral.Kind.ORDERED_MAP;
+      } else if (form instanceof hara.lang.data.SortedMap) {
+        kind = HaraNodes.CollectionLiteral.Kind.SORTED_MAP;
+      }
+      return new HaraNodes.CollectionLiteral(kind, elements.toArray(new HaraExpressionNode[0]));
+    }
+    if (form instanceof ISetType<?>) {
+      ISetType<?> set = (ISetType<?>) form;
+      ArrayList<HaraExpressionNode> elements = new ArrayList<>();
+      Iterator<?> iterator = set.iterator();
+      while (iterator.hasNext()) {
+        elements.add(analyze(iterator.next()));
+      }
+      HaraNodes.CollectionLiteral.Kind kind = HaraNodes.CollectionLiteral.Kind.SET;
+      if (form instanceof hara.lang.data.OrderedSet) {
+        kind = HaraNodes.CollectionLiteral.Kind.ORDERED_SET;
+      } else if (form instanceof hara.lang.data.SortedSet) {
+        kind = HaraNodes.CollectionLiteral.Kind.SORTED_SET;
+      }
+      return new HaraNodes.CollectionLiteral(kind, elements.toArray(new HaraExpressionNode[0]));
+    }
+    if (form instanceof ILinearType<?>) {
+      ILinearType<?> linear = (ILinearType<?>) form;
+      HaraNodes.CollectionLiteral.Kind kind =
+          form instanceof hara.lang.data.Tuple
+              ? HaraNodes.CollectionLiteral.Kind.TUPLE
+              : form instanceof hara.lang.data.Queue
+                  ? HaraNodes.CollectionLiteral.Kind.QUEUE
+                  : HaraNodes.CollectionLiteral.Kind.VECTOR;
+      HaraExpressionNode[] elements = new HaraExpressionNode[(int) linear.count()];
+      for (int i = 0; i < elements.length; i++) {
+        elements[i] = analyze(linear.nth(i));
+      }
+      return new HaraNodes.CollectionLiteral(kind, elements);
+    }
+    return null;
   }
 
   private HaraExpressionNode analyzeQuote(List<?> form) {
