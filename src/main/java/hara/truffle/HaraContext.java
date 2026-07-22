@@ -83,6 +83,11 @@ public final class HaraContext {
     return namespace == null ? null : namespace.lookup(symbol.getName());
   }
 
+  /** Names visible in the current namespace, used by interactive tooling. */
+  public java.util.List<String> currentSymbolNames() {
+    return currentNamespace.symbolNames();
+  }
+
   public Object macroExpand(Object form, boolean recursive) {
     Object result = form;
     int expansions = 0;
@@ -210,6 +215,8 @@ public final class HaraContext {
     target.define("iter-drop-while", new VariadicBuiltin("iter-drop-while", this::iterDropWhile));
     target.define("iter-mapcat", new VariadicBuiltin("iter-mapcat", this::iterMapcat));
     target.define("iter-keep", new VariadicBuiltin("iter-keep", this::iterKeep));
+    target.define("iter-interpose", new VariadicBuiltin("iter-interpose", this::iterInterpose));
+    target.define("iter-interleave", new VariadicBuiltin("iter-interleave", this::iterInterleave));
     target.define("iter-every?", new VariadicBuiltin("iter-every?", this::iterEvery));
     target.define("iter-any?", new VariadicBuiltin("iter-any?", this::iterAny));
     target.define("iter-some", new VariadicBuiltin("iter-some", this::iterSome));
@@ -820,6 +827,110 @@ public final class HaraContext {
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})
+  private Object iterInterpose(Object[] values) {
+    requireIteratorArity(values, 2, "iter-interpose");
+    Object separator = values[0];
+    Iterator source = (Iterator) iterValue(values[1]);
+    return closeable(
+        new CloseableIterator<Object>() {
+          private boolean first = true;
+          private boolean ready;
+          private boolean emitSeparator;
+          private boolean done;
+          private Object next;
+
+          private void prime() {
+            if (done || ready) return;
+            if (emitSeparator) {
+              if (!source.hasNext()) {
+                done = true;
+                Iter.close(source);
+                return;
+              }
+              next = separator;
+              emitSeparator = false;
+              ready = true;
+              return;
+            }
+            if (!source.hasNext()) {
+              done = true;
+              Iter.close(source);
+              return;
+            }
+            next = source.next();
+            emitSeparator = source.hasNext();
+            first = false;
+            ready = true;
+          }
+
+          @Override
+          public boolean hasNext() {
+            prime();
+            return ready;
+          }
+
+          @Override
+          public Object next() {
+            prime();
+            if (!ready) throw new NoSuchElementException();
+            Object result = next;
+            next = null;
+            ready = false;
+            return result;
+          }
+
+          @Override
+          public void close() {
+            done = true;
+            ready = false;
+            next = null;
+            Iter.close(source);
+          }
+        },
+        source);
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private Object iterInterleave(Object[] values) {
+    if (values.length == 0) {
+      throw new HaraException("iter-interleave expects at least one source");
+    }
+    Iterator[] sources = new Iterator[values.length];
+    for (int i = 0; i < values.length; i++) sources[i] = (Iterator) iterValue(values[i]);
+    return new CloseableIterator<Object>() {
+      private int index;
+      private boolean closed;
+
+      @Override
+      public boolean hasNext() {
+        if (closed) return false;
+        for (Iterator source : sources) {
+          if (!source.hasNext()) {
+            close();
+            return false;
+          }
+        }
+        return true;
+      }
+
+      @Override
+      public Object next() {
+        if (!hasNext()) throw new NoSuchElementException();
+        Object result = sources[index].next();
+        index = (index + 1) % sources.length;
+        return result;
+      }
+
+      @Override
+      public void close() {
+        if (closed) return;
+        closed = true;
+        for (Iterator source : sources) Iter.close(source);
+      }
+    };
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
   private Object iterEvery(Object[] values) {
     requireIteratorArity(values, 2, "iter-every?");
     Iterator source = (Iterator) iterValue(values[1]);
@@ -1347,6 +1458,10 @@ public final class HaraContext {
 
     private HaraVar lookup(String symbolName) {
       return vars.get(symbolName);
+    }
+
+    private java.util.List<String> symbolNames() {
+      return new java.util.ArrayList<>(vars.keySet());
     }
 
     private HaraVar define(String symbolName, Object value) {

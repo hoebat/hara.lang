@@ -73,6 +73,8 @@
 (defn drop-while [predicate value] (iter-drop-while predicate value))
 (defn partition-all [amount value] (iter-partition-all amount value))
 (defn partition [amount value] (iter-partition amount value))
+(defn interpose [separator value] (iter-interpose separator value))
+(defn interleave [value & rest] (apply iter-interleave value rest))
 (defn map [function value & rest]
   (if (empty? rest)
     (iter-map function value)

@@ -169,6 +169,10 @@
    :class :iterator
    :source "(load-resource \"hara/l0-core.hara\") (+ (iter-next (map + [1 2] [3 4])) (iter-next (map + [1] [2 3])))"
    :expect {:value 7 :type :integer}}
+  {:id :iterator/core-composition
+   :class :iterator
+   :source "(load-resource \"hara/l0-core.hara\") (+ (iter-next (interpose 0 [1 2])) (iter-next (interleave [1 2] [3 4])) (iter-next (iter-drop 1 (interleave [1 2] [3 4]))))"
+   :expect {:value 5 :type :integer}}
   {:id :iterator/reduce
    :class :iterator
    :source "(+ (reduce + [1 2 3]) (reduce + 10 [1 2 3]))"

@@ -16,7 +16,20 @@ import hara.lang.data.types.IMapType;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Iterator;
+import java.nio.file.Paths;
+import org.jline.reader.Candidate;
+import org.jline.reader.Completer;
+import org.jline.reader.EndOfFileException;
+import org.jline.reader.LineReader;
+import org.jline.reader.LineReaderBuilder;
+import org.jline.reader.ParsedLine;
+import org.jline.reader.UserInterruptException;
+import org.jline.reader.impl.DefaultParser;
+import org.jline.terminal.Terminal;
+import org.jline.terminal.TerminalBuilder;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
@@ -75,8 +88,9 @@ public final class Main {
       }
 
       try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+        context.eval(HaraLanguage.ID, "(load-resource \"hara/l0-core.hara\")");
         Value result = context.eval(HaraLanguage.ID, source);
-        output.println(result.isNull() ? "nil" : result.toString());
+        output.println(display(result));
       }
       return 0;
     } catch (PolyglotException exception) {
@@ -168,62 +182,117 @@ public final class Main {
 
   private static int runRepl(
       InputStream input, PrintStream output, PrintStream error, boolean interactive) {
-    try (Context context = Context.newBuilder(HaraLanguage.ID).build();
-        BufferedReader reader =
-            new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8))) {
-      StringBuilder source = new StringBuilder();
-      List<String> history = new ArrayList<>();
-      String line;
-      boolean continuation = false;
-      while (true) {
-        if (interactive) {
-          output.print(continuation ? "..> " : "hara> ");
-          output.flush();
-        }
-        line = reader.readLine();
-        if (line == null) {
-          if (source.length() != 0) {
-            error.println("Incomplete source");
-            return 1;
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(load-resource \"hara/l0-core.hara\")");
+      if (interactive) return runJLineRepl(context, output, error);
+      try (BufferedReader reader =
+          new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8))) {
+        StringBuilder source = new StringBuilder();
+        List<String> history = new ArrayList<>();
+        String line;
+        boolean continuation = false;
+        while (true) {
+          if (interactive) {
+            output.print(continuation ? "..> " : "hara> ");
+            output.flush();
           }
-          return 0;
-        }
-        if (source.length() == 0 && ":quit".equals(line.trim())) {
-          return 0;
-        }
-        if (source.length() == 0 && ":help".equals(line.trim())) {
-          output.println(":quit          exit the REPL");
-          output.println(":help          show this help");
-          output.println(":history       show evaluated forms");
-          continue;
-        }
-        if (source.length() == 0 && ":history".equals(line.trim())) {
-          for (int i = 0; i < history.size(); i++) {
-            output.println((i + 1) + ": " + history.get(i));
+          line = reader.readLine();
+          if (line == null) {
+            if (source.length() != 0) {
+              error.println("Incomplete source");
+              return 1;
+            }
+            return 0;
           }
-          continue;
-        }
+          if (source.length() == 0 && ":quit".equals(line.trim())) {
+            return 0;
+          }
+          if (source.length() == 0 && ":help".equals(line.trim())) {
+            output.println(":quit          exit the REPL");
+            output.println(":help          show this help");
+            output.println(":history       show evaluated forms");
+            continue;
+          }
+          if (source.length() == 0 && ":history".equals(line.trim())) {
+            for (int i = 0; i < history.size(); i++) {
+              output.println((i + 1) + ": " + history.get(i));
+            }
+            continue;
+          }
 
-        source.append(line).append('\n');
-        continuation = !isComplete(source);
-        if (continuation) {
-          continue;
-        }
+          source.append(line).append('\n');
+          continuation = !isComplete(source);
+          if (continuation) {
+            continue;
+          }
 
-        history.add(source.toString().stripTrailing());
-        try {
-          Value result = context.eval(HaraLanguage.ID, source.toString());
-          output.println(result.isNull() ? "nil" : result.toString());
-        } catch (PolyglotException exception) {
-          error.println(exception.getMessage());
+          history.add(source.toString().stripTrailing());
+          try {
+            Value result = context.eval(HaraLanguage.ID, source.toString());
+            output.println(display(result));
+          } catch (PolyglotException exception) {
+            error.println(exception.getMessage());
+          }
+          source.setLength(0);
+          continuation = false;
         }
-        source.setLength(0);
-        continuation = false;
       }
     } catch (IOException exception) {
       error.println(exception.getMessage());
       return 1;
     }
+  }
+
+  private static int runJLineRepl(Context context, PrintStream output, PrintStream error)
+      throws IOException {
+    try (Terminal terminal = TerminalBuilder.builder().system(true).build()) {
+      LineReader reader =
+          LineReaderBuilder.builder()
+              .terminal(terminal)
+              .parser(new LispLineParser())
+              .completer(new HaraCompleter())
+              .variable(
+                  LineReader.HISTORY_FILE,
+                  Paths.get(System.getProperty("user.home"), ".hara_truffle_history"))
+              .option(LineReader.Option.HISTORY_INCREMENTAL, true)
+              .build();
+      StringBuilder source = new StringBuilder();
+      while (true) {
+        try {
+          String line = reader.readLine(source.length() == 0 ? "hara> " : "..> ");
+          if (source.length() == 0 && ":quit".equals(line.trim())) return 0;
+          if (source.length() == 0 && ":help".equals(line.trim())) {
+            output.println(":quit          exit the REPL");
+            output.println(":help          show this help");
+            output.println(":history       show evaluated forms");
+            continue;
+          }
+          source.append(line).append('\n');
+          if (!isComplete(source)) continue;
+          try {
+            Value result = context.eval(HaraLanguage.ID, source.toString());
+            output.println(display(result));
+          } catch (PolyglotException exception) {
+            error.println(exception.getMessage());
+          }
+          source.setLength(0);
+        } catch (UserInterruptException exception) {
+          source.setLength(0);
+          output.println("^C");
+        } catch (EndOfFileException exception) {
+          return 0;
+        }
+      }
+    }
+  }
+
+  private static String display(Value result) {
+    if (result.isNull()) return "nil";
+    if (result.isHostObject() && result.asHostObject() instanceof Iterator<?>) {
+      return "#<lazy-iterator>";
+    }
+    if (result.hasIterator() && !result.hasArrayElements()) return "#<lazy-iterator>";
+    return result.toString();
   }
 
   private static boolean isComplete(CharSequence source) {
@@ -269,5 +338,54 @@ public final class Main {
     output.println("hara-truffle repl");
     output.println("hara-truffle conformance");
     output.println("hara-truffle help");
+  }
+
+  private static final class LispLineParser extends DefaultParser {
+    @Override
+    public boolean isDelimiterChar(CharSequence buffer, int pos) {
+      char c = buffer.charAt(pos);
+      return c == '('
+          || c == ')'
+          || c == '['
+          || c == ']'
+          || c == '{'
+          || c == '}'
+          || Character.isWhitespace(c)
+          || c == '"'
+          || c == '\'';
+    }
+  }
+
+  private static final class HaraCompleter implements Completer {
+    @Override
+    public void complete(LineReader reader, ParsedLine line, List<Candidate> candidates) {
+      String prefix = extractWord(line.line(), line.cursor());
+      List<String> names = new ArrayList<>(HaraLanguage.currentContext().currentSymbolNames());
+      Collections.sort(names);
+      for (String name : names) {
+        if (name.startsWith(prefix)) candidates.add(new Candidate(name));
+      }
+    }
+
+    private static String extractWord(String buffer, int cursor) {
+      int start = Math.max(0, cursor - 1);
+      while (start >= 0) {
+        char c = buffer.charAt(start);
+        if (c == '('
+            || c == ')'
+            || c == '['
+            || c == ']'
+            || c == '{'
+            || c == '}'
+            || Character.isWhitespace(c)
+            || c == '"'
+            || c == '\'') {
+          start++;
+          break;
+        }
+        start--;
+      }
+      return buffer.substring(Math.max(0, start), cursor);
+    }
   }
 }

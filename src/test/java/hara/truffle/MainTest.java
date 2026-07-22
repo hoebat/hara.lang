@@ -27,6 +27,24 @@ public class MainTest {
   }
 
   @Test
+  public void replLoadsCoreAndRendersLazyIterators() {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    ByteArrayOutputStream error = new ByteArrayOutputStream();
+    int status =
+        Main.run(
+            new String[] {"repl"},
+            new ByteArrayInputStream(
+                "(inc 1)\n(map inc [1 2 3])\n".getBytes(StandardCharsets.UTF_8)),
+            new PrintStream(output, true, StandardCharsets.UTF_8),
+            new PrintStream(error, true, StandardCharsets.UTF_8));
+
+    assertEquals(0, status);
+    assertTrue(output.toString(StandardCharsets.UTF_8).contains("2\n"));
+    assertTrue(output.toString(StandardCharsets.UTF_8).contains("#<lazy-iterator>\n"));
+    assertEquals("", error.toString(StandardCharsets.UTF_8));
+  }
+
+  @Test
   public void runsThePackagedL0ConformanceCorpus() {
     ByteArrayOutputStream output = new ByteArrayOutputStream();
     ByteArrayOutputStream error = new ByteArrayOutputStream();

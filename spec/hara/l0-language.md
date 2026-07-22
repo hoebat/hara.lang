@@ -131,6 +131,9 @@ Both require a positive chunk size.
 advance them in lockstep and stop at the shortest source, invoking the function
 with one value from each source.
 
+`interpose` lazily inserts a separator between source values. `interleave`
+round-robins multiple sources and stops when the shortest source is exhausted.
+
 Hara is iterator-first. It does not require Clojure `ISeq`/`Seq` semantics.
 The core iterator forms are:
 
