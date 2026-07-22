@@ -186,6 +186,14 @@
    :class :interop
    :source "(host-symbol \"java.lang.String\")"
    :expect {:error :host-interop-disabled}}
+  {:id :interop/host-get-denied
+   :class :interop
+   :source "(host-get nil \"value\")"
+   :expect {:error :host-interop-disabled}}
+  {:id :interop/host-call-denied
+   :class :interop
+   :source "(host-call nil \"value\")"
+   :expect {:error :host-interop-disabled}}
   {:id :unsupported/ratio
    :class :unsupported
    :source "1/2"
