@@ -150,6 +150,29 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void exposesMacroexpandFormsForTheRetainedRepl() {
+    try (Context context = context()) {
+      assertEquals(
+          "(if false nil 42)",
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(do (defmacro unless [test body] `(if ~test nil ~body)) "
+                      + "(macroexpand-1 '(unless false 42)))")
+              .toString());
+      assertEquals(
+          "(if true nil 7)",
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(do (defmacro inner [x] `(if true nil ~x)) "
+                      + "(defmacro outer [x] `(inner ~x)) "
+                      + "(macroexpand '(outer 7)))")
+              .toString());
+    }
+  }
+
+  @Test
   public void evaluatesSpecializedArithmeticOperations() {
     try (Context context = context()) {
       assertEquals(0, context.eval(HaraLanguage.ID, "(+)").asLong());

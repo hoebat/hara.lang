@@ -242,6 +242,10 @@ final class HaraAnalyzer {
           return analyzeExtendType(list);
         case "defmacro":
           return analyzeDefMacro(list);
+        case "macroexpand-1":
+          return analyzeMacroExpand(list, false);
+        case "macroexpand":
+          return analyzeMacroExpand(list, true);
         case "ns":
           return analyzeNamespace(list);
         case "alias":
@@ -1508,6 +1512,11 @@ final class HaraAnalyzer {
     }
     context.defineMacro(symbol, new HaraMacro(symbol, (ILinearType<?>) form.nth(2), body));
     return new HaraNodes.Literal(null);
+  }
+
+  private HaraExpressionNode analyzeMacroExpand(List<?> form, boolean recursive) {
+    requireCount(form, 2, recursive ? "macroexpand" : "macroexpand-1");
+    return new HaraNodes.MacroExpand(analyze(form.nth(1)), recursive);
   }
 
   private HaraExpressionNode analyzeNamespace(List<?> form) {

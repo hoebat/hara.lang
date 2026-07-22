@@ -955,6 +955,21 @@ public final class HaraNodes {
     }
   }
 
+  public static final class MacroExpand extends HaraExpressionNode {
+    @Child private HaraExpressionNode form;
+    private final boolean recursive;
+
+    public MacroExpand(HaraExpressionNode form, boolean recursive) {
+      this.form = form;
+      this.recursive = recursive;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      return HaraLanguage.currentContext().macroExpand(form.execute(frame), recursive);
+    }
+  }
+
   public static final class Declare extends HaraExpressionNode {
     private final Symbol[] symbols;
 

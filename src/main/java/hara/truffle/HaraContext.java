@@ -6,6 +6,7 @@ import hara.kernel.builtin.BuiltinStruct;
 import hara.lang.base.Iter;
 import hara.lang.base.iter.CloseableIterator;
 import hara.lang.data.Symbol;
+import hara.lang.data.List;
 import hara.lang.data.Keyword;
 import hara.lang.data.types.IMapType;
 import hara.lang.protocol.IFn;
@@ -77,6 +78,29 @@ public final class HaraContext {
     HaraNamespace namespace =
         namespaceName == null ? currentNamespace : namespaces.get(namespaceName);
     return namespace == null ? null : namespace.lookup(symbol.getName());
+  }
+
+  public Object macroExpand(Object form, boolean recursive) {
+    Object result = form;
+    int expansions = 0;
+    do {
+      Object expanded = macroExpandOnce(result);
+      if (expanded == result) return result;
+      result = expanded;
+      expansions++;
+      if (expansions > 1000) throw new HaraException("macro expansion exceeded 1000 steps");
+    } while (recursive);
+    return result;
+  }
+
+  private Object macroExpandOnce(Object form) {
+    if (!(form instanceof List<?>)) return form;
+    List<?> list = (List<?>) form;
+    if (list.count() == 0 || !(list.nth(0) instanceof Symbol)) return form;
+    Symbol operator = (Symbol) list.nth(0);
+    if (operator.getNamespace() != null) return form;
+    HaraMacro macro = resolveMacro(operator);
+    return macro == null ? form : macro.expand(list);
   }
 
   public void defineAlias(Symbol alias, Symbol target) {
