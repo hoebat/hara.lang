@@ -8,7 +8,6 @@ import hara.pod.v1.HandshakeRequest;
 import hara.pod.v1.HandshakeResponse;
 import hara.pod.v1.Manifest;
 import hara.pod.v1.ReleaseRequest;
-import hara.pod.v1.Value;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
@@ -75,17 +74,38 @@ public final class HaraLocalPodClient implements HaraPodClient {
     if (!(handle instanceof HaraPodHandle)) {
       throw new IllegalArgumentException("Not a pod handle: " + handle);
     }
-    request(
-        Envelope.newBuilder()
-            .setRelease(ReleaseRequest.newBuilder().setHandle(((HaraPodHandle) handle).handle()))
-            .build());
+    Envelope response =
+        request(
+            Envelope.newBuilder()
+                .setRelease(
+                    ReleaseRequest.newBuilder().setHandle(((HaraPodHandle) handle).handle()))
+                .build());
+    if (!response.hasReleaseResponse()) {
+      throw new HaraPodException("Expected release response, got " + response.getBodyCase());
+    }
+    if (response.getReleaseResponse().hasError()) {
+      throw new HaraPodException(
+          response.getReleaseResponse().getError().getCode()
+              + ": "
+              + response.getReleaseResponse().getError().getMessage());
+    }
   }
 
   public void cancel(long requestId) {
-    request(
-        Envelope.newBuilder()
-            .setCancel(CancelRequest.newBuilder().setTargetRequestId(requestId))
-            .build());
+    Envelope response =
+        request(
+            Envelope.newBuilder()
+                .setCancel(CancelRequest.newBuilder().setTargetRequestId(requestId))
+                .build());
+    if (!response.hasCancelResponse()) {
+      throw new HaraPodException("Expected cancel response, got " + response.getBodyCase());
+    }
+    if (response.getCancelResponse().hasError()) {
+      throw new HaraPodException(
+          response.getCancelResponse().getError().getCode()
+              + ": "
+              + response.getCancelResponse().getError().getMessage());
+    }
   }
 
   @Override

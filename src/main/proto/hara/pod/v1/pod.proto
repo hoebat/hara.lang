@@ -17,6 +17,8 @@ message Envelope {
     StreamRequest stream = 6;
     HandshakeResponse handshake_response = 7;
     CallResponse call_response = 8;
+    ReleaseResponse release_response = 9;
+    CancelResponse cancel_response = 10;
   }
 }
 
@@ -71,8 +73,17 @@ message ReleaseRequest {
   Handle handle = 1;
 }
 
+message ReleaseResponse {
+  Error error = 1;
+}
+
 message CancelRequest {
   uint64 target_request_id = 1;
+}
+
+message CancelResponse {
+  bool cancelled = 1;
+  Error error = 2;
 }
 
 message StreamRequest {
