@@ -50,6 +50,10 @@
    :class :runtime
    :source "(letfn [(fact [n] (if (= n 0) 1 (* n (fact (- n 1)))))] (fact 5))"
    :expect {:value 120 :type :integer}}
+  {:id :runtime/cond
+   :class :runtime
+   :source "(cond (= 1 2) 0 (= 2 2) 42 :else 99)"
+   :expect {:value 42 :type :integer}}
   {:id :runtime/destructuring
    :class :runtime
    :source "(let [{:keys [age]} {:age 41}] (+ age 1))"

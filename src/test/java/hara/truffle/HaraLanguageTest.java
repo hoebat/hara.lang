@@ -92,6 +92,16 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void evaluatesCondClausesInOrder() {
+    try (Context context = context()) {
+      assertEquals(
+          42, context.eval(HaraLanguage.ID, "(cond (= 1 2) 0 (= 2 2) 42 :else 99)").asLong());
+      assertTrue(context.eval(HaraLanguage.ID, "(cond false nil :else true)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(cond false nil)").isNull());
+    }
+  }
+
+  @Test
   public void evaluatesSpecializedArithmeticOperations() {
     try (Context context = context()) {
       assertEquals(0, context.eval(HaraLanguage.ID, "(+)").asLong());

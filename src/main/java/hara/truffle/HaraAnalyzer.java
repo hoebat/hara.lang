@@ -194,6 +194,8 @@ final class HaraAnalyzer {
           return analyzeWhen(list, false);
         case "when-not":
           return analyzeWhen(list, true);
+        case "cond":
+          return analyzeCond(list);
         case "and":
           return analyzeAnd(list);
         case "or":
@@ -406,6 +408,19 @@ final class HaraAnalyzer {
     HaraExpressionNode condition = analyze(form.nth(1));
     if (negate) return new HaraNodes.If(condition, new HaraNodes.Literal(null), consequent);
     return new HaraNodes.If(condition, consequent, new HaraNodes.Literal(null));
+  }
+
+  private HaraExpressionNode analyzeCond(List<?> form) {
+    if (form.count() == 1) return new HaraNodes.Literal(null);
+    if (form.count() % 2 == 0) throw error("cond expects test/expression pairs");
+    HaraExpressionNode result = new HaraNodes.Literal(null);
+    for (int i = (int) form.count() - 2; i >= 1; i -= 2) {
+      Object test = form.nth(i);
+      HaraExpressionNode condition = analyze(test);
+      HaraExpressionNode consequent = analyze(form.nth(i + 1));
+      result = new HaraNodes.If(condition, consequent, result);
+    }
+    return result;
   }
 
   private HaraExpressionNode analyzeAnd(List<?> form) {
