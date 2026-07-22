@@ -67,6 +67,10 @@ ordinary L0 forms and iterator operations. `rest` returns a lazy iterator;
 `next` returns that iterator only when it has a value, otherwise nil. This is
 the L0 replacement for requiring Clojure `ISeq`/`Seq` navigation.
 
+The same bootstrap provides ordinary names `map`, `filter`, `take`, `drop`,
+`mapcat`, `keep`, `cycle`, `zip`, and `partition-pair`; each returns or
+consumes explicit iterators according to the rules above.
+
 Destructuring supports nested positional vector patterns, vector rest
 bindings, map `:keys`, `:strs`, `:syms`, `:as`, and `:or` patterns in function,
 `let`, and `loop` bindings. Missing sequential or map values produce nil
