@@ -6,6 +6,9 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import hara.lang.base.iter.CloseableIterator;
 
 import static org.junit.Assert.*;
 
@@ -92,6 +95,44 @@ public class IterTest {
     assertEquals(1, requested[0]);
     assertEquals(Integer.valueOf(2), iter.next());
     assertEquals(2, requested[0]);
+  }
+
+  @Test
+  public void testConcatClosesExhaustedAndExplicitlyClosedSources() {
+    AtomicInteger closed = new AtomicInteger();
+    Iterator<Integer> first = closeable(Arrays.asList(1).iterator(), closed);
+    Iterator<Integer> second = closeable(Arrays.asList(2).iterator(), closed);
+
+    CloseableIterator<Integer> concatenated =
+        (CloseableIterator<Integer>) Iter.concat(first, second);
+    assertEquals(Integer.valueOf(1), concatenated.next());
+    assertEquals(Integer.valueOf(2), concatenated.next());
+    assertEquals(1, closed.get());
+    concatenated =
+        (CloseableIterator<Integer>)
+            Iter.concat(closeable(Arrays.asList(3).iterator(), closed), second);
+    assertEquals(Integer.valueOf(3), concatenated.next());
+    concatenated.close();
+    assertEquals(2, closed.get());
+  }
+
+  private static <E> Iterator<E> closeable(Iterator<E> iterator, AtomicInteger closed) {
+    return new CloseableIterator<E>() {
+      @Override
+      public boolean hasNext() {
+        return iterator.hasNext();
+      }
+
+      @Override
+      public E next() {
+        return iterator.next();
+      }
+
+      @Override
+      public void close() {
+        closed.incrementAndGet();
+      }
+    };
   }
 
   @Test

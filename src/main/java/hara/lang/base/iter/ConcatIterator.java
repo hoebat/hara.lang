@@ -23,17 +23,25 @@ public final class ConcatIterator<E> implements CloseableIterator<E> {
     if (closed) {
       return false;
     }
-    while (current == null || !current.hasNext()) {
+    while (true) {
+      if (current != null) {
+        if (current.hasNext()) {
+          return true;
+        }
+        // Release exhausted resource-backed children before acquiring the next
+        // source. This keeps lazy concatenation from retaining completed sources.
+        Iter.close(current);
+        current = null;
+      }
       if (sources.hasNext()) {
         current = sources.next();
       } else if (!appended.isEmpty()) {
         current = appended.removeFirst();
       } else {
-        current = null;
+        Iter.close(sources);
         return false;
       }
     }
-    return true;
   }
 
   @Override
