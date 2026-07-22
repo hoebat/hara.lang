@@ -67,6 +67,10 @@
    :class :module
    :source "(ns target) (def answer 42) (ns user) (refer \"target\") answer"
    :expect {:value 42 :type :integer}}
+  {:id :module/in-ns-use
+   :class :module
+   :source "(in-ns 'target) (def answer 42) (in-ns 'user) (use 'target) answer"
+   :expect {:value 42 :type :integer}}
   {:id :numeric/compare
    :class :numeric
    :source "(< 1N 2N)"

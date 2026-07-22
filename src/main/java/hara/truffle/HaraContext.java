@@ -47,6 +47,7 @@ public final class HaraContext {
       throw new HaraException("Namespace name must not be qualified");
     }
     currentNamespace = namespace(symbol.getName());
+    installNumericBuiltins(currentNamespace);
   }
 
   public HaraVar resolve(Symbol symbol) {
@@ -128,19 +129,22 @@ public final class HaraContext {
   }
 
   private void installNumericBuiltins() {
-    currentNamespace.define(
-        "bigint", new UnaryBuiltin("bigint", HaraNumericConversions::toBigInteger));
-    currentNamespace.define(
-        "bigdec", new UnaryBuiltin("bigdec", HaraNumericConversions::toBigDecimal));
-    currentNamespace.define("double", new UnaryBuiltin("double", HaraNumericConversions::toDouble));
-    currentNamespace.define(
+    installNumericBuiltins(currentNamespace);
+  }
+
+  private void installNumericBuiltins(HaraNamespace target) {
+    target.define("bigint", new UnaryBuiltin("bigint", HaraNumericConversions::toBigInteger));
+    target.define("bigdec", new UnaryBuiltin("bigdec", HaraNumericConversions::toBigDecimal));
+    target.define("double", new UnaryBuiltin("double", HaraNumericConversions::toDouble));
+    target.define(
         "not", new UnaryBuiltin("not", value -> value == null || Boolean.FALSE.equals(value)));
-    currentNamespace.define("load-string", new UnaryBuiltin("load-string", this::loadString));
-    currentNamespace.define("load-file", new UnaryBuiltin("load-file", this::loadFile));
-    currentNamespace.define("require", new UnaryBuiltin("require", this::requireModule));
-    currentNamespace.define("refer", new UnaryBuiltin("refer", this::referNamespace));
-    currentNamespace.define(
-        "module-revision", new UnaryBuiltin("module-revision", this::moduleRevision));
+    target.define("load-string", new UnaryBuiltin("load-string", this::loadString));
+    target.define("load-file", new UnaryBuiltin("load-file", this::loadFile));
+    target.define("require", new UnaryBuiltin("require", this::requireModule));
+    target.define("refer", new UnaryBuiltin("refer", this::referNamespace));
+    target.define("in-ns", new UnaryBuiltin("in-ns", this::inNamespace));
+    target.define("use", new UnaryBuiltin("use", this::useNamespace));
+    target.define("module-revision", new UnaryBuiltin("module-revision", this::moduleRevision));
   }
 
   private Object loadString(Object value) {
@@ -218,6 +222,21 @@ public final class HaraContext {
           .putAll(targetMacros);
     }
     return null;
+  }
+
+  private Object inNamespace(Object value) {
+    if (!(value instanceof Symbol) || ((Symbol) value).getNamespace() != null) {
+      throw new HaraException("in-ns expects an unqualified namespace symbol");
+    }
+    setCurrentNamespace((Symbol) value);
+    return value;
+  }
+
+  private Object useNamespace(Object value) {
+    if (value instanceof Symbol && ((Symbol) value).getNamespace() == null) {
+      return referNamespace(((Symbol) value).getName());
+    }
+    return referNamespace(value);
   }
 
   private Path canonicalPath(String value) {

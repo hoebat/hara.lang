@@ -421,6 +421,22 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void supportsInNsAndUseAsOrdinaryRuntimeForms() {
+    try (Context context = context()) {
+      assertEquals(
+          42,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(in-ns 'source) (def answer 42) (in-ns 'user) (use 'source) answer")
+              .asLong());
+      PolyglotException invalid =
+          assertThrows(PolyglotException.class, () -> context.eval(HaraLanguage.ID, "(in-ns 1)"));
+      assertTrue(invalid.getMessage().contains("unqualified namespace symbol"));
+    }
+  }
+
+  @Test
   public void isolatesDefinitionsBetweenContexts() {
     try (Context first = context();
         Context second = context()) {
