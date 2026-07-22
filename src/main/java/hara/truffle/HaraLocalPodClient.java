@@ -14,15 +14,22 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-/** Synchronous protobuf transport for a local pod subprocess. */
+/** Protobuf transport for a local pod subprocess. Calls may be in flight concurrently. */
 public final class HaraLocalPodClient implements HaraPodClient {
   private final InputStream input;
   private final OutputStream output;
   private final Process process;
   private final AtomicLong requestIds = new AtomicLong();
-  private final Object lock = new Object();
+  private final Object writeLock = new Object();
+  private final Map<Long, CompletableFuture<Envelope>> pending = new ConcurrentHashMap<>();
+  private final AtomicBoolean closed = new AtomicBoolean();
+  private final Thread reader;
   private final Manifest manifest;
 
   public static HaraLocalPodClient start(List<String> command, String clientName) {
@@ -40,6 +47,9 @@ public final class HaraLocalPodClient implements HaraPodClient {
     this.process = process;
     this.input = new BufferedInputStream(input);
     this.output = new BufferedOutputStream(output);
+    this.reader = new Thread(this::readResponses, "hara-pod-reader");
+    this.reader.setDaemon(true);
+    this.reader.start();
     this.manifest = handshake(clientName);
   }
 
@@ -110,6 +120,13 @@ public final class HaraLocalPodClient implements HaraPodClient {
 
   @Override
   public void close() {
+    if (!closed.compareAndSet(false, true)) {
+      return;
+    }
+    HaraPodException failure = new HaraPodException("Pod client closed");
+    pending.values().forEach(result -> result.completeExceptionally(failure));
+    pending.clear();
+    reader.interrupt();
     try {
       input.close();
       output.close();
@@ -146,19 +163,56 @@ public final class HaraLocalPodClient implements HaraPodClient {
   }
 
   private Envelope request(Envelope request) {
-    synchronized (lock) {
-      long requestId = requestIds.incrementAndGet();
+    if (closed.get()) {
+      throw new HaraPodException("Pod client is closed");
+    }
+    long requestId = requestIds.incrementAndGet();
+    CompletableFuture<Envelope> result = new CompletableFuture<>();
+    pending.put(requestId, result);
+    try {
       Envelope numbered = request.toBuilder().setRequestId(requestId).build();
-      try {
+      synchronized (writeLock) {
         numbered.writeDelimitedTo(output);
         output.flush();
+      }
+      return result.get();
+    } catch (IOException error) {
+      throw new HaraPodException("Pod transport failure", error);
+    } catch (InterruptedException error) {
+      Thread.currentThread().interrupt();
+      throw new HaraPodException("Interrupted waiting for pod response", error);
+    } catch (java.util.concurrent.ExecutionException error) {
+      Throwable cause = error.getCause();
+      if (cause instanceof HaraPodException) {
+        throw (HaraPodException) cause;
+      }
+      throw new HaraPodException("Pod request failed", cause);
+    } finally {
+      pending.remove(requestId);
+    }
+  }
+
+  private void readResponses() {
+    try {
+      while (!closed.get()) {
         Envelope response = Envelope.parseDelimitedFrom(input);
-        if (response == null || response.getRequestId() != requestId) {
-          throw new HaraPodException("Mismatched pod response request id");
+        if (response == null) {
+          throw new HaraPodException("Pod closed its output");
         }
-        return response;
-      } catch (IOException error) {
-        throw new HaraPodException("Pod transport failure", error);
+        CompletableFuture<Envelope> result = pending.get(response.getRequestId());
+        if (result == null) {
+          throw new HaraPodException(
+              "Mismatched pod response request id: " + response.getRequestId());
+        }
+        result.complete(response);
+      }
+    } catch (IOException | HaraPodException error) {
+      if (!closed.get()) {
+        HaraPodException failure =
+            error instanceof HaraPodException
+                ? (HaraPodException) error
+                : new HaraPodException("Pod transport failure", error);
+        pending.values().forEach(result -> result.completeExceptionally(failure));
       }
     }
   }

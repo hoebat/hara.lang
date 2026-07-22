@@ -12,6 +12,9 @@ import hara.pod.v1.Value;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import org.junit.Test;
 
 public class HaraLocalPodClientTest {
@@ -47,6 +50,16 @@ public class HaraLocalPodClientTest {
                     .writeDelimitedTo(serverOutput);
                 serverOutput.flush();
                 Envelope call = Envelope.parseDelimitedFrom(serverInput);
+                Envelope secondCall = Envelope.parseDelimitedFrom(serverInput);
+                Envelope.newBuilder()
+                    .setRequestId(secondCall.getRequestId())
+                    .setCallResponse(
+                        CallResponse.newBuilder()
+                            .setValue(
+                                Value.newBuilder()
+                                    .setStringValue(secondCall.getCall().getFunction())))
+                    .build()
+                    .writeDelimitedTo(serverOutput);
                 Envelope.newBuilder()
                     .setRequestId(call.getRequestId())
                     .setCallResponse(
@@ -64,7 +77,12 @@ public class HaraLocalPodClientTest {
 
     HaraLocalPodClient client = new HaraLocalPodClient(null, clientInput, clientOutput, "test");
     assertEquals("pod.test", client.manifest().getPodName());
-    assertEquals("pod.test/echo", client.call("pod.test/echo", new Object[] {"value"}));
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Object> first = executor.submit(() -> client.call("pod.test/first", new Object[0]));
+    Future<Object> second = executor.submit(() -> client.call("pod.test/second", new Object[0]));
+    assertEquals("pod.test/first", first.get());
+    assertEquals("pod.test/second", second.get());
+    executor.shutdownNow();
     client.close();
     server.join(1000);
     if (serverFailure.get() != null) {
