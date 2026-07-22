@@ -537,6 +537,9 @@ public final class HaraContext {
       }
       return HaraBox.export(selected.callTarget().call(selected.callArguments(arguments)));
     }
+    if (function instanceof HaraMultiFunction) {
+      return HaraBox.export(((HaraMultiFunction) function).invoke(arguments));
+    }
     if (function instanceof HaraStruct || function instanceof IFn) {
       return ifnProtocol.invoke("invoke", function, arguments);
     }
