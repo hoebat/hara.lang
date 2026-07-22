@@ -959,7 +959,7 @@ final class HaraAnalyzer {
       List<?> form, HaraNodes.Numeric.Operator operator, String name, Long identity) {
     int argumentCount = (int) form.count() - 1;
     if (argumentCount == 0) {
-      if (identity == null || operator == HaraNodes.Numeric.Operator.SUBTRACT) {
+      if (identity == null || operator != HaraNodes.Numeric.Operator.MULTIPLY) {
         throw error(name + " expects at least one argument");
       }
       return new HaraNodes.Literal(identity);

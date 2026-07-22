@@ -38,6 +38,7 @@ public class HaraLanguageTest {
       assertEquals(24, context.eval(HaraLanguage.ID, "(* 2 3 4)").asLong());
       assertEquals(2, context.eval(HaraLanguage.ID, "(/ 5 2)").asLong());
       assertEquals(0, context.eval(HaraLanguage.ID, "(/ 2)").asLong());
+      assertThrows(PolyglotException.class, () -> context.eval(HaraLanguage.ID, "(/)"));
     }
   }
 
