@@ -404,6 +404,23 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void refersNamespaceValuesIntoCurrentNamespace() {
+    try (Context context = context()) {
+      assertEquals(
+          42,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(ns source) (def answer 42) (ns user) (refer \"source\") answer")
+              .asLong());
+      PolyglotException missing =
+          assertThrows(
+              PolyglotException.class, () -> context.eval(HaraLanguage.ID, "(refer \"absent\")"));
+      assertTrue(missing.getMessage().contains("missing namespace"));
+    }
+  }
+
+  @Test
   public void isolatesDefinitionsBetweenContexts() {
     try (Context first = context();
         Context second = context()) {

@@ -1,7 +1,9 @@
 package hara.lang.data.types;
 
+import hara.lang.base.G;
 import hara.lang.base.Iter;
 import hara.lang.protocol.*;
+import java.util.Map.Entry;
 
 public abstract class ObjPersistent implements IObjType, IPersistent, IHashCached {
   public final IMetadata _meta;
@@ -28,6 +30,18 @@ public abstract class ObjPersistent implements IObjType, IPersistent, IHashCache
   }
 
   public String display() {
+    if (this instanceof IMapType) {
+      IMapType map = (IMapType) this;
+      return Iter.toString(
+          map.iterator(),
+          "{",
+          "}",
+          " ",
+          value -> {
+            Entry entry = (Entry) value;
+            return G.display(entry.getKey()) + " " + G.display(entry.getValue());
+          });
+    }
     if (this instanceof IColl) {
       IColl coll = (IColl) this;
       return Iter.display(coll.iterator(), coll.startString(), coll.endString(), coll.sepString());

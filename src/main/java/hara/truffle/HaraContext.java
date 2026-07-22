@@ -138,6 +138,7 @@ public final class HaraContext {
     currentNamespace.define("load-string", new UnaryBuiltin("load-string", this::loadString));
     currentNamespace.define("load-file", new UnaryBuiltin("load-file", this::loadFile));
     currentNamespace.define("require", new UnaryBuiltin("require", this::requireModule));
+    currentNamespace.define("refer", new UnaryBuiltin("refer", this::referNamespace));
     currentNamespace.define(
         "module-revision", new UnaryBuiltin("module-revision", this::moduleRevision));
   }
@@ -197,6 +198,26 @@ public final class HaraContext {
     }
     ModuleRecord module = modules.get(canonicalPath((String) value).toString());
     return module == null ? 0L : module.revision;
+  }
+
+  private Object referNamespace(Object value) {
+    if (!(value instanceof String)) {
+      throw new HaraException("refer expects a namespace string");
+    }
+    HaraNamespace target = namespaces.get((String) value);
+    if (target == null) {
+      throw new HaraException("Cannot refer missing namespace: " + value);
+    }
+    for (Map.Entry<String, HaraVar> entry : target.vars.entrySet()) {
+      currentNamespace.define(entry.getKey(), entry.getValue().get());
+    }
+    Map<String, HaraMacro> targetMacros = macros.get(target.name());
+    if (targetMacros != null) {
+      macros
+          .computeIfAbsent(currentNamespace.name(), ignored -> new ConcurrentHashMap<>())
+          .putAll(targetMacros);
+    }
+    return null;
   }
 
   private Path canonicalPath(String value) {
