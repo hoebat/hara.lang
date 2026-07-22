@@ -383,6 +383,13 @@ public final class HaraContext {
     if (function instanceof HaraStruct || function instanceof IFn) {
       return ifnProtocol.invoke("invoke", function, arguments);
     }
+    if (function instanceof HaraType) {
+      HaraType type = (HaraType) function;
+      if (arguments.length != type.arity()) {
+        throw new HaraException("constructor has no matching arity: " + arguments.length);
+      }
+      return new HaraStruct(type, arguments);
+    }
     throw new HaraException("value is not callable: " + function);
   }
 

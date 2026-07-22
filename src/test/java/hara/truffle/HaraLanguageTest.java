@@ -537,6 +537,13 @@ public class HaraLanguageTest {
           context
               .eval(HaraLanguage.ID, "(defn first-rest [x & xs] x) (apply first-rest [1 2 3 4])")
               .asLong());
+      assertEquals(
+          "Ada",
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(defstruct Person [name]) (field (apply Person [\"Ada\"]) :name)")
+              .asString());
     }
   }
 
