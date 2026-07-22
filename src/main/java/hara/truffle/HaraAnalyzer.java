@@ -205,6 +205,10 @@ final class HaraAnalyzer {
           return analyzeFunction(list);
         case "defn":
           return analyzeDefn(list);
+        case "defmulti":
+          return analyzeDefMulti(list);
+        case "defmethod":
+          return analyzeDefMethod(list);
         case "def":
           return analyzeDef(list);
         case "var":
@@ -666,6 +670,30 @@ final class HaraAnalyzer {
       function = new HaraNodes.MultiFunction(alternatives);
     }
     return new HaraNodes.DefineGlobal(symbol, function);
+  }
+
+  private HaraExpressionNode analyzeDefMulti(List<?> form) {
+    requireCount(form, 3, "defmulti");
+    Object name = form.nth(1);
+    if (!(name instanceof Symbol) || ((Symbol) name).getNamespace() != null) {
+      throw error("defmulti name must be an unqualified symbol");
+    }
+    return new HaraNodes.DefineMulti((Symbol) name, analyze(form.nth(2)));
+  }
+
+  private HaraExpressionNode analyzeDefMethod(List<?> form) {
+    requireCount(form, 5, "defmethod");
+    Object name = form.nth(1);
+    if (!(name instanceof Symbol) || ((Symbol) name).getNamespace() != null) {
+      throw error("defmethod name must be an unqualified symbol");
+    }
+    if (!isBindingVector(form.nth(3))) {
+      throw error("defmethod expects a dispatch value, parameter vector, and body");
+    }
+    Object[] body = new Object[(int) form.count() - 4];
+    for (int i = 4; i < form.count(); i++) body[i - 4] = form.nth(i);
+    return new HaraNodes.DefineMethod(
+        (Symbol) name, analyze(form.nth(2)), analyzeFunction((ILinearType<?>) form.nth(3), body));
   }
 
   @SuppressWarnings("unchecked")

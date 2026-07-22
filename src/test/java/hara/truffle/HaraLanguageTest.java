@@ -27,6 +27,17 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void dispatchesDefmultiAndDefmethodByArbitraryValues() {
+    try (Context context = context()) {
+      context.eval(HaraLanguage.ID, "(defmulti kind (fn [x] (if (= x 1) :one :other)))");
+      context.eval(HaraLanguage.ID, "(defmethod kind :one [x] \"one\")");
+      context.eval(HaraLanguage.ID, "(defmethod kind :default [x] \"other\")");
+      assertEquals("one", context.eval(HaraLanguage.ID, "(kind 1)").asString());
+      assertEquals("other", context.eval(HaraLanguage.ID, "(kind 2)").asString());
+    }
+  }
+
+  @Test
   public void evaluatesSpecializedArithmeticOperations() {
     try (Context context = context()) {
       assertEquals(0, context.eval(HaraLanguage.ID, "(+)").asLong());

@@ -24,6 +24,7 @@ import hara.truffle.HaraContext;
 import hara.truffle.HaraException;
 import hara.truffle.HaraFunction;
 import hara.truffle.HaraLanguage;
+import hara.truffle.HaraMultiFunction;
 import hara.truffle.HaraProtocol;
 import hara.truffle.HaraProtocolImplementation;
 import hara.truffle.HaraStruct;
@@ -903,6 +904,56 @@ public final class HaraNodes {
     }
   }
 
+  public static final class DefineMulti extends HaraExpressionNode {
+    private final Symbol symbol;
+    @Child private HaraExpressionNode dispatch;
+
+    public DefineMulti(Symbol symbol, HaraExpressionNode dispatch) {
+      this.symbol = symbol;
+      this.dispatch = dispatch;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      Object value = dispatch.execute(frame);
+      if (!(value instanceof HaraFunction)) {
+        throw new HaraException("defmulti dispatch function must be a function", this);
+      }
+      return HaraLanguage.currentContext()
+          .define(symbol, new HaraMultiFunction((HaraFunction) value));
+    }
+  }
+
+  public static final class DefineMethod extends HaraExpressionNode {
+    private final Symbol symbol;
+    @Child private HaraExpressionNode dispatchValue;
+    @Child private HaraExpressionNode function;
+
+    public DefineMethod(
+        Symbol symbol, HaraExpressionNode dispatchValue, HaraExpressionNode function) {
+      this.symbol = symbol;
+      this.dispatchValue = dispatchValue;
+      this.function = function;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      HaraContext context = HaraLanguage.currentContext();
+      HaraVar var = context.resolve(symbol);
+      if (var == null || !(var.get() instanceof HaraMultiFunction)) {
+        throw new HaraException(
+            "defmethod requires an existing defmulti: " + symbol.getName(), this);
+      }
+      Object method = function.execute(frame);
+      if (!(method instanceof HaraFunction)) {
+        throw new HaraException("defmethod body did not produce a function", this);
+      }
+      ((HaraMultiFunction) var.get())
+          .addMethod(dispatchValue.execute(frame), (HaraFunction) method);
+      return var;
+    }
+  }
+
   public static final class SetNamespace extends HaraExpressionNode {
     private final Symbol symbol;
 
@@ -1394,6 +1445,9 @@ public final class HaraNodes {
     @Override
     public Object execute(VirtualFrame frame) {
       Object target = function.execute(frame);
+      if (target instanceof HaraMultiFunction) {
+        return HaraBox.export(((HaraMultiFunction) target).invoke(evaluateArguments(frame)));
+      }
       if (target instanceof HaraStruct) {
         Object[] values = evaluateArguments(frame);
         return HaraLanguage.currentContext().ifnProtocol().invoke("invoke", target, values);
