@@ -127,8 +127,7 @@ public class HaraJavaAdaptersTest {
   public void exposesIteratorTraversalThroughTheCollectionProtocol() {
     HaraProtocol collection =
         new HaraProtocol(
-            "IColl",
-            Map.of("start-string", 1, "end-string", 1, "sep-string", 1, "iterator", 1));
+            "IColl", Map.of("start-string", 1, "end-string", 1, "sep-string", 1, "iterator", 1));
     HaraJavaAdapters.installCollection(collection);
     Vector.Standard<String> vector = Vector.Standard.from(null, "first", "second");
 
@@ -158,8 +157,7 @@ public class HaraJavaAdaptersTest {
     for (Object[] value : values) {
       Object receiver = value[0];
       assertEquals(value[1], count.invoke("count", receiver, new Object[0]));
-      Iterator<?> iterator =
-          (Iterator<?>) collection.invoke("iterator", receiver, new Object[0]);
+      Iterator<?> iterator = (Iterator<?>) collection.invoke("iterator", receiver, new Object[0]);
       if (value[2] != null) {
         assertEquals(value[2], iterator.next());
       } else {
@@ -179,8 +177,7 @@ public class HaraJavaAdaptersTest {
     HaraJavaAdapters.installIFn(ifn);
     Set.Standard<String> set = Set.Standard.from(null, "present");
     assertEquals("present", ifn.invoke("invoke", set, new Object[] {"present"}));
-    assertEquals(
-        "missing", ifn.invoke("invoke", set, new Object[] {"missing", "missing"}));
+    assertEquals("missing", ifn.invoke("invoke", set, new Object[] {"missing", "missing"}));
 
     HaraProtocol pair = new HaraProtocol("IPair", Map.of("key", 1, "value", 1));
     HaraJavaAdapters.installPair(pair);

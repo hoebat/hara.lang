@@ -13,6 +13,7 @@ import com.oracle.truffle.api.library.ExportLibrary;
 import com.oracle.truffle.api.library.ExportMessage;
 import hara.lang.data.types.ILinearType;
 import hara.lang.data.types.ISetType;
+import hara.lang.base.primitive.Cast;
 import hara.lang.protocol.ICount;
 import hara.lang.protocol.IFind;
 import hara.lang.protocol.IFn;
@@ -56,6 +57,8 @@ public final class HaraBox implements TruffleObject {
     }
     if (value instanceof Long
         || value instanceof Integer
+        || value instanceof Short
+        || value instanceof Byte
         || value instanceof Double
         || value instanceof Float
         || value instanceof Boolean
@@ -96,6 +99,34 @@ public final class HaraBox implements TruffleObject {
       throw InvalidArrayIndexException.create(index);
     }
     return export(arrayElement(value, index));
+  }
+
+  @ExportMessage
+  boolean isArrayElementModifiable(long index) {
+    return (value instanceof byte[] && index >= 0 && index < ((byte[]) value).length)
+        || (value instanceof List<?> && index >= 0 && index < ((List<?>) value).size());
+  }
+
+  @ExportMessage
+  boolean isArrayElementInsertable(long index) {
+    return false;
+  }
+
+  @ExportMessage
+  void writeArrayElement(long index, Object newValue)
+      throws InvalidArrayIndexException, UnsupportedTypeException {
+    if (!isArrayElementModifiable(index)) {
+      throw InvalidArrayIndexException.create(index);
+    }
+    try {
+      if (value instanceof byte[]) {
+        ((byte[]) value)[(int) index] = Cast.byteCast(unwrap(newValue));
+      } else {
+        ((List<Object>) value).set((int) index, unwrap(newValue));
+      }
+    } catch (IllegalArgumentException error) {
+      throw UnsupportedTypeException.create(new Object[] {newValue}, "expected a signed byte");
+    }
   }
 
   @ExportMessage
@@ -170,13 +201,49 @@ public final class HaraBox implements TruffleObject {
   }
 
   @ExportMessage
+  boolean isHashEntryModifiable(Object key) {
+    return value instanceof Map && ((Map<?, ?>) value).containsKey(key);
+  }
+
+  @ExportMessage
+  boolean isHashEntryInsertable(Object key) {
+    return value instanceof Map && !((Map<?, ?>) value).containsKey(key);
+  }
+
+  @ExportMessage
+  boolean isHashEntryRemovable(Object key) {
+    return value instanceof Map && ((Map<?, ?>) value).containsKey(key);
+  }
+
+  @ExportMessage
+  void writeHashEntry(Object key, Object newValue) throws UnsupportedMessageException {
+    if (!(value instanceof Map)) {
+      throw UnsupportedMessageException.create();
+    }
+    ((Map<Object, Object>) value).put(key, unwrap(newValue));
+  }
+
+  @ExportMessage
+  void removeHashEntry(Object key) throws UnknownKeyException, UnsupportedMessageException {
+    if (!(value instanceof Map)) {
+      throw UnsupportedMessageException.create();
+    }
+    if (!((Map<?, ?>) value).containsKey(key)) {
+      throw UnknownKeyException.create(key);
+    }
+    ((Map<?, ?>) value).remove(key);
+  }
+
+  @ExportMessage
   Object getHashEntriesIterator() throws UnsupportedMessageException {
     if (value instanceof Map) {
       Iterator<?> entries = ((Map<?, ?>) value).entrySet().iterator();
-      return new HaraIterator(entries, entry -> {
-        Map.Entry<?, ?> pair = (Map.Entry<?, ?>) entry;
-        return new HaraHashEntry(pair.getKey(), pair.getValue());
-      });
+      return new HaraIterator(
+          entries,
+          entry -> {
+            Map.Entry<?, ?> pair = (Map.Entry<?, ?>) entry;
+            return new HaraHashEntry(pair.getKey(), pair.getValue());
+          });
     }
     if (value instanceof ILookup) {
       ILookup<?, ?> lookup = (ILookup<?, ?>) value;

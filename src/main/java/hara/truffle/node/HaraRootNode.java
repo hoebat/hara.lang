@@ -6,6 +6,7 @@ import com.oracle.truffle.api.frame.MaterializedFrame;
 import com.oracle.truffle.api.frame.VirtualFrame;
 import com.oracle.truffle.api.nodes.RootNode;
 import com.oracle.truffle.api.source.SourceSection;
+import hara.kernel.builtin.BuiltinStruct;
 import hara.truffle.HaraBox;
 import hara.truffle.HaraException;
 import hara.truffle.HaraLanguage;
@@ -15,6 +16,8 @@ public final class HaraRootNode extends RootNode {
   private final int[] parameterSlots;
   private final int[] captureSlots;
   private final int[] captureSourceSlots;
+  private final int minimumArity;
+  private final boolean variadic;
   private final SourceSection sourceSection;
   private final boolean exportResult;
 
@@ -26,12 +29,15 @@ public final class HaraRootNode extends RootNode {
       int[] captureSlots,
       int[] captureSourceSlots,
       SourceSection sourceSection,
-      boolean exportResult) {
+      boolean exportResult,
+      boolean variadic) {
     super(language, descriptor);
     this.body = body;
     this.parameterSlots = parameterSlots;
     this.captureSlots = captureSlots;
     this.captureSourceSlots = captureSourceSlots;
+    this.minimumArity = parameterSlots.length - (variadic ? 1 : 0);
+    this.variadic = variadic;
     this.sourceSection = sourceSection;
     this.exportResult = exportResult;
   }
@@ -45,8 +51,9 @@ public final class HaraRootNode extends RootNode {
   public Object execute(VirtualFrame frame) {
     Object[] arguments = frame.getArguments();
     int argumentOffset = exportResult ? 0 : 1;
-    if (arguments.length != parameterSlots.length + argumentOffset) {
-      throw arityError(parameterSlots.length, arguments.length - argumentOffset);
+    int actualArity = arguments.length - argumentOffset;
+    if (actualArity < minimumArity || (!variadic && actualArity != minimumArity)) {
+      throw arityError(minimumArity, actualArity, variadic);
     }
 
     if (!exportResult) {
@@ -55,8 +62,13 @@ public final class HaraRootNode extends RootNode {
         frame.setObject(captureSlots[i], closure.getValue(captureSourceSlots[i]));
       }
     }
-    for (int i = 0; i < parameterSlots.length; i++) {
+    for (int i = 0; i < minimumArity; i++) {
       frame.setObject(parameterSlots[i], arguments[i + argumentOffset]);
+    }
+    if (variadic) {
+      Object[] rest = new Object[actualArity - minimumArity];
+      System.arraycopy(arguments, minimumArity + argumentOffset, rest, 0, rest.length);
+      frame.setObject(parameterSlots[minimumArity], BuiltinStruct.vector(rest));
     }
 
     Object result = body.execute(frame);
@@ -64,7 +76,8 @@ public final class HaraRootNode extends RootNode {
   }
 
   @TruffleBoundary
-  private HaraException arityError(int expected, int actual) {
-    return new HaraException("Expected " + expected + " arguments, received " + actual, this);
+  private HaraException arityError(int expected, int actual, boolean variadic) {
+    String expectedText = variadic ? "at least " + expected : Integer.toString(expected);
+    return new HaraException("Expected " + expectedText + " arguments, received " + actual, this);
   }
 }

@@ -859,6 +859,7 @@ public interface Num {
   }
 
   public static long remainder(long x, long y) {
+    if (y == 0) throw new ArithmeticException("Divide by zero");
     return x % y;
   }
 

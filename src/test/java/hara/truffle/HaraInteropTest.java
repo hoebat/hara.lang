@@ -46,8 +46,7 @@ public class HaraInteropTest {
     assertEquals("first", interop.getIteratorNextElement(iteratorValue));
 
     HaraStruct struct =
-        new HaraStruct(
-            new HaraType("Person", new String[] {"name"}), new Object[] {"Ada"});
+        new HaraStruct(new HaraType("Person", new String[] {"name"}), new Object[] {"Ada"});
     assertTrue(interop.hasMembers(struct));
     assertEquals("Ada", interop.readMember(struct, "name"));
   }

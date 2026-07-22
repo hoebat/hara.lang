@@ -3,6 +3,8 @@ package hara.kernel.base;
 import java.io.IOException;
 import java.io.PushbackReader;
 import java.io.StringReader;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.function.Predicate;
 
 public class Reader {
@@ -10,6 +12,17 @@ public class Reader {
   private final PushbackReader reader;
   private int lineNumber = 1;
   private int columnNumber = 1;
+  private final Deque<Position> positions = new ArrayDeque<>();
+
+  private static final class Position {
+    private final int line;
+    private final int column;
+
+    private Position(int line, int column) {
+      this.line = line;
+      this.column = column;
+    }
+  }
 
   public Reader(String s) {
     this(new StringReader(s));
@@ -50,6 +63,7 @@ public class Reader {
       if (c == -1) {
         return null;
       }
+      positions.push(new Position(lineNumber, columnNumber));
       if (c == '\n') {
         lineNumber++;
         columnNumber = 1;
@@ -65,11 +79,15 @@ public class Reader {
   public void unreadChar(Character c) {
     try {
       if (c == '\n') {
-        lineNumber--;
+        reader.unread(c);
       } else {
-        columnNumber--;
+        reader.unread(c);
       }
-      reader.unread(c);
+      Position previous = positions.pollFirst();
+      if (previous != null) {
+        lineNumber = previous.line;
+        columnNumber = previous.column;
+      }
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

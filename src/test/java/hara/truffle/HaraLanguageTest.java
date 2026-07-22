@@ -6,6 +6,8 @@ import static org.junit.Assert.assertTrue;
 
 import hara.kernel.base.RT;
 import java.math.BigInteger;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.PolyglotException;
@@ -30,6 +32,111 @@ public class HaraLanguageTest {
       assertEquals(7, context.eval(HaraLanguage.ID, "(- 10 3)").asLong());
       assertEquals(42, context.eval(HaraLanguage.ID, "(* 6 7)").asLong());
       assertEquals(2, context.eval(HaraLanguage.ID, "(/ 5 2)").asLong());
+    }
+  }
+
+  @Test
+  public void evaluatesNumericComparisonsEqualityAndRemainder() {
+    try (Context context = context()) {
+      assertTrue(context.eval(HaraLanguage.ID, "(< 1 2)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(<= 2 2)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(> 3 2)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(>= 3 3)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(= 1 1.0)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(not= 1 2)").asBoolean());
+      assertEquals(1, context.eval(HaraLanguage.ID, "(mod 7 3)").asLong());
+      assertTrue(context.eval(HaraLanguage.ID, "(< 1N 2N)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(< 1N 1.1M)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(= 1N 1.0M)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(< 1.2M 1.3M)").asBoolean());
+    }
+  }
+
+  @Test
+  public void numericOverflowAndDivisionErrorsAreExplicit() {
+    try (Context context = context()) {
+      Value overflow = context.eval(HaraLanguage.ID, "(+ 9223372036854775807 1)");
+      assertEquals(
+          BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.ONE), overflow.as(BigInteger.class));
+      PolyglotException divideByZero =
+          assertThrows(PolyglotException.class, () -> context.eval(HaraLanguage.ID, "(/ 1 0)"));
+      assertTrue(divideByZero.getMessage().contains("Divide by zero"));
+      PolyglotException remainderByZero =
+          assertThrows(PolyglotException.class, () -> context.eval(HaraLanguage.ID, "(mod 1 0)"));
+      assertTrue(remainderByZero.getMessage().contains("Divide by zero"));
+    }
+  }
+
+  @Test
+  public void numericSpecialValuesHaveStableComparisonBehavior() {
+    try (Context context = context()) {
+      assertTrue(context.eval(HaraLanguage.ID, "(= ##NaN ##NaN)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(not= ##NaN 1)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(= ##Inf ##Inf)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(< 1 ##Inf)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(not= ##Inf 1)").asBoolean());
+    }
+  }
+
+  @Test
+  public void constructsBytesWithTheOrdinaryBytesForm() {
+    try (Context context = context()) {
+      Value bytes = context.eval(HaraLanguage.ID, "(bytes 1 2 -3)");
+      assertTrue(bytes.hasArrayElements());
+      assertEquals(3, bytes.getArraySize());
+      assertEquals(1, bytes.getArrayElement(0).asLong());
+      assertEquals(2, bytes.getArrayElement(1).asLong());
+      assertEquals(-3, bytes.getArrayElement(2).asLong());
+      assertEquals(
+          3, context.eval(HaraLanguage.ID, "(protocol-call ICount count (bytes 1 2 -3))").asLong());
+      assertEquals(
+          2, context.eval(HaraLanguage.ID, "(protocol-call INth nth (bytes 1 2 -3) 1)").asLong());
+      assertEquals(
+          7,
+          context
+              .eval(HaraLanguage.ID, "(protocol-call ILookup lookup (bytes 1 2 -3) 8 7)")
+              .asLong());
+      bytes.setArrayElement(0, 9);
+      assertEquals(9, bytes.getArrayElement(0).asLong());
+    }
+  }
+
+  @Test
+  public void constructsAndMutatesExplicitXtalkTargetValues() {
+    try (Context context = context()) {
+      Value array = context.eval(HaraLanguage.ID, "(x:array 1 2)");
+      assertTrue(array.hasArrayElements());
+      array.setArrayElement(1, 7);
+      assertEquals(7, array.getArrayElement(1).asLong());
+
+      Value object = context.eval(HaraLanguage.ID, "(x:object :answer 41)");
+      assertTrue(object.hasHashEntries());
+      object.putHashEntry(":answer", 42);
+      assertEquals(42, object.getHashValue(":answer").asLong());
+      assertEquals(2, context.eval(HaraLanguage.ID, "(x:len (x:array 1 2))").asLong());
+      assertEquals(
+          7,
+          context
+              .eval(HaraLanguage.ID, "(let [a (x:array 1 2)] (x:set a 1 7) (x:get a 1))")
+              .asLong());
+      assertEquals(
+          1,
+          context
+              .eval(HaraLanguage.ID, "(let [a (x:array 1 2)] (x:delete a 0) (x:len a))")
+              .asLong());
+      assertEquals(
+          3,
+          context
+              .eval(HaraLanguage.ID, "(let [a (x:array 1 2)] (x:append a 3) (x:len a))")
+              .asLong());
+      assertEquals(
+          7,
+          context
+              .eval(HaraLanguage.ID, "(let [a (x:array 1 2)] (x:insert a 1 7) (x:get a 1))")
+              .asLong());
+      assertEquals(
+          2, context.eval(HaraLanguage.ID, "(x:len (x:slice (x:array 1 2 3) 1 3))").asLong());
+      assertEquals(2, context.eval(HaraLanguage.ID, "(x:get (x:clone (x:array 1 2)) 1)").asLong());
     }
   }
 
@@ -60,6 +167,46 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void evaluatesLoopAndTailRecur() {
+    try (Context context = context()) {
+      assertEquals(
+          42,
+          context.eval(HaraLanguage.ID, "(loop [value 41] (if value (recur nil) 42))").asLong());
+    }
+  }
+
+  @Test
+  public void rejectsRecurOutsideLoopAndNonTailRecur() {
+    try (Context context = context()) {
+      PolyglotException outside =
+          assertThrows(PolyglotException.class, () -> context.eval(HaraLanguage.ID, "(recur)"));
+      assertTrue(outside.getMessage().contains("outside loop"));
+
+      PolyglotException nonTail =
+          assertThrows(
+              PolyglotException.class,
+              () -> context.eval(HaraLanguage.ID, "(loop [value true] (+ (recur nil) 1))"));
+      assertTrue(nonTail.getMessage().contains("tail position"));
+    }
+  }
+
+  @Test
+  public void evaluatesThrowCatchAndFinally() {
+    try (Context context = context()) {
+      assertEquals(
+          42,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(try (throw 41) "
+                      + "(catch Exception error (+ error 1)) "
+                      + "(finally (def cleaned true)))")
+              .asLong());
+      assertTrue(context.eval(HaraLanguage.ID, "cleaned").asBoolean());
+    }
+  }
+
+  @Test
   public void storesLexicalBindingsInFrames() {
     try (Context context = context()) {
       assertEquals(5, context.eval(HaraLanguage.ID, "(let [x 2 y 3] (+ x y))").asLong());
@@ -80,6 +227,25 @@ public class HaraLanguageTest {
       assertEquals(42, context.eval(HaraLanguage.ID, "(+ answer 1)").asLong());
       context.eval(HaraLanguage.ID, "(def answer 42)");
       assertEquals(42, context.eval(HaraLanguage.ID, "answer").asLong());
+    }
+  }
+
+  @Test
+  public void loadsHaraSourceIntoTheCurrentContext() throws Exception {
+    try (Context context = context()) {
+      assertEquals(
+          42,
+          context.eval(HaraLanguage.ID, "(load-string \"(def loaded 41)\") (+ loaded 1)").asLong());
+
+      Path file = Files.createTempFile("hara-l0-", ".hara");
+      try {
+        Files.writeString(file, "(def from-file 42)");
+        String path = file.toString().replace("\\", "\\\\").replace("\"", "\\\"");
+        context.eval(HaraLanguage.ID, "(load-file \"" + path + "\")");
+        assertEquals(42, context.eval(HaraLanguage.ID, "from-file").asLong());
+      } finally {
+        Files.deleteIfExists(file);
+      }
     }
   }
 
@@ -122,6 +288,104 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void destructuresSequentialFunctionArguments() {
+    try (Context context = context()) {
+      assertEquals(
+          42,
+          context.eval(HaraLanguage.ID, "((fn [[left right]] (+ left right)) [19 23])").asLong());
+    }
+  }
+
+  @Test
+  public void supportsVariadicFunctionRestArguments() {
+    try (Context context = context()) {
+      assertEquals(
+          42, context.eval(HaraLanguage.ID, "((fn [value & more] value) 42 1 2)").asLong());
+      PolyglotException error =
+          assertThrows(
+              PolyglotException.class,
+              () -> context.eval(HaraLanguage.ID, "((fn [value & more] value))"));
+      assertTrue(error.getMessage().contains("at least 1 arguments"));
+    }
+  }
+
+  @Test
+  public void dispatchesMultiArityFnAndDefnClauses() {
+    try (Context context = context()) {
+      assertEquals(
+          42,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(defn choose "
+                      + "([value] value) "
+                      + "([left right] (+ left right))) "
+                      + "(choose 19 23)")
+              .asLong());
+      assertEquals(41, context.eval(HaraLanguage.ID, "(choose 41)").asLong());
+    }
+  }
+
+  @Test
+  public void destructuresMapFunctionArguments() {
+    try (Context context = context()) {
+      assertEquals(
+          42, context.eval(HaraLanguage.ID, "((fn [{:keys [age]}] (+ age 1)) {:age 41})").asLong());
+      assertEquals(
+          42,
+          context
+              .eval(HaraLanguage.ID, "((fn [{:keys [age] :or {age 41}}] (+ age 1)) {})")
+              .asLong());
+    }
+  }
+
+  @Test
+  public void destructuresLetAndLoopBindingsIncludingNestedRest() {
+    try (Context context = context()) {
+      assertEquals(
+          42,
+          context
+              .eval(HaraLanguage.ID, "(let [[left & rest] [19 23]] (if rest (+ left 23) 0))")
+              .asLong());
+      assertEquals(
+          42, context.eval(HaraLanguage.ID, "(let [{:keys [age]} {:age 41}] (+ age 1))").asLong());
+      assertEquals(
+          42,
+          context
+              .eval(HaraLanguage.ID, "(loop [[left & rest] [19 23]] (if rest (+ left 23) 0))")
+              .asLong());
+    }
+  }
+
+  @Test
+  public void definesOrdinaryFunctionsWithOptionalDocumentationAndAttributes() {
+    try (Context context = context()) {
+      assertEquals(
+          42,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(defn increment \"increments\" {:private true} [x] (+ x 1)) " + "(increment 41)")
+              .asLong());
+    }
+  }
+
+  @Test
+  public void resolvesRecursiveDefnCallsThroughTheCurrentNamespace() {
+    try (Context context = context()) {
+      assertEquals(
+          42,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(defn recurse-once [value] "
+                      + "  (if value (recurse-once nil) 42)) "
+                      + "(recurse-once true)")
+              .asLong());
+    }
+  }
+
+  @Test
   public void capturesLexicalBindingsInReturnedFunctions() {
     try (Context context = context()) {
       Value adder = context.eval(HaraLanguage.ID, "(let [x 41] (fn [y] (+ x y)))");
@@ -155,6 +419,21 @@ public class HaraLanguageTest {
       assertEquals(
           "Ada", context.eval(HaraLanguage.ID, "(field (Person \"Ada\" 36) :name)").asString());
       assertTrue(context.eval(HaraLanguage.ID, "Person").canExecute());
+    }
+  }
+
+  @Test
+  public void structsCarryLanguageNativeMetadata() {
+    try (Context context = context()) {
+      Value result =
+          context.eval(
+              HaraLanguage.ID,
+              "(defstruct Person [name]) "
+                  + "(protocol-call ILookup lookup "
+                  + "  (protocol-call IObjType meta "
+                  + "    (protocol-call IObjType with-meta (Person \"Ada\") {:doc \"person\"})) "
+                  + "  :doc)");
+      assertEquals("person", result.asString());
     }
   }
 
@@ -206,9 +485,7 @@ public class HaraLanguageTest {
                       + "  (fn [value] (protocol-call Describable describe value))) "
                       + "(describe-value (Person \"Ada\"))")
               .asString());
-      assertEquals(
-          42,
-          context.eval(HaraLanguage.ID, "(describe-value (NumberValue 42))").asLong());
+      assertEquals(42, context.eval(HaraLanguage.ID, "(describe-value (NumberValue 42))").asLong());
 
       assertEquals(
           2,

@@ -5,6 +5,8 @@ import org.junit.Test;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static org.junit.Assert.*;
 
@@ -18,6 +20,27 @@ public class ParserTest {
     assertEquals(new BigDecimal("123.45"), Parser.LispReader.readString("123.45M", null));
     assertEquals(BigDecimal.ONE, Parser.LispReader.readString("1.00M", null));
     assertEquals(0xFFL, Parser.LispReader.readString("0xFF", null));
+  }
+
+  @Test
+  public void readableNumericPrintingPreservesBigNumberCategories() {
+    BigInteger integer = BigInteger.valueOf(123);
+    BigDecimal decimal = new BigDecimal("123.45");
+    assertEquals("123N", hara.lang.base.G.display(integer));
+    assertEquals("123.45M", hara.lang.base.G.display(decimal));
+    assertEquals(integer, Parser.LispReader.readString(hara.lang.base.G.display(integer), null));
+    assertEquals(decimal, Parser.LispReader.readString(hara.lang.base.G.display(decimal), null));
+  }
+
+  @Test
+  public void l0ConformanceCorpusIsReadableEdn() throws Exception {
+    Object corpus =
+        Parser.LispReader.readString(
+            Files.readString(Path.of("spec/hara/l0-conformance.edn")), null);
+    assertTrue(corpus instanceof hara.lang.data.types.IMapType);
+    hara.lang.data.types.IMapType map = (hara.lang.data.types.IMapType) corpus;
+    assertEquals("0.1", map.lookup(Keyword.create("spec/version")));
+    assertTrue(map.lookup(Keyword.create("cases")) instanceof hara.lang.data.types.ILinearType);
   }
 
   @Test

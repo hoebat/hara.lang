@@ -60,6 +60,7 @@ public class ReaderTest {
     // Test unread affecting line/col
     r.unreadChar('\n');
     assertEquals(2, r.getLineNumber());
+    assertEquals(2, r.getColumnNumber());
     // Note: Column tracking on unread newline depends on implementation.
     // Existing Reader.java implementation: if(c=='\n') lineNumber--; else columnNumber--;
     // This assumes we are going back to end of previous line, but it doesn't restore exact column

@@ -1,8 +1,12 @@
 package hara.truffle;
 
 import com.oracle.truffle.api.TruffleLanguage;
+import com.oracle.truffle.api.source.Source;
 import hara.lang.data.Symbol;
 import hara.lang.protocol.IFn;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -106,6 +110,40 @@ public final class HaraContext {
     currentNamespace.define(
         "bigdec", new UnaryBuiltin("bigdec", HaraNumericConversions::toBigDecimal));
     currentNamespace.define("double", new UnaryBuiltin("double", HaraNumericConversions::toDouble));
+    currentNamespace.define("load-string", new UnaryBuiltin("load-string", this::loadString));
+    currentNamespace.define("load-file", new UnaryBuiltin("load-file", this::loadFile));
+  }
+
+  private Object loadString(Object value) {
+    if (!(value instanceof String)) {
+      throw new HaraException("load-string expects a string");
+    }
+    return parseAndExecute((String) value, "<string>");
+  }
+
+  private Object loadFile(Object value) {
+    if (!(value instanceof String)) {
+      throw new HaraException("load-file expects a path string");
+    }
+    try {
+      Path path = Path.of((String) value);
+      return parseAndExecute(Files.readString(path), path.toString());
+    } catch (IOException | RuntimeException error) {
+      throw new HaraException(
+          "Unable to load Hara file: " + value + " (" + error.getMessage() + ")");
+    }
+  }
+
+  private Object parseAndExecute(String sourceText, String name) {
+    try {
+      Source source = Source.newBuilder(HaraLanguage.ID, sourceText, name).build();
+      return environment.parsePublic(source).call();
+    } catch (RuntimeException error) {
+      if (error instanceof HaraException) {
+        throw (HaraException) error;
+      }
+      throw new HaraException("Unable to evaluate Hara source " + name + ": " + error.getMessage());
+    }
   }
 
   private static final class UnaryBuiltin implements IFn<Object, Object, Object> {

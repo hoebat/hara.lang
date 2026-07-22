@@ -7,6 +7,8 @@ import hara.lang.protocol.IHash;
 
 import java.util.Iterator;
 import java.util.Map.Entry;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
@@ -56,6 +58,10 @@ public interface G {
       return "\\" + e.toString();
     } else if (e instanceof Pattern) {
       return "#\"" + Str.escapeJava(e.toString()) + "\"";
+    } else if (e instanceof BigInteger) {
+      return e.toString() + "N";
+    } else if (e instanceof BigDecimal) {
+      return e.toString() + "M";
     } else if (e instanceof Class) {
       return ((Class) e).getName();
     } else if (e instanceof java.util.List) {

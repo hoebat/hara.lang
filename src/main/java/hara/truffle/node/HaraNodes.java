@@ -14,6 +14,8 @@ import com.oracle.truffle.api.interop.UnsupportedTypeException;
 import com.oracle.truffle.api.nodes.DirectCallNode;
 import com.oracle.truffle.api.nodes.IndirectCallNode;
 import hara.kernel.builtin.BuiltinStruct;
+import hara.lang.base.Eq;
+import hara.lang.base.primitive.Cast;
 import hara.lang.base.primitive.Num;
 import hara.lang.data.Symbol;
 import hara.lang.protocol.IFn;
@@ -27,9 +29,41 @@ import hara.truffle.HaraProtocolImplementation;
 import hara.truffle.HaraStruct;
 import hara.truffle.HaraType;
 import hara.truffle.HaraVar;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 
 public final class HaraNodes {
   private HaraNodes() {}
+
+  public static final class RecurTarget {
+    private final int arity;
+
+    public RecurTarget(int arity) {
+      this.arity = arity;
+    }
+
+    public int arity() {
+      return arity;
+    }
+  }
+
+  private static final class RecurException extends RuntimeException {
+    private final RecurTarget target;
+    private final Object[] values;
+
+    private RecurException(RecurTarget target, Object[] values) {
+      this.target = target;
+      this.values = values;
+    }
+  }
+
+  private static final class ThrownValue extends RuntimeException {
+    private final Object value;
+
+    private ThrownValue(Object value) {
+      this.value = value;
+    }
+  }
 
   public static final class Literal extends HaraExpressionNode {
     private final Object value;
@@ -50,6 +84,8 @@ public final class HaraNodes {
       TUPLE,
       VECTOR,
       QUEUE,
+      MUTABLE_ARRAY,
+      MUTABLE_OBJECT,
       MAP,
       ORDERED_MAP,
       SORTED_MAP,
@@ -84,6 +120,17 @@ public final class HaraNodes {
           return BuiltinStruct.vector(values);
         case QUEUE:
           return BuiltinStruct.queue(values);
+        case MUTABLE_ARRAY:
+          return new ArrayList<>(java.util.Arrays.asList(values));
+        case MUTABLE_OBJECT:
+          if ((values.length & 1) != 0) {
+            throw new HaraException("x:object expects an even number of key/value forms");
+          }
+          LinkedHashMap<Object, Object> object = new LinkedHashMap<>();
+          for (int i = 0; i < values.length; i += 2) {
+            object.put(values[i], values[i + 1]);
+          }
+          return object;
         case MAP:
           return BuiltinStruct.hashMap(values);
         case ORDERED_MAP:
@@ -102,6 +149,232 @@ public final class HaraNodes {
     }
   }
 
+  /** Constructs an ordinary mutable byte value from evaluated numeric values. */
+  public static final class Bytes extends HaraExpressionNode {
+    @Children private final HaraExpressionNode[] elements;
+
+    public Bytes(HaraExpressionNode[] elements) {
+      this.elements = elements;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      byte[] result = new byte[elements.length];
+      for (int i = 0; i < elements.length; i++) {
+        Object value = elements[i].execute(frame);
+        try {
+          result[i] = Cast.byteCast(value);
+        } catch (IllegalArgumentException error) {
+          throw new HaraException("bytes expects values in the byte range", this);
+        }
+      }
+      return result;
+    }
+  }
+
+  public static final class MutableOperation extends HaraExpressionNode {
+    public enum Operator {
+      LENGTH,
+      GET,
+      SET,
+      DELETE,
+      APPEND,
+      INSERT,
+      REMOVE,
+      CLONE,
+      SLICE
+    }
+
+    @Children private final HaraExpressionNode[] arguments;
+    private final Operator operator;
+
+    public MutableOperation(Operator operator, HaraExpressionNode[] arguments) {
+      this.operator = operator;
+      this.arguments = arguments;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      Object[] values = new Object[arguments.length];
+      for (int i = 0; i < arguments.length; i++) {
+        values[i] = HaraBox.unwrap(arguments[i].execute(frame));
+      }
+      switch (operator) {
+        case LENGTH:
+          return length(values[0]);
+        case GET:
+          return get(values[0], values[1], values.length == 3 ? values[2] : null);
+        case SET:
+          set(values[0], values[1], values[2]);
+          return values[0];
+        case DELETE:
+          delete(values[0], values[1]);
+          return values[0];
+        case APPEND:
+          append(values[0], values[1]);
+          return values[0];
+        case INSERT:
+          insert(values[0], values[1], values[2]);
+          return values[0];
+        case REMOVE:
+          remove(values[0], values[1]);
+          return values[0];
+        case CLONE:
+          return clone(values[0]);
+        case SLICE:
+          return slice(values[0], values[1], values.length == 3 ? values[2] : length(values[0]));
+        default:
+          throw new AssertionError(operator);
+      }
+    }
+
+    private static long length(Object value) {
+      if (value instanceof hara.lang.data.types.ILinearType<?>) {
+        return ((hara.lang.data.types.ILinearType<?>) value).count();
+      }
+      if (value instanceof java.util.Map<?, ?>) return ((java.util.Map<?, ?>) value).size();
+      if (value instanceof java.util.List<?>) return ((java.util.List<?>) value).size();
+      if (value instanceof String) return ((String) value).length();
+      if (value != null && value.getClass().isArray()) {
+        return java.lang.reflect.Array.getLength(value);
+      }
+      throw new HaraException("x:len does not support value: " + value);
+    }
+
+    private static Object get(Object target, Object key, Object fallback) {
+      try {
+        if (target instanceof java.util.Map<?, ?>) {
+          java.util.Map<?, ?> map = (java.util.Map<?, ?>) target;
+          return map.containsKey(key) ? map.get(key) : fallback;
+        }
+        if (target instanceof java.util.List<?>) {
+          return ((java.util.List<?>) target).get(index(key, target));
+        }
+        if (target instanceof byte[]) return ((byte[]) target)[index(key, target)];
+        if (target instanceof hara.lang.data.types.ILinearType<?>) {
+          return ((hara.lang.data.types.ILinearType<?>) target).nth(indexLong(key));
+        }
+        if (target instanceof String) return ((String) target).charAt(index(key, target));
+        if (target != null && target.getClass().isArray()) {
+          return java.lang.reflect.Array.get(target, index(key, target));
+        }
+      } catch (IndexOutOfBoundsException | IllegalArgumentException error) {
+        return fallback;
+      }
+      throw new HaraException("x:get does not support target: " + target, null);
+    }
+
+    private static void set(Object target, Object key, Object value) {
+      int index = index(key, target);
+      if (target instanceof java.util.List<?>) {
+        ((java.util.List<Object>) target).set(index, value);
+      } else if (target instanceof byte[]) {
+        try {
+          ((byte[]) target)[index] = Cast.byteCast(value);
+        } catch (IllegalArgumentException error) {
+          throw new HaraException("x:set expects a value in the byte range");
+        }
+      } else if (target != null && target.getClass().isArray()) {
+        java.lang.reflect.Array.set(target, index, value);
+      } else if (target instanceof java.util.Map<?, ?>) {
+        ((java.util.Map<Object, Object>) target).put(key, value);
+      } else {
+        throw new HaraException("x:set does not support target: " + target);
+      }
+    }
+
+    private static void delete(Object target, Object key) {
+      if (target instanceof java.util.Map<?, ?>) {
+        ((java.util.Map<?, ?>) target).remove(key);
+      } else if (target instanceof java.util.List<?>) {
+        ((java.util.List<?>) target).remove(index(key, target));
+      } else {
+        throw new HaraException("x:delete does not support target: " + target);
+      }
+    }
+
+    private static void append(Object target, Object value) {
+      if (target instanceof java.util.List<?>) {
+        ((java.util.List<Object>) target).add(value);
+        return;
+      }
+      throw new HaraException("x:append does not support target: " + target);
+    }
+
+    private static void insert(Object target, Object key, Object value) {
+      if (target instanceof java.util.List<?>) {
+        java.util.List<Object> list = (java.util.List<Object>) target;
+        long index = indexLong(key);
+        if (index < 0 || index > list.size()) {
+          throw new HaraException("x:insert index out of bounds: " + index);
+        }
+        list.add((int) index, value);
+        return;
+      }
+      throw new HaraException("x:insert does not support target: " + target);
+    }
+
+    private static void remove(Object target, Object key) {
+      if (target instanceof java.util.List<?>) {
+        ((java.util.List<?>) target).remove(index(key, target));
+        return;
+      }
+      if (target instanceof java.util.Map<?, ?>) {
+        ((java.util.Map<?, ?>) target).remove(key);
+        return;
+      }
+      throw new HaraException("x:remove does not support target: " + target);
+    }
+
+    private static Object clone(Object target) {
+      if (target instanceof byte[]) return ((byte[]) target).clone();
+      if (target instanceof java.util.List<?>) {
+        return new java.util.ArrayList<>((java.util.List<?>) target);
+      }
+      if (target instanceof java.util.Map<?, ?>) {
+        return new java.util.LinkedHashMap<>((java.util.Map<?, ?>) target);
+      }
+      throw new HaraException("x:clone does not support target: " + target);
+    }
+
+    private static Object slice(Object target, Object startValue, Object endValue) {
+      long start = indexLong(startValue);
+      long end = indexLong(endValue);
+      if (start < 0 || end < start || end > length(target)) {
+        throw new HaraException("x:slice range is out of bounds");
+      }
+      if (target instanceof byte[]) {
+        return java.util.Arrays.copyOfRange((byte[]) target, (int) start, (int) end);
+      }
+      if (target instanceof String) return ((String) target).substring((int) start, (int) end);
+      if (target instanceof java.util.List<?>) {
+        return new java.util.ArrayList<>(
+            ((java.util.List<?>) target).subList((int) start, (int) end));
+      }
+      if (target instanceof hara.lang.data.types.ILinearType<?>) {
+        Object[] values = new Object[(int) (end - start)];
+        for (int i = 0; i < values.length; i++) {
+          values[i] = ((hara.lang.data.types.ILinearType<?>) target).nth(start + i);
+        }
+        return BuiltinStruct.vector(values);
+      }
+      throw new HaraException("x:slice does not support target: " + target);
+    }
+
+    private static int index(Object key, Object target) {
+      long index = indexLong(key);
+      if (index < 0 || index >= length(target)) {
+        throw new IndexOutOfBoundsException("index: " + index);
+      }
+      return (int) index;
+    }
+
+    private static long indexLong(Object key) {
+      if (!(key instanceof Number)) throw new IllegalArgumentException("index must be numeric");
+      return ((Number) key).longValue();
+    }
+  }
+
   public static final class ReadLocal extends HaraExpressionNode {
     private final int slot;
 
@@ -112,6 +385,92 @@ public final class HaraNodes {
     @Override
     public Object execute(VirtualFrame frame) {
       return frame.getValue(slot);
+    }
+  }
+
+  public static final class Lookup extends HaraExpressionNode {
+    @Child private HaraExpressionNode target;
+    private final Object key;
+
+    public Lookup(HaraExpressionNode target, long index) {
+      this.target = target;
+      this.key = index;
+    }
+
+    public Lookup(HaraExpressionNode target, Object key) {
+      this.target = target;
+      this.key = key;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      Object value = target.execute(frame);
+      if (key instanceof Number && value instanceof hara.lang.data.types.ILinearType<?>) {
+        return ((hara.lang.data.types.ILinearType<?>) value).nth(((Number) key).longValue());
+      }
+      if (value instanceof String) {
+        return ((String) value).charAt(((Number) key).intValue());
+      }
+      if (value instanceof java.util.List<?>) {
+        return ((java.util.List<?>) value).get(((Number) key).intValue());
+      }
+      if (value != null && value.getClass().isArray()) {
+        return java.lang.reflect.Array.get(value, ((Number) key).intValue());
+      }
+      if (value instanceof hara.lang.data.types.IMapType<?, ?>) {
+        return ((hara.lang.data.types.IMapType<Object, Object>) value).lookup(key);
+      }
+      if (value instanceof java.util.Map<?, ?>) {
+        return ((java.util.Map<?, ?>) value).get(key);
+      }
+      throw new HaraException("Cannot destructure value: " + value, this);
+    }
+  }
+
+  public static final class DefaultValue extends HaraExpressionNode {
+    @Child private HaraExpressionNode value;
+    @Child private HaraExpressionNode fallback;
+
+    public DefaultValue(HaraExpressionNode value, HaraExpressionNode fallback) {
+      this.value = value;
+      this.fallback = fallback;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      Object result = value.execute(frame);
+      return result == null ? fallback.execute(frame) : result;
+    }
+  }
+
+  public static final class Rest extends HaraExpressionNode {
+    @Child private HaraExpressionNode target;
+    private final long start;
+
+    public Rest(HaraExpressionNode target, long start) {
+      this.target = target;
+      this.start = start;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      Object value = target.execute(frame);
+      if (value instanceof hara.lang.data.types.ILinearType<?>) {
+        hara.lang.data.types.ILinearType<?> linear = (hara.lang.data.types.ILinearType<?>) value;
+        if (start > linear.count()) {
+          throw new HaraException("Destructuring rest index is out of bounds", this);
+        }
+        Object[] values = new Object[(int) linear.count() - (int) start];
+        for (int i = 0; i < values.length; i++) {
+          values[i] = linear.nth(start + i);
+        }
+        return BuiltinStruct.vector(values);
+      }
+      if (value instanceof String) {
+        return BuiltinStruct.vector(
+            ((String) value).substring((int) start).chars().mapToObj(c -> (char) c).toArray());
+      }
+      throw new HaraException("Cannot destructure rest from value: " + value, this);
     }
   }
 
@@ -193,6 +552,112 @@ public final class HaraNodes {
         frame.setObject(slots[i], values[i]);
       }
       return body.execute(frame);
+    }
+  }
+
+  public static final class Loop extends HaraExpressionNode {
+    private final RecurTarget target;
+    private final int[] slots;
+    @Children private final HaraExpressionNode[] initializers;
+    @Child private HaraExpressionNode body;
+
+    public Loop(
+        RecurTarget target,
+        int[] slots,
+        HaraExpressionNode[] initializers,
+        HaraExpressionNode body) {
+      this.target = target;
+      this.slots = slots;
+      this.initializers = initializers;
+      this.body = body;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      Object[] values = new Object[initializers.length];
+      for (int i = 0; i < initializers.length; i++) {
+        values[i] = initializers[i].execute(frame);
+      }
+      while (true) {
+        for (int i = 0; i < slots.length; i++) {
+          frame.setObject(slots[i], values[i]);
+        }
+        try {
+          return body.execute(frame);
+        } catch (RecurException recur) {
+          if (recur.target != target) {
+            throw recur;
+          }
+          values = recur.values;
+        }
+      }
+    }
+  }
+
+  public static final class Recur extends HaraExpressionNode {
+    private final RecurTarget target;
+    @Children private final HaraExpressionNode[] values;
+
+    public Recur(RecurTarget target, HaraExpressionNode[] values) {
+      this.target = target;
+      this.values = values;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      Object[] evaluated = new Object[values.length];
+      for (int i = 0; i < values.length; i++) {
+        evaluated[i] = values[i].execute(frame);
+      }
+      throw new RecurException(target, evaluated);
+    }
+  }
+
+  public static final class Throw extends HaraExpressionNode {
+    @Child private HaraExpressionNode value;
+
+    public Throw(HaraExpressionNode value) {
+      this.value = value;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      throw new ThrownValue(value.execute(frame));
+    }
+  }
+
+  public static final class Try extends HaraExpressionNode {
+    @Child private HaraExpressionNode body;
+    private final int catchSlot;
+    @Child private HaraExpressionNode catchBody;
+    @Child private HaraExpressionNode finallyBody;
+
+    public Try(
+        HaraExpressionNode body,
+        int catchSlot,
+        HaraExpressionNode catchBody,
+        HaraExpressionNode finallyBody) {
+      this.body = body;
+      this.catchSlot = catchSlot;
+      this.catchBody = catchBody;
+      this.finallyBody = finallyBody;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      try {
+        return body.execute(frame);
+      } catch (ThrownValue thrown) {
+        if (catchBody == null) {
+          throw thrown;
+        }
+        frame.setObject(catchSlot, thrown.value);
+        return catchBody.execute(frame);
+      } finally {
+        if (finallyBody != null) {
+          finallyBody.execute(frame);
+        }
+      }
     }
   }
 
@@ -443,7 +908,8 @@ public final class HaraNodes {
     public enum Operator {
       SUBTRACT,
       MULTIPLY,
-      DIVIDE;
+      DIVIDE,
+      REMAINDER;
 
       private String symbol() {
         switch (this) {
@@ -453,6 +919,8 @@ public final class HaraNodes {
             return "*";
           case DIVIDE:
             return "/";
+          case REMAINDER:
+            return "mod";
           default:
             throw new AssertionError(this);
         }
@@ -466,6 +934,8 @@ public final class HaraNodes {
             return Num.multiplyP(left, right);
           case DIVIDE:
             return Num.divide(left, right);
+          case REMAINDER:
+            return Num.remainder(left, right);
           default:
             throw new AssertionError(this);
         }
@@ -480,6 +950,8 @@ public final class HaraNodes {
             return Num.multiply(left, right);
           case DIVIDE:
             return Num.divide(left, right);
+          case REMAINDER:
+            return Num.remainder(left, right);
           default:
             throw new AssertionError(this);
         }
@@ -527,21 +999,92 @@ public final class HaraNodes {
     }
   }
 
+  public static final class Compare extends HaraExpressionNode {
+    public enum Operator {
+      LESS,
+      LESS_OR_EQUAL,
+      GREATER,
+      GREATER_OR_EQUAL,
+      EQUAL,
+      NOT_EQUAL
+    }
+
+    @Child private HaraExpressionNode left;
+    @Child private HaraExpressionNode right;
+    private final Operator operator;
+
+    public Compare(Operator operator, HaraExpressionNode left, HaraExpressionNode right) {
+      this.operator = operator;
+      this.left = left;
+      this.right = right;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      Object leftValue = left.execute(frame);
+      Object rightValue = right.execute(frame);
+      if (operator == Operator.EQUAL || operator == Operator.NOT_EQUAL) {
+        boolean equal = Eq.eq(leftValue, rightValue);
+        return operator == Operator.EQUAL ? equal : !equal;
+      }
+      if (!(leftValue instanceof Number) || !(rightValue instanceof Number)) {
+        throw new HaraException("comparison expects two numbers", this);
+      }
+      int comparison = Num.compare((Number) leftValue, (Number) rightValue);
+      switch (operator) {
+        case LESS:
+          return comparison < 0;
+        case LESS_OR_EQUAL:
+          return comparison <= 0;
+        case GREATER:
+          return comparison > 0;
+        case GREATER_OR_EQUAL:
+          return comparison >= 0;
+        default:
+          throw new AssertionError(operator);
+      }
+    }
+  }
+
   public static final class FunctionLiteral extends HaraExpressionNode {
     private final RootCallTarget callTarget;
-    private final int arity;
+    private final int minimumArity;
+    private final boolean variadic;
     private final boolean captures;
 
-    public FunctionLiteral(RootCallTarget callTarget, int arity, boolean captures) {
+    public FunctionLiteral(
+        RootCallTarget callTarget, int minimumArity, boolean variadic, boolean captures) {
       this.callTarget = callTarget;
-      this.arity = arity;
+      this.minimumArity = minimumArity;
+      this.variadic = variadic;
       this.captures = captures;
     }
 
     @Override
     public Object execute(VirtualFrame frame) {
       MaterializedFrame closure = captures ? frame.materialize() : null;
-      return new HaraFunction(callTarget, arity, closure);
+      return new HaraFunction(callTarget, minimumArity, variadic, closure);
+    }
+  }
+
+  public static final class MultiFunction extends HaraExpressionNode {
+    @Children private final HaraExpressionNode[] alternatives;
+
+    public MultiFunction(HaraExpressionNode[] alternatives) {
+      this.alternatives = alternatives;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      HaraFunction[] functions = new HaraFunction[alternatives.length];
+      for (int i = 0; i < alternatives.length; i++) {
+        Object value = alternatives[i].execute(frame);
+        if (!(value instanceof HaraFunction)) {
+          throw new HaraException("Multi-arity clause did not produce a function", this);
+        }
+        functions[i] = (HaraFunction) value;
+      }
+      return new HaraFunction(functions);
     }
   }
 
@@ -572,7 +1115,7 @@ public final class HaraNodes {
       if (target instanceof HaraType) {
         HaraType haraType = (HaraType) target;
         if (arguments.length != haraType.arity()) {
-          throw arityError(haraType.arity(), arguments.length);
+          throw arityError(haraType.arity(), arguments.length, false);
         }
         Object[] values = evaluateArguments(frame);
         return new HaraStruct(haraType, values);
@@ -581,22 +1124,24 @@ public final class HaraNodes {
         throw notCallable(target);
       }
       HaraFunction haraFunction = (HaraFunction) target;
-      if (arguments.length != haraFunction.arity()) {
-        throw arityError(haraFunction.arity(), arguments.length);
+      HaraFunction selectedFunction = haraFunction.resolveArity(arguments.length);
+      if (selectedFunction == null) {
+        throw arityError(haraFunction.arity(), arguments.length, haraFunction.variadic());
       }
 
       Object[] values = evaluateArguments(frame);
 
-      if (haraFunction == cachedFunction) {
-        return directCall.call(haraFunction.callArguments(values));
+      if (selectedFunction == cachedFunction) {
+        return directCall.call(selectedFunction.callArguments(values));
       }
       if (cachedFunction == null) {
         CompilerDirectives.transferToInterpreterAndInvalidate();
-        cachedFunction = haraFunction;
-        directCall = insert(DirectCallNode.create(haraFunction.callTarget()));
-        return directCall.call(haraFunction.callArguments(values));
+        cachedFunction = selectedFunction;
+        directCall = insert(DirectCallNode.create(selectedFunction.callTarget()));
+        return directCall.call(selectedFunction.callArguments(values));
       }
-      return indirectCall.call(haraFunction.callTarget(), haraFunction.callArguments(values));
+      return indirectCall.call(
+          selectedFunction.callTarget(), selectedFunction.callArguments(values));
     }
 
     private Object[] evaluateArguments(VirtualFrame frame) {
@@ -613,8 +1158,9 @@ public final class HaraNodes {
     }
 
     @TruffleBoundary
-    private HaraException arityError(int expected, int actual) {
-      return new HaraException("Expected " + expected + " arguments, received " + actual, this);
+    private HaraException arityError(int expected, int actual, boolean variadic) {
+      String expectedText = variadic ? "at least " + expected : Integer.toString(expected);
+      return new HaraException("Expected " + expectedText + " arguments, received " + actual, this);
     }
   }
 
@@ -674,8 +1220,7 @@ public final class HaraNodes {
                 + arguments.length,
             this);
       }
-      HaraProtocolImplementation implementation =
-          cachedImplementation(haraProtocol, receiverValue);
+      HaraProtocolImplementation implementation = cachedImplementation(haraProtocol, receiverValue);
       if (implementation == null) {
         throw new HaraException(
             "No " + haraProtocol.name() + "/" + method + " implementation for " + receiverValue,

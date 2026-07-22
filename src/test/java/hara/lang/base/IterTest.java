@@ -145,8 +145,7 @@ public class IterTest {
 
   @Test
   public void testPartitionPairSupportsDirectNextAndDropsOddTail() {
-    Iterator<Entry<Integer, Integer>> pairs =
-        Iter.partitionPair(Arrays.asList(1, 2, 3).iterator());
+    Iterator<Entry<Integer, Integer>> pairs = Iter.partitionPair(Arrays.asList(1, 2, 3).iterator());
 
     Entry<Integer, Integer> pair = pairs.next();
     assertEquals(Integer.valueOf(1), pair.getKey());

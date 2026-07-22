@@ -8,15 +8,24 @@ import com.oracle.truffle.api.interop.UnknownIdentifierException;
 import com.oracle.truffle.api.library.ExportLibrary;
 import com.oracle.truffle.api.library.ExportMessage;
 import java.util.Arrays;
+import hara.lang.protocol.Constant;
+import hara.lang.protocol.IMetadata;
+import hara.lang.protocol.IObjType;
 
 @ExportLibrary(InteropLibrary.class)
-public final class HaraStruct implements TruffleObject {
+public final class HaraStruct implements TruffleObject, IObjType {
   private final HaraType type;
   private final Object[] values;
+  private final IMetadata metadata;
 
   public HaraStruct(HaraType type, Object[] values) {
+    this(type, values, null);
+  }
+
+  private HaraStruct(HaraType type, Object[] values, IMetadata metadata) {
     this.type = type;
     this.values = values.clone();
+    this.metadata = metadata;
   }
 
   public Object read(String field) throws UnknownIdentifierException {
@@ -29,6 +38,26 @@ public final class HaraStruct implements TruffleObject {
 
   public HaraType type() {
     return type;
+  }
+
+  @Override
+  public IMetadata meta() {
+    return metadata;
+  }
+
+  @Override
+  public HaraStruct withMeta(IMetadata metadata) {
+    return new HaraStruct(type, values, metadata);
+  }
+
+  @Override
+  public long hashCalc(Constant.HashType hashType) {
+    return hashCode();
+  }
+
+  @Override
+  public String display() {
+    return toString();
   }
 
   @ExportMessage

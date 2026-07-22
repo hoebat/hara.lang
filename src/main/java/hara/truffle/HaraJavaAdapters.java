@@ -82,6 +82,7 @@ public final class HaraJavaAdapters {
           }
           return lookupValue((ILookup<?, ?>) receiver, arguments);
         });
+    protocol.extend(byte[].class, "lookup", HaraJavaAdapters::lookupBytes);
   }
 
   public static void installAssoc(HaraProtocol protocol) {
@@ -95,6 +96,7 @@ public final class HaraJavaAdapters {
 
   public static void installCount(HaraProtocol protocol) {
     protocol.extend(ICount.class, "count", (receiver, arguments) -> ((ICount) receiver).count());
+    protocol.extend(byte[].class, "count", (receiver, arguments) -> ((byte[]) receiver).length);
   }
 
   public static void installConj(HaraProtocol protocol) {
@@ -114,6 +116,13 @@ public final class HaraJavaAdapters {
         IEquality.class,
         "equality",
         (receiver, arguments) -> ((IEquality) receiver).equality(arguments[0]));
+    protocol.extend(
+        byte[].class,
+        "equality",
+        (receiver, arguments) ->
+            arguments.length == 1
+                && arguments[0] instanceof byte[]
+                && Arrays.equals((byte[]) receiver, (byte[]) arguments[0]));
   }
 
   public static void installHash(HaraProtocol protocol) {
@@ -146,6 +155,17 @@ public final class HaraJavaAdapters {
         INth.class,
         "nth",
         (receiver, arguments) -> ((INth<?>) receiver).nth(((Number) arguments[0]).longValue()));
+    protocol.extend(
+        byte[].class,
+        "nth",
+        (receiver, arguments) -> {
+          long index = ((Number) arguments[0]).longValue();
+          byte[] bytes = (byte[]) receiver;
+          if (index < 0 || index >= bytes.length) {
+            throw new HaraException("byte index out of bounds: " + index);
+          }
+          return bytes[(int) index];
+        });
   }
 
   public static void installEmpty(HaraProtocol protocol) {
@@ -395,6 +415,18 @@ public final class HaraJavaAdapters {
       throw new HaraException("ILookup/lookup expects one or two arguments");
     }
     return lookupValueUnchecked(lookup, arguments);
+  }
+
+  private static Object lookupBytes(Object receiver, Object[] arguments) {
+    if (arguments.length < 1 || arguments.length > 2 || !(arguments[0] instanceof Number)) {
+      throw new HaraException("ILookup/lookup on bytes expects an index and optional default");
+    }
+    long index = ((Number) arguments[0]).longValue();
+    byte[] bytes = (byte[]) receiver;
+    if (index < 0 || index >= bytes.length) {
+      return arguments.length == 2 ? arguments[1] : null;
+    }
+    return bytes[(int) index];
   }
 
   @SuppressWarnings("unchecked")
