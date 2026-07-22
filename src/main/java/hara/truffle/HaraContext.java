@@ -206,6 +206,8 @@ public final class HaraContext {
     target.define("concat", new VariadicBuiltin("concat", this::concatIterators));
     target.define("iter-map", new VariadicBuiltin("iter-map", this::iterMap));
     target.define("iter-filter", new VariadicBuiltin("iter-filter", this::iterFilter));
+    target.define("iter-take-while", new VariadicBuiltin("iter-take-while", this::iterTakeWhile));
+    target.define("iter-drop-while", new VariadicBuiltin("iter-drop-while", this::iterDropWhile));
     target.define("iter-mapcat", new VariadicBuiltin("iter-mapcat", this::iterMapcat));
     target.define("iter-keep", new VariadicBuiltin("iter-keep", this::iterKeep));
     target.define("iter-every?", new VariadicBuiltin("iter-every?", this::iterEvery));
@@ -662,6 +664,124 @@ public final class HaraContext {
     Object function = values[0];
     return closeable(
         Iter.filter(source, value -> truthy(invokeCallable(function, new Object[] {value}))),
+        source);
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private Object iterTakeWhile(Object[] values) {
+    requireIteratorArity(values, 2, "iter-take-while");
+    Iterator source = (Iterator) iterValue(values[1]);
+    Object function = values[0];
+    return closeable(
+        new CloseableIterator<Object>() {
+          private boolean finished;
+          private boolean ready;
+          private Object next;
+
+          private void prime() {
+            if (finished || ready) return;
+            if (!source.hasNext()) {
+              finished = true;
+              Iter.close(source);
+              return;
+            }
+            Object candidate = source.next();
+            if (!truthy(invokeCallable(function, new Object[] {candidate}))) {
+              finished = true;
+              Iter.close(source);
+              return;
+            }
+            next = candidate;
+            ready = true;
+          }
+
+          @Override
+          public boolean hasNext() {
+            prime();
+            return ready;
+          }
+
+          @Override
+          public Object next() {
+            prime();
+            if (!ready) throw new NoSuchElementException();
+            Object result = next;
+            next = null;
+            ready = false;
+            return result;
+          }
+
+          @Override
+          public void close() {
+            finished = true;
+            ready = false;
+            next = null;
+            Iter.close(source);
+          }
+        },
+        source);
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private Object iterDropWhile(Object[] values) {
+    requireIteratorArity(values, 2, "iter-drop-while");
+    Iterator source = (Iterator) iterValue(values[1]);
+    Object function = values[0];
+    return closeable(
+        new CloseableIterator<Object>() {
+          private boolean dropped;
+          private boolean finished;
+          private boolean ready;
+          private Object next;
+
+          private void prime() {
+            if (finished || ready) return;
+            while (!dropped && source.hasNext()) {
+              Object candidate = source.next();
+              if (!truthy(invokeCallable(function, new Object[] {candidate}))) {
+                next = candidate;
+                ready = true;
+                dropped = true;
+              }
+            }
+            if (!dropped) {
+              finished = true;
+              Iter.close(source);
+              return;
+            }
+            if (!ready && source.hasNext()) {
+              next = source.next();
+              ready = true;
+            } else if (!ready) {
+              finished = true;
+              Iter.close(source);
+            }
+          }
+
+          @Override
+          public boolean hasNext() {
+            prime();
+            return ready;
+          }
+
+          @Override
+          public Object next() {
+            prime();
+            if (!ready) throw new NoSuchElementException();
+            Object result = next;
+            next = null;
+            ready = false;
+            return result;
+          }
+
+          @Override
+          public void close() {
+            finished = true;
+            ready = false;
+            next = null;
+            Iter.close(source);
+          }
+        },
         source);
   }
 

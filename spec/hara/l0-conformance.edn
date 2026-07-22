@@ -157,6 +157,10 @@
    :class :module
    :source "(load-resource \"hara/l0-core.hara\") (+ (iter-next (range 2 4)) (iter-next (iterate inc 4)) (iter-next (repeat 1 3)))"
    :expect {:value 9 :type :integer}}
+  {:id :iterator/core-while-combinators
+   :class :iterator
+   :source "(load-resource \"hara/l0-core.hara\") (+ (iter-next (take-while (fn [x] (< x 3)) [1 2 3])) (iter-next (drop-while (fn [x] (< x 3)) [1 2 3])))"
+   :expect {:value 4 :type :integer}}
   {:id :iterator/reduce
    :class :iterator
    :source "(+ (reduce + [1 2 3]) (reduce + 10 [1 2 3]))"

@@ -69,6 +69,8 @@
   ([function] (iter-repeatedly function))
   ([amount function] (take amount (iter-repeatedly function))))
 (defn iterate [function seed] (iter-iterate function seed))
+(defn take-while [predicate value] (iter-take-while predicate value))
+(defn drop-while [predicate value] (iter-drop-while predicate value))
 (defn map [function value] (iter-map function value))
 (defn filter [predicate value] (iter-filter predicate value))
 (defn take [amount value] (iter-take amount value))

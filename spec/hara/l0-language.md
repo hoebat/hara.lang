@@ -119,6 +119,10 @@ The bootstrap provides lazy `range`, `repeat`, `repeatedly`, and `iterate`
 generators. Finite forms return explicit iterators and infinite forms remain
 lazy until consumed by `take`, `iter-next`, or another iterator operation.
 
+`take-while` and `drop-while` are lazy iterator combinators. They evaluate
+predicates only as demand advances and close their source when it is exhausted
+or the stopping predicate is reached.
+
 Hara is iterator-first. It does not require Clojure `ISeq`/`Seq` semantics.
 The core iterator forms are:
 
