@@ -111,6 +111,16 @@ public interface Parser {
     @SuppressWarnings("unchecked")
     public static Object read(
         Reader r, boolean eofIsError, Object eofValue, boolean isRecursive, Map opts) {
+      int startLine = r.getLineNumber();
+      int startColumn = r.getColumnNumber();
+      Object value = readForm(r, eofIsError, eofValue, isRecursive, opts);
+      return attachSourceMetadata(
+          value, startLine, startColumn, r.getLineNumber(), r.getColumnNumber());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Object readForm(
+        Reader r, boolean eofIsError, Object eofValue, boolean isRecursive, Map opts) {
 
       if (opts == null) opts = hashMap(new Object[] {});
 
@@ -154,6 +164,31 @@ public interface Parser {
         if (isRecursive) throw Ex.Sneaky(e);
         throw new ReaderException(r.getLineNumber(), r.getColumnNumber(), e);
       }
+    }
+
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static Object attachSourceMetadata(
+        Object value, int startLine, int startColumn, int endLine, int endColumn) {
+      if (!(value instanceof ILinearType)
+          && !(value instanceof IMapType)
+          && !(value instanceof hara.lang.data.types.ISetType)) return value;
+      IObjType object = (IObjType) value;
+      IMapType span =
+          hashMap(
+              Array.objects(
+                  keyword("line"),
+                  startLine,
+                  keyword("column"),
+                  startColumn,
+                  keyword("end-line"),
+                  endLine,
+                  keyword("end-column"),
+                  endColumn));
+      IMetadata existing = object.meta();
+      if (existing instanceof IMapType) {
+        span = (IMapType) merge((IMapType) existing, span);
+      }
+      return object.withMeta(span);
     }
 
     @SuppressWarnings("unchecked")

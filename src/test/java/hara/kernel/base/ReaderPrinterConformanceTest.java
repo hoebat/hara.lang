@@ -5,6 +5,9 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import hara.lang.base.G;
+import hara.lang.data.Keyword;
+import hara.lang.data.types.IMapType;
+import hara.lang.protocol.IObjType;
 import org.junit.Test;
 
 public class ReaderPrinterConformanceTest {
@@ -52,6 +55,19 @@ public class ReaderPrinterConformanceTest {
   public void bytesUseTheirOrdinaryReadableConstructor() {
     byte[] bytes = {1, 2, -3};
     assertEquals("(bytes 1 2 -3)", G.display(bytes));
+  }
+
+  @Test
+  public void immutableFormsCarrySourceSpanMetadataWithoutChangingValueOrPrinting() {
+    Object form = Parser.LispReader.readString("(+ 1 2)", null);
+    @SuppressWarnings("rawtypes")
+    IMapType metadata = (IMapType) ((IObjType) form).meta();
+    assertEquals(1L, ((Number) metadata.lookup(Keyword.create("line"))).longValue());
+    assertEquals(1L, ((Number) metadata.lookup(Keyword.create("column"))).longValue());
+    assertTrue(((Number) metadata.lookup(Keyword.create("end-line"))).longValue() >= 1);
+    assertTrue(((Number) metadata.lookup(Keyword.create("end-column"))).longValue() > 1);
+    assertEquals("(+ 1 2)", G.display(form));
+    assertEquals(G.display(form), G.display(Parser.LispReader.readString(G.display(form), null)));
   }
 
   private static void assertReaderFailure(String source, String expected) {
