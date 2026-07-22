@@ -15,7 +15,7 @@ native-image \
   --no-fallback \
   -cp "$ROOT/target/classes:$DEPENDENCIES/*" \
   -H:Class=hara.truffle.Main \
-  --initialize-at-build-time=hara.truffle.HaraFunctionGen,hara.truffle.HaraBoxGen,hara.truffle.HaraNullGen,hara.truffle.HaraVarGen,hara.truffle.HaraProtocolGen,hara.truffle.HaraRecordGen,hara.truffle.HaraTypeGen,hara.truffle.HaraMemberNamesGen \
+  --initialize-at-build-time=hara.truffle.HaraFunctionGen,hara.truffle.HaraBoxGen,hara.truffle.HaraNullGen,hara.truffle.HaraVarGen,hara.truffle.HaraProtocolGen,hara.truffle.HaraStructGen,hara.truffle.HaraTypeGen,hara.truffle.HaraMemberNamesGen \
   -o "$ROOT/target/hara-truffle"
 
 echo "Built $ROOT/target/hara-truffle"

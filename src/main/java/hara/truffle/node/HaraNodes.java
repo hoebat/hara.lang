@@ -19,7 +19,7 @@ import hara.truffle.HaraException;
 import hara.truffle.HaraFunction;
 import hara.truffle.HaraLanguage;
 import hara.truffle.HaraProtocol;
-import hara.truffle.HaraRecord;
+import hara.truffle.HaraStruct;
 import hara.truffle.HaraType;
 import hara.truffle.HaraVar;
 
@@ -245,13 +245,13 @@ public final class HaraNodes {
     @Override
     public Object execute(VirtualFrame frame) {
       Object value = target.execute(frame);
-      if (!(value instanceof HaraRecord)) {
-        throw new HaraException("field expects a record", this);
+      if (!(value instanceof HaraStruct)) {
+        throw new HaraException("field expects a struct", this);
       }
       try {
-        return ((HaraRecord) value).read(field);
+        return ((HaraStruct) value).read(field);
       } catch (com.oracle.truffle.api.interop.UnknownIdentifierException exception) {
-        throw new HaraException("Unknown record field: " + field, this);
+        throw new HaraException("Unknown struct field: " + field, this);
       }
     }
   }
@@ -498,7 +498,7 @@ public final class HaraNodes {
     @Override
     public Object execute(VirtualFrame frame) {
       Object target = function.execute(frame);
-      if (target instanceof HaraRecord) {
+      if (target instanceof HaraStruct) {
         Object[] values = evaluateArguments(frame);
         return HaraLanguage.currentContext().ifnProtocol().invoke("invoke", target, values);
       }
@@ -508,7 +508,7 @@ public final class HaraNodes {
           throw arityError(haraType.arity(), arguments.length);
         }
         Object[] values = evaluateArguments(frame);
-        return new HaraRecord(haraType, values);
+        return new HaraStruct(haraType, values);
       }
       if (!(target instanceof HaraFunction)) {
         throw notCallable(target);
@@ -581,7 +581,7 @@ public final class HaraNodes {
       if (!(protocolValue instanceof HaraProtocol)) {
         throw new HaraException("protocol-call expects a protocol", this);
       }
-      if (!(receiverValue instanceof HaraRecord)) {
+      if (!(receiverValue instanceof HaraStruct)) {
         throw new HaraException("protocol-call expects a struct instance", this);
       }
       HaraProtocol haraProtocol = (HaraProtocol) protocolValue;
@@ -602,7 +602,7 @@ public final class HaraNodes {
       for (int i = 0; i < arguments.length; i++) {
         values[i + 1] = arguments[i].execute(frame);
       }
-      HaraType haraType = ((HaraRecord) receiverValue).type();
+      HaraType haraType = ((HaraStruct) receiverValue).type();
       HaraFunction haraFunction = haraProtocol.implementation(haraType, method);
       if (haraFunction == null) {
         throw new HaraException(

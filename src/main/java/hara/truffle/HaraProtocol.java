@@ -74,10 +74,10 @@ public final class HaraProtocol implements TruffleObject {
     if (method == null) {
       throw new HaraException("Unknown method " + name + "/" + methodName);
     }
-    if (!(receiver instanceof HaraRecord)) {
+    if (!(receiver instanceof HaraStruct)) {
       throw new HaraException("No " + name + " implementation for " + receiver);
     }
-    HaraFunction function = implementation(((HaraRecord) receiver).type(), methodName);
+    HaraFunction function = implementation(((HaraStruct) receiver).type(), methodName);
     if (function == null) {
       throw new HaraException(
           "No "
@@ -85,7 +85,7 @@ public final class HaraProtocol implements TruffleObject {
               + "/"
               + methodName
               + " implementation for "
-              + ((HaraRecord) receiver).type().name());
+              + ((HaraStruct) receiver).type().name());
     }
     Object[] callArguments = new Object[arguments.length + 1];
     callArguments[0] = receiver;

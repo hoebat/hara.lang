@@ -20,11 +20,11 @@ public final class HaraType implements TruffleObject {
     return fields.length;
   }
 
-  HaraRecord construct(Object[] values) throws ArityException {
+  HaraStruct construct(Object[] values) throws ArityException {
     if (values.length != fields.length) {
       throw ArityException.create(fields.length, fields.length, values.length);
     }
-    return new HaraRecord(this, values);
+    return new HaraStruct(this, values);
   }
 
   int fieldIndex(String field) {

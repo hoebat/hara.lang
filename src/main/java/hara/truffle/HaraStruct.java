@@ -10,11 +10,11 @@ import com.oracle.truffle.api.library.ExportMessage;
 import java.util.Arrays;
 
 @ExportLibrary(InteropLibrary.class)
-public final class HaraRecord implements TruffleObject {
+public final class HaraStruct implements TruffleObject {
   private final HaraType type;
   private final Object[] values;
 
-  public HaraRecord(HaraType type, Object[] values) {
+  public HaraStruct(HaraType type, Object[] values) {
     this.type = type;
     this.values = values.clone();
   }
@@ -53,9 +53,9 @@ public final class HaraRecord implements TruffleObject {
 
   @Override
   public boolean equals(Object other) {
-    return other instanceof HaraRecord
-        && type == ((HaraRecord) other).type
-        && Arrays.deepEquals(values, ((HaraRecord) other).values);
+    return other instanceof HaraStruct
+        && type == ((HaraStruct) other).type
+        && Arrays.deepEquals(values, ((HaraStruct) other).values);
   }
 
   @Override
