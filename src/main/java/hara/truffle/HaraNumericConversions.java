@@ -1,5 +1,6 @@
 package hara.truffle;
 
+import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import hara.lang.base.primitive.Num;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -8,6 +9,7 @@ import java.math.BigInteger;
 final class HaraNumericConversions {
   private HaraNumericConversions() {}
 
+  @TruffleBoundary
   static BigInteger toBigInteger(Object input) {
     Object value = unwrap(input);
     if (value instanceof BigInteger) return (BigInteger) value;
@@ -28,6 +30,7 @@ final class HaraNumericConversions {
     throw cannotConvert("bigint", input);
   }
 
+  @TruffleBoundary
   static BigDecimal toBigDecimal(Object input) {
     Object value = unwrap(input);
     if (value instanceof BigDecimal) return Num.canonicalDecimal((BigDecimal) value);
@@ -57,6 +60,7 @@ final class HaraNumericConversions {
     throw cannotConvert("bigdec", input);
   }
 
+  @TruffleBoundary
   static double toDouble(Object input) {
     Object value = unwrap(input);
     if (value instanceof Number) return ((Number) value).doubleValue();

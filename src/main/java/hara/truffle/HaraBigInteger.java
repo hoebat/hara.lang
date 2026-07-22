@@ -62,6 +62,7 @@ public final class HaraBigInteger implements TruffleObject {
   }
 
   @ExportMessage
+  @TruffleBoundary
   boolean fitsInFloat() {
     float converted = value.floatValue();
     return Float.isFinite(converted)
@@ -69,30 +70,35 @@ public final class HaraBigInteger implements TruffleObject {
   }
 
   @ExportMessage
+  @TruffleBoundary
   boolean fitsInDouble() {
     double converted = value.doubleValue();
     return Double.isFinite(converted) && BigDecimal.valueOf(converted).toBigInteger().equals(value);
   }
 
   @ExportMessage
+  @TruffleBoundary
   byte asByte() throws UnsupportedMessageException {
     if (!fitsInByte()) throw UnsupportedMessageException.create();
     return value.byteValue();
   }
 
   @ExportMessage
+  @TruffleBoundary
   short asShort() throws UnsupportedMessageException {
     if (!fitsInShort()) throw UnsupportedMessageException.create();
     return value.shortValue();
   }
 
   @ExportMessage
+  @TruffleBoundary
   int asInt() throws UnsupportedMessageException {
     if (!fitsInInt()) throw UnsupportedMessageException.create();
     return value.intValue();
   }
 
   @ExportMessage
+  @TruffleBoundary
   long asLong() throws UnsupportedMessageException {
     if (!fitsInLong()) throw UnsupportedMessageException.create();
     return value.longValue();
@@ -104,12 +110,14 @@ public final class HaraBigInteger implements TruffleObject {
   }
 
   @ExportMessage
+  @TruffleBoundary
   float asFloat() throws UnsupportedMessageException {
     if (!fitsInFloat()) throw UnsupportedMessageException.create();
     return value.floatValue();
   }
 
   @ExportMessage
+  @TruffleBoundary
   double asDouble() throws UnsupportedMessageException {
     if (!fitsInDouble()) throw UnsupportedMessageException.create();
     return value.doubleValue();
@@ -121,21 +129,25 @@ public final class HaraBigInteger implements TruffleObject {
     return value.toString();
   }
 
+  @TruffleBoundary
   @Override
   public boolean equals(Object other) {
     return other instanceof HaraBigInteger && value.equals(((HaraBigInteger) other).value);
   }
 
+  @TruffleBoundary
   @Override
   public int hashCode() {
     return value.hashCode();
   }
 
+  @TruffleBoundary
   @Override
   public String toString() {
     return value.toString();
   }
 
+  @TruffleBoundary
   private boolean between(BigInteger minimum, BigInteger maximum) {
     return value.compareTo(minimum) >= 0 && value.compareTo(maximum) <= 0;
   }

@@ -43,6 +43,7 @@ public final class HaraDecimal implements TruffleObject {
   }
 
   @ExportMessage
+  @TruffleBoundary
   Object readMember(String member) throws UnknownIdentifierException {
     switch (member) {
       case "value":
@@ -64,16 +65,19 @@ public final class HaraDecimal implements TruffleObject {
     return value.toPlainString() + "M";
   }
 
+  @TruffleBoundary
   @Override
   public boolean equals(Object other) {
     return other instanceof HaraDecimal && value.equals(((HaraDecimal) other).value);
   }
 
+  @TruffleBoundary
   @Override
   public int hashCode() {
     return value.hashCode();
   }
 
+  @TruffleBoundary
   @Override
   public String toString() {
     return value.toPlainString() + "M";

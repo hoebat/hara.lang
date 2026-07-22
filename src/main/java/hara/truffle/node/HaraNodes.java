@@ -112,6 +112,7 @@ public final class HaraNodes {
       return construct(kind, values);
     }
 
+    @TruffleBoundary
     @SuppressWarnings({"rawtypes", "unchecked"})
     private static Object construct(Kind kind, Object[] values) {
       switch (kind) {
@@ -164,12 +165,17 @@ public final class HaraNodes {
       for (int i = 0; i < elements.length; i++) {
         Object value = elements[i].execute(frame);
         try {
-          result[i] = Cast.byteCast(value);
+          result[i] = byteCast(value);
         } catch (IllegalArgumentException error) {
           throw new HaraException("bytes expects values in the byte range", this);
         }
       }
       return result;
+    }
+
+    @TruffleBoundary
+    private static byte byteCast(Object value) {
+      return Cast.byteCast(value);
     }
   }
 
@@ -192,7 +198,7 @@ public final class HaraNodes {
       Object input = HaraBox.unwrap(value.execute(frame));
       long number;
       try {
-        number = Cast.longCast(input);
+        number = longCast(input);
       } catch (RuntimeException error) {
         throw new HaraException("byte conversion expects an integral numeric value", this);
       }
@@ -201,6 +207,11 @@ public final class HaraNodes {
       }
       if (operator == Operator.UNSIGNED) return number < 0 ? number + 256 : number;
       return number > Byte.MAX_VALUE ? number - 256 : number;
+    }
+
+    @TruffleBoundary
+    private static long longCast(Object value) {
+      return Cast.longCast(value);
     }
   }
 
@@ -243,9 +254,13 @@ public final class HaraNodes {
       if (!(startValue instanceof Number) || !(endValue instanceof Number)) {
         throw new HaraException("byte-slice indexes must be numeric", this);
       }
+      return sliceBytes((byte[]) bytes, startValue, endValue);
+    }
+
+    @TruffleBoundary
+    private Object sliceBytes(byte[] array, Object startValue, Object endValue) {
       long startIndex = ((Number) startValue).longValue();
       long endIndex = ((Number) endValue).longValue();
-      byte[] array = (byte[]) bytes;
       if (startIndex < 0 || endIndex < startIndex || endIndex > array.length) {
         throw new HaraException(
             "byte-slice range is out of bounds: " + startIndex + ".." + endIndex, this);
@@ -284,6 +299,11 @@ public final class HaraNodes {
       for (int i = 0; i < arguments.length; i++) {
         values[i] = HaraBox.unwrap(arguments[i].execute(frame));
       }
+      return executeOperation(values);
+    }
+
+    @TruffleBoundary
+    private Object executeOperation(Object[] values) {
       switch (operator) {
         case LENGTH:
           return length(values[0]);
@@ -317,7 +337,7 @@ public final class HaraNodes {
           byteSet(values[0], values[1], values[2]);
           return values[0];
         default:
-          throw new AssertionError(operator);
+          throw unsupportedOperator(operator);
       }
     }
 
@@ -550,16 +570,26 @@ public final class HaraNodes {
       Object value = target.execute(frame);
       if (value == null) return null;
       if (key instanceof Number && value instanceof hara.lang.data.types.ILinearType<?>) {
-        long index = ((Number) key).longValue();
+        long index = keyIndex();
         hara.lang.data.types.ILinearType<?> linear = (hara.lang.data.types.ILinearType<?>) value;
         return index < 0 || index >= linear.count() ? null : linear.nth(index);
       }
       if (value instanceof String) {
-        int index = ((Number) key).intValue();
+        int index = (int) keyIndex();
         return index < 0 || index >= ((String) value).length()
             ? null
             : ((String) value).charAt(index);
       }
+      return lookupGeneric(value);
+    }
+
+    @TruffleBoundary
+    private long keyIndex() {
+      return ((Number) key).longValue();
+    }
+
+    @TruffleBoundary
+    private Object lookupGeneric(Object value) {
       if (value instanceof java.util.List<?>) {
         int index = ((Number) key).intValue();
         return index < 0 || index >= ((java.util.List<?>) value).size()
@@ -616,17 +646,32 @@ public final class HaraNodes {
         if (start > linear.count()) {
           throw new HaraException("Destructuring rest index is out of bounds", this);
         }
-        Object[] values = new Object[(int) linear.count() - (int) start];
-        for (int i = 0; i < values.length; i++) {
-          values[i] = linear.nth(start + i);
-        }
-        return BuiltinStruct.vector(values);
+        return restLinear(linear);
       }
       if (value instanceof String) {
-        return BuiltinStruct.vector(
-            ((String) value).substring((int) start).chars().mapToObj(c -> (char) c).toArray());
+        return restString((String) value);
       }
-      throw new HaraException("Cannot destructure rest from value: " + value, this);
+      throw cannotRest(value);
+    }
+
+    @TruffleBoundary
+    private HaraException cannotRest(Object value) {
+      return new HaraException("Cannot destructure rest from value: " + value, this);
+    }
+
+    @TruffleBoundary
+    private Object restLinear(hara.lang.data.types.ILinearType<?> linear) {
+      Object[] values = new Object[(int) linear.count() - (int) start];
+      for (int i = 0; i < values.length; i++) {
+        values[i] = linear.nth(start + i);
+      }
+      return BuiltinStruct.vector(values);
+    }
+
+    @TruffleBoundary
+    private Object restString(String value) {
+      return BuiltinStruct.vector(
+          value.substring((int) start).chars().mapToObj(c -> (char) c).toArray());
     }
   }
 
@@ -641,9 +686,14 @@ public final class HaraNodes {
     public Object execute(VirtualFrame frame) {
       HaraVar var = HaraLanguage.currentContext().resolve(symbol);
       if (var == null) {
-        throw new HaraException("Unbound symbol: " + symbol.display(), this);
+        throw unboundError("symbol");
       }
       return var.deref();
+    }
+
+    @TruffleBoundary
+    private HaraException unboundError(String kind) {
+      return new HaraException("Unbound " + kind + ": " + symbol.display(), this);
     }
   }
 
@@ -658,9 +708,14 @@ public final class HaraNodes {
     public Object execute(VirtualFrame frame) {
       HaraVar var = HaraLanguage.currentContext().resolve(symbol);
       if (var == null) {
-        throw new HaraException("Unbound var: " + symbol.display(), this);
+        throw unboundError("var");
       }
       return var;
+    }
+
+    @TruffleBoundary
+    private HaraException unboundError(String kind) {
+      return new HaraException("Unbound " + kind + ": " + symbol.display(), this);
     }
   }
 
@@ -693,9 +748,14 @@ public final class HaraNodes {
     public Object execute(VirtualFrame frame) {
       HaraVar var = HaraLanguage.currentContext().resolve(symbol);
       if (var == null) {
-        throw new HaraException("Unbound var: " + symbol.display(), this);
+        throw unboundError("var");
       }
       return var.reset(value.execute(frame));
+    }
+
+    @TruffleBoundary
+    private HaraException unboundError(String kind) {
+      return new HaraException("Unbound " + kind + ": " + symbol.display(), this);
     }
   }
 
@@ -827,11 +887,10 @@ public final class HaraNodes {
         for (int i = 0; i < symbols.length; i++) {
           HaraVar var = HaraLanguage.currentContext().resolve(symbols[i]);
           if (var == null) {
-            throw new HaraException("Unbound dynamic var: " + symbols[i].display(), this);
+            throw bindingError("Unbound dynamic var: ", symbols[i]);
           }
           if (!var.isDynamic()) {
-            throw new HaraException(
-                "binding requires a dynamic Var: " + symbols[i].display(), this);
+            throw bindingError("binding requires a dynamic Var: ", symbols[i]);
           }
           vars[i] = var;
           var.bind(values[i]);
@@ -841,6 +900,11 @@ public final class HaraNodes {
       } finally {
         for (int i = bound - 1; i >= 0; i--) vars[i].unbind();
       }
+    }
+
+    @TruffleBoundary
+    private HaraException bindingError(String message, Symbol symbol) {
+      return new HaraException(message + symbol.display(), this);
     }
   }
 
@@ -1090,8 +1154,7 @@ public final class HaraNodes {
       HaraContext context = HaraLanguage.currentContext();
       HaraVar var = context.resolve(symbol);
       if (var == null || !(var.get() instanceof HaraMultiFunction)) {
-        throw new HaraException(
-            "defmethod requires an existing defmulti: " + symbol.getName(), this);
+        throw defmultiError();
       }
       Object method = function.execute(frame);
       if (!(method instanceof HaraFunction)) {
@@ -1100,6 +1163,12 @@ public final class HaraNodes {
       ((HaraMultiFunction) var.get())
           .addMethod(dispatchValue.execute(frame), (HaraFunction) method);
       return var;
+    }
+
+    @TruffleBoundary
+    private HaraException defmultiError() {
+      return new HaraException(
+          "defmethod requires an existing defmulti: " + symbol.getName(), this);
     }
   }
 
@@ -1220,10 +1289,21 @@ public final class HaraNodes {
         throw new HaraException("field expects a struct", this);
       }
       try {
-        return ((HaraStruct) value).read(field);
+        return readStructField((HaraStruct) value);
       } catch (com.oracle.truffle.api.interop.UnknownIdentifierException exception) {
-        throw new HaraException("Unknown struct field: " + field, this);
+        throw unknownFieldError();
       }
+    }
+
+    @TruffleBoundary
+    private HaraException unknownFieldError() {
+      return new HaraException("Unknown struct field: " + field, this);
+    }
+
+    @TruffleBoundary
+    private Object readStructField(HaraStruct struct)
+        throws com.oracle.truffle.api.interop.UnknownIdentifierException {
+      return struct.read(field);
     }
   }
 
@@ -1240,8 +1320,13 @@ public final class HaraNodes {
       try {
         return HaraLanguage.currentContext().lookupHostSymbol(name);
       } catch (RuntimeException exception) {
-        throw new HaraException("Unable to resolve host symbol " + name, this);
+        throw hostSymbolError();
       }
+    }
+
+    @TruffleBoundary
+    private HaraException hostSymbolError() {
+      return new HaraException("Unable to resolve host symbol " + name, this);
     }
   }
 
@@ -1262,8 +1347,13 @@ public final class HaraNodes {
         return HaraLanguage.currentContext()
             .asGuestValue(InteropLibrary.getUncached().readMember(targetValue, member));
       } catch (UnsupportedMessageException | UnknownIdentifierException exception) {
-        throw new HaraException("Unable to read host member " + member, this);
+        throw hostGetError();
       }
+    }
+
+    @TruffleBoundary
+    private HaraException hostGetError() {
+      return new HaraException("Unable to read host member " + member, this);
     }
   }
 
@@ -1293,8 +1383,13 @@ public final class HaraNodes {
           | UnknownIdentifierException
           | UnsupportedTypeException
           | ArityException exception) {
-        throw new HaraException("Unable to call host member " + member, this);
+        throw hostCallError();
       }
+    }
+
+    @TruffleBoundary
+    private HaraException hostCallError() {
+      return new HaraException("Unable to call host member " + member, this);
     }
   }
 
@@ -1318,7 +1413,11 @@ public final class HaraNodes {
       Object leftValue = left.execute(frame);
       Object rightValue = right.execute(frame);
       if (isLongLike(leftValue) && isLongLike(rightValue)) {
-        return Num.addP(asLong(leftValue), asLong(rightValue));
+        try {
+          return Math.addExact(asLong(leftValue), asLong(rightValue));
+        } catch (ArithmeticException overflow) {
+          return addPromoting(leftValue, rightValue);
+        }
       }
       if (leftValue instanceof Number && rightValue instanceof Number) {
         CompilerDirectives.transferToInterpreterAndInvalidate();
@@ -1345,6 +1444,11 @@ public final class HaraNodes {
     private static Number addGeneric(Object left, Object right) {
       return Num.add(left, right);
     }
+
+    @TruffleBoundary
+    private static Number addPromoting(Object left, Object right) {
+      return Num.addP((Number) left, (Number) right);
+    }
   }
 
   public static final class Numeric extends HaraExpressionNode {
@@ -1365,23 +1469,53 @@ public final class HaraNodes {
           case REMAINDER:
             return "mod";
           default:
-            throw new AssertionError(this);
+            throw unsupportedOperator(this);
         }
       }
 
       private Number applyLong(long left, long right) {
         switch (this) {
           case SUBTRACT:
-            return Num.minusP(left, right);
+            try {
+              return Math.subtractExact(left, right);
+            } catch (ArithmeticException overflow) {
+              return applyPromoting(left, right);
+            }
           case MULTIPLY:
-            return Num.multiplyP(left, right);
+            try {
+              return Math.multiplyExact(left, right);
+            } catch (ArithmeticException overflow) {
+              return applyPromoting(left, right);
+            }
           case DIVIDE:
-            return Num.divide(left, right);
+            return divideLongs(left, right);
           case REMAINDER:
-            return Num.remainder(left, right);
+            return remainderLongs(left, right);
           default:
-            throw new AssertionError(this);
+            throw unsupportedOperator(this);
         }
+      }
+
+      @TruffleBoundary
+      private Number divideLongs(long left, long right) {
+        return Num.divide(left, right);
+      }
+
+      @TruffleBoundary
+      private Number applyPromoting(long left, long right) {
+        switch (this) {
+          case SUBTRACT:
+            return Num.minusP((Number) left, (Number) right);
+          case MULTIPLY:
+            return Num.multiplyP((Number) left, (Number) right);
+          default:
+            throw unsupportedOperator(this);
+        }
+      }
+
+      @TruffleBoundary
+      private Number remainderLongs(long left, long right) {
+        return Num.remainder(left, right);
       }
 
       @TruffleBoundary
@@ -1396,7 +1530,7 @@ public final class HaraNodes {
           case REMAINDER:
             return Num.remainder(left, right);
           default:
-            throw new AssertionError(this);
+            throw unsupportedOperator(this);
         }
       }
     }
@@ -1416,7 +1550,7 @@ public final class HaraNodes {
       Object leftValue = left.execute(frame);
       Object rightValue = right.execute(frame);
       if (!(leftValue instanceof Number) || !(rightValue instanceof Number)) {
-        throw new HaraException(operator.symbol() + " expects two numbers", this);
+        throw numericTypeError();
       }
       if (isLongLike(leftValue) && isLongLike(rightValue)) {
         long leftLong = asLong(leftValue);
@@ -1425,6 +1559,11 @@ public final class HaraNodes {
       }
       CompilerDirectives.transferToInterpreterAndInvalidate();
       return operator.applyGeneric(leftValue, rightValue);
+    }
+
+    @TruffleBoundary
+    private HaraException numericTypeError() {
+      return new HaraException(operator.symbol() + " expects two numbers", this);
     }
 
     private static boolean isLongLike(Object value) {
@@ -1440,6 +1579,16 @@ public final class HaraNodes {
       if (value instanceof Short) return (Short) value;
       return (Byte) value;
     }
+  }
+
+  @TruffleBoundary
+  private static boolean eqValues(Object left, Object right) {
+    return Eq.eq(left, right);
+  }
+
+  @TruffleBoundary
+  private static AssertionError unsupportedOperator(Object operator) {
+    return new AssertionError(operator);
   }
 
   public static final class Compare extends HaraExpressionNode {
@@ -1467,13 +1616,13 @@ public final class HaraNodes {
       Object leftValue = left.execute(frame);
       Object rightValue = right.execute(frame);
       if (operator == Operator.EQUAL || operator == Operator.NOT_EQUAL) {
-        boolean equal = Eq.eq(leftValue, rightValue);
+        boolean equal = eqValues(leftValue, rightValue);
         return operator == Operator.EQUAL ? equal : !equal;
       }
       if (!(leftValue instanceof Number) || !(rightValue instanceof Number)) {
         throw new HaraException("comparison expects two numbers", this);
       }
-      int comparison = Num.compare((Number) leftValue, (Number) rightValue);
+      int comparison = compareNumbers((Number) leftValue, (Number) rightValue);
       switch (operator) {
         case LESS:
           return comparison < 0;
@@ -1484,8 +1633,34 @@ public final class HaraNodes {
         case GREATER_OR_EQUAL:
           return comparison >= 0;
         default:
-          throw new AssertionError(operator);
+          throw unsupportedOperator(operator);
       }
+    }
+
+    static int compareNumbers(Number left, Number right) {
+      if (isLongLike(left) && isLongLike(right)) {
+        return Long.compare(asLong(left), asLong(right));
+      }
+      return compareGeneric(left, right);
+    }
+
+    private static boolean isLongLike(Object value) {
+      return value instanceof Byte
+          || value instanceof Short
+          || value instanceof Integer
+          || value instanceof Long;
+    }
+
+    private static long asLong(Object value) {
+      if (value instanceof Long) return (Long) value;
+      if (value instanceof Integer) return (Integer) value;
+      if (value instanceof Short) return (Short) value;
+      return (Byte) value;
+    }
+
+    @TruffleBoundary
+    private static int compareGeneric(Number left, Number right) {
+      return Num.compare(left, right);
     }
   }
 
@@ -1505,13 +1680,13 @@ public final class HaraNodes {
         Object current = values[i].execute(frame);
         boolean matches;
         if (operator == Compare.Operator.EQUAL || operator == Compare.Operator.NOT_EQUAL) {
-          boolean equal = Eq.eq(previous, current);
+          boolean equal = eqValues(previous, current);
           matches = operator == Compare.Operator.EQUAL ? equal : !equal;
         } else {
           if (!(previous instanceof Number) || !(current instanceof Number)) {
             throw new HaraException("comparison expects two numbers", this);
           }
-          int comparison = Num.compare((Number) previous, (Number) current);
+          int comparison = Compare.compareNumbers((Number) previous, (Number) current);
           switch (operator) {
             case LESS:
               matches = comparison < 0;
@@ -1526,7 +1701,7 @@ public final class HaraNodes {
               matches = comparison >= 0;
               break;
             default:
-              throw new AssertionError(operator);
+              throw unsupportedOperator(operator);
           }
         }
         if (!matches) return operator == Compare.Operator.NOT_EQUAL;
@@ -1595,15 +1770,13 @@ public final class HaraNodes {
     public Object execute(VirtualFrame frame) {
       Object target = function.execute(frame);
       if (target instanceof HaraMultiFunction) {
-        return HaraBox.export(((HaraMultiFunction) target).invoke(evaluateArguments(frame)));
+        return invokeMultiFunction((HaraMultiFunction) target, evaluateArguments(frame));
       }
       if (target instanceof HaraStruct) {
-        Object[] values = evaluateArguments(frame);
-        return HaraLanguage.currentContext().ifnProtocol().invoke("invoke", target, values);
+        return invokeViaProtocol(target, evaluateArguments(frame));
       }
       if (target instanceof IFn) {
-        Object[] values = evaluateArguments(frame);
-        return HaraLanguage.currentContext().ifnProtocol().invoke("invoke", target, values);
+        return invokeViaProtocol(target, evaluateArguments(frame));
       }
       if (target instanceof HaraType) {
         HaraType haraType = (HaraType) target;
@@ -1635,6 +1808,16 @@ public final class HaraNodes {
       }
       return indirectCall.call(
           selectedFunction.callTarget(), selectedFunction.callArguments(values));
+    }
+
+    @TruffleBoundary
+    private Object invokeMultiFunction(HaraMultiFunction target, Object[] values) {
+      return HaraBox.export(target.invoke(values));
+    }
+
+    @TruffleBoundary
+    private Object invokeViaProtocol(Object target, Object[] values) {
+      return HaraLanguage.currentContext().ifnProtocol().invoke("invoke", target, values);
     }
 
     private Object[] evaluateArguments(VirtualFrame frame) {
@@ -1701,23 +1884,10 @@ public final class HaraNodes {
         throw new HaraException("protocol-call expects a protocol", this);
       }
       HaraProtocol haraProtocol = (HaraProtocol) protocolValue;
-      HaraProtocol.HaraProtocolMethod descriptor = haraProtocol.method(method);
-      if (descriptor == null) {
-        throw new HaraException("Unknown protocol method: " + method, this);
-      }
-      if (!descriptor.acceptsCallArity(arguments.length + 1)) {
-        throw new HaraException(
-            "Expected "
-                + descriptor.expectedCallArguments()
-                + " protocol arguments, received "
-                + arguments.length,
-            this);
-      }
+      methodDescriptor(haraProtocol);
       HaraProtocolImplementation implementation = cachedImplementation(haraProtocol, receiverValue);
       if (implementation == null) {
-        throw new HaraException(
-            "No " + haraProtocol.name() + "/" + method + " implementation for " + receiverValue,
-            this);
+        throw noImplementation(haraProtocol, receiverValue);
       }
       Object[] values = new Object[arguments.length];
       for (int i = 0; i < arguments.length; i++) {
@@ -1725,7 +1895,7 @@ public final class HaraNodes {
       }
       HaraFunction haraFunction = implementation.function();
       if (haraFunction == null) {
-        return implementation.invoke(receiverValue, values);
+        return invokeImplementation(implementation, receiverValue, values);
       }
       Object[] callArguments = haraFunction.callArguments(prependReceiver(receiverValue, values));
       if (haraProtocol == cachedProtocol
@@ -1752,6 +1922,35 @@ public final class HaraNodes {
         return directCall.call(callArguments);
       }
       return indirectCall.call(haraFunction.callTarget(), callArguments);
+    }
+
+    @TruffleBoundary
+    private void methodDescriptor(HaraProtocol haraProtocol) {
+      HaraProtocol.HaraProtocolMethod descriptor = haraProtocol.method(method);
+      if (descriptor == null) {
+        throw new HaraException("Unknown protocol method: " + method, this);
+      }
+      if (!descriptor.acceptsCallArity(arguments.length + 1)) {
+        throw new HaraException(
+            "Expected "
+                + descriptor.expectedCallArguments()
+                + " protocol arguments, received "
+                + arguments.length,
+            this);
+      }
+    }
+
+    @TruffleBoundary
+    private HaraException noImplementation(HaraProtocol haraProtocol, Object receiverValue) {
+      return new HaraException(
+          "No " + haraProtocol.name() + "/" + method + " implementation for " + receiverValue,
+          this);
+    }
+
+    @TruffleBoundary
+    private Object invokeImplementation(
+        HaraProtocolImplementation implementation, Object receiver, Object[] values) {
+      return implementation.invoke(receiver, values);
     }
 
     private HaraProtocolImplementation cachedImplementation(

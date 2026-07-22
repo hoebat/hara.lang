@@ -50,10 +50,10 @@ public final class HaraBox implements TruffleObject {
       return HaraNull.SINGLETON;
     }
     if (value instanceof BigInteger) {
-      return new HaraBigInteger((BigInteger) value);
+      return exportBigInteger((BigInteger) value);
     }
     if (value instanceof BigDecimal) {
-      return new HaraDecimal((BigDecimal) value);
+      return exportBigDecimal((BigDecimal) value);
     }
     if (value instanceof Long
         || value instanceof Integer
@@ -67,6 +67,16 @@ public final class HaraBox implements TruffleObject {
       return value;
     }
     return new HaraBox(value);
+  }
+
+  @TruffleBoundary
+  private static Object exportBigInteger(BigInteger value) {
+    return new HaraBigInteger(value);
+  }
+
+  @TruffleBoundary
+  private static Object exportBigDecimal(BigDecimal value) {
+    return new HaraDecimal(value);
   }
 
   @ExportMessage
@@ -102,6 +112,7 @@ public final class HaraBox implements TruffleObject {
   }
 
   @ExportMessage
+  @TruffleBoundary
   boolean isArrayElementModifiable(long index) {
     return (value instanceof byte[] && index >= 0 && index < ((byte[]) value).length)
         || (value instanceof List<?> && index >= 0 && index < ((List<?>) value).size());
@@ -113,6 +124,7 @@ public final class HaraBox implements TruffleObject {
   }
 
   @ExportMessage
+  @TruffleBoundary
   void writeArrayElement(long index, Object newValue)
       throws InvalidArrayIndexException, UnsupportedTypeException {
     if (!isArrayElementModifiable(index)) {
@@ -135,6 +147,7 @@ public final class HaraBox implements TruffleObject {
   }
 
   @ExportMessage
+  @TruffleBoundary
   Object execute(Object[] arguments)
       throws UnsupportedTypeException, ArityException, UnsupportedMessageException {
     if (!(value instanceof IFn)) {
@@ -149,6 +162,7 @@ public final class HaraBox implements TruffleObject {
   }
 
   @ExportMessage
+  @TruffleBoundary
   Object getIterator() throws UnsupportedMessageException {
     if (value instanceof Iterator) {
       return new HaraIterator((Iterator<?>) value, Function.identity());
@@ -165,6 +179,7 @@ public final class HaraBox implements TruffleObject {
   }
 
   @ExportMessage
+  @TruffleBoundary
   long getHashSize() throws UnsupportedMessageException {
     if (value instanceof Map) {
       return ((Map<?, ?>) value).size();
@@ -176,6 +191,7 @@ public final class HaraBox implements TruffleObject {
   }
 
   @ExportMessage
+  @TruffleBoundary
   boolean isHashEntryReadable(Object key) {
     if (value instanceof Map) {
       return ((Map<?, ?>) value).containsKey(key);
@@ -184,6 +200,7 @@ public final class HaraBox implements TruffleObject {
   }
 
   @ExportMessage
+  @TruffleBoundary
   Object readHashValue(Object key) throws UnknownKeyException, UnsupportedMessageException {
     if (!isHashEntryReadable(key)) {
       if (!hasHashEntries()) {
@@ -201,21 +218,25 @@ public final class HaraBox implements TruffleObject {
   }
 
   @ExportMessage
+  @TruffleBoundary
   boolean isHashEntryModifiable(Object key) {
     return value instanceof Map && ((Map<?, ?>) value).containsKey(key);
   }
 
   @ExportMessage
+  @TruffleBoundary
   boolean isHashEntryInsertable(Object key) {
     return value instanceof Map && !((Map<?, ?>) value).containsKey(key);
   }
 
   @ExportMessage
+  @TruffleBoundary
   boolean isHashEntryRemovable(Object key) {
     return value instanceof Map && ((Map<?, ?>) value).containsKey(key);
   }
 
   @ExportMessage
+  @TruffleBoundary
   void writeHashEntry(Object key, Object newValue) throws UnsupportedMessageException {
     if (!(value instanceof Map)) {
       throw UnsupportedMessageException.create();
@@ -224,6 +245,7 @@ public final class HaraBox implements TruffleObject {
   }
 
   @ExportMessage
+  @TruffleBoundary
   void removeHashEntry(Object key) throws UnknownKeyException, UnsupportedMessageException {
     if (!(value instanceof Map)) {
       throw UnsupportedMessageException.create();
@@ -235,6 +257,7 @@ public final class HaraBox implements TruffleObject {
   }
 
   @ExportMessage
+  @TruffleBoundary
   Object getHashEntriesIterator() throws UnsupportedMessageException {
     if (value instanceof Map) {
       Iterator<?> entries = ((Map<?, ?>) value).entrySet().iterator();
@@ -257,6 +280,7 @@ public final class HaraBox implements TruffleObject {
   }
 
   @ExportMessage
+  @TruffleBoundary
   Object getHashKeysIterator() throws UnsupportedMessageException {
     if (value instanceof Map) {
       return new HaraIterator(((Map<?, ?>) value).keySet().iterator(), Function.identity());
@@ -271,6 +295,7 @@ public final class HaraBox implements TruffleObject {
   }
 
   @ExportMessage
+  @TruffleBoundary
   Object getHashValuesIterator() throws UnsupportedMessageException {
     if (value instanceof Map) {
       return new HaraIterator(((Map<?, ?>) value).values().iterator(), Function.identity());
@@ -295,6 +320,7 @@ public final class HaraBox implements TruffleObject {
     return value instanceof IDisplay ? ((IDisplay) value).display() : String.valueOf(value);
   }
 
+  @TruffleBoundary
   private static long arraySize(Object value) {
     if (value instanceof ILinearType) {
       return ((ILinearType<?>) value).count();
@@ -305,6 +331,7 @@ public final class HaraBox implements TruffleObject {
     return value != null && value.getClass().isArray() ? Array.getLength(value) : -1;
   }
 
+  @TruffleBoundary
   private static Object arrayElement(Object value, long index) {
     if (value instanceof ILinearType) {
       return ((ILinearType<?>) value).nth(index);
@@ -315,11 +342,13 @@ public final class HaraBox implements TruffleObject {
     return Array.get(value, (int) index);
   }
 
+  @TruffleBoundary
   @SuppressWarnings({"rawtypes", "unchecked"})
   private static Object lookupValue(ILookup<?, ?> lookup, Object key) {
     return ((ILookup) lookup).lookup(key);
   }
 
+  @TruffleBoundary
   @SuppressWarnings({"rawtypes", "unchecked"})
   private static boolean hasHashEntry(Object value, Object key) {
     if (value instanceof ISetType) {
@@ -347,11 +376,13 @@ public final class HaraBox implements TruffleObject {
     }
 
     @ExportMessage
+    @TruffleBoundary
     boolean hasIteratorNextElement() {
       return iterator.hasNext();
     }
 
     @ExportMessage
+    @TruffleBoundary
     Object getIteratorNextElement() throws StopIterationException {
       if (!iterator.hasNext()) {
         throw StopIterationException.create();

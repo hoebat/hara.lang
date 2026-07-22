@@ -1,5 +1,6 @@
 package hara.truffle;
 
+import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.TruffleObject;
 import com.oracle.truffle.api.library.ExportLibrary;
@@ -65,6 +66,7 @@ public final class HaraProtocol implements TruffleObject {
     extend(HaraDispatchKey.defaultKey(), methodName, invoker, null);
   }
 
+  @TruffleBoundary
   private void extend(
       HaraDispatchKey key, String methodName, HaraProtocolInvoker invoker, HaraFunction function) {
     HaraProtocolMethod method = method(methodName);
@@ -91,6 +93,7 @@ public final class HaraProtocol implements TruffleObject {
     return implementations.resolve(methodName, receiver);
   }
 
+  @TruffleBoundary
   public Object invoke(String methodName, Object receiver, Object[] arguments) {
     HaraProtocolMethod method = method(methodName);
     if (method == null) {
@@ -131,6 +134,7 @@ public final class HaraProtocol implements TruffleObject {
   }
 
   @ExportMessage
+  @TruffleBoundary
   Object toDisplayString(boolean allowSideEffects) {
     return "#<protocol " + name + ">";
   }

@@ -1,5 +1,6 @@
 package hara.truffle;
 
+import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.TruffleLanguage;
 import com.oracle.truffle.api.source.Source;
 import hara.kernel.builtin.BuiltinStruct;
@@ -62,6 +63,7 @@ public final class HaraContext {
     return namespaces.computeIfAbsent(name, HaraNamespace::new);
   }
 
+  @TruffleBoundary
   public void setCurrentNamespace(Symbol symbol) {
     if (symbol.getNamespace() != null) {
       throw new HaraException("Namespace name must not be qualified");
@@ -70,6 +72,7 @@ public final class HaraContext {
     installNumericBuiltins(currentNamespace);
   }
 
+  @TruffleBoundary
   public HaraVar resolve(Symbol symbol) {
     String namespaceName = symbol.getNamespace();
     if (namespaceName != null) {
@@ -88,6 +91,7 @@ public final class HaraContext {
     return currentNamespace.symbolNames();
   }
 
+  @TruffleBoundary
   public Object macroExpand(Object form, boolean recursive) {
     Object result = form;
     int expansions = 0;
@@ -111,6 +115,7 @@ public final class HaraContext {
     return macro == null ? form : macro.expand(list);
   }
 
+  @TruffleBoundary
   public void defineAlias(Symbol alias, Symbol target) {
     if (alias.getNamespace() != null || target.getNamespace() != null) {
       throw new HaraException("alias names must be unqualified");
@@ -123,6 +128,7 @@ public final class HaraContext {
         .put(alias.getName(), target.getName());
   }
 
+  @TruffleBoundary
   public HaraVar define(Symbol symbol, Object value) {
     if (symbol.getNamespace() != null && !symbol.getNamespace().equals(currentNamespace.name())) {
       throw new HaraException("Cannot define a var in another namespace: " + symbol.display());
@@ -160,6 +166,7 @@ public final class HaraContext {
     return environment.lookupHostSymbol(name);
   }
 
+  @TruffleBoundary
   HaraMacro resolveMacro(Symbol symbol) {
     String namespace = symbol.getNamespace();
     String namespaceName = namespace == null ? currentNamespace.name() : namespace;
@@ -296,6 +303,7 @@ public final class HaraContext {
             "pop", value -> protocolCall("INavigation", "pop-first", new Object[] {value})));
   }
 
+  @TruffleBoundary
   private Object arithmetic(String operator, Object[] values) {
     if (operator.equals("+") && values.length == 0) return 0L;
     if (operator.equals("*") && values.length == 0) return 1L;
@@ -327,6 +335,7 @@ public final class HaraContext {
     return result;
   }
 
+  @TruffleBoundary
   private Object compare(String operator, Object[] values) {
     if (values.length < 2) {
       throw new HaraException(operator + " expects at least two arguments");
@@ -403,6 +412,7 @@ public final class HaraContext {
     }
   }
 
+  @TruffleBoundary
   private Object loadResource(Object value) {
     if (!(value instanceof String) || ((String) value).isEmpty()) {
       throw new HaraException("load-resource expects a non-empty resource name");
@@ -423,6 +433,7 @@ public final class HaraContext {
     }
   }
 
+  @TruffleBoundary
   public Object requireModule(Object[] arguments) {
     if (arguments.length < 1 || arguments.length > 2 || !(arguments[0] instanceof String)) {
       throw new HaraException("require expects a path string");
@@ -542,6 +553,7 @@ public final class HaraContext {
     return value;
   }
 
+  @TruffleBoundary
   private void relocateLoadedMacros(
       String callerNamespace, Map<String, HaraMacro> callerMacrosBefore, ModuleRecord module) {
     if (module == null || callerNamespace.equals(module.namespace)) return;
@@ -581,6 +593,7 @@ public final class HaraContext {
     return module == null ? 0L : module.revision;
   }
 
+  @TruffleBoundary
   private Object moduleDependencies(Object value) {
     if (!(value instanceof String)) {
       throw new HaraException("module-dependencies expects a path string");
@@ -596,6 +609,7 @@ public final class HaraContext {
     return BuiltinStruct.vector(new LinkedHashSet<>(dependencies).toArray());
   }
 
+  @TruffleBoundary
   private Object referNamespace(Object value) {
     if (!(value instanceof String)) {
       throw new HaraException("refer expects a namespace string");
@@ -631,6 +645,7 @@ public final class HaraContext {
     return referNamespace(value);
   }
 
+  @TruffleBoundary
   private Object iterValue(Object value) {
     Object target = HaraBox.unwrap(value);
     if (target == null || target == HaraNull.SINGLETON) return Iter.emptyIterator();
@@ -642,11 +657,13 @@ public final class HaraContext {
     }
   }
 
+  @TruffleBoundary
   private Object iterHasNext(Object value) {
     Iterator<?> iterator = requireIterator(value, "iter-has?");
     return iterator.hasNext();
   }
 
+  @TruffleBoundary
   private Object iterNext(Object value) {
     Iterator<?> iterator = requireIterator(value, "iter-next");
     if (!iterator.hasNext()) throw new HaraException("iter-next reached the end of the iterator");
@@ -1121,6 +1138,7 @@ public final class HaraContext {
         source);
   }
 
+  @TruffleBoundary
   private Object iterRange(Object[] values) {
     if (values.length < 1 || values.length > 2) {
       throw new HaraException("iter-range expects an end or start and end");
@@ -1150,6 +1168,7 @@ public final class HaraContext {
     }
   }
 
+  @TruffleBoundary
   private static int iterationCount(Object value, String name) {
     if (!(value instanceof Number)) {
       throw new HaraException(name + " expects a numeric count");
@@ -1219,6 +1238,7 @@ public final class HaraContext {
     return invokeCallable(values[0], arguments.toArray());
   }
 
+  @TruffleBoundary
   private Object invokeCallable(Object value, Object[] arguments) {
     Object function = HaraBox.unwrap(value);
     if (function instanceof HaraFunction) {
@@ -1279,6 +1299,7 @@ public final class HaraContext {
     return HaraContext.class.getClassLoader().getResource(resourceName);
   }
 
+  @TruffleBoundary
   private ContextSnapshot snapshot() {
     Map<String, Map<String, Object>> values = new LinkedHashMap<>();
     Map<String, Map<String, HaraVar>> bindings = new LinkedHashMap<>();
@@ -1314,6 +1335,7 @@ public final class HaraContext {
         dependencyValues);
   }
 
+  @TruffleBoundary
   private void restore(ContextSnapshot snapshot) {
     namespaces.clear();
     for (Map.Entry<String, Map<String, Object>> entry : snapshot.values.entrySet()) {
@@ -1385,6 +1407,7 @@ public final class HaraContext {
     }
   }
 
+  @TruffleBoundary
   private Object parseAndExecute(String sourceText, String name) {
     try {
       Source source = Source.newBuilder(HaraLanguage.ID, sourceText, name).build();
@@ -1467,10 +1490,12 @@ public final class HaraContext {
       return new java.util.ArrayList<>(vars.keySet());
     }
 
+    @TruffleBoundary
     private HaraVar define(String symbolName, Object value) {
       return define(symbolName, value, null);
     }
 
+    @TruffleBoundary
     private HaraVar define(String symbolName, Object value, IMetadata metadata) {
       return vars.compute(
           symbolName,

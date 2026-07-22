@@ -43,6 +43,7 @@ public final class HaraVar
     return value;
   }
 
+  @TruffleBoundary
   @Override
   public Object deref() {
     Deque<Object> bindings = dynamicBindings.get();
@@ -57,10 +58,12 @@ public final class HaraVar
     return value;
   }
 
+  @TruffleBoundary
   public void bind(Object value) {
     dynamicBindings.get().addLast(value == null ? NIL_BINDING : value);
   }
 
+  @TruffleBoundary
   public void unbind() {
     Deque<Object> bindings = dynamicBindings.get();
     if (bindings.isEmpty()) throw new IllegalStateException("Var has no dynamic binding");

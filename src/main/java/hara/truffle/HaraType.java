@@ -55,6 +55,7 @@ public final class HaraType implements TruffleObject {
   }
 
   @ExportMessage
+  @com.oracle.truffle.api.CompilerDirectives.TruffleBoundary
   Object toDisplayString(boolean allowSideEffects) {
     return "#<type " + name + ">";
   }

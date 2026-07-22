@@ -1,5 +1,6 @@
 package hara.truffle;
 
+import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.interop.ArityException;
 import com.oracle.truffle.api.interop.InteropLibrary;
 import com.oracle.truffle.api.interop.TruffleObject;
@@ -20,6 +21,7 @@ public final class HaraMultiFunction implements TruffleObject {
     this.dispatchFunction = dispatchFunction;
   }
 
+  @TruffleBoundary
   public void addMethod(Object dispatchValue, HaraFunction method) {
     if (dispatchValue instanceof hara.lang.data.Keyword
         && ((hara.lang.data.Keyword) dispatchValue).getNamespace() == null
@@ -36,6 +38,7 @@ public final class HaraMultiFunction implements TruffleObject {
     methods.add(new Method(dispatchValue, method));
   }
 
+  @TruffleBoundary
   public Object invoke(Object[] arguments) {
     HaraFunction dispatch = dispatchFunction.resolveArity(arguments.length);
     if (dispatch == null) {
