@@ -83,4 +83,13 @@ public class ParserTest {
     assertTrue(error.getMessage().contains("expected ')' but found ']'"));
     assertTrue(error.getMessage().contains("line 1, column 3"));
   }
+
+  @Test
+  public void testParsePrefixAtEofReportsMissingOperand() {
+    RuntimeException quote = assertThrows(RuntimeException.class, () -> Parser.parseRoot("'"));
+    assertTrue(quote.getMessage().contains("EOF while reading quote"));
+
+    RuntimeException splice = assertThrows(RuntimeException.class, () -> Parser.parseRoot("~@"));
+    assertTrue(splice.getMessage().contains("EOF while reading unquote-splice"));
+  }
 }

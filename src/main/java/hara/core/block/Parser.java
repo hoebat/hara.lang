@@ -198,6 +198,10 @@ public class Parser {
   private Block.IBlock parseCons(String tag) {
     Block.Container.Props props = CONTAINER_PROPS.get(tag);
     reader.readChar();
+    if (reader.peekChar() == null) {
+      throw new Reader.ReaderException(
+          "EOF while reading " + tag, reader.getLineNumber(), reader.getColumnNumber());
+    }
     Vector.Mutable<Block.IBlock> children = Vector.Mutable.empty(null);
     children.pushLast(parse());
     return new Block.Container(tag, children.toPersistent(), props);
@@ -207,10 +211,18 @@ public class Parser {
     reader.readChar();
     if (reader.peekChar() == '@') {
       reader.readChar();
+      if (reader.peekChar() == null) {
+        throw new Reader.ReaderException(
+            "EOF while reading unquote-splice", reader.getLineNumber(), reader.getColumnNumber());
+      }
       return new Block.Container(
           "unquote-splice",
           Vector.Standard.from(null, parse()),
           CONTAINER_PROPS.get("unquote-splice"));
+    }
+    if (reader.peekChar() == null) {
+      throw new Reader.ReaderException(
+          "EOF while reading unquote", reader.getLineNumber(), reader.getColumnNumber());
     }
     return new Block.Container(
         "unquote", Vector.Standard.from(null, parse()), CONTAINER_PROPS.get("unquote"));
