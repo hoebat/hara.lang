@@ -706,6 +706,26 @@ public final class HaraNodes {
     }
   }
 
+  public static final class LetFn extends HaraExpressionNode {
+    private final int[] slots;
+    @Children private final HaraExpressionNode[] functions;
+    @Child private HaraExpressionNode body;
+
+    public LetFn(int[] slots, HaraExpressionNode[] functions, HaraExpressionNode body) {
+      this.slots = slots;
+      this.functions = functions;
+      this.body = body;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      for (int i = 0; i < functions.length; i++) {
+        frame.setObject(slots[i], functions[i].execute(frame));
+      }
+      return body.execute(frame);
+    }
+  }
+
   public static final class Binding extends HaraExpressionNode {
     private final Symbol[] symbols;
     @Children private final HaraExpressionNode[] initializers;

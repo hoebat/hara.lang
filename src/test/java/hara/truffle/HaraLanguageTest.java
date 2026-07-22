@@ -72,6 +72,26 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void supportsMutuallyRecursiveLetfnBindings() {
+    try (Context context = context()) {
+      assertEquals(
+          120,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(letfn [(fact [n] (if (= n 0) 1 (* n (fact (- n 1)))))] (fact 5))")
+              .asLong());
+      assertTrue(
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(letfn [(even? [n] (if (= n 0) true (odd? (- n 1)))) "
+                      + "(odd? [n] (if (= n 0) false (even? (- n 1))))] (even? 10))")
+              .asBoolean());
+    }
+  }
+
+  @Test
   public void evaluatesSpecializedArithmeticOperations() {
     try (Context context = context()) {
       assertEquals(0, context.eval(HaraLanguage.ID, "(+)").asLong());

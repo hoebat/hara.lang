@@ -200,6 +200,8 @@ final class HaraAnalyzer {
           return analyzeOr(list);
         case "let":
           return analyzeLet(list);
+        case "letfn":
+          return analyzeLetFn(list);
         case "binding":
           return analyzeBinding(list);
         case "loop":
@@ -466,6 +468,60 @@ final class HaraAnalyzer {
       body = new HaraNodes.Let(patternSlots.get(i), patternInitializers.get(i), body);
     }
     return new HaraNodes.Let(rawSlots, initializers, body);
+  }
+
+  private HaraExpressionNode analyzeLetFn(List<?> form) {
+    if (form.count() < 3 || !isBindingVector(form.nth(1))) {
+      throw error("letfn expects a function binding vector and a body");
+    }
+    ILinearType<?> bindings = (ILinearType<?>) form.nth(1);
+    int functionCount = (int) bindings.count();
+    int[] slots = new int[functionCount];
+    Map<Symbol, Integer> functionLocals = new HashMap<>(locals);
+    ArrayList<Object[]> definitions = new ArrayList<>();
+    for (int i = 0; i < functionCount; i++) {
+      Object definition = bindings.nth(i);
+      if (!(definition instanceof List<?>) || ((List<?>) definition).count() < 3) {
+        throw error("letfn definitions must be (name [arguments] body...)");
+      }
+      List<?> definitionList = (List<?>) definition;
+      Object name = definitionList.nth(0);
+      if (!(name instanceof Symbol) || ((Symbol) name).getNamespace() != null) {
+        throw error("letfn names must be unqualified symbols");
+      }
+      Symbol symbol = (Symbol) name;
+      if (functionLocals.containsKey(symbol)) {
+        throw error("Duplicate letfn name: " + symbol.getName());
+      }
+      slots[i] = frames.addSlot(FrameSlotKind.Object, symbol, null);
+      functionLocals.put(symbol, slots[i]);
+      Object[] body = new Object[(int) definitionList.count() - 2];
+      for (int j = 2; j < definitionList.count(); j++) body[j - 2] = definitionList.nth(j);
+      definitions.add(new Object[] {definitionList.nth(1), body});
+    }
+
+    HaraAnalyzer letFnAnalyzer =
+        new HaraAnalyzer(
+            language,
+            sourceSection,
+            context,
+            frames,
+            functionLocals,
+            enclosingLocals,
+            Map.of(),
+            Map.of(),
+            recurTarget);
+    HaraExpressionNode[] functions = new HaraExpressionNode[functionCount];
+    for (int i = 0; i < functionCount; i++) {
+      Object[] definition = definitions.get(i);
+      if (!isBindingVector(definition[0])) {
+        throw error("letfn parameters must be a binding vector");
+      }
+      functions[i] =
+          letFnAnalyzer.analyzeFunction((ILinearType<?>) definition[0], (Object[]) definition[1]);
+    }
+    HaraExpressionNode body = letFnAnalyzer.analyzeDo(form, 2);
+    return new HaraNodes.LetFn(slots, functions, body);
   }
 
   private HaraExpressionNode analyzeBinding(List<?> form) {

@@ -46,6 +46,10 @@
    :class :runtime
    :source "(loop [x 41] (if x (recur nil) 42))"
    :expect {:value 42 :type :integer}}
+  {:id :runtime/letfn
+   :class :runtime
+   :source "(letfn [(fact [n] (if (= n 0) 1 (* n (fact (- n 1)))))] (fact 5))"
+   :expect {:value 120 :type :integer}}
   {:id :runtime/destructuring
    :class :runtime
    :source "(let [{:keys [age]} {:age 41}] (+ age 1))"
