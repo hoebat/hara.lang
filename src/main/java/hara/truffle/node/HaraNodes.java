@@ -627,11 +627,14 @@ public final class HaraNodes {
     private HaraProtocolImplementation cachedImplementation;
     private HaraFunction cachedFunction;
     private Assumption cachedAssumption;
-    private HaraProtocol cachedDispatchProtocol;
-    private Object cachedDispatchShape;
-    private HaraProtocolImplementation cachedDispatchImplementation;
-    private Assumption cachedDispatchAssumption;
-    private boolean cachedDispatch;
+    private static final int DISPATCH_CACHE_LIMIT = 4;
+    private final HaraProtocol[] cachedDispatchProtocols = new HaraProtocol[DISPATCH_CACHE_LIMIT];
+    private final Object[] cachedDispatchShapes = new Object[DISPATCH_CACHE_LIMIT];
+    private final HaraProtocolImplementation[] cachedDispatchImplementations =
+        new HaraProtocolImplementation[DISPATCH_CACHE_LIMIT];
+    private final Assumption[] cachedDispatchAssumptions = new Assumption[DISPATCH_CACHE_LIMIT];
+    private int cachedDispatchSize;
+    private int cachedDispatchNext;
     private static final Object NIL_DISPATCH_SHAPE = new Object();
 
     public ProtocolInvoke(
@@ -710,21 +713,39 @@ public final class HaraNodes {
     private HaraProtocolImplementation cachedImplementation(
         HaraProtocol haraProtocol, Object receiverValue) {
       Object shape = dispatchShape(receiverValue);
-      if (cachedDispatch
-          && haraProtocol == cachedDispatchProtocol
-          && shape == cachedDispatchShape
-          && cachedDispatchAssumption != null
-          && cachedDispatchAssumption.isValid()) {
-        return cachedDispatchImplementation;
+      for (int i = 0; i < cachedDispatchSize; i++) {
+        if (haraProtocol == cachedDispatchProtocols[i]
+            && shape == cachedDispatchShapes[i]
+            && cachedDispatchAssumptions[i] != null
+            && cachedDispatchAssumptions[i].isValid()) {
+          return cachedDispatchImplementations[i];
+        }
       }
       CompilerDirectives.transferToInterpreterAndInvalidate();
       HaraProtocolImplementation implementation =
           haraProtocol.implementation(receiverValue, method);
-      cachedDispatchProtocol = haraProtocol;
-      cachedDispatchShape = shape;
-      cachedDispatchImplementation = implementation;
-      cachedDispatchAssumption = haraProtocol.implementationsStable();
-      cachedDispatch = true;
+      if (implementation == null) {
+        return null;
+      }
+
+      int slot = -1;
+      for (int i = 0; i < cachedDispatchSize; i++) {
+        if (cachedDispatchAssumptions[i] == null || !cachedDispatchAssumptions[i].isValid()) {
+          slot = i;
+          break;
+        }
+      }
+      if (slot < 0) {
+        if (cachedDispatchSize < DISPATCH_CACHE_LIMIT) {
+          slot = cachedDispatchSize++;
+        } else {
+          slot = cachedDispatchNext++ % DISPATCH_CACHE_LIMIT;
+        }
+      }
+      cachedDispatchProtocols[slot] = haraProtocol;
+      cachedDispatchShapes[slot] = shape;
+      cachedDispatchImplementations[slot] = implementation;
+      cachedDispatchAssumptions[slot] = haraProtocol.implementationsStable();
       return implementation;
     }
 
