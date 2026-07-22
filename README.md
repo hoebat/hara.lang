@@ -64,6 +64,8 @@ The current Hara L0 slice supports:
 
 The collection model is iterator-first and does not require `ISeq`, transducers, `transduce`, or `eduction`. Host interop is disabled unless the embedding context grants it. The Native Image workflow covers a smoke subset; Native Image startup, size, reachability, and benchmark evidence remain tracked separately from JVM verification.
 
+The normative L0 contract is maintained in [`spec/hara/l0-language.md`](spec/hara/l0-language.md), with executable examples in [`spec/hara/l0-conformance.edn`](spec/hara/l0-conformance.edn).
+
 ### Focused collection protocol tests
 
 Collection protocol tests are split into the same slices used by GitHub Actions so failures can be diagnosed without rerunning the entire suite:
