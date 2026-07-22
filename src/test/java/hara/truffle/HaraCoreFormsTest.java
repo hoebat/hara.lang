@@ -154,6 +154,17 @@ public class HaraCoreFormsTest {
   }
 
   @Test
+  public void malformedReaderErrorsPreserveSourceNameAndReaderPosition() throws Exception {
+    try (Context context = context()) {
+      Source source = Source.newBuilder(HaraLanguage.ID, "(+ 1 2", "broken.hara").build();
+      PolyglotException error = assertThrows(PolyglotException.class, () -> context.eval(source));
+      assertTrue(error.getMessage().contains("Unable to read Hara source broken.hara"));
+      assertTrue(error.getMessage().contains("line 1"));
+      assertTrue(error.getMessage().contains("column"));
+    }
+  }
+
+  @Test
   public void varAndDerefFailuresAreDeterministic() {
     try (Context context = context()) {
       assertTrue(

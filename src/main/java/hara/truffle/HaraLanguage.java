@@ -36,8 +36,23 @@ public final class HaraLanguage extends TruffleLanguage<HaraContext> {
         source.getLength() == 0
             ? source.createUnavailableSection()
             : source.createSection(0, source.getLength());
-    return HaraAnalyzer.compile(
-        this, readAll(source.getCharacters().toString()), sourceSection, currentContext());
+    Object[] forms;
+    try {
+      forms = readAll(source.getCharacters().toString());
+    } catch (hara.kernel.base.Parser.LispReader.ReaderException error) {
+      Throwable cause = error.getCause();
+      String detail = cause == null ? error.getMessage() : cause.getMessage();
+      throw new HaraException(
+          "Unable to read Hara source "
+              + source.getName()
+              + " at line "
+              + error.line()
+              + ", column "
+              + error.column()
+              + ": "
+              + detail);
+    }
+    return HaraAnalyzer.compile(this, forms, sourceSection, currentContext());
   }
 
   private static Object[] readAll(String source) {

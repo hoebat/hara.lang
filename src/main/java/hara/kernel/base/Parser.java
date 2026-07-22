@@ -95,6 +95,14 @@ public interface Parser {
         this.line = line;
         this.column = column;
       }
+
+      public int line() {
+        return line;
+      }
+
+      public int column() {
+        return column;
+      }
     }
 
     public static int readSingle(Reader r) {
