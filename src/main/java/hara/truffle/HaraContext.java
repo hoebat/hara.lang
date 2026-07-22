@@ -2,9 +2,11 @@ package hara.truffle;
 
 import com.oracle.truffle.api.TruffleLanguage;
 import hara.lang.data.Symbol;
-import java.util.Map;
+import hara.lang.protocol.IFn;
 import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 public final class HaraContext {
   private final TruffleLanguage.Env environment;
@@ -21,6 +23,7 @@ public final class HaraContext {
     ifnProtocol = new HaraProtocol("IFn", ifnMethods);
     currentNamespace.define("IFn", ifnProtocol);
     HaraJavaAdapters.install(this);
+    installNumericBuiltins();
   }
 
   TruffleLanguage.Env environment() {
@@ -87,6 +90,34 @@ public final class HaraContext {
     macros
         .computeIfAbsent(currentNamespace.name(), ignored -> new ConcurrentHashMap<>())
         .put(symbol.getName(), macro);
+  }
+
+  private void installNumericBuiltins() {
+    currentNamespace.define(
+        "bigint", new UnaryBuiltin("bigint", HaraNumericConversions::toBigInteger));
+    currentNamespace.define(
+        "bigdec", new UnaryBuiltin("bigdec", HaraNumericConversions::toBigDecimal));
+    currentNamespace.define("double", new UnaryBuiltin("double", HaraNumericConversions::toDouble));
+  }
+
+  private static final class UnaryBuiltin implements IFn<Object, Object, Object> {
+    private final String name;
+    private final Function<Object, Object> implementation;
+
+    private UnaryBuiltin(String name, Function<Object, Object> implementation) {
+      this.name = name;
+      this.implementation = implementation;
+    }
+
+    @Override
+    public Function<Object, Object> getArg1() {
+      return implementation;
+    }
+
+    @Override
+    public String toString() {
+      return "#<builtin " + name + ">";
+    }
   }
 
   private static final class HaraNamespace {

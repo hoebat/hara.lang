@@ -5,6 +5,7 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import hara.kernel.base.RT;
+import java.math.BigInteger;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.PolyglotException;
@@ -29,6 +30,22 @@ public class HaraLanguageTest {
       assertEquals(7, context.eval(HaraLanguage.ID, "(- 10 3)").asLong());
       assertEquals(42, context.eval(HaraLanguage.ID, "(* 6 7)").asLong());
       assertEquals(2, context.eval(HaraLanguage.ID, "(/ 5 2)").asLong());
+    }
+  }
+
+  @Test
+  public void convertsBetweenNumericRepresentationsExplicitly() {
+    try (Context context = context()) {
+      assertEquals(
+          BigInteger.ONE, context.eval(HaraLanguage.ID, "(bigint 1.9)").as(BigInteger.class));
+
+      Value decimal = context.eval(HaraLanguage.ID, "(bigdec 1.2300)");
+      assertTrue(decimal.hasMembers());
+      assertEquals("1.23", decimal.getMember("value").asString());
+
+      assertEquals(2.25, context.eval(HaraLanguage.ID, "(+ (double 1.25M) 1.0)").asDouble(), 0.0);
+      assertThrows(PolyglotException.class, () -> context.eval(HaraLanguage.ID, "(+ 1.25M 1.0)"));
+      assertThrows(PolyglotException.class, () -> context.eval(HaraLanguage.ID, "(bigint \"1\")"));
     }
   }
 
