@@ -51,6 +51,20 @@ target/hara-truffle eval '(let [x 19] (+ x 23))'
 
 The CLI also accepts `run <file>`, `stdin`, `repl`, and `help`. The `repl` command retains one Polyglot context across inputs, supports multiline forms, and continues after guest errors. The current slice supports literals, `quote`, `do`, `if`, parallel `let`, fixed-arity `fn` with lexical closures, invocation, binary `+`, persistent context-local vars through `def`, basic namespace switching through `ns`, multiple top-level forms, source-aware guest errors, compile-time `defmacro` with syntax-quote, unquote, and unquote-splicing, immutable `defstruct` values with Polyglot members, language-level protocols via `defprotocol`, `extend-type`, and `protocol-call` (including extending `IFn`), and explicit capability-gated host interop through `host-symbol`, `host-get`, and `host-call`. Collections and the broader builtin environment remain outside this migration slice.
 
+### Focused collection protocol tests
+
+Collection protocol tests are split into the same slices used by GitHub Actions so failures can be diagnosed without rerunning the entire suite:
+
+```shell
+mvn -Ptruffle -Dtest='hara.lang.data.CollectionsTest,hara.lang.data.ListTest,hara.lang.data.VectorTest,hara.lang.data.QueueTest,hara.lang.data.TupleTest,hara.lang.data.OrderedCollectionsTest,hara.lang.data.SortedCollectionsTest' test
+mvn -Ptruffle -Dtest='hara.lang.protocol.ProtocolTest,hara.truffle.HaraProtocolTest' test
+mvn -Ptruffle -Dtest='hara.truffle.HaraInteropTest,hara.truffle.HaraJavaAdaptersTest,hara.kernel.builtin.BuiltinInteropTest,hara.kernel.builtin.BuiltinCollectionTest' test
+mvn -Ptruffle -Dtest='hara.lang.base.IterTest,hara.lang.data.ConsTest,hara.core.zip.ZipTest' test
+mvn -Ptruffle -Dtest='hara.kernel.builtin.BuiltinStructTest,hara.truffle.HaraLanguageTest' test
+```
+
+The collection runtime is iterator-first. These slices do not require `ISeq`, transducers, `transduce`, or `eduction`.
+
 
 ## Design
 

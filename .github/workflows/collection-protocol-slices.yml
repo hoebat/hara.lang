@@ -1,0 +1,55 @@
+name: Collection protocol test slices
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  collection-slice:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: core-collections
+            name: Core collection behavior
+            tests: hara.lang.data.CollectionsTest,hara.lang.data.ListTest,hara.lang.data.VectorTest,hara.lang.data.QueueTest,hara.lang.data.TupleTest,hara.lang.data.OrderedCollectionsTest,hara.lang.data.SortedCollectionsTest
+          - id: protocol-dispatch
+            name: Protocol dispatch and extension
+            tests: hara.lang.protocol.ProtocolTest,hara.truffle.HaraProtocolTest
+          - id: java-truffle-interop
+            name: Java-backed and Truffle interop
+            tests: hara.truffle.HaraInteropTest,hara.truffle.HaraJavaAdaptersTest,hara.kernel.builtin.BuiltinInteropTest,hara.kernel.builtin.BuiltinCollectionTest
+          - id: iterator-laziness
+            name: Iterator and lazy operations
+            tests: hara.lang.base.IterTest,hara.lang.data.ConsTest,hara.core.zip.ZipTest
+          - id: struct-callability
+            name: HaraStruct and IFn behavior
+            tests: hara.kernel.builtin.BuiltinStructTest,hara.truffle.HaraLanguageTest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: temurin
+          cache: maven
+
+      - name: Run test slice
+        run: mvn -B -Ptruffle -DfailIfNoTests=true -Dtest="${{ matrix.tests }}" test
+
+      - name: Upload Surefire reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-${{ matrix.id }}
+          path: target/surefire-reports/
+          if-no-files-found: ignore
