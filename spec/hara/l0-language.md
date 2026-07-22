@@ -115,6 +115,10 @@ The ordinary `dissoc` function accepts a collection followed by one or more
 keys and returns persistent updates. `peek` and `pop` expose first-element
 navigation through the collection protocol; they never mutate the input.
 
+The bootstrap provides lazy `range`, `repeat`, `repeatedly`, and `iterate`
+generators. Finite forms return explicit iterators and infinite forms remain
+lazy until consumed by `take`, `iter-next`, or another iterator operation.
+
 Hara is iterator-first. It does not require Clojure `ISeq`/`Seq` semantics.
 The core iterator forms are:
 

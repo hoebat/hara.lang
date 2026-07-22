@@ -218,6 +218,10 @@ public final class HaraContext {
     target.define("iter-cycle", new UnaryBuiltin("iter-cycle", this::iterCycle));
     target.define(
         "iter-partition-pair", new UnaryBuiltin("iter-partition-pair", this::iterPartitionPair));
+    target.define("iter-range", new VariadicBuiltin("iter-range", this::iterRange));
+    target.define("iter-constantly", new UnaryBuiltin("iter-constantly", Iter::constantly));
+    target.define("iter-repeatedly", new UnaryBuiltin("iter-repeatedly", this::iterRepeatedly));
+    target.define("iter-iterate", new VariadicBuiltin("iter-iterate", this::iterIterate));
     target.define("alter-var-root", new VariadicBuiltin("alter-var-root", this::alterVarRoot));
     target.define("apply", new VariadicBuiltin("apply", this::applyFunction));
     target.define("module-revision", new UnaryBuiltin("module-revision", this::moduleRevision));
@@ -811,6 +815,29 @@ public final class HaraContext {
     Iterator<Map.Entry<Object, Object>> pairs = Iter.partitionPair(source);
     return Iter.map(
         pairs, pair -> BuiltinStruct.vector(new Object[] {pair.getKey(), pair.getValue()}));
+  }
+
+  private Object iterRange(Object[] values) {
+    if (values.length < 1 || values.length > 2) {
+      throw new HaraException("iter-range expects an end or start and end");
+    }
+    if (!(values[0] instanceof Number) || (values.length == 2 && !(values[1] instanceof Number))) {
+      throw new HaraException("iter-range expects numeric bounds");
+    }
+    long start = values.length == 1 ? 0L : ((Number) values[0]).longValue();
+    long end = ((Number) values[values.length - 1]).longValue();
+    return Iter.range(start, end);
+  }
+
+  private Object iterRepeatedly(Object function) {
+    return Iter.repeatedly(() -> invokeCallable(function, new Object[0]));
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private Object iterIterate(Object[] values) {
+    requireIteratorArity(values, 2, "iter-iterate");
+    Object function = values[0];
+    return Iter.iterate(values[1], value -> invokeCallable(function, new Object[] {value}));
   }
 
   private static void requireIteratorArity(Object[] values, int expected, String name) {

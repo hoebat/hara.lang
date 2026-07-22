@@ -58,6 +58,17 @@
 (defn vals [value] (map val value))
 (defn contains? [value entry]
   (not (nil? (protocol-call IFind find value entry))))
+(defn range
+  ([] (iter-range 0))
+  ([end] (iter-range end))
+  ([start end] (iter-range start end)))
+(defn repeat
+  ([value] (iter-constantly value))
+  ([amount value] (take amount (iter-constantly value))))
+(defn repeatedly
+  ([function] (iter-repeatedly function))
+  ([amount function] (take amount (iter-repeatedly function))))
+(defn iterate [function seed] (iter-iterate function seed))
 (defn map [function value] (iter-map function value))
 (defn filter [predicate value] (iter-filter predicate value))
 (defn take [amount value] (iter-take amount value))
