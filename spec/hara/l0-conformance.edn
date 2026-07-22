@@ -26,6 +26,14 @@
    :class :reader
    :source "'value"
    :expect {:form "(quote value)"}}
+  {:id :reader/deref
+   :class :reader
+   :source "@value"
+   :expect {:form "(deref value)"}}
+  {:id :reader/discard
+   :class :reader
+   :source "#_ 2 1"
+   :expect {:value 1 :type :integer}}
   {:id :compiler/arithmetic
    :class :compiler
    :source "(+ 19 23)"
