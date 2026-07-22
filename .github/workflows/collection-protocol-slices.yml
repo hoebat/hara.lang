@@ -31,6 +31,9 @@ jobs:
           - id: struct-callability
             name: HaraStruct and IFn behavior
             tests: hara.kernel.builtin.BuiltinStructTest,hara.truffle.HaraLanguageTest
+          - id: differential-boundaries
+            name: Differential semantics and unsupported boundaries
+            tests: hara.truffle.CollectionProtocolDifferentialTest,hara.truffle.HaraProtocolTest
 
     steps:
       - name: Check out source
