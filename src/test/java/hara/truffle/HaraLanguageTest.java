@@ -34,6 +34,8 @@ public class HaraLanguageTest {
       context.eval(HaraLanguage.ID, "(defmethod kind :default [x] \"other\")");
       assertEquals("one", context.eval(HaraLanguage.ID, "(kind 1)").asString());
       assertEquals("other", context.eval(HaraLanguage.ID, "(kind 2)").asString());
+      context.eval(HaraLanguage.ID, "(defmethod kind :one [x] \"updated\")");
+      assertEquals("updated", context.eval(HaraLanguage.ID, "(kind 1)").asString());
     }
   }
 

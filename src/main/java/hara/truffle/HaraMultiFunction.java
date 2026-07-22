@@ -27,6 +27,12 @@ public final class HaraMultiFunction implements TruffleObject {
       defaultMethod = method;
       return;
     }
+    for (int i = 0; i < methods.size(); i++) {
+      if (Eq.eq(dispatchValue, methods.get(i).dispatchValue)) {
+        methods.set(i, new Method(dispatchValue, method));
+        return;
+      }
+    }
     methods.add(new Method(dispatchValue, method));
   }
 
