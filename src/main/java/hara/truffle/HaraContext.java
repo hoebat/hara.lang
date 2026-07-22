@@ -17,6 +17,7 @@ public final class HaraContext {
   private final Map<String, HaraNamespace> namespaces = new ConcurrentHashMap<>();
   private final Map<String, Map<String, HaraMacro>> macros = new ConcurrentHashMap<>();
   private final Map<String, Map<String, String>> aliases = new ConcurrentHashMap<>();
+  private final Map<String, ModuleRecord> modules = new ConcurrentHashMap<>();
   private volatile HaraNamespace currentNamespace;
   private final HaraProtocol ifnProtocol;
 
@@ -134,6 +135,9 @@ public final class HaraContext {
         "not", new UnaryBuiltin("not", value -> value == null || Boolean.FALSE.equals(value)));
     currentNamespace.define("load-string", new UnaryBuiltin("load-string", this::loadString));
     currentNamespace.define("load-file", new UnaryBuiltin("load-file", this::loadFile));
+    currentNamespace.define("require", new UnaryBuiltin("require", this::requireModule));
+    currentNamespace.define(
+        "module-revision", new UnaryBuiltin("module-revision", this::moduleRevision));
   }
 
   private Object loadString(Object value) {
@@ -155,13 +159,46 @@ public final class HaraContext {
     }
     ContextSnapshot snapshot = snapshot();
     try {
-      Path path = Path.of((String) value);
-      return parseAndExecute(Files.readString(path), path.toString());
+      Path path = canonicalPath((String) value);
+      Object result = parseAndExecute(Files.readString(path), path.toString());
+      registerModule(path);
+      return result;
     } catch (IOException | RuntimeException error) {
       restore(snapshot);
       throw new HaraException(
           "Unable to load Hara file: " + value + " (" + error.getMessage() + ")");
     }
+  }
+
+  private Object requireModule(Object value) {
+    if (!(value instanceof String)) {
+      throw new HaraException("require expects a path string");
+    }
+    Path path = canonicalPath((String) value);
+    if (!modules.containsKey(path.toString())) {
+      loadFile(path.toString());
+    }
+    return null;
+  }
+
+  private Object moduleRevision(Object value) {
+    if (!(value instanceof String)) {
+      throw new HaraException("module-revision expects a path string");
+    }
+    ModuleRecord module = modules.get(canonicalPath((String) value).toString());
+    return module == null ? 0L : module.revision;
+  }
+
+  private Path canonicalPath(String value) {
+    return Path.of(value).toAbsolutePath().normalize();
+  }
+
+  private void registerModule(Path path) {
+    String key = path.toString();
+    ModuleRecord previous = modules.get(key);
+    String namespaceName = currentNamespace.name();
+    modules.put(
+        key, new ModuleRecord(key, namespaceName, previous == null ? 1L : previous.revision + 1L));
   }
 
   private ContextSnapshot snapshot() {
@@ -181,7 +218,8 @@ public final class HaraContext {
     for (Map.Entry<String, Map<String, String>> entry : aliases.entrySet()) {
       aliasValues.put(entry.getKey(), new LinkedHashMap<>(entry.getValue()));
     }
-    return new ContextSnapshot(currentNamespace.name(), values, macroValues, aliasValues);
+    return new ContextSnapshot(
+        currentNamespace.name(), values, macroValues, aliasValues, new LinkedHashMap<>(modules));
   }
 
   private void restore(ContextSnapshot snapshot) {
@@ -201,6 +239,8 @@ public final class HaraContext {
     for (Map.Entry<String, Map<String, String>> entry : snapshot.aliases.entrySet()) {
       aliases.put(entry.getKey(), new ConcurrentHashMap<>(entry.getValue()));
     }
+    modules.clear();
+    modules.putAll(snapshot.modules);
   }
 
   private static final class ContextSnapshot {
@@ -208,16 +248,31 @@ public final class HaraContext {
     private final Map<String, Map<String, Object>> values;
     private final Map<String, Map<String, HaraMacro>> macros;
     private final Map<String, Map<String, String>> aliases;
+    private final Map<String, ModuleRecord> modules;
 
     private ContextSnapshot(
         String currentNamespace,
         Map<String, Map<String, Object>> values,
         Map<String, Map<String, HaraMacro>> macros,
-        Map<String, Map<String, String>> aliases) {
+        Map<String, Map<String, String>> aliases,
+        Map<String, ModuleRecord> modules) {
       this.currentNamespace = currentNamespace;
       this.values = values;
       this.macros = macros;
       this.aliases = aliases;
+      this.modules = modules;
+    }
+  }
+
+  private static final class ModuleRecord {
+    private final String path;
+    private final String namespace;
+    private final long revision;
+
+    private ModuleRecord(String path, String namespace, long revision) {
+      this.path = path;
+      this.namespace = namespace;
+      this.revision = revision;
     }
   }
 

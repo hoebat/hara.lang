@@ -309,6 +309,34 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void requireCachesCanonicalModulesAndLoadFileIncrementsRevision() throws Exception {
+    try (Context context = context()) {
+      Path file = Files.createTempFile("hara-l0-module-", ".hara");
+      try {
+        Files.writeString(file, "(def module-answer 41)");
+        String path = file.toString().replace("\\", "\\\\").replace("\"", "\\\"");
+        context.eval(HaraLanguage.ID, "(require \"" + path + "\")");
+        assertEquals(41, context.eval(HaraLanguage.ID, "module-answer").asLong());
+        assertEquals(
+            1, context.eval(HaraLanguage.ID, "(module-revision \"" + path + "\")").asLong());
+
+        Files.writeString(file, "(def module-answer 42)");
+        context.eval(HaraLanguage.ID, "(require \"" + path + "\")");
+        assertEquals(41, context.eval(HaraLanguage.ID, "module-answer").asLong());
+        assertEquals(
+            1, context.eval(HaraLanguage.ID, "(module-revision \"" + path + "\")").asLong());
+
+        context.eval(HaraLanguage.ID, "(load-file \"" + path + "\")");
+        assertEquals(42, context.eval(HaraLanguage.ID, "module-answer").asLong());
+        assertEquals(
+            2, context.eval(HaraLanguage.ID, "(module-revision \"" + path + "\")").asLong());
+      } finally {
+        Files.deleteIfExists(file);
+      }
+    }
+  }
+
+  @Test
   public void evaluatesMultipleTopLevelFormsAndNamespaces() {
     try (Context context = context()) {
       assertEquals(3, context.eval(HaraLanguage.ID, "(def x 1) (+ x 2)").asLong());
