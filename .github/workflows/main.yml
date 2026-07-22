@@ -64,6 +64,7 @@ jobs:
       run: |
         test "$(target/hara-truffle conformance)" = "L0 conformance passed: 41 cases"
         test "$(target/hara-truffle eval '(+ 19 23)')" = "42"
+        test "$(target/hara-truffle eval '(byte-u8 -1)')" = "255"
         test "$(target/hara-truffle eval '(protocol-call ICount count (bytes 1 2 3))')" = "3"
         test "$(target/hara-truffle eval '(let [a (x:array 1 2)] (x:set a 1 7) (x:get a 1))')" = "7"
         test "$(target/hara-truffle eval '(defstruct Person [name]) (protocol-call ILookup lookup (protocol-call IObjType meta (protocol-call IObjType with-meta (Person "Ada") {:doc "person"})) :doc)')" = "person"
@@ -80,6 +81,8 @@ jobs:
         test "$(target/hara-truffle eval '(load-resource \"hara/l0-core.hara\") ((comp2 inc inc) 40)')" = "42"
         test "$(target/hara-truffle eval '(require \"hara/l0-core.hara\") ((comp2 inc inc) 40)')" = "42"
         test "$(target/hara-truffle eval '(defmulti kind (fn [x] (if (= x 1) :one :other))) (defmethod kind :one [x] \"one\") (defmethod kind :default [x] \"other\") (kind 2)')" = "other"
+        test "$(target/hara-truffle eval '(do (defmacro unless [test body] `(if ~test nil ~body)) (unless false 42))')" = "42"
+        test "$(target/hara-truffle eval '(do (declare answer) (def answer 42) (defn- read-answer [] answer) (read-answer))')" = "42"
     - name: Upload Native Image evidence
       if: always()
       uses: actions/upload-artifact@v4
