@@ -164,18 +164,34 @@ public class Parser {
 
   private Block.IBlock parseCollection(String tag) {
     Block.Container.Props props = CONTAINER_PROPS.get(tag);
-    this.endDelimiter = props.end.charAt(0);
+    Character previousDelimiter = this.endDelimiter;
+    Character expectedDelimiter = props.end.charAt(0);
+    this.endDelimiter = expectedDelimiter;
     reader.readChar(); // consume start delimiter
     Vector.Mutable<Block.IBlock> children = Vector.Mutable.empty(null);
     while (true) {
       Character ch = reader.peekChar();
-      if (ch == null || ch.equals(this.endDelimiter)) {
+      if (ch == null) {
+        this.endDelimiter = previousDelimiter;
+        throw new Reader.ReaderException(
+            "EOF while reading " + tag + ", expected '" + expectedDelimiter + "'",
+            reader.getLineNumber(),
+            reader.getColumnNumber());
+      }
+      if (ch.equals(expectedDelimiter)) {
         break;
+      }
+      if (ch == ')' || ch == ']' || ch == '}') {
+        this.endDelimiter = previousDelimiter;
+        throw new Reader.ReaderException(
+            "Mismatched delimiter: expected '" + expectedDelimiter + "' but found '" + ch + "'",
+            reader.getLineNumber(),
+            reader.getColumnNumber());
       }
       children.pushLast(parse());
     }
     reader.readChar(); // consume end delimiter
-    this.endDelimiter = null;
+    this.endDelimiter = previousDelimiter;
     return new Block.Container(tag, children.toPersistent(), props);
   }
 

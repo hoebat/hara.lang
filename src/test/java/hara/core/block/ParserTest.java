@@ -3,6 +3,7 @@ package hara.core.block;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 public class ParserTest {
@@ -61,5 +62,25 @@ public class ParserTest {
     Block.Container root = Parser.parseRoot("a b c");
     assertEquals("root", root.tag());
     assertEquals(5, root.children().count());
+  }
+
+  @Test
+  public void testParseNestedCollectionsRestoresOuterDelimiter() {
+    Block.Container root = Parser.parseRoot("([1])");
+    assertEquals(1, root.children().count());
+  }
+
+  @Test
+  public void testParseUnterminatedCollectionReportsExpectedDelimiter() {
+    RuntimeException error = assertThrows(RuntimeException.class, () -> Parser.parseRoot("(1 2"));
+    assertTrue(error.getMessage().contains("EOF while reading list, expected ')'"));
+    assertTrue(error.getMessage().contains("line 1, column 5"));
+  }
+
+  @Test
+  public void testParseMismatchedCollectionReportsBothDelimiters() {
+    RuntimeException error = assertThrows(RuntimeException.class, () -> Parser.parseRoot("(1]"));
+    assertTrue(error.getMessage().contains("expected ')' but found ']'"));
+    assertTrue(error.getMessage().contains("line 1, column 3"));
   }
 }
