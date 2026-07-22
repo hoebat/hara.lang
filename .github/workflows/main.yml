@@ -53,3 +53,5 @@ jobs:
         test "$(target/hara-truffle eval '(= 1.0M 1.00M)')" = "true"
         test "$(target/hara-truffle eval '(def ^:dynamic *answer* 1) (binding [*answer* 42] *answer*)')" = "42"
         test "$(target/hara-truffle eval '(def answer 1) (set! answer 42) answer')" = "42"
+        test "$(target/hara-truffle eval '(let [it (concat [1] [2])] (iter-next it) (iter-next it))')" = "2"
+        test "$(target/hara-truffle eval '(def answer 1) (defn add [x y] (+ x y)) (alter-var-root (var answer) add 41) answer')" = "42"
