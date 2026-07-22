@@ -1,13 +1,19 @@
 package hara.truffle;
 
 import com.google.protobuf.ByteString;
+import hara.lang.base.primitive.Num;
+import hara.pod.v1.BigIntegerValue;
+import hara.pod.v1.DecimalValue;
 import hara.pod.v1.Handle;
 import hara.pod.v1.ListValue;
 import hara.pod.v1.MapEntry;
 import hara.pod.v1.MapValue;
 import hara.pod.v1.NullValue;
 import hara.pod.v1.Value;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +29,24 @@ public final class HaraPodValueCodec {
     }
     if (value instanceof Boolean) {
       return result.setBooleanValue((Boolean) value).build();
+    }
+    if (value instanceof HaraBigInteger) {
+      value = ((HaraBigInteger) value).value();
+    }
+    if (value instanceof HaraDecimal) {
+      value = ((HaraDecimal) value).value();
+    }
+    if (value instanceof BigInteger) {
+      return result.setBigInteger(encodeBigInteger((BigInteger) value)).build();
+    }
+    if (value instanceof BigDecimal) {
+      BigDecimal decimal = Num.canonicalDecimal((BigDecimal) value);
+      return result
+          .setDecimal(
+              DecimalValue.newBuilder()
+                  .setUnscaled(encodeBigInteger(decimal.unscaledValue()))
+                  .setScale(decimal.scale()))
+          .build();
     }
     if (value instanceof Byte
         || value instanceof Short
@@ -92,9 +116,36 @@ public final class HaraPodValueCodec {
         return map;
       case TENSOR:
         return value.getTensor();
+      case BIG_INTEGER:
+        return decodeBigInteger(value.getBigInteger());
+      case DECIMAL:
+        DecimalValue decimal = value.getDecimal();
+        if (!decimal.hasUnscaled()) {
+          throw new IllegalArgumentException("Decimal pod value is missing its unscaled integer");
+        }
+        return Num.canonicalDecimal(
+            new BigDecimal(decodeBigInteger(decimal.getUnscaled()), decimal.getScale()));
       case KIND_NOT_SET:
       default:
         return HaraNull.SINGLETON;
     }
+  }
+
+  private static BigIntegerValue encodeBigInteger(BigInteger value) {
+    return BigIntegerValue.newBuilder()
+        .setTwosComplement(ByteString.copyFrom(value.toByteArray()))
+        .build();
+  }
+
+  private static BigInteger decodeBigInteger(BigIntegerValue encoded) {
+    byte[] bytes = encoded.getTwosComplement().toByteArray();
+    if (bytes.length == 0) {
+      throw new IllegalArgumentException("BigInteger pod value must not be empty");
+    }
+    BigInteger value = new BigInteger(bytes);
+    if (!Arrays.equals(bytes, value.toByteArray())) {
+      throw new IllegalArgumentException("BigInteger pod value is not minimally encoded");
+    }
+    return value;
   }
 }

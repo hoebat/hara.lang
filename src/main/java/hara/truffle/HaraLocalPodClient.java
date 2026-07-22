@@ -145,7 +145,7 @@ public final class HaraLocalPodClient implements HaraPodClient {
                 .setHandshake(
                     HandshakeRequest.newBuilder()
                         .setAbiMajor(1)
-                        .setAbiMinor(0)
+                        .setAbiMinor(1)
                         .setClientName(clientName))
                 .build());
     if (!response.hasHandshakeResponse()) {

@@ -121,7 +121,19 @@ message Value {
     ListValue list = 8;
     MapValue map = 9;
     Tensor tensor = 10;
+    BigIntegerValue big_integer = 11;
+    DecimalValue decimal = 12;
   }
+}
+
+message BigIntegerValue {
+  // Minimal signed, big-endian two's-complement representation.
+  bytes twos_complement = 1;
+}
+
+message DecimalValue {
+  BigIntegerValue unscaled = 1;
+  sint32 scale = 2;
 }
 
 enum NullValue {

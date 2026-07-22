@@ -18,7 +18,7 @@ public class PodProtocolTest {
     Manifest manifest =
         Manifest.newBuilder()
             .setAbiMajor(1)
-            .setAbiMinor(0)
+            .setAbiMinor(1)
             .setPodName("hara.test")
             .addCapabilities("tensor")
             .addNamespaces(
