@@ -627,6 +627,12 @@ public final class HaraNodes {
     private HaraProtocolImplementation cachedImplementation;
     private HaraFunction cachedFunction;
     private Assumption cachedAssumption;
+    private HaraProtocol cachedDispatchProtocol;
+    private Object cachedDispatchShape;
+    private HaraProtocolImplementation cachedDispatchImplementation;
+    private Assumption cachedDispatchAssumption;
+    private boolean cachedDispatch;
+    private static final Object NIL_DISPATCH_SHAPE = new Object();
 
     public ProtocolInvoke(
         HaraExpressionNode protocol,
@@ -660,7 +666,7 @@ public final class HaraNodes {
             this);
       }
       HaraProtocolImplementation implementation =
-          haraProtocol.implementation(receiverValue, method);
+          cachedImplementation(haraProtocol, receiverValue);
       if (implementation == null) {
         throw new HaraException(
             "No " + haraProtocol.name() + "/" + method + " implementation for " + receiverValue,
@@ -699,6 +705,37 @@ public final class HaraNodes {
         return directCall.call(callArguments);
       }
       return indirectCall.call(haraFunction.callTarget(), callArguments);
+    }
+
+    private HaraProtocolImplementation cachedImplementation(
+        HaraProtocol haraProtocol, Object receiverValue) {
+      Object shape = dispatchShape(receiverValue);
+      if (cachedDispatch
+          && haraProtocol == cachedDispatchProtocol
+          && shape == cachedDispatchShape
+          && cachedDispatchAssumption != null
+          && cachedDispatchAssumption.isValid()) {
+        return cachedDispatchImplementation;
+      }
+      CompilerDirectives.transferToInterpreterAndInvalidate();
+      HaraProtocolImplementation implementation =
+          haraProtocol.implementation(receiverValue, method);
+      cachedDispatchProtocol = haraProtocol;
+      cachedDispatchShape = shape;
+      cachedDispatchImplementation = implementation;
+      cachedDispatchAssumption = haraProtocol.implementationsStable();
+      cachedDispatch = true;
+      return implementation;
+    }
+
+    private Object dispatchShape(Object receiverValue) {
+      if (receiverValue == null) {
+        return NIL_DISPATCH_SHAPE;
+      }
+      if (receiverValue instanceof HaraStruct) {
+        return ((HaraStruct) receiverValue).type();
+      }
+      return receiverValue.getClass();
     }
 
     private Object[] prependReceiver(Object receiver, Object[] arguments) {
