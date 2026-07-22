@@ -564,6 +564,22 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void requireSupportsSelectiveMacroReferences() throws Exception {
+    try (Context context = context()) {
+      Path file = Files.createTempFile("hara-l0-macro-refer-", ".hara");
+      try {
+        Files.writeString(
+            file, "(ns library-macros) (defmacro unless [test body] `(if ~test nil ~body))");
+        String path = file.toString().replace("\\", "\\\\").replace("\"", "\\\"");
+        context.eval(HaraLanguage.ID, "(require \"" + path + "\" {:refer-macros [unless]})");
+        assertEquals(42, context.eval(HaraLanguage.ID, "(unless false 42)").asLong());
+      } finally {
+        Files.deleteIfExists(file);
+      }
+    }
+  }
+
+  @Test
   public void requireRejectsCyclesAndRollsBackPartialModules() throws Exception {
     try (Context context = context()) {
       Path directory = Files.createTempDirectory("hara-l0-cycle-");

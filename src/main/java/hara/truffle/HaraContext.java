@@ -275,6 +275,8 @@ public final class HaraContext {
         if (!loadingModules.add(key)) {
           throw new HaraException("Cyclic module require: " + key);
         }
+        Map<String, HaraMacro> callerMacrosBefore =
+            new LinkedHashMap<>(macros.getOrDefault(callerNamespace, Map.of()));
         try {
           loadingStack.addLast(key);
           if (classpath) {
@@ -287,6 +289,8 @@ public final class HaraContext {
           loadingStack.removeLastOccurrence(key);
           loadingModules.remove(key);
         }
+        ModuleRecord loaded = modules.get(key);
+        relocateLoadedMacros(callerNamespace, callerMacrosBefore, loaded);
       }
       currentNamespace = namespace(callerNamespace);
       installNumericBuiltins(currentNamespace);
@@ -313,28 +317,49 @@ public final class HaraContext {
 
     @SuppressWarnings("rawtypes")
     Object refer = unwrapQuoted(((IMapType) options).lookup(Keyword.create("refer")));
-    if (refer == null) return;
-    if (!(refer instanceof ILinearType<?>)) {
-      throw new HaraException("require :refer expects a sequential collection of symbols");
+    if (refer != null) {
+      if (!(refer instanceof ILinearType<?>)) {
+        throw new HaraException("require :refer expects a sequential collection of symbols");
+      }
+      HaraNamespace target = namespaces.get(module.namespace);
+      for (Object value : (ILinearType<?>) refer) {
+        if (!(value instanceof Symbol) || ((Symbol) value).getNamespace() != null) {
+          throw new HaraException("require :refer expects unqualified symbols");
+        }
+        Symbol symbol = (Symbol) value;
+        HaraVar variable = target == null ? null : target.lookup(symbol.getName());
+        if (variable == null) {
+          throw new HaraException(
+              "Cannot refer missing var " + symbol.getName() + " from " + module.namespace);
+        }
+        currentNamespace.refer(symbol.getName(), variable);
+        Map<String, HaraMacro> targetMacros = macros.get(module.namespace);
+        if (targetMacros != null && targetMacros.containsKey(symbol.getName())) {
+          macros
+              .computeIfAbsent(currentNamespace.name(), ignored -> new ConcurrentHashMap<>())
+              .put(symbol.getName(), targetMacros.get(symbol.getName()));
+        }
+      }
     }
-    HaraNamespace target = namespaces.get(module.namespace);
-    for (Object value : (ILinearType<?>) refer) {
+
+    Object referMacros = unwrapQuoted(((IMapType) options).lookup(Keyword.create("refer-macros")));
+    if (referMacros == null) return;
+    if (!(referMacros instanceof ILinearType<?>)) {
+      throw new HaraException("require :refer-macros expects a sequential collection of symbols");
+    }
+    Map<String, HaraMacro> targetMacros = macros.get(module.namespace);
+    for (Object value : (ILinearType<?>) referMacros) {
       if (!(value instanceof Symbol) || ((Symbol) value).getNamespace() != null) {
-        throw new HaraException("require :refer expects unqualified symbols");
+        throw new HaraException("require :refer-macros expects unqualified symbols");
       }
-      Symbol symbol = (Symbol) value;
-      HaraVar variable = target == null ? null : target.lookup(symbol.getName());
-      if (variable == null) {
-        throw new HaraException(
-            "Cannot refer missing var " + symbol.getName() + " from " + module.namespace);
+      String name = ((Symbol) value).getName();
+      HaraMacro macro = targetMacros == null ? null : targetMacros.get(name);
+      if (macro == null) {
+        throw new HaraException("Cannot refer missing macro " + name + " from " + module.namespace);
       }
-      currentNamespace.refer(symbol.getName(), variable);
-      Map<String, HaraMacro> targetMacros = macros.get(module.namespace);
-      if (targetMacros != null && targetMacros.containsKey(symbol.getName())) {
-        macros
-            .computeIfAbsent(currentNamespace.name(), ignored -> new ConcurrentHashMap<>())
-            .put(symbol.getName(), targetMacros.get(symbol.getName()));
-      }
+      macros
+          .computeIfAbsent(currentNamespace.name(), ignored -> new ConcurrentHashMap<>())
+          .put(name, macro);
     }
   }
 
@@ -345,6 +370,22 @@ public final class HaraContext {
       return ((List<?>) value).nth(1);
     }
     return value;
+  }
+
+  private void relocateLoadedMacros(
+      String callerNamespace, Map<String, HaraMacro> callerMacrosBefore, ModuleRecord module) {
+    if (module == null || callerNamespace.equals(module.namespace)) return;
+    Map<String, HaraMacro> callerMacros = macros.get(callerNamespace);
+    if (callerMacros == null) return;
+    Map<String, HaraMacro> moduleMacros =
+        macros.computeIfAbsent(module.namespace, ignored -> new ConcurrentHashMap<>());
+    for (Map.Entry<String, HaraMacro> entry : new LinkedHashMap<>(callerMacros).entrySet()) {
+      HaraMacro previous = callerMacrosBefore.get(entry.getKey());
+      if (previous != entry.getValue()) {
+        moduleMacros.put(entry.getKey(), entry.getValue());
+        callerMacros.remove(entry.getKey(), entry.getValue());
+      }
+    }
   }
 
   @SuppressWarnings("rawtypes")

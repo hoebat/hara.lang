@@ -109,6 +109,10 @@
    :class :module
    :source "(require \"hara/l0-core.hara\" {:refer [inc]}) (inc 41)"
    :expect {:value 42 :type :integer}}
+  {:id :module/refer-macros
+   :class :module
+   :source "(require \"hara/l0-macros.hara\" {:refer-macros [unless]}) (unless false 42)"
+   :expect {:value 42 :type :integer}}
   {:id :module/core-bootstrap
    :class :module
    :source "(load-resource \"hara/l0-core.hara\") ((comp2 inc inc) 40)"

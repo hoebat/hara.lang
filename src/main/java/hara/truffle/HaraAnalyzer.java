@@ -1525,6 +1525,13 @@ final class HaraAnalyzer {
     if (form.count() < 2 || form.count() > 3) {
       throw error("require expects a path and optional options map");
     }
+    if (form.nth(1) instanceof String
+        && (form.count() == 2 || form.nth(2) instanceof IMapType<?, ?>)) {
+      Object[] arguments =
+          form.count() == 2 ? new Object[] {form.nth(1)} : new Object[] {form.nth(1), form.nth(2)};
+      context.requireModule(arguments);
+      return new HaraNodes.Literal(null);
+    }
     HaraExpressionNode path = analyze(form.nth(1));
     HaraExpressionNode options =
         form.count() == 3 ? new HaraNodes.Literal(form.nth(2)) : new HaraNodes.Literal(null);

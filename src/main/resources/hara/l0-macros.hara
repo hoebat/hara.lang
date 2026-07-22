@@ -1,0 +1,3 @@
+; Minimal namespaced macro module used by the L0 bootstrap/conformance tests.
+(ns hara.l0-macros)
+(defmacro unless [test body] `(if ~test nil ~body))
