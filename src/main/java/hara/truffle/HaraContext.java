@@ -196,6 +196,9 @@ public final class HaraContext {
     target.define("iter-take", new VariadicBuiltin("iter-take", this::iterTake));
     target.define("iter-drop", new VariadicBuiltin("iter-drop", this::iterDrop));
     target.define("iter-zip", new VariadicBuiltin("iter-zip", this::iterZip));
+    target.define("iter-cycle", new UnaryBuiltin("iter-cycle", this::iterCycle));
+    target.define(
+        "iter-partition-pair", new UnaryBuiltin("iter-partition-pair", this::iterPartitionPair));
     target.define("alter-var-root", new VariadicBuiltin("alter-var-root", this::alterVarRoot));
     target.define("apply", new VariadicBuiltin("apply", this::applyFunction));
     target.define("module-revision", new UnaryBuiltin("module-revision", this::moduleRevision));
@@ -611,6 +614,19 @@ public final class HaraContext {
         }
       }
     };
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private Object iterCycle(Object value) {
+    return Iter.cycle(() -> (Iterator) iterValue(value));
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private Object iterPartitionPair(Object value) {
+    Iterator<Object> source = (Iterator<Object>) iterValue(value);
+    Iterator<Map.Entry<Object, Object>> pairs = Iter.partitionPair(source);
+    return Iter.map(
+        pairs, pair -> BuiltinStruct.vector(new Object[] {pair.getKey(), pair.getValue()}));
   }
 
   private static void requireIteratorArity(Object[] values, int expected, String name) {

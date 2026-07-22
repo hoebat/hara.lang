@@ -101,6 +101,10 @@
    :class :iterator
    :source "(let [ia (iter (x:array 1 2)) ib (iter (bytes 3 4))] (+ (iter-next ia) (iter-next ib)))"
    :expect {:value 4 :type :integer}}
+  {:id :iterator/cycle-partition
+   :class :iterator
+   :source "(let [it (iter-cycle [1 2])] (+ (iter-next it) (iter-next it) (iter-next it) (x:get (iter-next (iter-partition-pair [4 5])) 1)))"
+   :expect {:value 9 :type :integer}}
   {:id :function/apply
    :class :function
    :source "(defn sum3 [a b c] (+ a b c)) (apply sum3 1 [2 3])"

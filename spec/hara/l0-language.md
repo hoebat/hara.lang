@@ -89,7 +89,11 @@ The core iterator forms are:
 
 * `iter`, `iter-has?`, `iter-next`, and `iter-close`;
 * lazy `concat`, `iter-map`, `iter-filter`, `iter-take`, `iter-drop`, and
-  `iter-zip`.
+  `iter-zip`, `iter-cycle`, and `iter-partition-pair`.
+
+`iter-cycle` re-acquires a replayable source only after its current iteration
+is exhausted. `iter-partition-pair` emits two-element persistent vectors and
+drops an unmatched final element.
 
 Iterator sources are acquired only when demanded. `iter-next` reports a stable
 exhaustion error, and closing a wrapper closes its acquired source iterators.
