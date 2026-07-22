@@ -61,6 +61,12 @@ variadic fallback. `apply` spreads the final sequential argument into the
 call. Invocation supports Hara functions, protocol `IFn` implementations,
 multifunctions, and `defstruct` constructors.
 
+The packaged `hara/l0-core.hara` bootstrap defines `nil?`, `some?`, `false?`,
+`true?`, `empty?`, `first`, `second`, `rest`, `next`, and `not-empty` using
+ordinary L0 forms and iterator operations. `rest` returns a lazy iterator;
+`next` returns that iterator only when it has a value, otherwise nil. This is
+the L0 replacement for requiring Clojure `ISeq`/`Seq` navigation.
+
 Destructuring supports nested positional vector patterns, vector rest
 bindings, map `:keys`, `:strs`, `:syms`, `:as`, and `:or` patterns in function,
 `let`, and `loop` bindings. Missing sequential or map values produce nil
