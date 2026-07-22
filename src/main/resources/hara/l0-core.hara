@@ -5,3 +5,5 @@
 (defn dec [value] (- value 1))
 (defn constantly [value] (fn [ignored & rest] value))
 (defn comp2 [f g] (fn [value] (f (g value))))
+(defn comp3 [f g h] (fn [value] (f (g (h value)))))
+(defn complement [predicate] (fn [value] (not (predicate value))))

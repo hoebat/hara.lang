@@ -34,6 +34,8 @@ public class HaraLanguageTest {
           context
               .eval(HaraLanguage.ID, "(load-resource \"hara/l0-core.hara\") ((comp2 inc inc) 40)")
               .asLong());
+      assertEquals(42, context.eval(HaraLanguage.ID, "((comp3 inc inc inc) 39)").asLong());
+      assertTrue(context.eval(HaraLanguage.ID, "((complement (fn [x] (= x 1))) 2)").asBoolean());
       assertEquals(9, context.eval(HaraLanguage.ID, "((constantly 9) nil)").asLong());
     }
   }
@@ -46,6 +48,7 @@ public class HaraLanguageTest {
           context
               .eval(HaraLanguage.ID, "(require \"hara/l0-core.hara\") ((comp2 inc inc) 40)")
               .asLong());
+      assertEquals(42, context.eval(HaraLanguage.ID, "((comp3 inc inc inc) 39)").asLong());
       assertEquals(
           1, context.eval(HaraLanguage.ID, "(module-revision \"hara/l0-core.hara\")").asLong());
       context.eval(HaraLanguage.ID, "(require \"hara/l0-core.hara\" {:reload true})");
