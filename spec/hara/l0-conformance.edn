@@ -133,6 +133,10 @@
    :class :module
    :source "(load-resource \"hara/l0-core.hara\") (+ (first [1 2]) (second [2 3]) (iter-next (rest [3 4])))"
    :expect {:value 8 :type :integer}}
+  {:id :module/core-iterator-aliases
+   :class :module
+   :source "(load-resource \"hara/l0-core.hara\") (+ (iter-next (map inc [3])) (iter-next (filter (fn [x] (= x 2)) [1 2])) (x:get (iter-next (partition-pair [4 5])) 1))"
+   :expect {:value 11 :type :integer}}
   {:id :module/classpath-require
    :class :module
    :source "(require \"hara/l0-core.hara\") ((comp2 inc inc) 40)"

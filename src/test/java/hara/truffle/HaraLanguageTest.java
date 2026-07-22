@@ -70,6 +70,25 @@ public class HaraLanguageTest {
       assertTrue(context.eval(HaraLanguage.ID, "(next [1 2])").hasIterator());
       assertTrue(context.eval(HaraLanguage.ID, "(not-empty [1])").hasArrayElements());
       assertTrue(context.eval(HaraLanguage.ID, "(not-empty [])").isNull());
+      assertEquals(4, context.eval(HaraLanguage.ID, "(iter-next (map inc [3]))").asLong());
+      assertEquals(
+          2,
+          context.eval(HaraLanguage.ID, "(iter-next (filter (fn [x] (= x 2)) [1 2 3]))").asLong());
+      assertEquals(
+          2, context.eval(HaraLanguage.ID, "(iter-next (take 1 (drop 1 [1 2])))").asLong());
+      assertEquals(
+          2, context.eval(HaraLanguage.ID, "(iter-next (mapcat (fn [x] [x x]) [2]))").asLong());
+      assertEquals(
+          2,
+          context
+              .eval(HaraLanguage.ID, "(iter-next (keep (fn [x] (if (= x 2) x nil)) [1 2]))")
+              .asLong());
+      assertEquals(1, context.eval(HaraLanguage.ID, "(iter-next (cycle [1 2]))").asLong());
+      assertEquals(
+          2, context.eval(HaraLanguage.ID, "(x:get (iter-next (zip [1] [2])) 1)").asLong());
+      assertEquals(
+          2,
+          context.eval(HaraLanguage.ID, "(x:get (iter-next (partition-pair [1 2])) 1)").asLong());
     }
   }
 
