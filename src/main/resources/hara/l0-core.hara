@@ -40,6 +40,24 @@
   (assoc value key (apply function (concat [(get value key)] args))))
 (defn update-in [value keys function & args]
   (assoc-in value keys (apply function (concat [(get-in value keys)] args))))
+(defn last [value]
+  (let [it (iter value)]
+    (if (iter-has? it)
+      (loop [result (iter-next it)]
+        (if (iter-has? it) (recur (iter-next it)) result))
+      nil)))
+(defn reverse [value]
+  (let [it (iter value)]
+    (loop [result '()]
+      (if (iter-has? it)
+        (recur (cons (iter-next it) result))
+        result))))
+(defn key [entry] (first entry))
+(defn val [entry] (second entry))
+(defn keys [value] (map key value))
+(defn vals [value] (map val value))
+(defn contains? [value entry]
+  (not (nil? (protocol-call IFind find value entry))))
 (defn map [function value] (iter-map function value))
 (defn filter [predicate value] (iter-filter predicate value))
 (defn take [amount value] (iter-take amount value))

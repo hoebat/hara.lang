@@ -77,6 +77,11 @@ The bootstrap also provides `get-in`, `assoc-in`, `update`, and `update-in` for
 persistent nested values. These are ordinary `.hara` functions built on the
 collection protocol functions; they do not introduce mutable update semantics.
 
+Collection navigation also includes `last`, `reverse`, `key`, `val`, `keys`,
+`vals`, and `contains?`. `keys` and `vals` return lazy iterators over map
+entries, while `reverse` returns a persistent list and does not mutate its
+input.
+
 `reduce` eagerly consumes an iterator with either `(reduce function value)`
 or `(reduce function initial value)`. The two-argument form uses the first
 source element as its accumulator and rejects an empty source; the three-
