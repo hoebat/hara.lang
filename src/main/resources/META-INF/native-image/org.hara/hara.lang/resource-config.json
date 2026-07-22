@@ -3,6 +3,9 @@
     "includes": [
       {
         "pattern": "hara/.*\\.hara"
+      },
+      {
+        "pattern": "spec/hara/.*\\.edn"
       }
     ]
   }
