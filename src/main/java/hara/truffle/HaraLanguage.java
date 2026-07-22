@@ -2,7 +2,12 @@ package hara.truffle;
 
 import com.oracle.truffle.api.CallTarget;
 import com.oracle.truffle.api.TruffleLanguage;
+import com.oracle.truffle.api.source.Source;
+import com.oracle.truffle.api.source.SourceSection;
 import hara.kernel.base.Parser;
+import hara.kernel.base.Reader;
+import java.util.ArrayList;
+import java.util.List;
 
 @TruffleLanguage.Registration(
     id = HaraLanguage.ID,
@@ -20,10 +25,32 @@ public final class HaraLanguage extends TruffleLanguage<HaraContext> {
     return new HaraContext(environment);
   }
 
+  public static HaraContext currentContext() {
+    return getCurrentContext(HaraLanguage.class);
+  }
+
   @Override
   protected CallTarget parse(ParsingRequest request) {
-    Object form =
-        Parser.LispReader.readString(request.getSource().getCharacters().toString(), null);
-    return HaraAnalyzer.compile(this, form);
+    Source source = request.getSource();
+    SourceSection sourceSection =
+        source.getLength() == 0
+            ? source.createUnavailableSection()
+            : source.createSection(0, source.getLength());
+    return HaraAnalyzer.compile(
+        this, readAll(source.getCharacters().toString()), sourceSection, currentContext());
+  }
+
+  private static Object[] readAll(String source) {
+    Reader reader = new Reader(source);
+    Object eof = new Object();
+    List<Object> forms = new ArrayList<>();
+    Object form;
+    do {
+      form = Parser.LispReader.read(reader, false, eof, false, null);
+      if (form != eof) {
+        forms.add(form);
+      }
+    } while (form != eof);
+    return forms.toArray();
   }
 }

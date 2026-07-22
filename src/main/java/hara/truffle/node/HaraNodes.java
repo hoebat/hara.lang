@@ -1,13 +1,27 @@
 package hara.truffle.node;
 
+import com.oracle.truffle.api.Assumption;
 import com.oracle.truffle.api.CompilerDirectives;
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
+import com.oracle.truffle.api.RootCallTarget;
+import com.oracle.truffle.api.frame.MaterializedFrame;
 import com.oracle.truffle.api.frame.VirtualFrame;
+import com.oracle.truffle.api.interop.ArityException;
+import com.oracle.truffle.api.interop.InteropLibrary;
+import com.oracle.truffle.api.interop.UnknownIdentifierException;
+import com.oracle.truffle.api.interop.UnsupportedMessageException;
+import com.oracle.truffle.api.interop.UnsupportedTypeException;
 import com.oracle.truffle.api.nodes.DirectCallNode;
 import com.oracle.truffle.api.nodes.IndirectCallNode;
 import hara.lang.base.primitive.Num;
+import hara.lang.data.Symbol;
 import hara.truffle.HaraException;
 import hara.truffle.HaraFunction;
+import hara.truffle.HaraLanguage;
+import hara.truffle.HaraProtocol;
+import hara.truffle.HaraRecord;
+import hara.truffle.HaraType;
+import hara.truffle.HaraVar;
 
 public final class HaraNodes {
   private HaraNodes() {}
@@ -35,6 +49,23 @@ public final class HaraNodes {
     @Override
     public Object execute(VirtualFrame frame) {
       return frame.getValue(slot);
+    }
+  }
+
+  public static final class ReadGlobal extends HaraExpressionNode {
+    private final Symbol symbol;
+
+    public ReadGlobal(Symbol symbol) {
+      this.symbol = symbol;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      HaraVar var = HaraLanguage.currentContext().resolve(symbol);
+      if (var == null) {
+        throw new HaraException("Unbound symbol: " + symbol.display(), this);
+      }
+      return var.get();
     }
   }
 
@@ -102,6 +133,206 @@ public final class HaraNodes {
     }
   }
 
+  public static final class DefineGlobal extends HaraExpressionNode {
+    private final Symbol symbol;
+    @Child private HaraExpressionNode initializer;
+
+    public DefineGlobal(Symbol symbol, HaraExpressionNode initializer) {
+      this.symbol = symbol;
+      this.initializer = initializer;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      return HaraLanguage.currentContext().define(symbol, initializer.execute(frame));
+    }
+  }
+
+  public static final class SetNamespace extends HaraExpressionNode {
+    private final Symbol symbol;
+
+    public SetNamespace(Symbol symbol) {
+      this.symbol = symbol;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      HaraLanguage.currentContext().setCurrentNamespace(symbol);
+      return symbol;
+    }
+  }
+
+  public static final class DefineProtocol extends HaraExpressionNode {
+    private final Symbol symbol;
+    private final HaraProtocol protocol;
+
+    public DefineProtocol(Symbol symbol, HaraProtocol protocol) {
+      this.symbol = symbol;
+      this.protocol = protocol;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      return HaraLanguage.currentContext().define(symbol, protocol);
+    }
+  }
+
+  public static final class ProtocolMethodImplementation {
+    private final String name;
+    private final HaraExpressionNode function;
+
+    public ProtocolMethodImplementation(String name, HaraExpressionNode function) {
+      this.name = name;
+      this.function = function;
+    }
+  }
+
+  public static final class ExtendType extends HaraExpressionNode {
+    @Child private HaraExpressionNode type;
+    @Child private HaraExpressionNode protocol;
+    @Children private final HaraExpressionNode[] functions;
+    private final String[] names;
+
+    public ExtendType(
+        HaraExpressionNode type,
+        HaraExpressionNode protocol,
+        ProtocolMethodImplementation[] implementations) {
+      this.type = type;
+      this.protocol = protocol;
+      this.functions = new HaraExpressionNode[implementations.length];
+      this.names = new String[implementations.length];
+      for (int i = 0; i < implementations.length; i++) {
+        functions[i] = implementations[i].function;
+        names[i] = implementations[i].name;
+      }
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      Object typeValue = type.execute(frame);
+      Object protocolValue = protocol.execute(frame);
+      if (!(typeValue instanceof HaraType)) {
+        throw new HaraException("extend-type expects a struct type", this);
+      }
+      if (!(protocolValue instanceof HaraProtocol)) {
+        throw new HaraException("extend-type expects a protocol", this);
+      }
+      HaraFunction[] methodFunctions = new HaraFunction[functions.length];
+      for (int i = 0; i < functions.length; i++) {
+        Object functionValue = functions[i].execute(frame);
+        if (!(functionValue instanceof HaraFunction)) {
+          throw new HaraException("protocol implementation must be a function", this);
+        }
+        methodFunctions[i] = (HaraFunction) functionValue;
+      }
+      HaraProtocol haraProtocol = (HaraProtocol) protocolValue;
+      for (int i = 0; i < names.length; i++) {
+        haraProtocol.extend((HaraType) typeValue, names[i], methodFunctions[i]);
+      }
+      return haraProtocol;
+    }
+  }
+
+  public static final class ReadField extends HaraExpressionNode {
+    @Child private HaraExpressionNode target;
+    private final String field;
+
+    public ReadField(HaraExpressionNode target, String field) {
+      this.target = target;
+      this.field = field;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      Object value = target.execute(frame);
+      if (!(value instanceof HaraRecord)) {
+        throw new HaraException("field expects a record", this);
+      }
+      try {
+        return ((HaraRecord) value).read(field);
+      } catch (com.oracle.truffle.api.interop.UnknownIdentifierException exception) {
+        throw new HaraException("Unknown record field: " + field, this);
+      }
+    }
+  }
+
+  public static final class HostSymbol extends HaraExpressionNode {
+    private final String name;
+
+    public HostSymbol(String name) {
+      this.name = name;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      requireHostInterop(this);
+      try {
+        return HaraLanguage.currentContext().lookupHostSymbol(name);
+      } catch (RuntimeException exception) {
+        throw new HaraException("Unable to resolve host symbol " + name, this);
+      }
+    }
+  }
+
+  public static final class HostGet extends HaraExpressionNode {
+    @Child private HaraExpressionNode target;
+    private final String member;
+
+    public HostGet(HaraExpressionNode target, String member) {
+      this.target = target;
+      this.member = member;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      requireHostInterop(this);
+      Object targetValue = target.execute(frame);
+      try {
+        return HaraLanguage.currentContext()
+            .asGuestValue(InteropLibrary.getUncached().readMember(targetValue, member));
+      } catch (UnsupportedMessageException | UnknownIdentifierException exception) {
+        throw new HaraException("Unable to read host member " + member, this);
+      }
+    }
+  }
+
+  public static final class HostCall extends HaraExpressionNode {
+    @Child private HaraExpressionNode target;
+    @Children private final HaraExpressionNode[] arguments;
+    private final String member;
+
+    public HostCall(HaraExpressionNode target, String member, HaraExpressionNode[] arguments) {
+      this.target = target;
+      this.member = member;
+      this.arguments = arguments;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      requireHostInterop(this);
+      Object targetValue = target.execute(frame);
+      Object[] values = new Object[arguments.length];
+      for (int i = 0; i < arguments.length; i++) {
+        values[i] = arguments[i].execute(frame);
+      }
+      try {
+        return HaraLanguage.currentContext()
+            .asGuestValue(InteropLibrary.getUncached().invokeMember(targetValue, member, values));
+      } catch (UnsupportedMessageException
+          | UnknownIdentifierException
+          | UnsupportedTypeException
+          | ArityException exception) {
+        throw new HaraException("Unable to call host member " + member, this);
+      }
+    }
+  }
+
+  private static void requireHostInterop(HaraExpressionNode location) {
+    if (!HaraLanguage.currentContext().hostInteropAllowed()) {
+      throw new HaraException("Host interop is disabled for this Hara context", location);
+    }
+  }
+
   public static final class Add extends HaraExpressionNode {
     @Child private HaraExpressionNode left;
     @Child private HaraExpressionNode right;
@@ -145,16 +376,109 @@ public final class HaraNodes {
     }
   }
 
-  public static final class FunctionLiteral extends HaraExpressionNode {
-    private final HaraFunction function;
+  public static final class Numeric extends HaraExpressionNode {
+    public enum Operator {
+      SUBTRACT,
+      MULTIPLY,
+      DIVIDE;
 
-    public FunctionLiteral(HaraFunction function) {
-      this.function = function;
+      private String symbol() {
+        switch (this) {
+          case SUBTRACT:
+            return "-";
+          case MULTIPLY:
+            return "*";
+          case DIVIDE:
+            return "/";
+          default:
+            throw new AssertionError(this);
+        }
+      }
+
+      private Number applyLong(long left, long right) {
+        switch (this) {
+          case SUBTRACT:
+            return Num.minus(left, right);
+          case MULTIPLY:
+            return Num.multiply(left, right);
+          case DIVIDE:
+            return Num.divide(left, right);
+          default:
+            throw new AssertionError(this);
+        }
+      }
+
+      @TruffleBoundary
+      private Number applyGeneric(Object left, Object right) {
+        switch (this) {
+          case SUBTRACT:
+            return Num.minus(left, right);
+          case MULTIPLY:
+            return Num.multiply(left, right);
+          case DIVIDE:
+            return Num.divide(left, right);
+          default:
+            throw new AssertionError(this);
+        }
+      }
+    }
+
+    @Child private HaraExpressionNode left;
+    @Child private HaraExpressionNode right;
+    private final Operator operator;
+
+    public Numeric(Operator operator, HaraExpressionNode left, HaraExpressionNode right) {
+      this.operator = operator;
+      this.left = left;
+      this.right = right;
     }
 
     @Override
     public Object execute(VirtualFrame frame) {
-      return function;
+      Object leftValue = left.execute(frame);
+      Object rightValue = right.execute(frame);
+      if (!(leftValue instanceof Number) || !(rightValue instanceof Number)) {
+        throw new HaraException(operator.symbol() + " expects two numbers", this);
+      }
+      if (isLongLike(leftValue) && isLongLike(rightValue)) {
+        long leftLong = asLong(leftValue);
+        long rightLong = asLong(rightValue);
+        return operator.applyLong(leftLong, rightLong);
+      }
+      CompilerDirectives.transferToInterpreterAndInvalidate();
+      return operator.applyGeneric(leftValue, rightValue);
+    }
+
+    private static boolean isLongLike(Object value) {
+      return value instanceof Byte
+          || value instanceof Short
+          || value instanceof Integer
+          || value instanceof Long;
+    }
+
+    private static long asLong(Object value) {
+      if (value instanceof Long) return (Long) value;
+      if (value instanceof Integer) return (Integer) value;
+      if (value instanceof Short) return (Short) value;
+      return (Byte) value;
+    }
+  }
+
+  public static final class FunctionLiteral extends HaraExpressionNode {
+    private final RootCallTarget callTarget;
+    private final int arity;
+    private final boolean captures;
+
+    public FunctionLiteral(RootCallTarget callTarget, int arity, boolean captures) {
+      this.callTarget = callTarget;
+      this.arity = arity;
+      this.captures = captures;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      MaterializedFrame closure = captures ? frame.materialize() : null;
+      return new HaraFunction(callTarget, arity, closure);
     }
   }
 
@@ -174,6 +498,18 @@ public final class HaraNodes {
     @Override
     public Object execute(VirtualFrame frame) {
       Object target = function.execute(frame);
+      if (target instanceof HaraRecord) {
+        Object[] values = evaluateArguments(frame);
+        return HaraLanguage.currentContext().ifnProtocol().invoke("invoke", target, values);
+      }
+      if (target instanceof HaraType) {
+        HaraType haraType = (HaraType) target;
+        if (arguments.length != haraType.arity()) {
+          throw arityError(haraType.arity(), arguments.length);
+        }
+        Object[] values = evaluateArguments(frame);
+        return new HaraRecord(haraType, values);
+      }
       if (!(target instanceof HaraFunction)) {
         throw notCallable(target);
       }
@@ -182,21 +518,26 @@ public final class HaraNodes {
         throw arityError(haraFunction.arity(), arguments.length);
       }
 
-      Object[] values = new Object[arguments.length];
-      for (int i = 0; i < arguments.length; i++) {
-        values[i] = arguments[i].execute(frame);
-      }
+      Object[] values = evaluateArguments(frame);
 
       if (haraFunction == cachedFunction) {
-        return directCall.call(values);
+        return directCall.call(haraFunction.callArguments(values));
       }
       if (cachedFunction == null) {
         CompilerDirectives.transferToInterpreterAndInvalidate();
         cachedFunction = haraFunction;
         directCall = insert(DirectCallNode.create(haraFunction.callTarget()));
-        return directCall.call(values);
+        return directCall.call(haraFunction.callArguments(values));
       }
-      return indirectCall.call(haraFunction.callTarget(), values);
+      return indirectCall.call(haraFunction.callTarget(), haraFunction.callArguments(values));
+    }
+
+    private Object[] evaluateArguments(VirtualFrame frame) {
+      Object[] values = new Object[arguments.length];
+      for (int i = 0; i < arguments.length; i++) {
+        values[i] = arguments[i].execute(frame);
+      }
+      return values;
     }
 
     @TruffleBoundary
@@ -207,6 +548,92 @@ public final class HaraNodes {
     @TruffleBoundary
     private HaraException arityError(int expected, int actual) {
       return new HaraException("Expected " + expected + " arguments, received " + actual, this);
+    }
+  }
+
+  public static final class ProtocolInvoke extends HaraExpressionNode {
+    @Child private HaraExpressionNode protocol;
+    @Child private HaraExpressionNode receiver;
+    @Children private final HaraExpressionNode[] arguments;
+    private final String method;
+    @Child private DirectCallNode directCall;
+    @Child private IndirectCallNode indirectCall = IndirectCallNode.create();
+    private HaraProtocol cachedProtocol;
+    private HaraType cachedType;
+    private HaraFunction cachedFunction;
+    private Assumption cachedAssumption;
+
+    public ProtocolInvoke(
+        HaraExpressionNode protocol,
+        String method,
+        HaraExpressionNode receiver,
+        HaraExpressionNode[] arguments) {
+      this.protocol = protocol;
+      this.method = method;
+      this.receiver = receiver;
+      this.arguments = arguments;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      Object protocolValue = protocol.execute(frame);
+      Object receiverValue = receiver.execute(frame);
+      if (!(protocolValue instanceof HaraProtocol)) {
+        throw new HaraException("protocol-call expects a protocol", this);
+      }
+      if (!(receiverValue instanceof HaraRecord)) {
+        throw new HaraException("protocol-call expects a struct instance", this);
+      }
+      HaraProtocol haraProtocol = (HaraProtocol) protocolValue;
+      HaraProtocol.HaraProtocolMethod descriptor = haraProtocol.method(method);
+      if (descriptor == null) {
+        throw new HaraException("Unknown protocol method: " + method, this);
+      }
+      if (descriptor.arity() >= 0 && descriptor.arity() != arguments.length + 1) {
+        throw new HaraException(
+            "Expected "
+                + (descriptor.arity() - 1)
+                + " protocol arguments, received "
+                + arguments.length,
+            this);
+      }
+      Object[] values = new Object[arguments.length + 1];
+      values[0] = receiverValue;
+      for (int i = 0; i < arguments.length; i++) {
+        values[i + 1] = arguments[i].execute(frame);
+      }
+      HaraType haraType = ((HaraRecord) receiverValue).type();
+      HaraFunction haraFunction = haraProtocol.implementation(haraType, method);
+      if (haraFunction == null) {
+        throw new HaraException(
+            "No " + haraProtocol.name() + "/" + method + " implementation for " + haraType.name(),
+            this);
+      }
+      Object[] callArguments = haraFunction.callArguments(values);
+      if (haraProtocol == cachedProtocol
+          && haraType == cachedType
+          && haraFunction == cachedFunction
+          && cachedAssumption != null
+          && cachedAssumption.isValid()) {
+        return directCall.call(callArguments);
+      }
+      if (cachedFunction == null) {
+        CompilerDirectives.transferToInterpreterAndInvalidate();
+        cachedProtocol = haraProtocol;
+        cachedType = haraType;
+        cachedFunction = haraFunction;
+        cachedAssumption = haraProtocol.implementationsStable();
+        directCall = insert(DirectCallNode.create(haraFunction.callTarget()));
+        return directCall.call(callArguments);
+      }
+      if (haraProtocol == cachedProtocol && haraType == cachedType) {
+        CompilerDirectives.transferToInterpreterAndInvalidate();
+        cachedFunction = haraFunction;
+        cachedAssumption = haraProtocol.implementationsStable();
+        directCall = insert(DirectCallNode.create(haraFunction.callTarget()));
+        return directCall.call(callArguments);
+      }
+      return indirectCall.call(haraFunction.callTarget(), callArguments);
     }
   }
 }

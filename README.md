@@ -49,7 +49,7 @@ scripts/build-truffle-native
 target/hara-truffle eval '(let [x 19] (+ x 23))'
 ```
 
-The CLI also accepts `run <file>`, `stdin`, and `help`. This first slice supports literals, `quote`, `do`, `if`, parallel `let`, fixed-arity non-capturing `fn`, invocation, and binary `+`.
+The CLI also accepts `run <file>`, `stdin`, `repl`, and `help`. The `repl` command retains one Polyglot context across inputs, supports multiline forms, and continues after guest errors. The current slice supports literals, `quote`, `do`, `if`, parallel `let`, fixed-arity `fn` with lexical closures, invocation, binary `+`, persistent context-local vars through `def`, basic namespace switching through `ns`, multiple top-level forms, source-aware guest errors, compile-time `defmacro` with syntax-quote, unquote, and unquote-splicing, immutable `defstruct` values with Polyglot members, language-level protocols via `defprotocol`, `extend-type`, and `protocol-call` (including extending `IFn`), and explicit capability-gated host interop through `host-symbol`, `host-get`, and `host-call`. Collections and the broader builtin environment remain outside this migration slice.
 
 
 ## Design

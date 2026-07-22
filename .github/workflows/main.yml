@@ -19,10 +19,26 @@ jobs:
         distribution: 'temurin'
         cache: maven
     - name: Build and test with Maven
-      run: mvn -B package --file pom.xml
+      run: mvn -B -Ptruffle package --file pom.xml
 
     - name: Upload Coverage Report
       uses: actions/upload-artifact@v4
       with:
         name: jacoco-report
         path: target/site/jacoco/
+
+  native-image-smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up GraalVM
+      uses: graalvm/setup-graalvm@v1
+      with:
+        java-version: '21'
+        distribution: 'graalvm-community'
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Build the Truffle Native Image
+      run: ./scripts/build-truffle-native
+    - name: Run a Native Image smoke test
+      run: test "$(target/hara-truffle eval '(+ 19 23)')" = "42"
