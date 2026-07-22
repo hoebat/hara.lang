@@ -15,10 +15,12 @@ import com.oracle.truffle.api.nodes.DirectCallNode;
 import com.oracle.truffle.api.nodes.IndirectCallNode;
 import hara.lang.base.primitive.Num;
 import hara.lang.data.Symbol;
+import hara.lang.protocol.IFn;
 import hara.truffle.HaraException;
 import hara.truffle.HaraFunction;
 import hara.truffle.HaraLanguage;
 import hara.truffle.HaraProtocol;
+import hara.truffle.HaraProtocolImplementation;
 import hara.truffle.HaraStruct;
 import hara.truffle.HaraType;
 import hara.truffle.HaraVar;
@@ -502,6 +504,10 @@ public final class HaraNodes {
         Object[] values = evaluateArguments(frame);
         return HaraLanguage.currentContext().ifnProtocol().invoke("invoke", target, values);
       }
+      if (target instanceof IFn) {
+        Object[] values = evaluateArguments(frame);
+        return HaraLanguage.currentContext().ifnProtocol().invoke("invoke", target, values);
+      }
       if (target instanceof HaraType) {
         HaraType haraType = (HaraType) target;
         if (arguments.length != haraType.arity()) {
@@ -559,7 +565,7 @@ public final class HaraNodes {
     @Child private DirectCallNode directCall;
     @Child private IndirectCallNode indirectCall = IndirectCallNode.create();
     private HaraProtocol cachedProtocol;
-    private HaraType cachedType;
+    private HaraProtocolImplementation cachedImplementation;
     private HaraFunction cachedFunction;
     private Assumption cachedAssumption;
 
@@ -581,38 +587,37 @@ public final class HaraNodes {
       if (!(protocolValue instanceof HaraProtocol)) {
         throw new HaraException("protocol-call expects a protocol", this);
       }
-      if (!(receiverValue instanceof HaraStruct)) {
-        throw new HaraException("protocol-call expects a struct instance", this);
-      }
       HaraProtocol haraProtocol = (HaraProtocol) protocolValue;
       HaraProtocol.HaraProtocolMethod descriptor = haraProtocol.method(method);
       if (descriptor == null) {
         throw new HaraException("Unknown protocol method: " + method, this);
       }
-      if (descriptor.arity() >= 0 && descriptor.arity() != arguments.length + 1) {
+      if (!descriptor.acceptsCallArity(arguments.length + 1)) {
         throw new HaraException(
             "Expected "
-                + (descriptor.arity() - 1)
+                + descriptor.expectedCallArguments()
                 + " protocol arguments, received "
                 + arguments.length,
             this);
       }
-      Object[] values = new Object[arguments.length + 1];
-      values[0] = receiverValue;
-      for (int i = 0; i < arguments.length; i++) {
-        values[i + 1] = arguments[i].execute(frame);
-      }
-      HaraType haraType = ((HaraStruct) receiverValue).type();
-      HaraFunction haraFunction = haraProtocol.implementation(haraType, method);
-      if (haraFunction == null) {
+      HaraProtocolImplementation implementation =
+          haraProtocol.implementation(receiverValue, method);
+      if (implementation == null) {
         throw new HaraException(
-            "No " + haraProtocol.name() + "/" + method + " implementation for " + haraType.name(),
+            "No " + haraProtocol.name() + "/" + method + " implementation for " + receiverValue,
             this);
       }
-      Object[] callArguments = haraFunction.callArguments(values);
+      Object[] values = new Object[arguments.length];
+      for (int i = 0; i < arguments.length; i++) {
+        values[i] = arguments[i].execute(frame);
+      }
+      HaraFunction haraFunction = implementation.function();
+      if (haraFunction == null) {
+        return implementation.invoke(receiverValue, values);
+      }
+      Object[] callArguments = haraFunction.callArguments(prependReceiver(receiverValue, values));
       if (haraProtocol == cachedProtocol
-          && haraType == cachedType
-          && haraFunction == cachedFunction
+          && implementation == cachedImplementation
           && cachedAssumption != null
           && cachedAssumption.isValid()) {
         return directCall.call(callArguments);
@@ -620,20 +625,28 @@ public final class HaraNodes {
       if (cachedFunction == null) {
         CompilerDirectives.transferToInterpreterAndInvalidate();
         cachedProtocol = haraProtocol;
-        cachedType = haraType;
+        cachedImplementation = implementation;
         cachedFunction = haraFunction;
         cachedAssumption = haraProtocol.implementationsStable();
         directCall = insert(DirectCallNode.create(haraFunction.callTarget()));
         return directCall.call(callArguments);
       }
-      if (haraProtocol == cachedProtocol && haraType == cachedType) {
+      if (haraProtocol == cachedProtocol && implementation == cachedImplementation) {
         CompilerDirectives.transferToInterpreterAndInvalidate();
         cachedFunction = haraFunction;
+        cachedImplementation = implementation;
         cachedAssumption = haraProtocol.implementationsStable();
         directCall = insert(DirectCallNode.create(haraFunction.callTarget()));
         return directCall.call(callArguments);
       }
       return indirectCall.call(haraFunction.callTarget(), callArguments);
+    }
+
+    private Object[] prependReceiver(Object receiver, Object[] arguments) {
+      Object[] values = new Object[arguments.length + 1];
+      values[0] = receiver;
+      System.arraycopy(arguments, 0, values, 1, arguments.length);
+      return values;
     }
   }
 }

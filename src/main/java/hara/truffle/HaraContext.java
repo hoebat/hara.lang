@@ -20,6 +20,7 @@ public final class HaraContext {
     ifnMethods.put("invoke", -1);
     ifnProtocol = new HaraProtocol("IFn", ifnMethods);
     currentNamespace.define("IFn", ifnProtocol);
+    HaraJavaAdapters.install(this);
   }
 
   TruffleLanguage.Env environment() {
@@ -52,6 +53,12 @@ public final class HaraContext {
 
   public HaraProtocol ifnProtocol() {
     return ifnProtocol;
+  }
+
+  HaraProtocol defineProtocol(String name, Map<String, Integer> methodArities) {
+    HaraProtocol protocol = new HaraProtocol(name, methodArities);
+    currentNamespace.define(name, protocol);
+    return protocol;
   }
 
   public boolean hostInteropAllowed() {
