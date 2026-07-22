@@ -231,6 +231,10 @@ public class Parser {
   private Block.IBlock parseHash() {
     reader.readChar();
     Character ch = reader.peekChar();
+    if (ch == null) {
+      throw new Reader.ReaderException(
+          "EOF while reading hash dispatch", reader.getLineNumber(), reader.getColumnNumber());
+    }
     switch (ch) {
       case '{':
         return parseCollection("set");

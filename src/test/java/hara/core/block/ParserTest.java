@@ -92,4 +92,11 @@ public class ParserTest {
     RuntimeException splice = assertThrows(RuntimeException.class, () -> Parser.parseRoot("~@"));
     assertTrue(splice.getMessage().contains("EOF while reading unquote-splice"));
   }
+
+  @Test
+  public void testParseHashAtEofReportsReaderError() {
+    RuntimeException error = assertThrows(RuntimeException.class, () -> Parser.parseRoot("#"));
+    assertTrue(error.getMessage().contains("EOF while reading hash dispatch"));
+    assertTrue(error.getMessage().contains("line 1, column 2"));
+  }
 }
