@@ -110,6 +110,8 @@ public final class HaraContext {
     currentNamespace.define(
         "bigdec", new UnaryBuiltin("bigdec", HaraNumericConversions::toBigDecimal));
     currentNamespace.define("double", new UnaryBuiltin("double", HaraNumericConversions::toDouble));
+    currentNamespace.define(
+        "not", new UnaryBuiltin("not", value -> value == null || Boolean.FALSE.equals(value)));
     currentNamespace.define("load-string", new UnaryBuiltin("load-string", this::loadString));
     currentNamespace.define("load-file", new UnaryBuiltin("load-file", this::loadFile));
   }

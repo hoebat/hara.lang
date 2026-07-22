@@ -75,6 +75,9 @@ public class HaraLanguageTest {
       assertTrue(context.eval(HaraLanguage.ID, "(= ##Inf ##Inf)").asBoolean());
       assertTrue(context.eval(HaraLanguage.ID, "(< 1 ##Inf)").asBoolean());
       assertTrue(context.eval(HaraLanguage.ID, "(not= ##Inf 1)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(not false)").asBoolean());
+      assertTrue(!context.eval(HaraLanguage.ID, "(not true)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(not nil)").asBoolean());
     }
   }
 
