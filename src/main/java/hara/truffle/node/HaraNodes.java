@@ -315,33 +315,41 @@ public final class HaraNodes {
     }
 
     private static void set(Object target, Object key, Object value) {
-      if (target instanceof java.util.Map<?, ?>) {
-        ((java.util.Map<Object, Object>) target).put(key, value);
-        return;
-      }
-      int index = index(key, target);
-      if (target instanceof java.util.List<?>) {
-        ((java.util.List<Object>) target).set(index, value);
-      } else if (target instanceof byte[]) {
-        try {
-          ((byte[]) target)[index] = Cast.byteCast(value);
-        } catch (IllegalArgumentException error) {
-          throw new HaraException("x:set expects a value in the byte range");
+      try {
+        if (target instanceof java.util.Map<?, ?>) {
+          ((java.util.Map<Object, Object>) target).put(key, value);
+          return;
         }
-      } else if (target != null && target.getClass().isArray()) {
-        java.lang.reflect.Array.set(target, index, value);
-      } else {
-        throw new HaraException("x:set does not support target: " + target);
+        int index = index(key, target);
+        if (target instanceof java.util.List<?>) {
+          ((java.util.List<Object>) target).set(index, value);
+        } else if (target instanceof byte[]) {
+          try {
+            ((byte[]) target)[index] = Cast.byteCast(value);
+          } catch (IllegalArgumentException error) {
+            throw new HaraException("x:set expects a value in the byte range");
+          }
+        } else if (target != null && target.getClass().isArray()) {
+          java.lang.reflect.Array.set(target, index, value);
+        } else {
+          throw new HaraException("x:set does not support target: " + target);
+        }
+      } catch (IndexOutOfBoundsException error) {
+        throw new HaraException("x:set index out of bounds: " + key);
       }
     }
 
     private static void delete(Object target, Object key) {
-      if (target instanceof java.util.Map<?, ?>) {
-        ((java.util.Map<?, ?>) target).remove(key);
-      } else if (target instanceof java.util.List<?>) {
-        ((java.util.List<?>) target).remove(index(key, target));
-      } else {
-        throw new HaraException("x:delete does not support target: " + target);
+      try {
+        if (target instanceof java.util.Map<?, ?>) {
+          ((java.util.Map<?, ?>) target).remove(key);
+        } else if (target instanceof java.util.List<?>) {
+          ((java.util.List<?>) target).remove(index(key, target));
+        } else {
+          throw new HaraException("x:delete does not support target: " + target);
+        }
+      } catch (IndexOutOfBoundsException error) {
+        throw new HaraException("x:delete index out of bounds: " + key);
       }
     }
 
@@ -367,13 +375,17 @@ public final class HaraNodes {
     }
 
     private static void remove(Object target, Object key) {
-      if (target instanceof java.util.List<?>) {
-        ((java.util.List<?>) target).remove(index(key, target));
-        return;
-      }
-      if (target instanceof java.util.Map<?, ?>) {
-        ((java.util.Map<?, ?>) target).remove(key);
-        return;
+      try {
+        if (target instanceof java.util.List<?>) {
+          ((java.util.List<?>) target).remove(index(key, target));
+          return;
+        }
+        if (target instanceof java.util.Map<?, ?>) {
+          ((java.util.Map<?, ?>) target).remove(key);
+          return;
+        }
+      } catch (IndexOutOfBoundsException error) {
+        throw new HaraException("x:remove index out of bounds: " + key);
       }
       throw new HaraException("x:remove does not support target: " + target);
     }

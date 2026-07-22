@@ -74,6 +74,30 @@ public class HaraMutableBoundaryTest {
   }
 
   @Test
+  public void mutableMutationBoundsHaveStableDiagnostics() {
+    try (Context context = context()) {
+      assertTrue(
+          assertThrows(
+                  PolyglotException.class,
+                  () -> context.eval(HaraLanguage.ID, "(x:set (x:array 1) 4 9)"))
+              .getMessage()
+              .contains("x:set index out of bounds"));
+      assertTrue(
+          assertThrows(
+                  PolyglotException.class,
+                  () -> context.eval(HaraLanguage.ID, "(x:delete (x:array 1) 4)"))
+              .getMessage()
+              .contains("x:delete index out of bounds"));
+      assertTrue(
+          assertThrows(
+                  PolyglotException.class,
+                  () -> context.eval(HaraLanguage.ID, "(x:remove (x:array 1) 4)"))
+              .getMessage()
+              .contains("x:remove index out of bounds"));
+    }
+  }
+
+  @Test
   public void iteratorFormsAreLazyAndExplicitlyClosable() {
     try (Context context = context()) {
       assertEquals(
