@@ -729,15 +729,23 @@ public interface Iter {
 
   public static <E> Iterator<E> cycle(Supplier<Iterator<E>> f) {
     return new Iterator<E>() {
-      Iterator<E> _it = f.get();
+      Iterator<E> _it;
+
+      private void initialize() {
+        if (_it == null) {
+          _it = f.get();
+        }
+      }
 
       @Override
       public boolean hasNext() {
+        initialize();
         return true;
       }
 
       @Override
       public E next() {
+        initialize();
         if (_it.hasNext()) {
           return _it.next();
         } else {
@@ -806,23 +814,29 @@ public interface Iter {
       E _v0;
       State _state = State.NOT_SET;
 
+      private void prime() {
+        if (_state != State.NOT_SET) {
+          return;
+        }
+        if (!it.hasNext()) {
+          _state = State.DONE;
+          return;
+        }
+        _v0 = it.next();
+        _state = it.hasNext() ? State.READY : State.DONE;
+      }
+
       @Override
       public boolean hasNext() {
-        if (_state == State.NOT_SET) {
-          if (it.hasNext()) {
-            _v0 = it.next();
-            _state = State.READY;
-          } else {
-            return false;
-          }
-        }
-        return it.hasNext();
+        prime();
+        return _state == State.READY;
       }
 
       @SuppressWarnings({"unchecked", "rawtypes"})
       @Override
       public IPair<E, E> next() {
-        if (it.hasNext()) {
+        prime();
+        if (_state == State.READY) {
           var pair = new Tuple.Tup2.L(null, _v0, it.next());
           _state = State.NOT_SET;
           return pair;

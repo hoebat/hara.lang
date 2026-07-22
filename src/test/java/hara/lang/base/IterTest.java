@@ -5,6 +5,7 @@ import org.junit.Test;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map.Entry;
 
 import static org.junit.Assert.*;
 
@@ -123,5 +124,33 @@ public class IterTest {
     Iterator<Integer> dropped = Iter.drop(Arrays.asList(1, 2, 3).iterator(), 2);
     assertEquals(Integer.valueOf(3), dropped.next());
     assertFalse(dropped.hasNext());
+  }
+
+  @Test
+  public void testCycleDefersSourceAcquisitionUntilFirstConsumption() {
+    final int[] requested = {0};
+    Iterator<Integer> cycled =
+        Iter.cycle(
+            () -> {
+              requested[0]++;
+              return Arrays.asList(1).iterator();
+            });
+
+    assertEquals(0, requested[0]);
+    assertEquals(Integer.valueOf(1), cycled.next());
+    assertEquals(1, requested[0]);
+    assertEquals(Integer.valueOf(1), cycled.next());
+    assertEquals(2, requested[0]);
+  }
+
+  @Test
+  public void testPartitionPairSupportsDirectNextAndDropsOddTail() {
+    Iterator<Entry<Integer, Integer>> pairs =
+        Iter.partitionPair(Arrays.asList(1, 2, 3).iterator());
+
+    Entry<Integer, Integer> pair = pairs.next();
+    assertEquals(Integer.valueOf(1), pair.getKey());
+    assertEquals(Integer.valueOf(2), pair.getValue());
+    assertFalse(pairs.hasNext());
   }
 }
