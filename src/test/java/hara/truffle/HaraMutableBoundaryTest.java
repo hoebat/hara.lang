@@ -161,6 +161,14 @@ public class HaraMutableBoundaryTest {
               .getMessage()
               .contains("reached the end"));
       context.eval(HaraLanguage.ID, "(iter-close (iter \"abc\"))");
+      assertEquals(
+          4,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(let [ia (iter (x:array 1 2)) ib (iter (bytes 3 4))] "
+                      + "(+ (iter-next ia) (iter-next ib)))")
+              .asLong());
     }
   }
 

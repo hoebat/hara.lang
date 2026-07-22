@@ -97,6 +97,10 @@
    :class :iterator
    :source "(let [it (iter-map (fn [x] (* x 2)) [1 2])] (iter-next it))"
    :expect {:value 2 :type :integer}}
+  {:id :iterator/mutable-bytes
+   :class :iterator
+   :source "(let [ia (iter (x:array 1 2)) ib (iter (bytes 3 4))] (+ (iter-next ia) (iter-next ib)))"
+   :expect {:value 4 :type :integer}}
   {:id :function/apply
    :class :function
    :source "(defn sum3 [a b c] (+ a b c)) (apply sum3 1 [2 3])"
