@@ -21,6 +21,9 @@ jobs:
     - name: Build and test with Maven
       run: mvn -B -Ptruffle package --file pom.xml
 
+    - name: Run JVM L0 conformance corpus
+      run: mvn -B -Ptruffle -Dtest=hara.truffle.HaraL0ConformanceTest test
+
     - name: Upload Coverage Report
       uses: actions/upload-artifact@v4
       with:
@@ -46,3 +49,5 @@ jobs:
         test "$(target/hara-truffle eval '(protocol-call ICount count (bytes 1 2 3))')" = "3"
         test "$(target/hara-truffle eval '(let [a (x:array 1 2)] (x:set a 1 7) (x:get a 1))')" = "7"
         test "$(target/hara-truffle eval '(defstruct Person [name]) (protocol-call ILookup lookup (protocol-call IObjType meta (protocol-call IObjType with-meta (Person "Ada") {:doc "person"})) :doc)')" = "person"
+        test "$(target/hara-truffle eval '(= -0.0 0.0)')" = "true"
+        test "$(target/hara-truffle eval '(= 1.0M 1.00M)')" = "true"
