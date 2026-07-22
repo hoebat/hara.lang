@@ -806,18 +806,54 @@ public final class HaraNodes {
 
   public static final class Try extends HaraExpressionNode {
     @Child private HaraExpressionNode body;
-    private final int catchSlot;
-    @Child private HaraExpressionNode catchBody;
+    @Children private final CatchClause[] catches;
     @Child private HaraExpressionNode finallyBody;
 
-    public Try(
-        HaraExpressionNode body,
-        int catchSlot,
-        HaraExpressionNode catchBody,
-        HaraExpressionNode finallyBody) {
+    public static final class CatchClause extends HaraExpressionNode {
+      private final String typeName;
+      private final int catchSlot;
+      @Child private HaraExpressionNode body;
+
+      public CatchClause(String typeName, int catchSlot, HaraExpressionNode body) {
+        this.typeName = typeName;
+        this.catchSlot = catchSlot;
+        this.body = body;
+      }
+
+      private boolean matches(Object value) {
+        if ("Object".equals(typeName)
+            || "Exception".equals(typeName)
+            || "Throwable".equals(typeName)) {
+          return true;
+        }
+        if (value instanceof HaraStruct) {
+          return typeName.equals(((HaraStruct) value).type().name());
+        }
+        if ("Number".equals(typeName)) return value instanceof Number;
+        if ("String".equals(typeName)) return value instanceof String;
+        if ("Boolean".equals(typeName)) return value instanceof Boolean;
+        if ("Long".equals(typeName)) return value instanceof Long;
+        if ("Integer".equals(typeName)) return value instanceof Integer;
+        if ("Double".equals(typeName)) return value instanceof Double;
+        if ("BigInteger".equals(typeName)) return value instanceof java.math.BigInteger;
+        if ("BigDecimal".equals(typeName)) return value instanceof java.math.BigDecimal;
+        return false;
+      }
+
+      @Override
+      public Object execute(VirtualFrame frame) {
+        return body.execute(frame);
+      }
+
+      private Object executeCatch(VirtualFrame frame, Object value) {
+        frame.setObject(catchSlot, value);
+        return body.execute(frame);
+      }
+    }
+
+    public Try(HaraExpressionNode body, CatchClause[] catches, HaraExpressionNode finallyBody) {
       this.body = body;
-      this.catchSlot = catchSlot;
-      this.catchBody = catchBody;
+      this.catches = catches;
       this.finallyBody = finallyBody;
     }
 
@@ -826,11 +862,12 @@ public final class HaraNodes {
       try {
         return body.execute(frame);
       } catch (ThrownValue thrown) {
-        if (catchBody == null) {
-          throw thrown;
+        for (CatchClause clause : catches) {
+          if (clause.matches(thrown.value)) {
+            return clause.executeCatch(frame, thrown.value);
+          }
         }
-        frame.setObject(catchSlot, thrown.value);
-        return catchBody.execute(frame);
+        throw thrown;
       } finally {
         if (finallyBody != null) {
           finallyBody.execute(frame);

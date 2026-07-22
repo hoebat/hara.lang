@@ -230,6 +230,29 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void supportsOrderedTypedGuestCatchClauses() {
+    try (Context context = context()) {
+      assertEquals(
+          7,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(defstruct Problem [value]) "
+                      + "(try (throw (Problem 7)) "
+                      + "(catch Other error 0) "
+                      + "(catch Problem error (field error :value)))")
+              .asLong());
+      PolyglotException unmatched =
+          assertThrows(
+              PolyglotException.class,
+              () ->
+                  context.eval(
+                      HaraLanguage.ID, "(try (throw (Problem 9)) (catch Other error error))"));
+      assertTrue(unmatched.isGuestException());
+    }
+  }
+
+  @Test
   public void storesLexicalBindingsInFrames() {
     try (Context context = context()) {
       assertEquals(5, context.eval(HaraLanguage.ID, "(let [x 2 y 3] (+ x y))").asLong());

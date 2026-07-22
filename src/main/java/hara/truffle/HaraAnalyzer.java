@@ -908,17 +908,14 @@ final class HaraAnalyzer {
       throw error("try expects a body");
     }
     ArrayList<Object> bodyForms = new ArrayList<>();
-    List<?> catchForm = null;
+    ArrayList<List<?>> catchForms = new ArrayList<>();
     List<?> finallyForm = null;
     for (int i = 1; i < form.count(); i++) {
       Object clause = form.nth(i);
       if (clause instanceof List<?> && ((List<?>) clause).count() > 0) {
         Object name = ((List<?>) clause).nth(0);
         if (name instanceof Symbol && "catch".equals(((Symbol) name).getName())) {
-          if (catchForm != null) {
-            throw error("try supports one catch clause");
-          }
-          catchForm = (List<?>) clause;
+          catchForms.add((List<?>) clause);
           continue;
         }
         if (name instanceof Symbol && "finally".equals(((Symbol) name).getName())) {
@@ -929,19 +926,22 @@ final class HaraAnalyzer {
           continue;
         }
       }
-      if (catchForm != null || finallyForm != null) {
+      if (!catchForms.isEmpty() || finallyForm != null) {
         throw error("try clauses must follow the body");
       }
       bodyForms.add(clause);
     }
     HaraExpressionNode body = analyzeForms(bodyForms.toArray());
-    int catchSlot = -1;
-    HaraExpressionNode catchBody = null;
-    if (catchForm != null) {
-      if (catchForm.count() < 4 || !(catchForm.nth(2) instanceof Symbol)) {
-        throw error("catch expects a class, binding, and body");
+    HaraNodes.Try.CatchClause[] catches = new HaraNodes.Try.CatchClause[catchForms.size()];
+    for (int i = 0; i < catchForms.size(); i++) {
+      List<?> catchForm = catchForms.get(i);
+      if (catchForm.count() < 4
+          || !(catchForm.nth(1) instanceof Symbol)
+          || ((Symbol) catchForm.nth(1)).getNamespace() != null
+          || !(catchForm.nth(2) instanceof Symbol)) {
+        throw error("catch expects an unqualified class, binding, and body");
       }
-      catchSlot = frames.addSlot(FrameSlotKind.Object, catchForm.nth(2), null);
+      int catchSlot = frames.addSlot(FrameSlotKind.Object, catchForm.nth(2), null);
       Map<Symbol, Integer> catchLocals = new HashMap<>(locals);
       catchLocals.put((Symbol) catchForm.nth(2), catchSlot);
       HaraAnalyzer catchAnalyzer =
@@ -955,13 +955,17 @@ final class HaraAnalyzer {
               Map.of(),
               Map.of(),
               recurTarget);
-      catchBody = catchAnalyzer.analyzeDo(catchForm, 3);
+      catches[i] =
+          new HaraNodes.Try.CatchClause(
+              ((Symbol) catchForm.nth(1)).getName(),
+              catchSlot,
+              catchAnalyzer.analyzeDo(catchForm, 3));
     }
     HaraExpressionNode finallyBody = null;
     if (finallyForm != null) {
       finallyBody = analyzeDo(finallyForm, 1);
     }
-    return new HaraNodes.Try(body, catchSlot, catchBody, finallyBody);
+    return new HaraNodes.Try(body, catches, finallyBody);
   }
 
   private void validateTailRecurs(Object form, boolean tail) {
