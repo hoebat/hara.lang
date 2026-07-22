@@ -468,6 +468,21 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void altersVarRootThroughAnHaraFunction() {
+    try (Context context = context()) {
+      assertEquals(
+          41,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(def answer 1) (defn add [x y] (+ x y)) "
+                      + "(alter-var-root (var answer) add 40) answer")
+              .asLong());
+      assertEquals(41, context.eval(HaraLanguage.ID, "answer").asLong());
+    }
+  }
+
+  @Test
   public void supportsInNsAndUseAsOrdinaryRuntimeForms() {
     try (Context context = context()) {
       assertEquals(
