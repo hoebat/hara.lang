@@ -127,6 +127,10 @@ or the stopping predicate is reached.
 chunk; `partition` emits only complete chunks and discards an unmatched tail.
 Both require a positive chunk size.
 
+`map` and `iter-map` accept one or more sources. With multiple sources they
+advance them in lockstep and stop at the shortest source, invoking the function
+with one value from each source.
+
 Hara is iterator-first. It does not require Clojure `ISeq`/`Seq` semantics.
 The core iterator forms are:
 

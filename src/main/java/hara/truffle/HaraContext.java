@@ -656,11 +656,13 @@ public final class HaraContext {
 
   @SuppressWarnings({"rawtypes", "unchecked"})
   private Object iterMap(Object[] values) {
-    requireIteratorArity(values, 2, "iter-map");
-    Iterator source = (Iterator) iterValue(values[1]);
+    if (values.length < 2) {
+      throw new HaraException("iter-map expects a function and at least one source");
+    }
     Object function = values[0];
-    return closeable(
-        Iter.map(source, value -> invokeCallable(function, new Object[] {value})), source);
+    Object[] sourceValues = java.util.Arrays.copyOfRange(values, 1, values.length);
+    Iterator zipped = (Iterator) iterZip(sourceValues);
+    return closeable(Iter.map(zipped, value -> invokeCallable(function, (Object[]) value)), zipped);
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})

@@ -113,6 +113,7 @@ public class HaraLanguageTest {
       assertTrue(context.eval(HaraLanguage.ID, "(not-empty [1])").hasArrayElements());
       assertTrue(context.eval(HaraLanguage.ID, "(not-empty [])").isNull());
       assertEquals(4, context.eval(HaraLanguage.ID, "(iter-next (map inc [3]))").asLong());
+      assertEquals(4, context.eval(HaraLanguage.ID, "(iter-next (map + [1 2] [3 4]))").asLong());
       assertEquals(
           2,
           context.eval(HaraLanguage.ID, "(iter-next (filter (fn [x] (= x 2)) [1 2 3]))").asLong());
