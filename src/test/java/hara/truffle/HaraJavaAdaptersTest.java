@@ -1,11 +1,15 @@
 package hara.truffle;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 import hara.lang.data.Atom;
 import hara.lang.data.List;
 import hara.lang.data.Keyword;
+import hara.lang.data.Queue;
+import hara.lang.data.Set;
 import hara.lang.data.SortedMap;
+import hara.lang.data.Tuple;
 import hara.lang.data.Vector;
 import hara.lang.base.primitive.Counter;
 import hara.lang.base.primitive.Delay;
@@ -131,5 +135,57 @@ public class HaraJavaAdaptersTest {
     Iterator<?> iterator = (Iterator<?>) collection.invoke("iterator", vector, new Object[0]);
     assertEquals("first", iterator.next());
     assertEquals("second", iterator.next());
+  }
+
+  @Test
+  public void coversTheCommonCollectionProtocolAcrossAllCoreShapes() {
+    HaraProtocol collection =
+        new HaraProtocol(
+            "IColl", Map.of("start-string", 1, "end-string", 1, "sep-string", 1, "iterator", 1));
+    HaraJavaAdapters.installCollection(collection);
+
+    HaraProtocol count = new HaraProtocol("ICount", Map.of("count", 1));
+    HaraJavaAdapters.installCount(count);
+
+    Object[][] values = {
+      {Vector.Standard.from(null, "one", "two"), 2L, "one"},
+      {List.Standard.from(null, "one", "two"), 2L, "one"},
+      {Queue.Standard.from(null, "one", "two"), 2L, "one"},
+      {new Tuple.Tup3.L<>(null, "one", "two", "three"), 3L, "one"},
+      {Set.Standard.from(null, "one", "two"), 2L, null}
+    };
+
+    for (Object[] value : values) {
+      Object receiver = value[0];
+      assertEquals(value[1], count.invoke("count", receiver, new Object[0]));
+      Iterator<?> iterator =
+          (Iterator<?>) collection.invoke("iterator", receiver, new Object[0]);
+      if (value[2] != null) {
+        assertEquals(value[2], iterator.next());
+      } else {
+        assertTrue(iterator.hasNext());
+      }
+    }
+  }
+
+  @Test
+  public void adaptsIndexedSetAndPairInvocationSemantics() {
+    HaraProtocol nth = new HaraProtocol("INth", Map.of("nth", 2));
+    HaraJavaAdapters.installNth(nth);
+    Queue.Standard<String> queue = Queue.Standard.from(null, "zero", "one");
+    assertEquals("one", nth.invoke("nth", queue, new Object[] {1L}));
+
+    HaraProtocol ifn = new HaraProtocol("IFn", Map.of("invoke", -1));
+    HaraJavaAdapters.installIFn(ifn);
+    Set.Standard<String> set = Set.Standard.from(null, "present");
+    assertEquals("present", ifn.invoke("invoke", set, new Object[] {"present"}));
+    assertEquals(
+        "missing", ifn.invoke("invoke", set, new Object[] {"missing", "missing"}));
+
+    HaraProtocol pair = new HaraProtocol("IPair", Map.of("key", 1, "value", 1));
+    HaraJavaAdapters.installPair(pair);
+    Tuple.Tup2.L<String, Integer> tuple = new Tuple.Tup2.L<>(null, "key", 42);
+    assertEquals("key", pair.invoke("key", tuple, new Object[0]));
+    assertEquals(42, pair.invoke("value", tuple, new Object[0]));
   }
 }
