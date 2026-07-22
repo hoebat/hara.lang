@@ -24,6 +24,15 @@ jobs:
     - name: Run JVM L0 conformance corpus
       run: mvn -B -Ptruffle -Dtest=hara.truffle.HaraL0ConformanceTest test
 
+    - name: Run JVM L0 benchmark matrix
+      run: ./scripts/run-truffle-benchmark 2 1000 | tee target/l0-benchmark.txt
+
+    - name: Upload JVM L0 benchmark evidence
+      uses: actions/upload-artifact@v4
+      with:
+        name: l0-benchmark
+        path: target/l0-benchmark.txt
+
     - name: Upload Coverage Report
       uses: actions/upload-artifact@v4
       with:

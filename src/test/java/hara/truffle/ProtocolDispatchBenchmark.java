@@ -19,24 +19,34 @@ public final class ProtocolDispatchBenchmark {
     int warmup = args.length > 0 ? Integer.parseInt(args[0]) : DEFAULT_WARMUP;
     int iterations = args.length > 1 ? Integer.parseInt(args[1]) : DEFAULT_ITERATIONS;
 
-    long monomorphic = run(MONOMORPHIC_PROGRAM, new String[] {"(Cell 1)"}, warmup, iterations);
-    long polymorphic =
-        run(POLYMORPHIC_PROGRAM, new String[] {"(CellA 1)", "(CellB 1)"}, warmup, iterations);
-
-    System.out.printf(
-        "monomorphic: %d calls in %.3f ms (%.1f M calls/s)%n",
-        iterations,
-        monomorphic / 1_000_000.0,
-        iterations / (monomorphic / 1_000_000_000.0) / 1_000_000.0);
-    System.out.printf(
-        "polymorphic: %d calls in %.3f ms (%.1f M calls/s)%n",
-        iterations,
-        polymorphic / 1_000_000.0,
-        iterations / (polymorphic / 1_000_000_000.0) / 1_000_000.0);
+    runCase("arithmetic", ARITHMETIC_PROGRAM, new String[] {"1"}, 2, warmup, iterations);
+    runCase("direct-call", DIRECT_CALL_PROGRAM, new String[] {"1"}, 2, warmup, iterations);
+    runCase(
+        "protocol-monomorphic",
+        MONOMORPHIC_PROGRAM,
+        new String[] {"(Cell 1)"},
+        1,
+        warmup,
+        iterations);
+    runCase(
+        "protocol-polymorphic",
+        POLYMORPHIC_PROGRAM,
+        new String[] {"(CellA 1)", "(CellB 1)"},
+        1,
+        warmup,
+        iterations);
+    runCase("multimethod", MULTIMETHOD_PROGRAM, new String[] {"1"}, 2, warmup, iterations);
+    runCase("lookup", LOOKUP_PROGRAM, new String[] {"{:key 1}"}, 1, warmup, iterations);
+    runCase("iterator", ITERATOR_PROGRAM, new String[] {"[1]"}, 2, warmup, iterations);
   }
 
-  private static long run(
-      String program, String[] receiverExpressions, int warmup, int iterations) {
+  private static void runCase(
+      String name,
+      String program,
+      String[] receiverExpressions,
+      long expected,
+      int warmup,
+      int iterations) {
     try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
       Value benchmark = context.eval(HaraLanguage.ID, program);
       Value[] receivers = new Value[receiverExpressions.length];
@@ -53,12 +63,19 @@ public final class ProtocolDispatchBenchmark {
         result = benchmark.execute(receivers[i % receivers.length]);
       }
       long elapsed = System.nanoTime() - start;
-      if (result == null || result.asLong() != 1) {
+      if (result == null || result.asLong() != expected) {
         throw new AssertionError("benchmark result mismatch: " + result);
       }
-      return elapsed;
+      System.out.printf(
+          "benchmark=%s iterations=%d elapsed_ns=%d calls_per_sec=%.1f%n",
+          name, iterations, elapsed, iterations / (elapsed / 1_000_000_000.0));
     }
   }
+
+  private static final String ARITHMETIC_PROGRAM = "(fn [value] (+ value 1))";
+
+  private static final String DIRECT_CALL_PROGRAM =
+      "(defn add1 [value] (+ value 1)) (fn [value] (add1 value))";
 
   private static final String COMMON_PROGRAM =
       "(defprotocol Value (value [self])) "
@@ -75,4 +92,15 @@ public final class ProtocolDispatchBenchmark {
           + "(extend-type CellA Value (value [self] (field self :value))) "
           + "(extend-type CellB Value (value [self] (field self :value))) "
           + "(fn [value] (protocol-call Value value value))";
+
+  private static final String MULTIMETHOD_PROGRAM =
+      "(defmulti kind (fn [value] value)) "
+          + "(defmethod kind 1 [value] (+ value 1)) "
+          + "(fn [value] (kind value))";
+
+  private static final String LOOKUP_PROGRAM =
+      "(fn [value] (protocol-call ILookup lookup value :key))";
+
+  private static final String ITERATOR_PROGRAM =
+      "(fn [value] (let [it (iter-map (fn [x] (+ x 1)) value)] (iter-next it)))";
 }
