@@ -547,9 +547,8 @@ public interface Iter {
     return new ConcatIterator(Iter.objects(x, y));
   }
 
-  @SuppressWarnings({"unchecked", "rawtypes"})
-  public static Iterator concat(Iterator<Iterator> all) {
-    return new ConcatIterator(all);
+  public static <E> Iterator<E> concat(Iterator<? extends Iterator<? extends E>> all) {
+    return new ConcatIterator<>(all);
   }
 
   public static <E> Iterator<E> flattenIterables(Iterator<? extends Iterable<E>> it) {

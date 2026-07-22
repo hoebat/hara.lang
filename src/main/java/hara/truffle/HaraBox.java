@@ -98,6 +98,22 @@ public final class HaraBox implements TruffleObject {
   }
 
   @ExportMessage
+  boolean hasIterator() {
+    return value instanceof Iterator || value instanceof Iterable;
+  }
+
+  @ExportMessage
+  Object getIterator() throws UnsupportedMessageException {
+    if (value instanceof Iterator) {
+      return new HaraIterator((Iterator<?>) value, Function.identity());
+    }
+    if (value instanceof Iterable) {
+      return new HaraIterator(((Iterable<?>) value).iterator(), Function.identity());
+    }
+    throw UnsupportedMessageException.create();
+  }
+
+  @ExportMessage
   boolean hasHashEntries() {
     return value instanceof Map || value instanceof ILookup || value instanceof ISetType;
   }

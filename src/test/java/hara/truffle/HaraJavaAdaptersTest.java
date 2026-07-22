@@ -9,6 +9,7 @@ import hara.lang.data.SortedMap;
 import hara.lang.data.Vector;
 import hara.lang.base.primitive.Counter;
 import hara.lang.base.primitive.Delay;
+import java.util.Iterator;
 import java.util.Map;
 import org.junit.Test;
 
@@ -116,5 +117,19 @@ public class HaraJavaAdaptersTest {
     HaraJavaAdapters.installIndexedKV(indexed);
     SortedMap.Standard<Integer, String> sorted = SortedMap.Standard.from(null, 1, "one", 2, "two");
     assertEquals(1L, indexed.invoke("index-of-key", sorted, new Object[] {2}));
+  }
+
+  @Test
+  public void exposesIteratorTraversalThroughTheCollectionProtocol() {
+    HaraProtocol collection =
+        new HaraProtocol(
+            "IColl",
+            Map.of("start-string", 1, "end-string", 1, "sep-string", 1, "iterator", 1));
+    HaraJavaAdapters.installCollection(collection);
+    Vector.Standard<String> vector = Vector.Standard.from(null, "first", "second");
+
+    Iterator<?> iterator = (Iterator<?>) collection.invoke("iterator", vector, new Object[0]);
+    assertEquals("first", iterator.next());
+    assertEquals("second", iterator.next());
   }
 }

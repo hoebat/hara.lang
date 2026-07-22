@@ -62,4 +62,34 @@ public class IterTest {
     assertEquals(Integer.valueOf(4), iter.next());
     assertFalse(iter.hasNext());
   }
+
+  @Test
+  public void testConcatDoesNotRequestLaterSourcesUntilNeeded() {
+    final int[] requested = {0};
+    Iterator<Iterator<Integer>> sources =
+        new Iterator<Iterator<Integer>>() {
+          private int sourceIndex;
+
+          @Override
+          public boolean hasNext() {
+            return sourceIndex < 2;
+          }
+
+          @Override
+          public Iterator<Integer> next() {
+            requested[0]++;
+            int start = sourceIndex++ * 2;
+            return Arrays.asList(start, start + 1).iterator();
+          }
+        };
+
+    Iterator<Integer> iter = Iter.concat(sources);
+    assertEquals(0, requested[0]);
+    assertEquals(Integer.valueOf(0), iter.next());
+    assertEquals(1, requested[0]);
+    assertEquals(Integer.valueOf(1), iter.next());
+    assertEquals(1, requested[0]);
+    assertEquals(Integer.valueOf(2), iter.next());
+    assertEquals(2, requested[0]);
+  }
 }

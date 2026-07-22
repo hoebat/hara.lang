@@ -38,6 +38,13 @@ public class HaraInteropTest {
     assertEquals(2, interop.getArraySize(javaList));
     assertEquals(2L, interop.readArrayElement(javaList, 1));
 
+    Object iterator = HaraBox.export(Vector.Standard.from(null, "first", "second").iterator());
+    assertTrue(interop.hasIterator(iterator));
+    Object iteratorValue = interop.getIterator(iterator);
+    assertTrue(interop.isIterator(iteratorValue));
+    assertTrue(interop.hasIteratorNextElement(iteratorValue));
+    assertEquals("first", interop.getIteratorNextElement(iteratorValue));
+
     HaraStruct struct =
         new HaraStruct(
             new HaraType("Person", new String[] {"name"}), new Object[] {"Ada"});
