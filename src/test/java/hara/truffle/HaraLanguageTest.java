@@ -82,6 +82,10 @@ public class HaraLanguageTest {
       assertEquals(1, context.eval(HaraLanguage.ID, "(iter-next (vals {:a 1}))").asLong());
       assertTrue(context.eval(HaraLanguage.ID, "(contains? {:a nil} :a)").asBoolean());
       assertTrue(!context.eval(HaraLanguage.ID, "(contains? {:a 1} :b)").asBoolean());
+      assertEquals(2, context.eval(HaraLanguage.ID, "(get (dissoc {:a 1 :b 2} :a) :b)").asLong());
+      assertTrue(context.eval(HaraLanguage.ID, "(nil? (get (dissoc {:a 1} :a) :a))").asBoolean());
+      assertEquals(1, context.eval(HaraLanguage.ID, "(peek [1 2])").asLong());
+      assertEquals(2, context.eval(HaraLanguage.ID, "(peek (pop '(1 2)))").asLong());
       assertTrue(context.eval(HaraLanguage.ID, "(next [1 2])").hasIterator());
       assertTrue(context.eval(HaraLanguage.ID, "(not-empty [1])").hasArrayElements());
       assertTrue(context.eval(HaraLanguage.ID, "(not-empty [])").isNull());

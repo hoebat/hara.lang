@@ -111,6 +111,10 @@ become mutable merely because they cross a host boundary. Protocol operations
 such as count, lookup, nth, assoc, dissoc, conj, cons, first, next, and
 empty preserve the collection-family rules tested by the conformance suites.
 
+The ordinary `dissoc` function accepts a collection followed by one or more
+keys and returns persistent updates. `peek` and `pop` expose first-element
+navigation through the collection protocol; they never mutate the input.
+
 Hara is iterator-first. It does not require Clojure `ISeq`/`Seq` semantics.
 The core iterator forms are:
 

@@ -246,6 +246,32 @@ public final class HaraContext {
     target.define(
         "empty",
         new UnaryBuiltin("empty", value -> protocolCall("IEmpty", "empty", new Object[] {value})));
+    target.define(
+        "dissoc",
+        new VariadicBuiltin(
+            "dissoc",
+            values -> {
+              if (values.length < 1) {
+                throw new HaraException("dissoc expects a collection and at least one key");
+              }
+              Object result = values[0];
+              for (int i = 1; i < values.length; i++) {
+                if (HaraBox.unwrap(result) == null
+                    || HaraBox.unwrap(result) == HaraNull.SINGLETON) {
+                  return result;
+                }
+                result = protocolCall("IDissoc", "dissoc", new Object[] {result, values[i]});
+              }
+              return result;
+            }));
+    target.define(
+        "peek",
+        new UnaryBuiltin(
+            "peek", value -> protocolCall("INavigation", "peek-first", new Object[] {value})));
+    target.define(
+        "pop",
+        new UnaryBuiltin(
+            "pop", value -> protocolCall("INavigation", "pop-first", new Object[] {value})));
   }
 
   private Object arithmetic(String operator, Object[] values) {
