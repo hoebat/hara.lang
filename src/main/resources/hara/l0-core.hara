@@ -35,3 +35,6 @@
 (defn cycle [value] (iter-cycle value))
 (defn zip [first & rest] (apply iter-zip first rest))
 (defn partition-pair [value] (iter-partition-pair value))
+(defn every? [predicate value] (iter-every? predicate value))
+(defn any? [predicate value] (iter-any? predicate value))
+(defn some [predicate value] (iter-some predicate value))

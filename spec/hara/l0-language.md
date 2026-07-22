@@ -69,7 +69,9 @@ the L0 replacement for requiring Clojure `ISeq`/`Seq` navigation.
 
 The same bootstrap provides ordinary names `map`, `filter`, `take`, `drop`,
 `mapcat`, `keep`, `cycle`, `zip`, and `partition-pair`; each returns or
-consumes explicit iterators according to the rules above.
+consumes explicit iterators according to the rules above. Predicate reductions
+`every?`, `any?`, and `some` consume an iterator lazily until their result is
+known; `some` returns the first matching source value or nil.
 
 Destructuring supports nested positional vector patterns, vector rest
 bindings, map `:keys`, `:strs`, `:syms`, `:as`, and `:or` patterns in function,

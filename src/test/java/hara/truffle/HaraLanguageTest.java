@@ -89,6 +89,9 @@ public class HaraLanguageTest {
       assertEquals(
           2,
           context.eval(HaraLanguage.ID, "(x:get (iter-next (partition-pair [1 2])) 1)").asLong());
+      assertTrue(context.eval(HaraLanguage.ID, "(every? (fn [x] (> x 0)) [1 2])").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(any? (fn [x] (= x 2)) [1 2])").asBoolean());
+      assertEquals(2, context.eval(HaraLanguage.ID, "(some (fn [x] (= x 2)) [1 2])").asLong());
     }
   }
 

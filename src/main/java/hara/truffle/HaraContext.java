@@ -195,6 +195,9 @@ public final class HaraContext {
     target.define("iter-filter", new VariadicBuiltin("iter-filter", this::iterFilter));
     target.define("iter-mapcat", new VariadicBuiltin("iter-mapcat", this::iterMapcat));
     target.define("iter-keep", new VariadicBuiltin("iter-keep", this::iterKeep));
+    target.define("iter-every?", new VariadicBuiltin("iter-every?", this::iterEvery));
+    target.define("iter-any?", new VariadicBuiltin("iter-any?", this::iterAny));
+    target.define("iter-some", new VariadicBuiltin("iter-some", this::iterSome));
     target.define("iter-take", new VariadicBuiltin("iter-take", this::iterTake));
     target.define("iter-drop", new VariadicBuiltin("iter-drop", this::iterDrop));
     target.define("iter-zip", new VariadicBuiltin("iter-zip", this::iterZip));
@@ -585,6 +588,30 @@ public final class HaraContext {
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})
+  private Object iterEvery(Object[] values) {
+    requireIteratorArity(values, 2, "iter-every?");
+    Iterator source = (Iterator) iterValue(values[1]);
+    Object function = values[0];
+    return Iter.every(source, value -> truthy(invokeCallable(function, new Object[] {value})));
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private Object iterAny(Object[] values) {
+    requireIteratorArity(values, 2, "iter-any?");
+    Iterator source = (Iterator) iterValue(values[1]);
+    Object function = values[0];
+    return Iter.any(source, value -> truthy(invokeCallable(function, new Object[] {value})));
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private Object iterSome(Object[] values) {
+    requireIteratorArity(values, 2, "iter-some");
+    Iterator source = (Iterator) iterValue(values[1]);
+    Object function = values[0];
+    return Iter.some(source, value -> truthy(invokeCallable(function, new Object[] {value})));
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
   private Object iterTake(Object[] values) {
     requireIteratorArity(values, 2, "iter-take");
     Iterator source = (Iterator) iterValue(values[1]);
@@ -676,7 +703,7 @@ public final class HaraContext {
   }
 
   private static boolean truthy(Object value) {
-    return value != null && !Boolean.FALSE.equals(value);
+    return value != null && value != HaraNull.SINGLETON && !Boolean.FALSE.equals(value);
   }
 
   @SuppressWarnings("unchecked")

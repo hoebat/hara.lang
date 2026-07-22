@@ -137,6 +137,10 @@
    :class :module
    :source "(load-resource \"hara/l0-core.hara\") (+ (iter-next (map inc [3])) (iter-next (filter (fn [x] (= x 2)) [1 2])) (x:get (iter-next (partition-pair [4 5])) 1))"
    :expect {:value 11 :type :integer}}
+  {:id :module/core-predicate-reductions
+   :class :module
+   :source "(load-resource \"hara/l0-core.hara\") (+ (if (every? (fn [x] (> x 0)) [1 2]) 1 0) (if (any? (fn [x] (= x 2)) [1 2]) 2 0) (some (fn [x] (= x 2)) [1 2]))"
+   :expect {:value 5 :type :integer}}
   {:id :module/classpath-require
    :class :module
    :source "(require \"hara/l0-core.hara\") ((comp2 inc inc) 40)"
