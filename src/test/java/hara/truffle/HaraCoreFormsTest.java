@@ -6,6 +6,7 @@ import static org.junit.Assert.assertTrue;
 
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
+import org.graalvm.polyglot.Source;
 import org.junit.Test;
 
 public class HaraCoreFormsTest {
@@ -136,6 +137,18 @@ public class HaraCoreFormsTest {
               PolyglotException.class, () -> context.eval(HaraLanguage.ID, "(do\n  (+ 1 :bad))"));
       assertTrue(error.getMessage().contains("expects two numbers"));
       assertTrue(error.getSourceLocation() != null);
+      assertEquals(2, error.getSourceLocation().getStartLine());
+    }
+  }
+
+  @Test
+  public void runtimeErrorsPreserveSourceNameAndLeadingWhitespaceLocation() throws Exception {
+    try (Context context = context()) {
+      Source source =
+          Source.newBuilder(HaraLanguage.ID, "  \n  (+ 1 :bad)", "diagnostic.hara").build();
+      PolyglotException error = assertThrows(PolyglotException.class, () -> context.eval(source));
+      assertTrue(error.getSourceLocation() != null);
+      assertEquals("diagnostic.hara", error.getSourceLocation().getSource().getName());
       assertEquals(2, error.getSourceLocation().getStartLine());
     }
   }

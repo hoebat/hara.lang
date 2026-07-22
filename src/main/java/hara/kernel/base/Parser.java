@@ -111,6 +111,14 @@ public interface Parser {
     @SuppressWarnings("unchecked")
     public static Object read(
         Reader r, boolean eofIsError, Object eofValue, boolean isRecursive, Map opts) {
+      while (true) {
+        Character leading = r.readChar();
+        if (leading == null) break;
+        if (!S.isWhitespace(leading)) {
+          r.unreadChar(leading);
+          break;
+        }
+      }
       int startLine = r.getLineNumber();
       int startColumn = r.getColumnNumber();
       Object value = readForm(r, eofIsError, eofValue, isRecursive, opts);
