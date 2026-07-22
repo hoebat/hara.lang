@@ -152,7 +152,8 @@ The numeric categories are fixed-width integral values, floating-point values,
 representation capable of preserving the operation result; primitive pairs
 use specialized Truffle paths and big-number cases use generic fallback.
 `+`, `-`, `*`, `/`, and `mod` are variadic with the documented identities and
-unary behavior. Division is ratio-free: `(/ 2)` evaluates to integer `0`.
+unary behavior and are also callable Vars, so they can be passed to functions
+such as `reduce`. Division is ratio-free: `(/ 2)` evaluates to integer `0`.
 Division or remainder by zero is an error. Numeric equality and hashing
 normalize equivalent integral/decimal representations, decimal scale, and
 signed zero according to the conformance cases. NaN and infinities are valid

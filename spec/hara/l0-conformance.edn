@@ -143,7 +143,7 @@
    :expect {:value 5 :type :integer}}
   {:id :iterator/reduce
    :class :iterator
-   :source "(+ (reduce (fn [a b] (+ a b)) [1 2 3]) (reduce (fn [a b] (+ a b)) 10 [1 2 3]))"
+   :source "(+ (reduce + [1 2 3]) (reduce + 10 [1 2 3]))"
    :expect {:value 22 :type :integer}}
   {:id :module/classpath-require
    :class :module

@@ -4,6 +4,7 @@ import com.oracle.truffle.api.TruffleLanguage;
 import com.oracle.truffle.api.source.Source;
 import hara.kernel.builtin.BuiltinStruct;
 import hara.lang.base.Iter;
+import hara.lang.base.primitive.Num;
 import hara.lang.base.iter.CloseableIterator;
 import hara.lang.data.Symbol;
 import hara.lang.data.List;
@@ -174,6 +175,11 @@ public final class HaraContext {
   }
 
   private void installNumericBuiltins(HaraNamespace target) {
+    target.define("+", new VariadicBuiltin("+", values -> arithmetic("+", values)));
+    target.define("-", new VariadicBuiltin("-", values -> arithmetic("-", values)));
+    target.define("*", new VariadicBuiltin("*", values -> arithmetic("*", values)));
+    target.define("/", new VariadicBuiltin("/", values -> arithmetic("/", values)));
+    target.define("mod", new VariadicBuiltin("mod", values -> arithmetic("mod", values)));
     target.define("bigint", new UnaryBuiltin("bigint", HaraNumericConversions::toBigInteger));
     target.define("bigdec", new UnaryBuiltin("bigdec", HaraNumericConversions::toBigDecimal));
     target.define("double", new UnaryBuiltin("double", HaraNumericConversions::toDouble));
@@ -233,6 +239,37 @@ public final class HaraContext {
     target.define(
         "empty",
         new UnaryBuiltin("empty", value -> protocolCall("IEmpty", "empty", new Object[] {value})));
+  }
+
+  private Object arithmetic(String operator, Object[] values) {
+    if (operator.equals("+") && values.length == 0) return 0L;
+    if (operator.equals("*") && values.length == 0) return 1L;
+    if (values.length == 0) {
+      throw new HaraException(operator + " expects at least one number");
+    }
+    if (operator.equals("mod") && values.length != 2) {
+      throw new HaraException("mod expects two numbers");
+    }
+    if (operator.equals("-") && values.length == 1) return Num.minusP(values[0]);
+    if (operator.equals("/") && values.length == 1) return Num.divide(1L, values[0]);
+    Object result = values[0];
+    for (int i = 1; i < values.length; i++) {
+      Object value = values[i];
+      if (operator.equals("+")) {
+        result = Num.addP(result, value);
+      } else if (operator.equals("-")) {
+        result = Num.minusP(result, value);
+      } else if (operator.equals("*")) {
+        result = Num.multiplyP(result, value);
+      } else if (operator.equals("/")) {
+        result = Num.divide(result, value);
+      } else if (operator.equals("mod")) {
+        result = Num.remainder(result, value);
+      } else {
+        throw new HaraException("Unknown arithmetic operator: " + operator);
+      }
+    }
+    return result;
   }
 
   private Object protocolCall(String protocolName, String methodName, Object[] values) {
