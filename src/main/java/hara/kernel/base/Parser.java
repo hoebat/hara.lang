@@ -202,6 +202,9 @@ public interface Parser {
 
         while (S.isWhitespace(ch)) ch = readSingle(r);
 
+        int formLine = r.getLineNumber();
+        int formColumn = Math.max(1, r.getColumnNumber() - 1);
+
         if (ch == -1) {
           if (firstline < 0) throw new Ex.Runtime("EOF while reading");
           else throw new Ex.Runtime("EOF while reading, starting at line " + firstline);
@@ -212,7 +215,11 @@ public interface Parser {
         BiFunction macroFn = getMacro(ch);
         if (macroFn != null) {
           Object mret = macroFn.apply(r, opts);
-          if (mret != r) list.add(mret);
+          if (mret != r) {
+            list.add(
+                attachSourceMetadata(
+                    mret, formLine, formColumn, r.getLineNumber(), r.getColumnNumber()));
+          }
         } else {
           unread(r, ch);
           Object o = read(r, true, null, isRecursive, opts);

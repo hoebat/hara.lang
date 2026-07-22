@@ -9,6 +9,7 @@ import hara.lang.data.Symbol;
 import hara.lang.data.types.IMapType;
 import hara.lang.data.types.ILinearType;
 import hara.lang.data.types.ISetType;
+import hara.lang.protocol.IObjType;
 import hara.truffle.node.HaraExpressionNode;
 import hara.truffle.node.HaraNodes;
 import hara.truffle.node.HaraRootNode;
@@ -77,6 +78,12 @@ final class HaraAnalyzer {
   }
 
   private HaraExpressionNode analyze(Object form) {
+    HaraExpressionNode node = analyzeForm(form);
+    attachSourceSection(node, form);
+    return node;
+  }
+
+  private HaraExpressionNode analyzeForm(Object form) {
     Object expanded = expandMacro(form);
     if (expanded != form) {
       return analyze(expanded);
@@ -261,6 +268,34 @@ final class HaraAnalyzer {
       }
     }
     return analyzeInvocation(list);
+  }
+
+  @SuppressWarnings("rawtypes")
+  private void attachSourceSection(HaraExpressionNode node, Object form) {
+    if (!(form instanceof IObjType) || sourceSection == null) return;
+    Object metadata = ((IObjType) form).meta();
+    if (!(metadata instanceof IMapType)) return;
+    IMapType span = (IMapType) metadata;
+    Object lineValue = span.lookup(Keyword.create("line"));
+    Object columnValue = span.lookup(Keyword.create("column"));
+    Object endLineValue = span.lookup(Keyword.create("end-line"));
+    Object endColumnValue = span.lookup(Keyword.create("end-column"));
+    if (!(lineValue instanceof Number)
+        || !(columnValue instanceof Number)
+        || !(endLineValue instanceof Number)
+        || !(endColumnValue instanceof Number)) return;
+    try {
+      int line = ((Number) lineValue).intValue();
+      int column = ((Number) columnValue).intValue();
+      int endLine = ((Number) endLineValue).intValue();
+      int endColumn = ((Number) endColumnValue).intValue();
+      int start = sourceSection.getSource().getLineStartOffset(line) + column - 1;
+      int end = sourceSection.getSource().getLineStartOffset(endLine) + endColumn - 1;
+      node.setHaraSourceSection(
+          sourceSection.getSource().createSection(start, Math.max(1, end - start)));
+    } catch (RuntimeException ignored) {
+      // Keep the whole-source section as the safe fallback for malformed metadata.
+    }
   }
 
   private HaraExpressionNode analyzeCollectionLiteral(Object form) {

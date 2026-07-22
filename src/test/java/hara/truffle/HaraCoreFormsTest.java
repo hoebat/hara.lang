@@ -129,6 +129,18 @@ public class HaraCoreFormsTest {
   }
 
   @Test
+  public void runtimeErrorsExposeTheAnalyzedFormSourceLocation() {
+    try (Context context = context()) {
+      PolyglotException error =
+          assertThrows(
+              PolyglotException.class, () -> context.eval(HaraLanguage.ID, "(do\n  (+ 1 :bad))"));
+      assertTrue(error.getMessage().contains("expects two numbers"));
+      assertTrue(error.getSourceLocation() != null);
+      assertEquals(2, error.getSourceLocation().getStartLine());
+    }
+  }
+
+  @Test
   public void varAndDerefFailuresAreDeterministic() {
     try (Context context = context()) {
       assertTrue(
