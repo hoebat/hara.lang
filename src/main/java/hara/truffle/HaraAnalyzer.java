@@ -248,6 +248,8 @@ final class HaraAnalyzer {
           return analyzeMacroExpand(list, true);
         case "ns":
           return analyzeNamespace(list);
+        case "require":
+          return analyzeRequire(list);
         case "alias":
           return analyzeAlias(list);
         case "field":
@@ -1517,6 +1519,16 @@ final class HaraAnalyzer {
   private HaraExpressionNode analyzeMacroExpand(List<?> form, boolean recursive) {
     requireCount(form, 2, recursive ? "macroexpand" : "macroexpand-1");
     return new HaraNodes.MacroExpand(analyze(form.nth(1)), recursive);
+  }
+
+  private HaraExpressionNode analyzeRequire(List<?> form) {
+    if (form.count() < 2 || form.count() > 3) {
+      throw error("require expects a path and optional options map");
+    }
+    HaraExpressionNode path = analyze(form.nth(1));
+    HaraExpressionNode options =
+        form.count() == 3 ? new HaraNodes.Literal(form.nth(2)) : new HaraNodes.Literal(null);
+    return new HaraNodes.Require(path, options);
   }
 
   private HaraExpressionNode analyzeNamespace(List<?> form) {

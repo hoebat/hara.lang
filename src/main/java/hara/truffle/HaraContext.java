@@ -9,6 +9,7 @@ import hara.lang.data.Symbol;
 import hara.lang.data.List;
 import hara.lang.data.Keyword;
 import hara.lang.data.types.IMapType;
+import hara.lang.data.types.ILinearType;
 import hara.lang.protocol.IFn;
 import hara.lang.protocol.IMetadata;
 import java.io.IOException;
@@ -252,7 +253,7 @@ public final class HaraContext {
     }
   }
 
-  private Object requireModule(Object[] arguments) {
+  public Object requireModule(Object[] arguments) {
     if (arguments.length < 1 || arguments.length > 2 || !(arguments[0] instanceof String)) {
       throw new HaraException("require expects a path string");
     }
@@ -304,12 +305,46 @@ public final class HaraContext {
       throw new HaraException("require options expect a map");
     }
     @SuppressWarnings("rawtypes")
-    Object alias = ((IMapType) options).lookup(Keyword.create("as"));
-    if (alias == null) return;
-    if (!(alias instanceof Symbol) || ((Symbol) alias).getNamespace() != null) {
+    Object alias = unwrapQuoted(((IMapType) options).lookup(Keyword.create("as")));
+    if (alias != null && (!(alias instanceof Symbol) || ((Symbol) alias).getNamespace() != null)) {
       throw new HaraException("require :as expects an unqualified symbol");
     }
-    defineAlias((Symbol) alias, Symbol.create(module.namespace));
+    if (alias != null) defineAlias((Symbol) alias, Symbol.create(module.namespace));
+
+    @SuppressWarnings("rawtypes")
+    Object refer = unwrapQuoted(((IMapType) options).lookup(Keyword.create("refer")));
+    if (refer == null) return;
+    if (!(refer instanceof ILinearType<?>)) {
+      throw new HaraException("require :refer expects a sequential collection of symbols");
+    }
+    HaraNamespace target = namespaces.get(module.namespace);
+    for (Object value : (ILinearType<?>) refer) {
+      if (!(value instanceof Symbol) || ((Symbol) value).getNamespace() != null) {
+        throw new HaraException("require :refer expects unqualified symbols");
+      }
+      Symbol symbol = (Symbol) value;
+      HaraVar variable = target == null ? null : target.lookup(symbol.getName());
+      if (variable == null) {
+        throw new HaraException(
+            "Cannot refer missing var " + symbol.getName() + " from " + module.namespace);
+      }
+      currentNamespace.refer(symbol.getName(), variable);
+      Map<String, HaraMacro> targetMacros = macros.get(module.namespace);
+      if (targetMacros != null && targetMacros.containsKey(symbol.getName())) {
+        macros
+            .computeIfAbsent(currentNamespace.name(), ignored -> new ConcurrentHashMap<>())
+            .put(symbol.getName(), targetMacros.get(symbol.getName()));
+      }
+    }
+  }
+
+  private Object unwrapQuoted(Object value) {
+    if (value instanceof List<?>
+        && ((List<?>) value).count() == 2
+        && Symbol.create("quote").equals(((List<?>) value).nth(0))) {
+      return ((List<?>) value).nth(1);
+    }
+    return value;
   }
 
   @SuppressWarnings("rawtypes")

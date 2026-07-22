@@ -970,6 +970,27 @@ public final class HaraNodes {
     }
   }
 
+  public static final class Require extends HaraExpressionNode {
+    @Child private HaraExpressionNode path;
+    @Child private HaraExpressionNode options;
+
+    public Require(HaraExpressionNode path, HaraExpressionNode options) {
+      this.path = path;
+      this.options = options;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      Object pathValue = path.execute(frame);
+      Object optionsValue = options.execute(frame);
+      return HaraLanguage.currentContext()
+          .requireModule(
+              optionsValue == null
+                  ? new Object[] {pathValue}
+                  : new Object[] {pathValue, optionsValue});
+    }
+  }
+
   public static final class Declare extends HaraExpressionNode {
     private final Symbol[] symbols;
 
