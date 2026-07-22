@@ -13,6 +13,7 @@ mvn -Ptruffle -DskipTests compile dependency:copy-dependencies \
 
 native-image \
   --no-fallback \
+  --emit=build-report \
   -cp "$ROOT/target/classes:$DEPENDENCIES/*" \
   -H:Class=hara.truffle.Main \
   --initialize-at-build-time=hara.truffle.HaraFunctionGen,hara.truffle.HaraBoxGen,hara.truffle.HaraNullGen,hara.truffle.HaraVarGen,hara.truffle.HaraProtocolGen,hara.truffle.HaraStructGen,hara.truffle.HaraTypeGen,hara.truffle.HaraMemberNamesGen \

@@ -43,6 +43,14 @@ jobs:
         github-token: ${{ secrets.GITHUB_TOKEN }}
     - name: Build the Truffle Native Image
       run: ./scripts/build-truffle-native
+    - name: Record Native Image build and startup metrics
+      run: |
+        {
+          echo "native_image_version=$(native-image --version)"
+          echo "binary_bytes=$(stat -c '%s' target/hara-truffle)"
+          /usr/bin/time -f 'startup_seconds=%e' target/hara-truffle eval 'nil' >/dev/null
+          echo "reachability_manifest=$(find target/classes/META-INF/native-image -type f -print | sort | tr '\n' ',')"
+        } 2>&1 | tee target/native-image-metrics.txt
     - name: Run a Native Image smoke test
       run: |
         test "$(target/hara-truffle eval '(+ 19 23)')" = "42"
@@ -59,3 +67,13 @@ jobs:
         test "$(target/hara-truffle eval '(defstruct Problem [value]) (try (throw (Problem 7)) (catch Other error 0) (catch Problem error (field error :value)))')" = "7"
         test "$(target/hara-truffle eval '(ns source) (def answer 1) (ns user) (refer \"source\") (in-ns '\\''source) (set! answer 2) (in-ns '\\''user) answer')" = "2"
         test "$(target/hara-truffle eval '(load-resource \"hara/l0-resource.hara\")')" = "42"
+        test "$(target/hara-truffle eval '(defmulti kind (fn [x] (if (= x 1) :one :other))) (defmethod kind :one [x] \"one\") (defmethod kind :default [x] \"other\") (kind 2)')" = "other"
+    - name: Upload Native Image evidence
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: native-image-evidence
+        path: |
+          target/native-image-metrics.txt
+          target/hara-truffle
+          target/*build_report*
