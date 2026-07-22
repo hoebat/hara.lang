@@ -16,6 +16,7 @@ public final class HaraContext {
   private final TruffleLanguage.Env environment;
   private final Map<String, HaraNamespace> namespaces = new ConcurrentHashMap<>();
   private final Map<String, Map<String, HaraMacro>> macros = new ConcurrentHashMap<>();
+  private final Map<String, Map<String, String>> aliases = new ConcurrentHashMap<>();
   private volatile HaraNamespace currentNamespace;
   private final HaraProtocol ifnProtocol;
 
@@ -46,9 +47,28 @@ public final class HaraContext {
   }
 
   public HaraVar resolve(Symbol symbol) {
+    String namespaceName = symbol.getNamespace();
+    if (namespaceName != null) {
+      namespaceName =
+          aliases
+              .getOrDefault(currentNamespace.name(), Map.of())
+              .getOrDefault(namespaceName, namespaceName);
+    }
     HaraNamespace namespace =
-        symbol.getNamespace() == null ? currentNamespace : namespaces.get(symbol.getNamespace());
+        namespaceName == null ? currentNamespace : namespaces.get(namespaceName);
     return namespace == null ? null : namespace.lookup(symbol.getName());
+  }
+
+  public void defineAlias(Symbol alias, Symbol target) {
+    if (alias.getNamespace() != null || target.getNamespace() != null) {
+      throw new HaraException("alias names must be unqualified");
+    }
+    if (!namespaces.containsKey(target.getName())) {
+      throw new HaraException("Cannot alias missing namespace: " + target.getName());
+    }
+    aliases
+        .computeIfAbsent(currentNamespace.name(), ignored -> new ConcurrentHashMap<>())
+        .put(alias.getName(), target.getName());
   }
 
   public HaraVar define(Symbol symbol, Object value) {
@@ -157,7 +177,11 @@ public final class HaraContext {
     for (Map.Entry<String, Map<String, HaraMacro>> entry : macros.entrySet()) {
       macroValues.put(entry.getKey(), new LinkedHashMap<>(entry.getValue()));
     }
-    return new ContextSnapshot(currentNamespace.name(), values, macroValues);
+    Map<String, Map<String, String>> aliasValues = new LinkedHashMap<>();
+    for (Map.Entry<String, Map<String, String>> entry : aliases.entrySet()) {
+      aliasValues.put(entry.getKey(), new LinkedHashMap<>(entry.getValue()));
+    }
+    return new ContextSnapshot(currentNamespace.name(), values, macroValues, aliasValues);
   }
 
   private void restore(ContextSnapshot snapshot) {
@@ -173,20 +197,27 @@ public final class HaraContext {
     for (Map.Entry<String, Map<String, HaraMacro>> entry : snapshot.macros.entrySet()) {
       macros.put(entry.getKey(), new ConcurrentHashMap<>(entry.getValue()));
     }
+    aliases.clear();
+    for (Map.Entry<String, Map<String, String>> entry : snapshot.aliases.entrySet()) {
+      aliases.put(entry.getKey(), new ConcurrentHashMap<>(entry.getValue()));
+    }
   }
 
   private static final class ContextSnapshot {
     private final String currentNamespace;
     private final Map<String, Map<String, Object>> values;
     private final Map<String, Map<String, HaraMacro>> macros;
+    private final Map<String, Map<String, String>> aliases;
 
     private ContextSnapshot(
         String currentNamespace,
         Map<String, Map<String, Object>> values,
-        Map<String, Map<String, HaraMacro>> macros) {
+        Map<String, Map<String, HaraMacro>> macros,
+        Map<String, Map<String, String>> aliases) {
       this.currentNamespace = currentNamespace;
       this.values = values;
       this.macros = macros;
+      this.aliases = aliases;
     }
   }
 

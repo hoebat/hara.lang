@@ -724,6 +724,22 @@ public final class HaraNodes {
     }
   }
 
+  public static final class DefineAlias extends HaraExpressionNode {
+    private final Symbol alias;
+    private final Symbol target;
+
+    public DefineAlias(Symbol alias, Symbol target) {
+      this.alias = alias;
+      this.target = target;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      HaraLanguage.currentContext().defineAlias(alias, target);
+      return alias;
+    }
+  }
+
   public static final class DefineProtocol extends HaraExpressionNode {
     private final Symbol symbol;
     private final HaraProtocol protocol;

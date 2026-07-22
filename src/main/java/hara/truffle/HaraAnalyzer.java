@@ -208,6 +208,8 @@ final class HaraAnalyzer {
           return analyzeDefMacro(list);
         case "ns":
           return analyzeNamespace(list);
+        case "alias":
+          return analyzeAlias(list);
         case "field":
           return analyzeField(list);
         case "protocol-call":
@@ -1263,6 +1265,14 @@ final class HaraAnalyzer {
       throw error("ns name must be an unqualified symbol");
     }
     return new HaraNodes.SetNamespace((Symbol) name);
+  }
+
+  private HaraExpressionNode analyzeAlias(List<?> form) {
+    requireCount(form, 3, "alias");
+    if (!(form.nth(1) instanceof Symbol) || !(form.nth(2) instanceof Symbol)) {
+      throw error("alias expects an alias and namespace symbol");
+    }
+    return new HaraNodes.DefineAlias((Symbol) form.nth(1), (Symbol) form.nth(2));
   }
 
   private Object expandMacro(Object form) {
