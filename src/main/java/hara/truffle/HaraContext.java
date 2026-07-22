@@ -382,13 +382,51 @@ public final class HaraContext {
     return closeable(Iter.drop(source, iterationCount(values[0], "iter-drop")), source);
   }
 
-  @SuppressWarnings({"rawtypes", "unchecked"})
   private Object iterZip(Object[] values) {
     if (values.length == 0) {
       throw new HaraException("iter-zip expects at least one source");
     }
-    Iterator sources = Iter.map(Iter.objects(values), value -> (Iterator) iterValue(value));
-    return Iter.zip((Iterator) sources);
+    return new CloseableIterator<Object[]>() {
+      private Iterator<?>[] sources;
+      private boolean closed;
+
+      private void initialize() {
+        if (sources != null) return;
+        sources = new Iterator<?>[values.length];
+        for (int i = 0; i < values.length; i++) {
+          sources[i] = (Iterator<?>) iterValue(values[i]);
+        }
+      }
+
+      @Override
+      public boolean hasNext() {
+        if (closed) return false;
+        initialize();
+        for (Iterator<?> source : sources) {
+          if (!source.hasNext()) return false;
+        }
+        return true;
+      }
+
+      @Override
+      public Object[] next() {
+        if (!hasNext()) throw new NoSuchElementException();
+        Object[] result = new Object[sources.length];
+        for (int i = 0; i < sources.length; i++) {
+          result[i] = sources[i].next();
+        }
+        return result;
+      }
+
+      @Override
+      public void close() {
+        if (closed) return;
+        closed = true;
+        if (sources != null) {
+          for (Iterator<?> source : sources) Iter.close(source);
+        }
+      }
+    };
   }
 
   private static void requireIteratorArity(Object[] values, int expected, String name) {
