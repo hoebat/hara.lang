@@ -17,6 +17,8 @@ import hara.kernel.builtin.BuiltinStruct;
 import hara.lang.base.primitive.Num;
 import hara.lang.data.Symbol;
 import hara.lang.protocol.IFn;
+import hara.truffle.HaraBox;
+import hara.truffle.HaraContext;
 import hara.truffle.HaraException;
 import hara.truffle.HaraFunction;
 import hara.truffle.HaraLanguage;
@@ -651,7 +653,11 @@ public final class HaraNodes {
     @Override
     public Object execute(VirtualFrame frame) {
       Object protocolValue = protocol.execute(frame);
-      Object receiverValue = receiver.execute(frame);
+      Object receiverValue = HaraBox.unwrap(receiver.execute(frame));
+      HaraContext context = HaraLanguage.currentContext();
+      if (context.isHostObject(receiverValue)) {
+        receiverValue = context.asHostObject(receiverValue);
+      }
       if (!(protocolValue instanceof HaraProtocol)) {
         throw new HaraException("protocol-call expects a protocol", this);
       }

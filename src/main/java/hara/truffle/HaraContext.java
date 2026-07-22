@@ -72,6 +72,14 @@ public final class HaraContext {
     return environment.asGuestValue(value);
   }
 
+  public boolean isHostObject(Object value) {
+    return environment.isHostObject(value);
+  }
+
+  public Object asHostObject(Object value) {
+    return environment.asHostObject(value);
+  }
+
   public Object lookupHostSymbol(String name) {
     return environment.lookupHostSymbol(name);
   }

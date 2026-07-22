@@ -37,6 +37,13 @@ public final class HaraBox implements TruffleObject {
     this.display = display(value);
   }
 
+  public static Object unwrap(Object value) {
+    if (value instanceof HaraBox) {
+      return ((HaraBox) value).value;
+    }
+    return value;
+  }
+
   public static Object export(Object value) {
     if (value == null) {
       return HaraNull.SINGLETON;
