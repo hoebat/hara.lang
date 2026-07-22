@@ -268,6 +268,10 @@ final class HaraAnalyzer {
           return analyzeNumeric(list, HaraNodes.Numeric.Operator.REMAINDER, "mod");
         case "bytes":
           return analyzeBytes(list);
+        case "byte-u8":
+          return analyzeByteValue(list, HaraNodes.ByteValue.Operator.UNSIGNED);
+        case "byte-s8":
+          return analyzeByteValue(list, HaraNodes.ByteValue.Operator.SIGNED);
         case "<":
           return analyzeCompare(list, HaraNodes.Compare.Operator.LESS, "<");
         case "<=":
@@ -1206,6 +1210,12 @@ final class HaraAnalyzer {
       elements[i - 1] = analyze(form.nth(i));
     }
     return new HaraNodes.Bytes(elements);
+  }
+
+  private HaraExpressionNode analyzeByteValue(List<?> form, HaraNodes.ByteValue.Operator operator) {
+    requireCount(
+        form, 2, operator == HaraNodes.ByteValue.Operator.UNSIGNED ? "byte-u8" : "byte-s8");
+    return new HaraNodes.ByteValue(operator, analyze(form.nth(1)));
   }
 
   private HaraExpressionNode analyzeByteCopy(List<?> form) {

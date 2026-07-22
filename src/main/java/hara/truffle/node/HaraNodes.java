@@ -173,6 +173,37 @@ public final class HaraNodes {
     }
   }
 
+  public static final class ByteValue extends HaraExpressionNode {
+    public enum Operator {
+      SIGNED,
+      UNSIGNED
+    }
+
+    private final Operator operator;
+    @Child private HaraExpressionNode value;
+
+    public ByteValue(Operator operator, HaraExpressionNode value) {
+      this.operator = operator;
+      this.value = value;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      Object input = HaraBox.unwrap(value.execute(frame));
+      long number;
+      try {
+        number = Cast.longCast(input);
+      } catch (RuntimeException error) {
+        throw new HaraException("byte conversion expects an integral numeric value", this);
+      }
+      if (number < Byte.MIN_VALUE || number > 0xffL) {
+        throw new HaraException("byte conversion expects a value in the range -128..255", this);
+      }
+      if (operator == Operator.UNSIGNED) return number < 0 ? number + 256 : number;
+      return number > Byte.MAX_VALUE ? number - 256 : number;
+    }
+  }
+
   public static final class ByteCopy extends HaraExpressionNode {
     @Child private HaraExpressionNode value;
 

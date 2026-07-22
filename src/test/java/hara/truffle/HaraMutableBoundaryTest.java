@@ -37,6 +37,20 @@ public class HaraMutableBoundaryTest {
   }
 
   @Test
+  public void byteValuesConvertBetweenSignedAndUnsignedRepresentations() {
+    try (Context context = context()) {
+      assertEquals(255, context.eval(HaraLanguage.ID, "(byte-u8 -1)").asLong());
+      assertEquals(-1, context.eval(HaraLanguage.ID, "(byte-s8 255)").asLong());
+      assertEquals(127, context.eval(HaraLanguage.ID, "(byte-s8 127)").asLong());
+      assertTrue(
+          assertThrows(
+                  PolyglotException.class, () -> context.eval(HaraLanguage.ID, "(byte-u8 256)"))
+              .getMessage()
+              .contains("range -128..255"));
+    }
+  }
+
+  @Test
   public void mutableObjectsUseKeysWhileSequentialTargetsRequireNumericIndexes() {
     try (Context context = context()) {
       assertEquals(

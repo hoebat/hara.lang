@@ -157,6 +157,10 @@
    :class :numeric
    :source "(/ 2)"
    :expect {:value 0 :type :integer}}
+  {:id :bytes/signed-unsigned
+   :class :bytes
+   :source "(+ (byte-u8 -1) (byte-s8 255))"
+   :expect {:value 254 :type :integer}}
   {:id :protocol/struct-extension
    :class :protocol
    :source "(protocol-call ICount count (Box 4))"
