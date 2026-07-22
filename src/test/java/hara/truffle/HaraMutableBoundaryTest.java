@@ -100,6 +100,25 @@ public class HaraMutableBoundaryTest {
     }
   }
 
+  @Test
+  public void concatIsLazyAndIteratorBacked() {
+    try (Context context = context()) {
+      assertEquals(
+          2,
+          context
+              .eval(
+                  HaraLanguage.ID, "(let [it (concat [1 2] [3 4])] (iter-next it) (iter-next it))")
+              .asLong());
+      assertEquals(
+          1, context.eval(HaraLanguage.ID, "(let [it (concat [1] 1)] (iter-next it))").asLong());
+      assertThrows(
+          PolyglotException.class,
+          () ->
+              context.eval(
+                  HaraLanguage.ID, "(let [it (concat [1] 1)] (iter-next it) (iter-next it))"));
+    }
+  }
+
   private static Context context() {
     return Context.newBuilder(HaraLanguage.ID).build();
   }

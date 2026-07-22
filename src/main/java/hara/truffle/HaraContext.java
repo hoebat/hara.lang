@@ -159,6 +159,7 @@ public final class HaraContext {
     target.define("iter-has?", new UnaryBuiltin("iter-has?", this::iterHasNext));
     target.define("iter-next", new UnaryBuiltin("iter-next", this::iterNext));
     target.define("iter-close", new UnaryBuiltin("iter-close", this::iterClose));
+    target.define("concat", new VariadicBuiltin("concat", this::concatIterators));
     target.define("module-revision", new UnaryBuiltin("module-revision", this::moduleRevision));
     target.define(
         "module-dependencies", new UnaryBuiltin("module-dependencies", this::moduleDependencies));
@@ -321,6 +322,11 @@ public final class HaraContext {
     Iterator<?> iterator = requireIterator(value, "iter-close");
     Iter.close(iterator);
     return null;
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private Object concatIterators(Object[] values) {
+    return Iter.concat((Iterator) Iter.map(Iter.objects(values), value -> Iter.iter(value)));
   }
 
   private Iterator<?> requireIterator(Object value, String operation) {

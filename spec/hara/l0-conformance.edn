@@ -60,6 +60,10 @@
    :class :iterator
    :source "(let [it (iter [1 2])] (iter-next it))"
    :expect {:value 1 :type :integer}}
+  {:id :iterator/concat
+   :class :iterator
+   :source "(let [it (concat [1] [2])] (iter-next it) (iter-next it))"
+   :expect {:value 2 :type :integer}}
   {:id :collection/bytes
    :class :collection
    :source "(protocol-call INth nth (bytes 1 2 -3) 2)"
