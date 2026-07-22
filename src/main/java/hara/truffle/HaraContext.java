@@ -198,6 +198,7 @@ public final class HaraContext {
     target.define("iter-every?", new VariadicBuiltin("iter-every?", this::iterEvery));
     target.define("iter-any?", new VariadicBuiltin("iter-any?", this::iterAny));
     target.define("iter-some", new VariadicBuiltin("iter-some", this::iterSome));
+    target.define("reduce", new VariadicBuiltin("reduce", this::reduceIterator));
     target.define("iter-take", new VariadicBuiltin("iter-take", this::iterTake));
     target.define("iter-drop", new VariadicBuiltin("iter-drop", this::iterDrop));
     target.define("iter-zip", new VariadicBuiltin("iter-zip", this::iterZip));
@@ -609,6 +610,34 @@ public final class HaraContext {
     Iterator source = (Iterator) iterValue(values[1]);
     Object function = values[0];
     return Iter.some(source, value -> truthy(invokeCallable(function, new Object[] {value})));
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private Object reduceIterator(Object[] values) {
+    if (values.length != 2 && values.length != 3) {
+      throw new HaraException(
+          "reduce expects a function and collection, optionally with an initial value");
+    }
+    Object function = values[0];
+    Iterator source = (Iterator) iterValue(values[values.length - 1]);
+    try {
+      Object accumulator;
+      if (values.length == 3) {
+        accumulator = values[1];
+      } else {
+        if (!source.hasNext()) {
+          throw new HaraException(
+              "reduce cannot reduce an empty collection without an initial value");
+        }
+        accumulator = source.next();
+      }
+      while (source.hasNext()) {
+        accumulator = invokeCallable(function, new Object[] {accumulator, source.next()});
+      }
+      return accumulator;
+    } finally {
+      Iter.close(source);
+    }
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})

@@ -92,6 +92,10 @@ public class HaraLanguageTest {
       assertTrue(context.eval(HaraLanguage.ID, "(every? (fn [x] (> x 0)) [1 2])").asBoolean());
       assertTrue(context.eval(HaraLanguage.ID, "(any? (fn [x] (= x 2)) [1 2])").asBoolean());
       assertEquals(2, context.eval(HaraLanguage.ID, "(some (fn [x] (= x 2)) [1 2])").asLong());
+      assertEquals(
+          6, context.eval(HaraLanguage.ID, "(reduce (fn [a b] (+ a b)) [1 2 3])").asLong());
+      assertEquals(
+          16, context.eval(HaraLanguage.ID, "(reduce (fn [a b] (+ a b)) 10 [1 2 3])").asLong());
     }
   }
 
