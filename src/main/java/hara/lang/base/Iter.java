@@ -564,17 +564,22 @@ public interface Iter {
 
       long _n = n;
 
-      @Override
-      public boolean hasNext() {
+      private void skip() {
         while (_n > 0 && it.hasNext()) {
-          it.next(); // discarded
+          it.next();
           _n--;
         }
+      }
+
+      @Override
+      public boolean hasNext() {
+        skip();
         return it.hasNext();
       }
 
       @Override
       public E next() {
+        skip();
         if (!it.hasNext()) {
           throw new Ex.NoSuchElement();
         }
@@ -769,11 +774,20 @@ public interface Iter {
 
   @SuppressWarnings({"rawtypes"})
   public static Iterator<Object[]> zip(Iterator<Iterator<Object>> input) {
-    Iterator[] its = Iter.toArray(input, Iterator.class);
-
     return new Iterator<Object[]>() {
+      private Iterator[] its;
+      private boolean initialized;
+
+      private void initialize() {
+        if (!initialized) {
+          its = Iter.toArray(input, Iterator.class);
+          initialized = true;
+        }
+      }
+
       @Override
       public boolean hasNext() {
+        initialize();
         return Array.every((it) -> it.hasNext(), its);
       }
 

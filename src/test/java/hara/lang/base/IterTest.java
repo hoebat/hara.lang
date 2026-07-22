@@ -92,4 +92,36 @@ public class IterTest {
     assertEquals(Integer.valueOf(2), iter.next());
     assertEquals(2, requested[0]);
   }
+
+  @Test
+  public void testZipDefersSourceAcquisitionUntilFirstConsumption() {
+    final int[] requested = {0};
+    Iterator<Iterator<Object>> sources =
+        new Iterator<Iterator<Object>>() {
+          private int index;
+
+          @Override
+          public boolean hasNext() {
+            return index < 2;
+          }
+
+          @Override
+          public Iterator<Object> next() {
+            requested[0]++;
+            return Arrays.<Object>asList(index++).iterator();
+          }
+        };
+
+    Iterator<Object[]> zipped = Iter.zip(sources);
+    assertEquals(0, requested[0]);
+    assertArrayEquals(new Object[] {0, 1}, zipped.next());
+    assertEquals(2, requested[0]);
+  }
+
+  @Test
+  public void testDropAppliesWhenNextIsCalledDirectly() {
+    Iterator<Integer> dropped = Iter.drop(Arrays.asList(1, 2, 3).iterator(), 2);
+    assertEquals(Integer.valueOf(3), dropped.next());
+    assertFalse(dropped.hasNext());
+  }
 }
