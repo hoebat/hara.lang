@@ -296,6 +296,21 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void loadsPackagedHaraResourcesTransactionally() {
+    try (Context context = context()) {
+      assertEquals(
+          42, context.eval(HaraLanguage.ID, "(load-resource \"hara/l0-resource.hara\")").asLong());
+      assertEquals(42, context.eval(HaraLanguage.ID, "l0-resource-answer").asLong());
+      assertTrue(
+          assertThrows(
+                  PolyglotException.class,
+                  () -> context.eval(HaraLanguage.ID, "(load-resource \"hara/missing.hara\")"))
+              .getMessage()
+              .contains("Unable to find Hara resource"));
+    }
+  }
+
+  @Test
   public void failedModuleEvaluationRollsBackVarsMacrosAndNamespace() throws Exception {
     try (Context context = context()) {
       context.eval(HaraLanguage.ID, "(def stable 7)");

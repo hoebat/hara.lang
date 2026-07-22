@@ -11,8 +11,10 @@ import hara.lang.data.types.IMapType;
 import hara.lang.protocol.IFn;
 import hara.lang.protocol.IMetadata;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -154,6 +156,7 @@ public final class HaraContext {
         "not", new UnaryBuiltin("not", value -> value == null || Boolean.FALSE.equals(value)));
     target.define("load-string", new UnaryBuiltin("load-string", this::loadString));
     target.define("load-file", new UnaryBuiltin("load-file", this::loadFile));
+    target.define("load-resource", new UnaryBuiltin("load-resource", this::loadResource));
     target.define("require", new VariadicBuiltin("require", this::requireModule));
     target.define("refer", new UnaryBuiltin("refer", this::referNamespace));
     target.define("in-ns", new UnaryBuiltin("in-ns", this::inNamespace));
@@ -202,6 +205,26 @@ public final class HaraContext {
       restore(snapshot);
       throw new HaraException(
           "Unable to load Hara file: " + value + " (" + error.getMessage() + ")");
+    }
+  }
+
+  private Object loadResource(Object value) {
+    if (!(value instanceof String) || ((String) value).isEmpty()) {
+      throw new HaraException("load-resource expects a non-empty resource name");
+    }
+    ContextSnapshot snapshot = snapshot();
+    try (InputStream input =
+        HaraContext.class.getClassLoader().getResourceAsStream((String) value)) {
+      if (input == null) {
+        throw new HaraException("Unable to find Hara resource: " + value);
+      }
+      return parseAndExecute(
+          new String(input.readAllBytes(), StandardCharsets.UTF_8), "classpath:" + value);
+    } catch (IOException | RuntimeException error) {
+      restore(snapshot);
+      if (error instanceof HaraException) throw (HaraException) error;
+      throw new HaraException(
+          "Unable to load Hara resource: " + value + " (" + error.getMessage() + ")");
     }
   }
 

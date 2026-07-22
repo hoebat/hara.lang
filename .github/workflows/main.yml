@@ -58,3 +58,4 @@ jobs:
         test "$(target/hara-truffle eval '(defn sum3 [a b c] (+ a b c)) (apply sum3 1 [2 3])')" = "6"
         test "$(target/hara-truffle eval '(defstruct Problem [value]) (try (throw (Problem 7)) (catch Other error 0) (catch Problem error (field error :value)))')" = "7"
         test "$(target/hara-truffle eval '(ns source) (def answer 1) (ns user) (refer \"source\") (in-ns '\\''source) (set! answer 2) (in-ns '\\''user) answer')" = "2"
+        test "$(target/hara-truffle eval '(load-resource \"hara/l0-resource.hara\")')" = "42"
