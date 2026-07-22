@@ -49,7 +49,20 @@ scripts/build-truffle-native
 target/hara-truffle eval '(let [x 19] (+ x 23))'
 ```
 
-The CLI also accepts `run <file>`, `stdin`, `repl`, and `help`. The `repl` command retains one Polyglot context across inputs, supports multiline forms, and continues after guest errors. The current slice supports literals, `quote`, `do`, `if`, parallel `let`, fixed-arity `fn` with lexical closures, invocation, binary `+`, persistent context-local vars through `def`, basic namespace switching through `ns`, multiple top-level forms, source-aware guest errors, compile-time `defmacro` with syntax-quote, unquote, and unquote-splicing, immutable `defstruct` values with Polyglot members, language-level protocols via `defprotocol`, `extend-type`, and `protocol-call` (including extending `IFn`), and explicit capability-gated host interop through `host-symbol`, `host-get`, and `host-call`. Collections and the broader builtin environment remain outside this migration slice.
+The CLI also accepts `run <file>`, `stdin`, `repl`, and `help`. The `repl` command retains one Polyglot context across inputs, supports multiline forms, and continues after guest errors.
+
+The current Hara L0 slice supports:
+
+* literals, `quote`, `do`, `if`, `when`, `when-not`, `and`, and `or`;
+* lexical `let`, `loop`/`recur`, closures, variadic and multi-arity functions, and destructuring;
+* variadic arithmetic/comparisons, BigInteger/BigDecimal values, and explicit ratio-free numeric behavior;
+* persistent collections, iterator-first collection protocols, canonical `bytes`, and mutable `x:array`/`x:object` values;
+* context-local Vars, namespaces, `load-string`/`load-file`, transactional module rollback, and compile-time macros;
+* immutable `defstruct` values with metadata and Polyglot members;
+* language-level protocols via `defprotocol`, `extend-type`, and `protocol-call`, including extending `IFn`;
+* explicit capability-gated host interop through `host-symbol`, `host-get`, and `host-call`.
+
+The collection model is iterator-first and does not require `ISeq`, transducers, `transduce`, or `eduction`. Host interop is disabled unless the embedding context grants it. The Native Image workflow covers a smoke subset; Native Image startup, size, reachability, and benchmark evidence remain tracked separately from JVM verification.
 
 ### Focused collection protocol tests
 
