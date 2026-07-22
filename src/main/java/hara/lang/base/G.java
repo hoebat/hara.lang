@@ -47,6 +47,33 @@ public interface G {
     return "[" + display(e.getKey()) + " " + display(e.getValue()) + "]";
   }
 
+  public static String displayCharacter(Character value) {
+    switch (value) {
+      case '\n':
+        return "\\newline";
+      case ' ':
+        return "\\space";
+      case '\t':
+        return "\\tab";
+      case '\b':
+        return "\\backspace";
+      case '\f':
+        return "\\formfeed";
+      case '\r':
+        return "\\return";
+      default:
+        return Character.isISOControl(value) ? String.format("\\u%04X", (int) value) : "\\" + value;
+    }
+  }
+
+  public static String displayBytes(byte[] value) {
+    StringBuilder display = new StringBuilder("(bytes");
+    for (byte element : value) {
+      display.append(' ').append(element);
+    }
+    return display.append(')').toString();
+  }
+
   @SuppressWarnings({"rawtypes", "unchecked"})
   public static String display(Object e) {
     if (e == null) {
@@ -56,7 +83,9 @@ public interface G {
     } else if (e instanceof String) {
       return "\"" + Str.escapeJava((String) e) + "\"";
     } else if (e instanceof Character) {
-      return "\\" + e.toString();
+      return displayCharacter((Character) e);
+    } else if (e instanceof byte[]) {
+      return displayBytes((byte[]) e);
     } else if (e instanceof Pattern) {
       return "#\"" + Str.escapeJava(e.toString()) + "\"";
     } else if (e instanceof BigInteger) {
@@ -135,6 +164,7 @@ public interface G {
   }
 
   private static long hashValue(Object value) {
+    if (value instanceof byte[]) return java.util.Arrays.hashCode((byte[]) value);
     if (!(value instanceof Number)) return value.hashCode();
     if (value instanceof Double || value instanceof Float) {
       double number = ((Number) value).doubleValue();

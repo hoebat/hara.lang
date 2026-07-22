@@ -172,6 +172,56 @@ public final class HaraNodes {
     }
   }
 
+  public static final class ByteCopy extends HaraExpressionNode {
+    @Child private HaraExpressionNode value;
+
+    public ByteCopy(HaraExpressionNode value) {
+      this.value = value;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      Object bytes = HaraBox.unwrap(value.execute(frame));
+      if (!(bytes instanceof byte[])) {
+        throw new HaraException("byte-copy expects bytes", this);
+      }
+      return ((byte[]) bytes).clone();
+    }
+  }
+
+  public static final class ByteSlice extends HaraExpressionNode {
+    @Child private HaraExpressionNode value;
+    @Child private HaraExpressionNode start;
+    @Child private HaraExpressionNode end;
+
+    public ByteSlice(HaraExpressionNode value, HaraExpressionNode start, HaraExpressionNode end) {
+      this.value = value;
+      this.start = start;
+      this.end = end;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      Object bytes = HaraBox.unwrap(value.execute(frame));
+      Object startValue = start.execute(frame);
+      Object endValue = end.execute(frame);
+      if (!(bytes instanceof byte[])) {
+        throw new HaraException("byte-slice expects bytes", this);
+      }
+      if (!(startValue instanceof Number) || !(endValue instanceof Number)) {
+        throw new HaraException("byte-slice indexes must be numeric", this);
+      }
+      long startIndex = ((Number) startValue).longValue();
+      long endIndex = ((Number) endValue).longValue();
+      byte[] array = (byte[]) bytes;
+      if (startIndex < 0 || endIndex < startIndex || endIndex > array.length) {
+        throw new HaraException(
+            "byte-slice range is out of bounds: " + startIndex + ".." + endIndex, this);
+      }
+      return java.util.Arrays.copyOfRange(array, (int) startIndex, (int) endIndex);
+    }
+  }
+
   public static final class MutableOperation extends HaraExpressionNode {
     public enum Operator {
       LENGTH,
@@ -258,13 +308,17 @@ public final class HaraNodes {
         if (target != null && target.getClass().isArray()) {
           return java.lang.reflect.Array.get(target, index(key, target));
         }
-      } catch (IndexOutOfBoundsException | IllegalArgumentException error) {
+      } catch (IndexOutOfBoundsException error) {
         return fallback;
       }
       throw new HaraException("x:get does not support target: " + target, null);
     }
 
     private static void set(Object target, Object key, Object value) {
+      if (target instanceof java.util.Map<?, ?>) {
+        ((java.util.Map<Object, Object>) target).put(key, value);
+        return;
+      }
       int index = index(key, target);
       if (target instanceof java.util.List<?>) {
         ((java.util.List<Object>) target).set(index, value);
@@ -276,8 +330,6 @@ public final class HaraNodes {
         }
       } else if (target != null && target.getClass().isArray()) {
         java.lang.reflect.Array.set(target, index, value);
-      } else if (target instanceof java.util.Map<?, ?>) {
-        ((java.util.Map<Object, Object>) target).put(key, value);
       } else {
         throw new HaraException("x:set does not support target: " + target);
       }
@@ -370,7 +422,7 @@ public final class HaraNodes {
     }
 
     private static long indexLong(Object key) {
-      if (!(key instanceof Number)) throw new IllegalArgumentException("index must be numeric");
+      if (!(key instanceof Number)) throw new HaraException("index must be numeric: " + key);
       return ((Number) key).longValue();
     }
   }
@@ -501,6 +553,39 @@ public final class HaraNodes {
         throw new HaraException("Unbound symbol: " + symbol.display(), this);
       }
       return var.get();
+    }
+  }
+
+  public static final class VarReference extends HaraExpressionNode {
+    private final Symbol symbol;
+
+    public VarReference(Symbol symbol) {
+      this.symbol = symbol;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      HaraVar var = HaraLanguage.currentContext().resolve(symbol);
+      if (var == null) {
+        throw new HaraException("Unbound var: " + symbol.display(), this);
+      }
+      return var;
+    }
+  }
+
+  public static final class Deref extends HaraExpressionNode {
+    @Child private HaraExpressionNode value;
+
+    public Deref(HaraExpressionNode value) {
+      this.value = value;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      Object receiver = value.execute(frame);
+      HaraVar protocolVar = HaraLanguage.currentContext().resolve(Symbol.create("IDeref"));
+      HaraProtocol protocol = (HaraProtocol) protocolVar.get();
+      return protocol.invoke("deref", receiver, new Object[0]);
     }
   }
 

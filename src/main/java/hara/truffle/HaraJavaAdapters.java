@@ -127,6 +127,8 @@ public final class HaraJavaAdapters {
 
   public static void installHash(HaraProtocol protocol) {
     protocol.extend(IHash.class, "hash", (receiver, arguments) -> ((IHash) receiver).hashGet());
+    protocol.extend(
+        byte[].class, "hash", (receiver, arguments) -> (long) Arrays.hashCode((byte[]) receiver));
   }
 
   public static void installMetadata(HaraProtocol protocol) {

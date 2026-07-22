@@ -1,0 +1,79 @@
+package hara.truffle;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
+
+import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.PolyglotException;
+import org.graalvm.polyglot.Value;
+import org.junit.Test;
+
+public class HaraMutableBoundaryTest {
+  @Test
+  public void bytesHaveReadableContentEqualityHashCopyAndSliceSemantics() {
+    try (Context context = context()) {
+      Value bytes = context.eval(HaraLanguage.ID, "(bytes 1 2 -3)");
+      assertEquals("(bytes 1 2 -3)", bytes.toString());
+      assertTrue(context.eval(HaraLanguage.ID, "(= (bytes 1 2 -3) (bytes 1 2 -3))").asBoolean());
+      assertTrue(
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(= (protocol-call IHash hash (bytes 1 2 -3)) "
+                      + "(protocol-call IHash hash (bytes 1 2 -3)))")
+              .asBoolean());
+      assertEquals(
+          2, context.eval(HaraLanguage.ID, "(x:get (byte-slice (bytes 1 2 -3) 1 3) 0)").asLong());
+      assertEquals(
+          1,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(let [source (bytes 1 2)] "
+                      + "(let [copy (byte-copy source)] (x:set copy 0 9) (x:get source 0)))")
+              .asLong());
+    }
+  }
+
+  @Test
+  public void mutableObjectsUseKeysWhileSequentialTargetsRequireNumericIndexes() {
+    try (Context context = context()) {
+      assertEquals(
+          42,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(let [object (x:object)] " + "(x:set object :answer 42) (x:get object :answer))")
+              .asLong());
+      assertEquals(7, context.eval(HaraLanguage.ID, "(x:get (x:array 1) 9 7)").asLong());
+
+      PolyglotException invalidIndex =
+          assertThrows(
+              PolyglotException.class,
+              () -> context.eval(HaraLanguage.ID, "(x:get (x:array 1) :bad 7)"));
+      assertTrue(invalidIndex.getMessage().contains("index must be numeric"));
+    }
+  }
+
+  @Test
+  public void byteOperationsRejectWrongTypesAndInvalidRanges() {
+    try (Context context = context()) {
+      assertTrue(
+          assertThrows(
+                  PolyglotException.class, () -> context.eval(HaraLanguage.ID, "(byte-copy [1 2])"))
+              .getMessage()
+              .contains("byte-copy expects bytes"));
+      assertTrue(
+          assertThrows(
+                  PolyglotException.class,
+                  () -> context.eval(HaraLanguage.ID, "(byte-slice (bytes 1 2) 0 3)"))
+              .getMessage()
+              .contains("range is out of bounds"));
+    }
+  }
+
+  private static Context context() {
+    return Context.newBuilder(HaraLanguage.ID).build();
+  }
+}

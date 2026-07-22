@@ -198,6 +198,10 @@ final class HaraAnalyzer {
           return analyzeDefn(list);
         case "def":
           return analyzeDef(list);
+        case "var":
+          return analyzeVar(list);
+        case "deref":
+          return analyzeDeref(list);
         case "defstruct":
           return analyzeDefStruct(list);
         case "defprotocol":
@@ -244,6 +248,10 @@ final class HaraAnalyzer {
           return analyzeCompare(list, HaraNodes.Compare.Operator.EQUAL, "=");
         case "not=":
           return analyzeCompare(list, HaraNodes.Compare.Operator.NOT_EQUAL, "not=");
+        case "byte-copy":
+          return analyzeByteCopy(list);
+        case "byte-slice":
+          return analyzeByteSlice(list);
         default:
           return analyzeInvocation(list);
       }
@@ -1000,6 +1008,17 @@ final class HaraAnalyzer {
     return new HaraNodes.Bytes(elements);
   }
 
+  private HaraExpressionNode analyzeByteCopy(List<?> form) {
+    requireCount(form, 2, "byte-copy");
+    return new HaraNodes.ByteCopy(analyze(form.nth(1)));
+  }
+
+  private HaraExpressionNode analyzeByteSlice(List<?> form) {
+    requireCount(form, 4, "byte-slice");
+    return new HaraNodes.ByteSlice(
+        analyze(form.nth(1)), analyze(form.nth(2)), analyze(form.nth(3)));
+  }
+
   private HaraExpressionNode analyzeMutableCollection(
       List<?> form, HaraNodes.CollectionLiteral.Kind kind) {
     HaraExpressionNode[] elements = new HaraExpressionNode[(int) form.count() - 1];
@@ -1032,6 +1051,20 @@ final class HaraAnalyzer {
       throw error("def name must not be qualified");
     }
     return new HaraNodes.DefineGlobal(symbol, analyze(form.nth(2)));
+  }
+
+  private HaraExpressionNode analyzeVar(List<?> form) {
+    requireCount(form, 2, "var");
+    Object name = form.nth(1);
+    if (!(name instanceof Symbol)) {
+      throw error("var expects a symbol");
+    }
+    return new HaraNodes.VarReference((Symbol) name);
+  }
+
+  private HaraExpressionNode analyzeDeref(List<?> form) {
+    requireCount(form, 2, "deref");
+    return new HaraNodes.Deref(analyze(form.nth(1)));
   }
 
   private HaraExpressionNode analyzeDefStruct(List<?> form) {

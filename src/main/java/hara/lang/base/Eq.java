@@ -16,6 +16,8 @@ public interface Eq {
       return false;
     } else if (a instanceof Number && b instanceof Number) {
       return Num.eq(a, b);
+    } else if (a instanceof byte[] && b instanceof byte[]) {
+      return java.util.Arrays.equals((byte[]) a, (byte[]) b);
     } else if (a instanceof IEquality) {
       return ((IEquality) a).equality(b);
     } else if (b instanceof IEquality) {

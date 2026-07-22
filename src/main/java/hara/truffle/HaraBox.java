@@ -291,6 +291,7 @@ public final class HaraBox implements TruffleObject {
 
   @TruffleBoundary
   private static String display(Object value) {
+    if (value instanceof byte[]) return hara.lang.base.G.displayBytes((byte[]) value);
     return value instanceof IDisplay ? ((IDisplay) value).display() : String.valueOf(value);
   }
 
