@@ -264,7 +264,10 @@ public final class HaraNodes {
       INSERT,
       REMOVE,
       CLONE,
-      SLICE
+      SLICE,
+      BYTE_LENGTH,
+      BYTE_GET,
+      BYTE_SET
     }
 
     @Children private final HaraExpressionNode[] arguments;
@@ -305,8 +308,52 @@ public final class HaraNodes {
           return clone(values[0]);
         case SLICE:
           return slice(values[0], values[1], values.length == 3 ? values[2] : length(values[0]));
+        case BYTE_LENGTH:
+          return byteLength(values[0]);
+        case BYTE_GET:
+          return byteGet(
+              values[0], values[1], values.length == 3 ? values[2] : null, values.length == 3);
+        case BYTE_SET:
+          byteSet(values[0], values[1], values[2]);
+          return values[0];
         default:
           throw new AssertionError(operator);
+      }
+    }
+
+    private static long byteLength(Object value) {
+      if (value instanceof byte[]) return ((byte[]) value).length;
+      throw new HaraException("byte-count expects bytes");
+    }
+
+    private static Object byteGet(Object target, Object key, Object fallback, boolean hasFallback) {
+      if (!(target instanceof byte[])) {
+        throw new HaraException("byte-get expects bytes");
+      }
+      int index;
+      try {
+        index = index(key, target);
+      } catch (HaraException | IndexOutOfBoundsException error) {
+        if (hasFallback) return fallback;
+        throw new HaraException("byte-get index out of bounds: " + key);
+      }
+      return ((byte[]) target)[index];
+    }
+
+    private static void byteSet(Object target, Object key, Object value) {
+      if (!(target instanceof byte[])) {
+        throw new HaraException("byte-set expects bytes");
+      }
+      int index;
+      try {
+        index = index(key, target);
+      } catch (HaraException | IndexOutOfBoundsException error) {
+        throw new HaraException("byte-set index out of bounds: " + key);
+      }
+      try {
+        ((byte[]) target)[index] = Cast.byteCast(value);
+      } catch (IllegalArgumentException error) {
+        throw new HaraException("byte-set expects a value in the byte range");
       }
     }
 

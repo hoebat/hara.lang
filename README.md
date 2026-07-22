@@ -56,7 +56,7 @@ The current Hara L0 slice supports:
 * literals, `quote`, `do`, `if`, `when`, `when-not`, `and`, and `or`;
 * lexical `let`, `loop`/`recur`, closures, variadic and multi-arity functions, and destructuring;
 * variadic arithmetic/comparisons, BigInteger/BigDecimal values, and explicit ratio-free numeric behavior;
-* persistent collections, iterator-first collection protocols, canonical `bytes`, and mutable `x:array`/`x:object` values;
+* persistent collections, iterator-first collection protocols, canonical `bytes` with `byte-count`/`byte-get`/`byte-set`, and mutable `x:array`/`x:object` values;
 * context-local Vars, namespaces, `load-string`/`load-file`, transactional module rollback, and compile-time macros;
 * immutable `defstruct` values with metadata and Polyglot members;
 * language-level protocols via `defprotocol`, `extend-type`, and `protocol-call`, including extending `IFn`;

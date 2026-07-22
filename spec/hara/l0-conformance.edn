@@ -169,6 +169,10 @@
    :class :bytes
    :source "(+ (byte-u8 -1) (byte-s8 255))"
    :expect {:value 254 :type :integer}}
+  {:id :bytes/ordinary-operations
+   :class :bytes
+   :source "(let [b (bytes 1 2)] (byte-set b 0 9) (+ (byte-count b) (byte-get b 0)))"
+   :expect {:value 11 :type :integer}}
   {:id :protocol/struct-extension
    :class :protocol
    :source "(protocol-call ICount count (Box 4))"

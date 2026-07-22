@@ -51,6 +51,32 @@ public class HaraMutableBoundaryTest {
   }
 
   @Test
+  public void ordinaryByteOperationsHaveExplicitBoundsAndMutationSemantics() {
+    try (Context context = context()) {
+      assertEquals(3, context.eval(HaraLanguage.ID, "(byte-count (bytes 1 2 -3))").asLong());
+      assertEquals(2, context.eval(HaraLanguage.ID, "(byte-get (bytes 1 2 -3) 1)").asLong());
+      assertEquals(
+          9,
+          context
+              .eval(HaraLanguage.ID, "(let [b (bytes 1 2)] (byte-set b 0 9) (byte-get b 0))")
+              .asLong());
+      assertEquals(7, context.eval(HaraLanguage.ID, "(byte-get (bytes 1) 4 7)").asLong());
+      assertTrue(
+          assertThrows(
+                  PolyglotException.class,
+                  () -> context.eval(HaraLanguage.ID, "(byte-get (bytes 1) 4)"))
+              .getMessage()
+              .contains("byte-get index out of bounds"));
+      assertTrue(
+          assertThrows(
+                  PolyglotException.class,
+                  () -> context.eval(HaraLanguage.ID, "(byte-set (bytes 1) 0 256)"))
+              .getMessage()
+              .contains("byte-set expects a value in the byte range"));
+    }
+  }
+
+  @Test
   public void mutableObjectsUseKeysWhileSequentialTargetsRequireNumericIndexes() {
     try (Context context = context()) {
       assertEquals(

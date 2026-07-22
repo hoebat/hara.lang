@@ -278,6 +278,12 @@ final class HaraAnalyzer {
           return analyzeByteValue(list, HaraNodes.ByteValue.Operator.UNSIGNED);
         case "byte-s8":
           return analyzeByteValue(list, HaraNodes.ByteValue.Operator.SIGNED);
+        case "byte-count":
+          return analyzeByteOperation(list, HaraNodes.MutableOperation.Operator.BYTE_LENGTH, 2, 2);
+        case "byte-get":
+          return analyzeByteOperation(list, HaraNodes.MutableOperation.Operator.BYTE_GET, 3, 4);
+        case "byte-set":
+          return analyzeByteOperation(list, HaraNodes.MutableOperation.Operator.BYTE_SET, 4, 4);
         case "<":
           return analyzeCompare(list, HaraNodes.Compare.Operator.LESS, "<");
         case "<=":
@@ -1233,6 +1239,18 @@ final class HaraAnalyzer {
     requireCount(form, 4, "byte-slice");
     return new HaraNodes.ByteSlice(
         analyze(form.nth(1)), analyze(form.nth(2)), analyze(form.nth(3)));
+  }
+
+  private HaraExpressionNode analyzeByteOperation(
+      List<?> form, HaraNodes.MutableOperation.Operator operator, int minimum, int maximum) {
+    if (form.count() < minimum || form.count() > maximum) {
+      throw error("byte operation has an invalid arity");
+    }
+    HaraExpressionNode[] arguments = new HaraExpressionNode[(int) form.count() - 1];
+    for (int i = 1; i < form.count(); i++) {
+      arguments[i - 1] = analyze(form.nth(i));
+    }
+    return new HaraNodes.MutableOperation(operator, arguments);
   }
 
   private HaraExpressionNode analyzeMutableCollection(
