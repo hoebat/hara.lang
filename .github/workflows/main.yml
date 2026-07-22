@@ -51,3 +51,5 @@ jobs:
         test "$(target/hara-truffle eval '(defstruct Person [name]) (protocol-call ILookup lookup (protocol-call IObjType meta (protocol-call IObjType with-meta (Person "Ada") {:doc "person"})) :doc)')" = "person"
         test "$(target/hara-truffle eval '(= -0.0 0.0)')" = "true"
         test "$(target/hara-truffle eval '(= 1.0M 1.00M)')" = "true"
+        test "$(target/hara-truffle eval '(def ^:dynamic *answer* 1) (binding [*answer* 42] *answer*)')" = "42"
+        test "$(target/hara-truffle eval '(def answer 1) (set! answer 42) answer')" = "42"
