@@ -165,6 +165,18 @@ public class HaraCoreFormsTest {
   }
 
   @Test
+  public void compileErrorsExposeTheOffendingFormSourceLocation() throws Exception {
+    try (Context context = context()) {
+      Source source = Source.newBuilder(HaraLanguage.ID, "  \n  (if true)", "compile.hara").build();
+      PolyglotException error = assertThrows(PolyglotException.class, () -> context.eval(source));
+      assertTrue(error.getMessage().contains("if expects two or three arguments"));
+      assertTrue(error.getSourceLocation() != null);
+      assertEquals("compile.hara", error.getSourceLocation().getSource().getName());
+      assertEquals(2, error.getSourceLocation().getStartLine());
+    }
+  }
+
+  @Test
   public void varAndDerefFailuresAreDeterministic() {
     try (Context context = context()) {
       assertTrue(

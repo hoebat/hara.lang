@@ -78,9 +78,18 @@ final class HaraAnalyzer {
   }
 
   private HaraExpressionNode analyze(Object form) {
-    HaraExpressionNode node = analyzeForm(form);
-    attachSourceSection(node, form);
-    return node;
+    try {
+      HaraExpressionNode node = analyzeForm(form);
+      attachSourceSection(node, form);
+      return node;
+    } catch (HaraException error) {
+      if (error.haraLocation() != null || !(form instanceof IObjType)) {
+        throw error;
+      }
+      HaraExpressionNode location = new HaraNodes.Literal(null);
+      attachSourceSection(location, form);
+      throw new HaraException(error.getMessage(), location);
+    }
   }
 
   private HaraExpressionNode analyzeForm(Object form) {
