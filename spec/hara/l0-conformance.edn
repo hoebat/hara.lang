@@ -67,6 +67,14 @@
    :class :numeric
    :source "(mod 7 3)"
    :expect {:value 1 :type :integer}}
+  {:id :numeric/negative-zero
+   :class :numeric
+   :source "(= -0.0 0.0)"
+   :expect {:value true :type :boolean}}
+  {:id :numeric/decimal-scale
+   :class :numeric
+   :source "(= 1.0M 1.00M)"
+   :expect {:value true :type :boolean}}
   {:id :protocol/struct-extension
    :class :protocol
    :source "(protocol-call ICount count (Box 4))"

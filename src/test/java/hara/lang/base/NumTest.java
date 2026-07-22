@@ -52,6 +52,14 @@ public class NumTest {
         BigInteger.valueOf(Long.MAX_VALUE).add(BigInteger.ONE), Num.addP(Long.MAX_VALUE, 1L));
   }
 
+  @Test
+  public void testLanguageNumericHashNormalizesEqualRepresentations() {
+    assertEquals(G.hashRapid(1L), G.hashRapid(BigInteger.ONE));
+    assertEquals(G.hashRapid(1L), G.hashRapid(new BigDecimal("1.00")));
+    assertEquals(G.hashRapid(0.0d), G.hashRapid(-0.0d));
+    assertTrue(Num.eq(-0.0d, 0.0d));
+  }
+
   @Test(expected = IllegalArgumentException.class)
   public void testDecimalAndFloatingPointRequireExplicitConversion() {
     Num.add(new BigDecimal("1.5"), 2.0);

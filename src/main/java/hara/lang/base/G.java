@@ -1,6 +1,7 @@
 package hara.lang.base;
 
 import hara.lang.base.primitive.Array;
+import hara.lang.base.primitive.Num;
 import hara.lang.protocol.Constant;
 import hara.lang.protocol.IDisplay;
 import hara.lang.protocol.IHash;
@@ -94,7 +95,7 @@ public interface G {
     } else if (o == null) {
       return 0;
     } else {
-      return o.hashCode();
+      return hashValue(o);
     }
   }
 
@@ -104,13 +105,13 @@ public interface G {
     } else if (o == null) {
       return 0;
     } else {
-      return o.hashCode();
+      return hashValue(o);
     }
   }
 
   public static long hashSip(Object o) {
     if (o == null) return 0;
-    return o.hashCode();
+    return hashValue(o);
   }
 
   public static Function<Object, Long> hashFn(Constant.HashType t) {
@@ -123,7 +124,7 @@ public interface G {
       case SIP:
         return item -> Long.valueOf(hashSip(item));
       case SYSTEM:
-        return item -> Long.valueOf(item.hashCode());
+        return item -> Long.valueOf(hashValue(item));
       default:
         throw new UnsupportedOperationException("Not Supported");
     }
@@ -131,5 +132,22 @@ public interface G {
 
   public static long hashCalc(Constant.HashType t, Object o) {
     return hashFn(t).apply(o);
+  }
+
+  private static long hashValue(Object value) {
+    if (!(value instanceof Number)) return value.hashCode();
+    if (value instanceof Double || value instanceof Float) {
+      double number = ((Number) value).doubleValue();
+      if (number == 0.0d) return 0;
+      if (!Double.isFinite(number)) return Double.hashCode(number);
+      return Num.canonicalDecimal(BigDecimal.valueOf(number)).hashCode();
+    }
+    if (value instanceof BigDecimal) {
+      return Num.canonicalDecimal((BigDecimal) value).hashCode();
+    }
+    if (value instanceof BigInteger) {
+      return Num.canonicalDecimal(new BigDecimal((BigInteger) value)).hashCode();
+    }
+    return BigDecimal.valueOf(((Number) value).longValue()).hashCode();
   }
 }
