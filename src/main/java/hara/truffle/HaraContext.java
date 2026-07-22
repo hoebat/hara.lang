@@ -274,7 +274,7 @@ public final class HaraContext {
       throw new HaraException("Cannot refer missing namespace: " + value);
     }
     for (Map.Entry<String, HaraVar> entry : target.vars.entrySet()) {
-      currentNamespace.define(entry.getKey(), entry.getValue().get());
+      currentNamespace.refer(entry.getKey(), entry.getValue());
     }
     Map<String, HaraMacro> targetMacros = macros.get(target.name());
     if (targetMacros != null) {
@@ -399,12 +399,16 @@ public final class HaraContext {
 
   private ContextSnapshot snapshot() {
     Map<String, Map<String, Object>> values = new LinkedHashMap<>();
+    Map<String, Map<String, HaraVar>> bindings = new LinkedHashMap<>();
     for (Map.Entry<String, HaraNamespace> namespace : namespaces.entrySet()) {
       Map<String, Object> namespaceValues = new LinkedHashMap<>();
+      Map<String, HaraVar> namespaceBindings = new LinkedHashMap<>();
       for (Map.Entry<String, HaraVar> var : namespace.getValue().vars.entrySet()) {
         namespaceValues.put(var.getKey(), var.getValue().get());
+        namespaceBindings.put(var.getKey(), var.getValue());
       }
       values.put(namespace.getKey(), namespaceValues);
+      bindings.put(namespace.getKey(), namespaceBindings);
     }
     Map<String, Map<String, HaraMacro>> macroValues = new LinkedHashMap<>();
     for (Map.Entry<String, Map<String, HaraMacro>> entry : macros.entrySet()) {
@@ -421,6 +425,7 @@ public final class HaraContext {
     return new ContextSnapshot(
         currentNamespace.name(),
         values,
+        bindings,
         macroValues,
         aliasValues,
         new LinkedHashMap<>(modules),
@@ -432,7 +437,13 @@ public final class HaraContext {
     for (Map.Entry<String, Map<String, Object>> entry : snapshot.values.entrySet()) {
       HaraNamespace namespace = namespace(entry.getKey());
       for (Map.Entry<String, Object> value : entry.getValue().entrySet()) {
-        namespace.define(value.getKey(), value.getValue());
+        HaraVar binding = snapshot.bindings.get(entry.getKey()).get(value.getKey());
+        if (binding == null) {
+          namespace.define(value.getKey(), value.getValue());
+        } else {
+          binding.set(value.getValue());
+          namespace.refer(value.getKey(), binding);
+        }
       }
     }
     currentNamespace = namespace(snapshot.currentNamespace);
@@ -456,6 +467,7 @@ public final class HaraContext {
   private static final class ContextSnapshot {
     private final String currentNamespace;
     private final Map<String, Map<String, Object>> values;
+    private final Map<String, Map<String, HaraVar>> bindings;
     private final Map<String, Map<String, HaraMacro>> macros;
     private final Map<String, Map<String, String>> aliases;
     private final Map<String, ModuleRecord> modules;
@@ -464,12 +476,14 @@ public final class HaraContext {
     private ContextSnapshot(
         String currentNamespace,
         Map<String, Map<String, Object>> values,
+        Map<String, Map<String, HaraVar>> bindings,
         Map<String, Map<String, HaraMacro>> macros,
         Map<String, Map<String, String>> aliases,
         Map<String, ModuleRecord> modules,
         Map<String, Set<String>> moduleDependencies) {
       this.currentNamespace = currentNamespace;
       this.values = values;
+      this.bindings = bindings;
       this.macros = macros;
       this.aliases = aliases;
       this.modules = modules;
@@ -581,6 +595,11 @@ public final class HaraContext {
             existing.set(value);
             return existing;
           });
+    }
+
+    private HaraVar refer(String symbolName, HaraVar value) {
+      vars.put(symbolName, value);
+      return value;
     }
   }
 }

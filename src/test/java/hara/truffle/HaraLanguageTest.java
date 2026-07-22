@@ -491,6 +491,20 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void refersLiveVarIdentityAcrossNamespaces() {
+    try (Context context = context()) {
+      assertEquals(
+          2,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(ns source) (def answer 1) (ns user) (refer \"source\") "
+                      + "(in-ns 'source) (set! answer 2) (in-ns 'user) answer")
+              .asLong());
+    }
+  }
+
+  @Test
   public void altersVarRootThroughAnHaraFunction() {
     try (Context context = context()) {
       assertEquals(
