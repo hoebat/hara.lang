@@ -206,12 +206,14 @@ public final class HaraContext {
     try {
       Path path = canonicalPath((String) arguments[0]);
       String key = path.toString();
+      boolean reload =
+          arguments.length == 2 && requireOption(arguments[1], "reload") == Boolean.TRUE;
       if (!loadingStack.isEmpty()) {
         moduleDependencies
             .computeIfAbsent(loadingStack.peekLast(), ignored -> ConcurrentHashMap.newKeySet())
             .add(key);
       }
-      if (!modules.containsKey(key)) {
+      if (reload || !modules.containsKey(key)) {
         if (!loadingModules.add(key)) {
           throw new HaraException("Cyclic module require: " + key);
         }
@@ -246,6 +248,14 @@ public final class HaraContext {
       throw new HaraException("require :as expects an unqualified symbol");
     }
     defineAlias((Symbol) alias, Symbol.create(module.namespace));
+  }
+
+  @SuppressWarnings("rawtypes")
+  private Object requireOption(Object options, String name) {
+    if (!(options instanceof IMapType)) {
+      throw new HaraException("require options expect a map");
+    }
+    return ((IMapType) options).lookup(Keyword.create(name));
   }
 
   private Object moduleRevision(Object value) {

@@ -353,6 +353,11 @@ public class HaraLanguageTest {
         assertEquals(42, context.eval(HaraLanguage.ID, "module-answer").asLong());
         assertEquals(
             2, context.eval(HaraLanguage.ID, "(module-revision \"" + path + "\")").asLong());
+        Files.writeString(file, "(def module-answer 43)");
+        context.eval(HaraLanguage.ID, "(require \"" + path + "\" {:reload true})");
+        assertEquals(43, context.eval(HaraLanguage.ID, "module-answer").asLong());
+        assertEquals(
+            3, context.eval(HaraLanguage.ID, "(module-revision \"" + path + "\")").asLong());
       } finally {
         Files.deleteIfExists(file);
       }
