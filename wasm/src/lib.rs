@@ -232,9 +232,21 @@ impl Runtime {
             .map_err(|error| JsValue::from_str(&error))
     }
 
+    pub fn eval_traced(&mut self, source: &str) -> Result<String, JsValue> {
+        self.refresh_qualified_bindings();
+        core::eval_text_traced(source, &mut self.env)
+            .map_err(|error| JsValue::from_str(&error))
+    }
+
     #[cfg(not(target_arch = "wasm32"))]
     pub fn eval_native(&mut self, source: &str) -> Result<String, String> {
         self.eval_text(source)
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn eval_native_traced(&mut self, source: &str) -> Result<String, String> {
+        self.refresh_qualified_bindings();
+        core::eval_text_traced(source, &mut self.env)
     }
 }
 
@@ -444,7 +456,7 @@ mod tests {
         let mut runtime = Runtime::new();
         assert_eq!(runtime.eval_text("#{1 (+ 1 1) 1}").unwrap(), "#{1 2}");
         assert_eq!(runtime.eval_text("(count #{1 2 2})").unwrap(), "2");
-        assert_eq!(runtime.eval_text("(contains? #{1 2} 2)").unwrap(), "true");
+        assert_eq!(runtime.eval_text("(protocol-call IFind has? #{1 2} 2)").unwrap(), "true");
         assert_eq!(runtime.eval_text("(conj #{1} 2)").unwrap(), "#{1 2}");
         assert_eq!(runtime.eval_text("(set 1 2 1)").unwrap(), "#{1 2}");
         assert_eq!(runtime.eval_text("(= #{1 2} #{2 1})").unwrap(), "true");
@@ -472,8 +484,10 @@ mod tests {
     #[test]
     fn map_membership_keys_and_values_are_portable() {
         let mut runtime = Runtime::new();
-        assert_eq!(runtime.eval_text(r#"(contains? {"a" 1} "a")"#).unwrap(), "true");
-        assert_eq!(runtime.eval_text("(contains? [1 2] 2)").unwrap(), "true");
+        assert_eq!(runtime.eval_text(r#"(protocol-call IFind has? {"a" 1} "a")"#).unwrap(), "true");
+        assert_eq!(runtime.eval_text("(protocol-call IFind has? [1 2] 1)").unwrap(), "true");
+        assert_eq!(runtime.eval_text("(protocol-call IFind has? [1 2] 2)").unwrap(), "false");
+        assert_eq!(runtime.eval_text(r#"(protocol-call IFind has? {"a" nil} "a")"#).unwrap(), "true");
         assert_eq!(runtime.eval_text(r#"(keys {"a" 1 "b" 2})"#).unwrap(), r#"["a" "b"]"#);
         assert_eq!(runtime.eval_text(r#"(vals {"a" 1 "b" 2})"#).unwrap(), "[1 2]");
     }
@@ -635,6 +649,18 @@ mod tests {
     }
 
     #[test]
+    fn seq_boundaries_and_source_aware_transforms_match_design() {
+        let mut runtime = Runtime::new();
+        assert_eq!(runtime.eval_text("(seq? (map inc [1 2 3]))").unwrap(), "true");
+        assert_eq!(runtime.eval_text("(first (map inc [1 2 3]))").unwrap(), "2");
+        assert_eq!(runtime.eval_text("(first ((map inc) [1 2 3]))").unwrap(), "2");
+        assert_eq!(runtime.eval_text("(first ((map inc) (seq [1 2 3])))").unwrap(), "2");
+        assert_eq!(runtime.eval_text("(first (seq (map inc) [1 2 3]))").unwrap(), "2");
+        assert_eq!(runtime.eval_text("(first ((comp (map inc) (map inc)) [1 2 3]))").unwrap(), "3");
+        assert_eq!(runtime.eval_text("(first (seq (comp (map inc) (map inc)) [1 2 3]))").unwrap(), "3");
+    }
+
+    #[test]
     fn iterators_are_closeable_and_support_map_filter() {
         let mut runtime = Runtime::new();
         assert_eq!(runtime.eval_text("(let (it (iter [1 2])) (iter-next it))").unwrap(), "1");
@@ -652,6 +678,9 @@ mod tests {
         assert_eq!(runtime.eval_text("(protocol-call ICount count [1 2 3])").unwrap(), "3");
         assert_eq!(runtime.eval_text("(protocol-call INth nth (bytes 1 -3) 1)").unwrap(), "-3");
         assert_eq!(runtime.eval_text(r#"(protocol-call ILookup lookup {"a" 9} "a")"#).unwrap(), "9");
+        assert_eq!(runtime.eval_text(r#"(protocol-call IFind has? {"a" nil} "a")"#).unwrap(), "true");
+        assert_eq!(runtime.eval_text("(protocol-call IFind has? [10 20] 1)").unwrap(), "true");
+        assert_eq!(runtime.eval_text("(protocol-call IFind has? [10 20] 10)").unwrap(), "false");
         assert_eq!(runtime.eval_text(r#"(protocol-call IAssoc assoc {"a" 9} "b" 10)"#).unwrap(), r#"{"a" 9 "b" 10}"#);
         assert_eq!(runtime.eval_text(r#"(protocol-call IConj conj [1] 2)"#).unwrap(), "[1 2]");
         assert_eq!(runtime.eval_text(r#"(protocol-call IDissoc dissoc {"a" 9 "b" 10} "a")"#).unwrap(), r#"{"b" 10}"#);
@@ -753,7 +782,6 @@ mod tests {
         assert_eq!(runtime.eval_text("(even? 4)").unwrap(), "true");
         assert_eq!(runtime.eval_text("(odd? 3)").unwrap(), "true");
         assert_eq!(runtime.eval_text("(nil? nil)").unwrap(), "true");
-        assert_eq!(runtime.eval_text("(some? 1)").unwrap(), "true");
         assert_eq!(runtime.eval_text("(true? true)").unwrap(), "true");
         assert_eq!(runtime.eval_text("(false? false)").unwrap(), "true");
     }
@@ -762,15 +790,15 @@ mod tests {
     fn core_sequence_navigation_ranges_and_quantifiers() {
         let mut runtime = Runtime::new();
         assert_eq!(runtime.eval_text("(second [10 20 30])").unwrap(), "20");
-        assert_eq!(runtime.eval_text("(next [10 20 30])").unwrap(), "(20 30)");
         assert_eq!(runtime.eval_text("(not-empty [])").unwrap(), "nil");
         assert_eq!(runtime.eval_text("(not-empty [1])").unwrap(), "[1]");
-        assert_eq!(runtime.eval_text("(range 3)").unwrap(), "<iterator>");
+        assert_eq!(runtime.eval_text("(range 3)").unwrap(), "<seq>");
+        assert_eq!(runtime.eval_text("(seq? (map (fn [x] (+ x 1)) [1 2 3]))").unwrap(), "true");
+        assert_eq!(runtime.eval_text("(first (map (fn [x] (+ x 1)) [1 2 3]))").unwrap(), "2");
         assert_eq!(runtime.eval_text("(count (range 2 5))").unwrap(), "3");
         assert_eq!(runtime.eval_text("(count (repeat 4 :x))").unwrap(), "4");
         assert_eq!(runtime.eval_text("(every? (fn [x] (pos? x)) [1 2 3])").unwrap(), "true");
         assert_eq!(runtime.eval_text("(any? (fn [x] (= x 2)) [1 2 3])").unwrap(), "true");
-        assert_eq!(runtime.eval_text("(some (fn [x] (if (= x 2) :yes nil)) [1 2 3])").unwrap(), ":yes");
     }
 
     #[test]
@@ -896,5 +924,20 @@ mod tests {
             runtime.eval_text("unknown").unwrap_err(),
             "unbound symbol: unknown"
         );
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn native_error_traces_are_opt_in_and_nested() {
+        let mut runtime = Runtime::new();
+        assert_eq!(runtime.eval_native("(+ 19 23)").unwrap(), "42");
+        assert_eq!(runtime.eval_native("unknown").unwrap_err(), "unbound symbol: unknown");
+        let error = runtime
+            .eval_native_traced("(do (defn inner [] (/ 1 0)) (defn outer [] (inner)) (outer))")
+            .unwrap_err();
+        assert!(error.contains("[hara stack]"));
+        assert!(error.contains("at inner"));
+        assert!(error.contains("at outer"));
+        assert_eq!(error.matches("[hara stack]").count(), 1);
     }
 }

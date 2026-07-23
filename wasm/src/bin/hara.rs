@@ -79,7 +79,7 @@ fn main() {
 }
 
 fn evaluate(runtime: &mut Runtime, source: &str) {
-    match runtime.eval_native(source) {
+    match runtime.eval_native_traced(source) {
         Ok(value) => println!("{value}"),
         Err(error) => fail(error),
     }
