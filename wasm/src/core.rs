@@ -981,6 +981,19 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 if fs.len()!=2 { return Err("deref expects a var".into()); }
                 match eval(&fs[1], env)? { Value::Var(value)=>Ok(value.borrow().clone()), _=>Err("deref expects a var".into()) }
             }
+            Form::Symbol(n) if n == "throw" => {
+                if fs.len()!=2 { return Err("throw expects one value".into()); }
+                let value=eval(&fs[1], env)?; Err(format!("thrown: {}", value.display()))
+            }
+            Form::Symbol(n) if n == "try" => {
+                if fs.len()<2 { return Err("try expects a body".into()); }
+                let mut body=Vec::new(); let mut catch_form=None; let mut finally_forms=Vec::new();
+                for form in &fs[1..] { match form { Form::List(parts) if !parts.is_empty() && matches!(&parts[0],Form::Symbol(name) if name=="catch") => catch_form=Some(parts), Form::List(parts) if !parts.is_empty() && matches!(&parts[0],Form::Symbol(name) if name=="finally") => finally_forms.extend_from_slice(&parts[1..]), _ if catch_form.is_none() => body.push(form), _ => return Err("try clauses must follow the body".into()) } }
+                let mut result=Ok(Value::Nil); for form in body { result=eval(form,env); if result.is_err() { break; } }
+                if let Err(ref error)=result { if let Some(parts)=catch_form { if parts.len()!=3 { return Err("catch expects a name and body".into()); } let name=match &parts[1] { Form::Symbol(name)=>name.clone(), _=>return Err("catch name must be a symbol".into()) }; let old=env.insert(name.clone(),Value::String(error.clone())); result=eval(&parts[2],env); if let Some(old)=old { env.insert(name,old); } else { env.remove(&name); } } }
+                for form in finally_forms { let final_result=eval(&form,env); if final_result.is_err() { result=final_result; } }
+                result
+            }
             Form::Symbol(n) if n == "def" => {
                 if fs.len()!=3 { return Err("def expects a name and value".into()); }
                 let name=match &fs[1] { Form::Symbol(name)=>name.clone(), _=>return Err("def name must be a symbol".into()) }; let value=eval(&fs[2], env)?; env.insert(name, value.clone()); Ok(value)

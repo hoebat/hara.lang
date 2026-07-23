@@ -541,6 +541,15 @@ mod tests {
     }
 
     #[test]
+    fn throw_and_try_catch_finally_are_host_neutral() {
+        let mut runtime = Runtime::new();
+        assert_eq!(runtime.eval_text("(try (throw :failed) (catch error error))").unwrap(), "\"thrown: :failed\"");
+        assert_eq!(runtime.eval_text("(try 42 (finally 0))").unwrap(), "42");
+        assert_eq!(runtime.eval_text("(try (throw :failed) (catch error (str error :handled)))").unwrap(), "\"thrown: :failed:handled\"");
+        assert!(runtime.eval_text("(throw :failed)").unwrap_err().contains("thrown: :failed"));
+    }
+
+    #[test]
     fn def_binds_values_in_the_current_environment() {
         let mut runtime = Runtime::new();
         assert_eq!(runtime.eval_text("(do (def answer 41) (+ answer 1))").unwrap(), "42");
