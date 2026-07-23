@@ -26,7 +26,8 @@ public class HaraRustWasmExtensionTest {
         "{:namespace \"test.rust.core\" :version \"0.1.0\" :provider :wasm "
             + ":module \"hara.wasm\" :abi :core-v1 "
             + ":exports {\"add\" {:args [:i32 :i32] :returns :i32} "
-            + "\"version\" {:args [] :returns :i32}} :capabilities []}");
+            + "\"version\" {:args [] :returns :i32} "
+            + "\"eval_i64\" {:args [:utf8] :returns :i64}} :capabilities []}");
     Files.copy(artifact, extension.resolve("hara.wasm"));
     String previous = System.getProperty("hara.extensions.path");
     System.setProperty("hara.extensions.path", root.toString());
@@ -39,6 +40,7 @@ public class HaraRustWasmExtensionTest {
                   "(ns app (:require [test.rust.core :as rust :refer [add version]])) "
                       + "(+ (rust/add 20 22) (version))")
               .asLong());
+      assertEquals(42, context.eval(HaraLanguage.ID, "(rust/eval_i64 \"(+ 20 22)\")").asLong());
     } finally {
       if (previous == null) System.clearProperty("hara.extensions.path");
       else System.setProperty("hara.extensions.path", previous);

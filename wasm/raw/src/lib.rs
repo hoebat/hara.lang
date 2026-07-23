@@ -9,6 +9,12 @@ pub extern "C" fn version() -> i32 { 1 }
 #[no_mangle]
 pub extern "C" fn add(left: i32, right: i32) -> i32 { left.wrapping_add(right) }
 
+
+#[no_mangle]
+pub extern "C" fn alloc(size: usize) -> *mut u8 {
+    unsafe { std::alloc::alloc(std::alloc::Layout::from_size_align(size.max(1), 1).unwrap()) }
+}
+
 #[no_mangle]
 pub extern "C" fn eval_i64(source_ptr: *const u8, source_len: usize) -> i64 {
     if source_ptr.is_null() { return i64::MIN; }
