@@ -1835,6 +1835,46 @@ impl SocketProvider for UnsupportedSocketProvider {
     }
 }
 
+fn portable_type_name(value: &Value) -> &str {
+    match value {
+        Value::Nil => "nil",
+        Value::Number(_) => "integer",
+        Value::Float(_) => "float",
+        Value::BigInteger(_) => "big-integer",
+        Value::Decimal(_) => "decimal",
+        Value::Character(_) => "character",
+        Value::Regex(_) => "pattern",
+        Value::Tagged(_, _) => "tagged-literal",
+        Value::Bool(_) => "boolean",
+        Value::String(_) => "string",
+        Value::Keyword(_) => "keyword",
+        Value::Symbol(_) => "symbol",
+        Value::Function(_) => "function",
+        Value::Bytes(_) => "bytes",
+        Value::ByteBuffer(_) => "byte-buffer",
+        Value::Array(_) => "array",
+        Value::Object(_) => "object",
+        Value::Promise(_) => "promise",
+        Value::Atom(_) => "atom",
+        Value::Recur(_) => "recur",
+        Value::List(_) => "list",
+        Value::Queue(_) => "queue",
+        Value::Tuple(_) => "tuple",
+        Value::Vector(_) => "vector",
+        Value::Map(_) => "hash-map",
+        Value::OrderedMap(_) => "ordered-map",
+        Value::SortedMap(_) => "sorted-map",
+        Value::Trie(_) => "trie",
+        Value::Set(_) => "hash-set",
+        Value::OrderedSet(_) => "ordered-set",
+        Value::SortedSet(_) => "sorted-set",
+        Value::Iterator(_) => "iterator",
+        Value::Var(_) => "var",
+        Value::Namespace(_) => "namespace",
+        Value::Extension(_) => "extension",
+    }
+}
+
 pub fn receiver_category(value: &Value) -> &'static str {
     match value {
         Value::Nil => "nil",
@@ -4240,7 +4280,7 @@ fn eval_basic_object_form(
             let value = eval(&forms[1], env)?;
             Ok(Value::Keyword(Keyword::create(
                 Some("hara.type"),
-                receiver_category(&value),
+                portable_type_name(&value),
             )?))
         }
         "compare" => {

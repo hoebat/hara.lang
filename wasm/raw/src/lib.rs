@@ -462,7 +462,7 @@ mod tests {
             "(if (= (type (symbol \"hara/name\")) :hara.type/symbol) 42 0)",
             "(if (= (type []) :hara.type/tuple) 42 0)",
             "(if (= (type (vector)) :hara.type/vector) 42 0)",
-            "(if (= (type {}) :hara.type/map) 42 0)",
+            "(if (= (type {}) :hara.type/ordered-map) 42 0)",
             "(if (= (type (ns:create (quote example))) :hara.type/namespace) 42 0)",
         ] {
             assert_eq!(evaluate(source), Ok(42), "{source}");
