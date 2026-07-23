@@ -43,7 +43,7 @@ pub struct Function {
 }
 
 #[derive(Debug, Clone)]
-enum IteratorGenerator { Constant(Value), Repeated(Rc<Function>), Iterate(Rc<Function>, Value), TakeWhile(Rc<Function>, Value), DropWhile(Rc<Function>, Value, bool), Map(Rc<Function>, Value), Filter(Rc<Function>, Value) }
+enum IteratorGenerator { Constant(Value), Repeated(Rc<Function>), Iterate(Rc<Function>, Value), TakeWhile(Rc<Function>, Value), DropWhile(Rc<Function>, Value, bool), Map(Rc<Function>, Value), Filter(Rc<Function>, Value), Mapcat(Rc<Function>, Value, Option<Value>), Keep(Rc<Function>, Value) }
 
 #[derive(Debug, Clone)]
 pub struct IteratorState {
@@ -69,6 +69,8 @@ impl IteratorState {
                 IteratorGenerator::DropWhile(function, source, started) => { loop { let value=iterator_next(source)?; if *started || !call_function(function, vec![value.clone()])?.truthy() { *started=true; break Ok(value); } } },
                 IteratorGenerator::Map(function, source) => { let value=iterator_next(source)?; call_function(function, vec![value]) },
                 IteratorGenerator::Filter(function, source) => { loop { let value=iterator_next(source)?; if call_function(function, vec![value.clone()])?.truthy() { break Ok(value); } } },
+                IteratorGenerator::Mapcat(function, source, pending) => { loop { if let Some(iterator)=pending { match iterator_next(iterator) { Ok(value)=>break Ok(value), Err(_)=>*pending=None } } let value=iterator_next(source)?; *pending=Some(make_iterator(call_function(function, vec![value])?)?); } },
+                IteratorGenerator::Keep(function, source) => { loop { let value=iterator_next(source)?; let mapped=call_function(function, vec![value])?; if !matches!(mapped, Value::Nil) { break Ok(mapped); } } },
             };
         }
         if self.values.is_empty() { return Err("iter-next reached the end of the iterator".into()); }
@@ -773,6 +775,9 @@ fn iterator_take_while(function: Rc<Function>, value: Value) -> Result<Value, St
     Ok(Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::TakeWhile(function, source))))))
 }
 fn iterator_map(function: Rc<Function>, value: Value) -> Result<Value, String> { let source=match value { Value::Iterator(iterator) => Value::Iterator(iterator), value => make_iterator(value)? }; if let Value::Iterator(iterator)=&source { if iterator.borrow().generator.is_none() { let values=iterator_values(source)?; return Ok(iterator_from_values(values.into_iter().map(|value| call_function(&function, vec![value])).collect::<Result<Vec<_>,_>>()?)); } } Ok(Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::Map(function, source)))))) }
+fn iterator_mapcat(function: Rc<Function>, value: Value) -> Result<Value, String> { let source=match value { Value::Iterator(iterator)=>Value::Iterator(iterator), value=>make_iterator(value)? }; if let Value::Iterator(iterator)=&source { if iterator.borrow().generator.is_none() { let values=iterator_values(source)?; let mut output=Vec::new(); for value in values { output.extend(iterator_values(call_function(&function, vec![value])?)?); } return Ok(iterator_from_values(output)); } } Ok(Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::Mapcat(function, source, None)))))) }
+fn iterator_keep(function: Rc<Function>, value: Value) -> Result<Value, String> { let source=match value { Value::Iterator(iterator)=>Value::Iterator(iterator), value=>make_iterator(value)? }; if let Value::Iterator(iterator)=&source { if iterator.borrow().generator.is_none() { let values=iterator_values(source)?; let mut output=Vec::new(); for value in values { let mapped=call_function(&function, vec![value])?; if !matches!(mapped,Value::Nil) { output.push(mapped); } } return Ok(iterator_from_values(output)); } } Ok(Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::Keep(function, source)))))) }
+
 fn iterator_filter(function: Rc<Function>, value: Value) -> Result<Value, String> { let source=match value { Value::Iterator(iterator) => Value::Iterator(iterator), value => make_iterator(value)? }; if let Value::Iterator(iterator)=&source { if iterator.borrow().generator.is_none() { let values=iterator_values(source)?; return Ok(iterator_from_values(values.into_iter().filter_map(|value| match call_function(&function, vec![value.clone()]) { Ok(result) if result.truthy()=>Some(Ok(value)), Ok(_)=>None, Err(error)=>Some(Err(error)) }).collect::<Result<Vec<_>,_>>()?)); } } Ok(Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::Filter(function, source)))))) }
 
 fn iterator_drop_while(function: Rc<Function>, value: Value) -> Result<Value, String> {
@@ -1122,15 +1127,11 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
             }
             Form::Symbol(n) if ["iter-mapcat", "mapcat"].contains(&n.as_str()) => {
                 if fs.len()!=3 { return Err(format!("{n} expects a function and collection")); }
-                let function=eval(&fs[1], env)?; let values=iterator_values(eval(&fs[2], env)?)?; let mut output=Vec::new();
-                for value in values { let mapped=match &function { Value::Function(function) => call_function(function, vec![value])?, _ => return Err(format!("{n} expects a function")) }; output.extend(iterator_values(mapped)?); }
-                Ok(iterator_from_values(output))
+                let function=match eval(&fs[1], env)? { Value::Function(function)=>function, _=>return Err(format!("{n} expects a function")) }; iterator_mapcat(function,eval(&fs[2], env)?)
             }
             Form::Symbol(n) if ["iter-keep", "keep"].contains(&n.as_str()) => {
                 if fs.len()!=3 { return Err(format!("{n} expects a function and collection")); }
-                let function=eval(&fs[1], env)?; let values=iterator_values(eval(&fs[2], env)?)?; let mut output=Vec::new();
-                for value in values { let mapped=match &function { Value::Function(function) => call_function(function, vec![value])?, _ => return Err(format!("{n} expects a function")) }; if !matches!(mapped, Value::Nil) { output.push(mapped); } }
-                Ok(iterator_from_values(output))
+                let function=match eval(&fs[1], env)? { Value::Function(function)=>function, _=>return Err(format!("{n} expects a function")) }; iterator_keep(function,eval(&fs[2], env)?)
             }
             Form::Symbol(n) if ["iter-partition-all", "partition-all", "iter-partition", "partition"].contains(&n.as_str()) => {
                 if fs.len()!=3 { return Err(format!("{n} expects an amount and collection")); } let amount=value_index(&eval(&fs[1], env)?)?; if amount==0 { return Err(format!("{n} amount must be positive")); }
