@@ -1174,14 +1174,16 @@ public final class HaraNodes {
 
   public static final class SetNamespace extends HaraExpressionNode {
     private final Symbol symbol;
+    private final Object[] clauses;
 
-    public SetNamespace(Symbol symbol) {
+    public SetNamespace(Symbol symbol, Object[] clauses) {
       this.symbol = symbol;
+      this.clauses = clauses;
     }
 
     @Override
     public Object execute(VirtualFrame frame) {
-      HaraLanguage.currentContext().setCurrentNamespace(symbol);
+      HaraLanguage.currentContext().setCurrentNamespace(symbol, clauses);
       return symbol;
     }
   }
@@ -1390,6 +1392,26 @@ public final class HaraNodes {
     @TruffleBoundary
     private HaraException hostCallError() {
       return new HaraException("Unable to call host member " + member, this);
+    }
+  }
+
+  public static final class MarkerCall extends HaraExpressionNode {
+    @Child private HaraExpressionNode receiver;
+    @Children private final HaraExpressionNode[] arguments;
+    private final String method;
+
+    public MarkerCall(HaraExpressionNode receiver, String method, HaraExpressionNode[] arguments) {
+      this.receiver = receiver;
+      this.method = method;
+      this.arguments = arguments;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      Object target = receiver.execute(frame);
+      Object[] values = new Object[arguments.length];
+      for (int i = 0; i < arguments.length; i++) values[i] = arguments[i].execute(frame);
+      return HaraLanguage.currentContext().invokeMarkerMethod(target, method, values);
     }
   }
 

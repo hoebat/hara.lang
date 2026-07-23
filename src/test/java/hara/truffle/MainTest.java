@@ -7,9 +7,48 @@ import java.io.ByteArrayOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import org.junit.Test;
 
 public class MainTest {
+  @Test
+  public void fileLibraryIsDefaultDeniedAndExplicitlyGranted() throws Exception {
+    ByteArrayOutputStream deniedOutput = new ByteArrayOutputStream();
+    ByteArrayOutputStream deniedError = new ByteArrayOutputStream();
+    int denied =
+        Main.run(
+            new String[] {"eval", "(file/read \"denied.bin\")"},
+            new PrintStream(deniedOutput, true, StandardCharsets.UTF_8),
+            new PrintStream(deniedError, true, StandardCharsets.UTF_8));
+    assertEquals(1, denied);
+    assertTrue(deniedError.toString(StandardCharsets.UTF_8).contains("file access is denied"));
+
+    Path path = Files.createTempFile("hara-runtime-library-", ".bin");
+    Files.delete(path);
+    try {
+      ByteArrayOutputStream output = new ByteArrayOutputStream();
+      ByteArrayOutputStream error = new ByteArrayOutputStream();
+      String escaped = path.toString().replace("\\", "\\\\").replace("\"", "\\\"");
+      String form =
+          "(deref (file/write \""
+              + escaped
+              + "\" (bytes 1 -1))) "
+              + "(bytes/get (deref (file/read \""
+              + escaped
+              + "\")) 1)";
+      int status =
+          Main.run(
+              new String[] {"--allow-file", "eval", form},
+              new PrintStream(output, true, StandardCharsets.UTF_8),
+              new PrintStream(error, true, StandardCharsets.UTF_8));
+      assertEquals(error.toString(StandardCharsets.UTF_8), 0, status);
+      assertEquals("255\n", output.toString(StandardCharsets.UTF_8));
+    } finally {
+      Files.deleteIfExists(path);
+    }
+  }
+
   @Test
   public void evaluatesAnExpression() {
     ByteArrayOutputStream output = new ByteArrayOutputStream();

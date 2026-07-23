@@ -254,6 +254,8 @@ final class HaraAnalyzer {
           return analyzeAlias(list);
         case "field":
           return analyzeField(list);
+        case ".":
+          return analyzeMarkerCall(list);
         case "protocol-call":
           return analyzeProtocolCall(list);
         case "host-symbol":
@@ -1493,6 +1495,23 @@ final class HaraAnalyzer {
     return new HaraNodes.HostCall(analyze(form.nth(1)), memberName(form.nth(2)), arguments);
   }
 
+  private HaraExpressionNode analyzeMarkerCall(List<?> form) {
+    requireCount(form, 3, ".");
+    if (!(form.nth(2) instanceof List<?>)) {
+      throw error("dot expects a method call such as (. value (filter predicate))");
+    }
+    List<?> call = (List<?>) form.nth(2);
+    if (call.count() == 0
+        || !(call.nth(0) instanceof Symbol)
+        || ((Symbol) call.nth(0)).getNamespace() != null) {
+      throw error("dot method must be an unqualified symbol");
+    }
+    HaraExpressionNode[] arguments = new HaraExpressionNode[(int) call.count() - 1];
+    for (int i = 1; i < call.count(); i++) arguments[i - 1] = analyze(call.nth(i));
+    return new HaraNodes.MarkerCall(
+        analyze(form.nth(1)), ((Symbol) call.nth(0)).getName(), arguments);
+  }
+
   private String memberName(Object value) {
     if (value instanceof Keyword) {
       Keyword keyword = (Keyword) value;
@@ -1557,12 +1576,14 @@ final class HaraAnalyzer {
   }
 
   private HaraExpressionNode analyzeNamespace(List<?> form) {
-    requireCount(form, 2, "ns");
+    if (form.count() < 2) throw error("ns expects a namespace name");
     Object name = form.nth(1);
     if (!(name instanceof Symbol) || ((Symbol) name).getNamespace() != null) {
       throw error("ns name must be an unqualified symbol");
     }
-    return new HaraNodes.SetNamespace((Symbol) name);
+    Object[] clauses = new Object[(int) form.count() - 2];
+    for (int i = 2; i < form.count(); i++) clauses[i - 2] = form.nth(i);
+    return new HaraNodes.SetNamespace((Symbol) name, clauses);
   }
 
   private HaraExpressionNode analyzeAlias(List<?> form) {

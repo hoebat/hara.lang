@@ -62,6 +62,9 @@ The current Hara L0 slice supports:
 * language-level protocols via `defprotocol`, `extend-type`, and `protocol-call`, including extending `IFn`;
 * explicit capability-gated host interop through `host-symbol`, `host-get`, and `host-call`.
 
+The generated runtime-library namespace contract is documented in
+[`spec/hara/runtime-libraries.md`](spec/hara/runtime-libraries.md).
+
 The collection model is iterator-first and does not require `ISeq`, transducers, `transduce`, or `eduction`. Host interop is disabled unless the embedding context grants it. The Native Image workflow runs the verified fallback-runtime profile; optimized Truffle host compilation remains a separate runtime-quality task because the current generic host paths violate GraalVM’s blocklist checks.
 
 The normative L0 contract is maintained in [`spec/hara/l0-language.md`](spec/hara/l0-language.md), with executable examples in [`spec/hara/l0-conformance.edn`](spec/hara/l0-conformance.edn).

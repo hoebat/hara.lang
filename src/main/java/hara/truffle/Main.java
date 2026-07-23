@@ -33,6 +33,7 @@ import org.jline.terminal.TerminalBuilder;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
+import org.graalvm.polyglot.io.IOAccess;
 
 public final class Main {
   private Main() {}
@@ -49,13 +50,16 @@ public final class Main {
   }
 
   static int run(String[] args, InputStream input, PrintStream output, PrintStream error) {
+    Capabilities capabilities = parseCapabilities(args);
+    args = capabilities.arguments;
     if (args.length == 0 || "help".equals(args[0]) || "--help".equals(args[0])) {
       printUsage(output);
       return 0;
     }
 
     if ("repl".equals(args[0])) {
-      return runRepl(input, output, error, input == System.in && System.console() != null);
+      return runRepl(
+          input, output, error, input == System.in && System.console() != null, capabilities);
     }
     if ("conformance".equals(args[0])) {
       return runConformance(output, error);
@@ -87,7 +91,7 @@ public final class Main {
           return 2;
       }
 
-      try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      try (Context context = context(capabilities)) {
         context.eval(HaraLanguage.ID, "(load-resource \"hara/l0-core.hara\")");
         Value result = context.eval(HaraLanguage.ID, source);
         output.println(display(result));
@@ -181,8 +185,12 @@ public final class Main {
   }
 
   private static int runRepl(
-      InputStream input, PrintStream output, PrintStream error, boolean interactive) {
-    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      InputStream input,
+      PrintStream output,
+      PrintStream error,
+      boolean interactive,
+      Capabilities capabilities) {
+    try (Context context = context(capabilities)) {
       context.eval(HaraLanguage.ID, "(load-resource \"hara/l0-core.hara\")");
       if (interactive) return runJLineRepl(context, output, error);
       try (BufferedReader reader =
@@ -240,6 +248,39 @@ public final class Main {
     } catch (IOException exception) {
       error.println(exception.getMessage());
       return 1;
+    }
+  }
+
+  private static Context context(Capabilities capabilities) {
+    IOAccess access =
+        IOAccess.newBuilder()
+            .allowHostFileAccess(capabilities.file)
+            .allowHostSocketAccess(capabilities.network)
+            .build();
+    return Context.newBuilder(HaraLanguage.ID).allowIO(access).build();
+  }
+
+  private static Capabilities parseCapabilities(String[] arguments) {
+    ArrayList<String> positional = new ArrayList<>();
+    boolean file = false;
+    boolean network = false;
+    for (String argument : arguments) {
+      if ("--allow-file".equals(argument)) file = true;
+      else if ("--allow-net".equals(argument)) network = true;
+      else positional.add(argument);
+    }
+    return new Capabilities(file, network, positional.toArray(new String[0]));
+  }
+
+  private static final class Capabilities {
+    private final boolean file;
+    private final boolean network;
+    private final String[] arguments;
+
+    private Capabilities(boolean file, boolean network, String[] arguments) {
+      this.file = file;
+      this.network = network;
+      this.arguments = arguments;
     }
   }
 
@@ -332,10 +373,10 @@ public final class Main {
   }
 
   private static void printUsage(PrintStream output) {
-    output.println("hara-truffle eval <expression>");
-    output.println("hara-truffle run <file>");
-    output.println("hara-truffle stdin");
-    output.println("hara-truffle repl");
+    output.println("hara-truffle [--allow-file] [--allow-net] eval <expression>");
+    output.println("hara-truffle [--allow-file] [--allow-net] run <file>");
+    output.println("hara-truffle [--allow-file] [--allow-net] stdin");
+    output.println("hara-truffle [--allow-file] [--allow-net] repl");
     output.println("hara-truffle conformance");
     output.println("hara-truffle help");
   }

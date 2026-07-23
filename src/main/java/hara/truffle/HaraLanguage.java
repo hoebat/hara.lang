@@ -30,6 +30,11 @@ public final class HaraLanguage extends TruffleLanguage<HaraContext> {
   }
 
   @Override
+  protected boolean isThreadAccessAllowed(Thread thread, boolean singleThreaded) {
+    return true;
+  }
+
+  @Override
   protected CallTarget parse(ParsingRequest request) {
     Source source = request.getSource();
     SourceSection sourceSection =

@@ -15,8 +15,13 @@ import hara.lang.data.types.IMapType;
 import hara.lang.data.types.ILinearType;
 import hara.lang.protocol.IFn;
 import hara.lang.protocol.IMetadata;
+import hara.lang.protocol.IDeref;
+import hara.lang.protocol.IDerefTimeout;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.InetSocketAddress;
+import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
@@ -30,9 +35,28 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.LinkedHashSet;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 public final class HaraContext {
+  private static final String CORE_NAMESPACE = "hara.lib.core";
+  private static final Map<String, String> GENERATED_LIBRARIES =
+      Map.of(
+          "string", "hara.lib.string",
+          "promise", "hara.lib.promise",
+          "bytes", "hara.lib.bytes",
+          "socket", "hara.lib.socket",
+          "file", "hara.lib.file");
+  private static final Map<String, String> DEFAULT_LIBRARY_ALIASES =
+      Map.of(
+          "string", "str",
+          "promise", "promise",
+          "bytes", "bytes",
+          "socket", "socket",
+          "file", "file");
   private final TruffleLanguage.Env environment;
   private final Map<String, HaraNamespace> namespaces = new ConcurrentHashMap<>();
   private final Map<String, Map<String, HaraMacro>> macros = new ConcurrentHashMap<>();
@@ -46,13 +70,16 @@ public final class HaraContext {
 
   HaraContext(TruffleLanguage.Env environment) {
     this.environment = environment;
-    currentNamespace = namespace("user");
+    currentNamespace = namespace(CORE_NAMESPACE);
     Map<String, Integer> ifnMethods = new LinkedHashMap<>();
     ifnMethods.put("invoke", -1);
     ifnProtocol = new HaraProtocol("IFn", ifnMethods);
     currentNamespace.define("IFn", ifnProtocol);
     HaraJavaAdapters.install(this);
-    installNumericBuiltins();
+    installNumericBuiltins(currentNamespace);
+    installGeneratedLibraries();
+    currentNamespace = namespace("user");
+    initializeUserNamespace(currentNamespace);
   }
 
   TruffleLanguage.Env environment() {
@@ -69,7 +96,166 @@ public final class HaraContext {
       throw new HaraException("Namespace name must not be qualified");
     }
     currentNamespace = namespace(symbol.getName());
-    installNumericBuiltins(currentNamespace);
+    initializeUserNamespace(currentNamespace);
+  }
+
+  @TruffleBoundary
+  public void setCurrentNamespace(Symbol symbol, Object[] clauses) {
+    setCurrentNamespace(symbol);
+    configureGeneratedAliases(clauses);
+  }
+
+  private void initializeUserNamespace(HaraNamespace target) {
+    HaraNamespace core = namespace(CORE_NAMESPACE);
+    for (Map.Entry<String, HaraVar> entry : core.vars.entrySet()) {
+      if (target.lookup(entry.getKey()) == null) target.refer(entry.getKey(), entry.getValue());
+    }
+    Map<String, String> namespaceAliases =
+        aliases.computeIfAbsent(target.name(), ignored -> new ConcurrentHashMap<>());
+    for (Map.Entry<String, String> entry : DEFAULT_LIBRARY_ALIASES.entrySet()) {
+      namespaceAliases.putIfAbsent(entry.getValue(), GENERATED_LIBRARIES.get(entry.getKey()));
+    }
+  }
+
+  @SuppressWarnings("rawtypes")
+  private void configureGeneratedAliases(Object[] clauses) {
+    Set<String> excluded = new LinkedHashSet<>();
+    Map<String, String> overrides = new LinkedHashMap<>();
+    ArrayList<Object> requireSpecs = new ArrayList<>();
+    for (Object clauseValue : clauses) {
+      if (!(clauseValue instanceof List<?>) || ((List<?>) clauseValue).count() == 0) {
+        throw new HaraException("ns clauses must be non-empty lists");
+      }
+      List<?> clause = (List<?>) clauseValue;
+      Object head = clause.nth(0);
+      if (!(head instanceof Keyword))
+        throw new HaraException("ns clause must start with a keyword");
+      String clauseName = ((Keyword) head).getName();
+      if ("intrinsics".equals(clauseName)) {
+        if (clause.count() != 2) {
+          throw new HaraException(":intrinsics expects :all or an options map");
+        }
+        Object intrinsicOptions = clause.nth(1);
+        if (Keyword.create("all").equals(intrinsicOptions)) continue;
+        if (!(intrinsicOptions instanceof IMapType<?, ?>)) {
+          throw new HaraException(":intrinsics expects :all or an options map");
+        }
+        IMapType options = (IMapType) intrinsicOptions;
+        Object excludeValue = options.lookup(Keyword.create("exclude"));
+        if (excludeValue != null) {
+          if (!(excludeValue instanceof ILinearType<?>)) {
+            throw new HaraException(":intrinsics :exclude expects a vector of library symbols");
+          }
+          for (Object value : (ILinearType<?>) excludeValue) {
+            String library = libraryName(value, ":intrinsics :exclude");
+            if (!excluded.add(library)) {
+              throw new HaraException("Duplicate intrinsic exclusion: " + library);
+            }
+          }
+        }
+        Object aliasesValue = options.lookup(Keyword.create("aliases"));
+        if (aliasesValue != null) {
+          if (!(aliasesValue instanceof IMapType<?, ?>)) {
+            throw new HaraException(":intrinsics :aliases expects a map");
+          }
+          Iterator<?> iterator = ((IMapType<?, ?>) aliasesValue).iterator();
+          while (iterator.hasNext()) {
+            java.util.Map.Entry<?, ?> entry = (java.util.Map.Entry<?, ?>) iterator.next();
+            String library = libraryName(entry.getKey(), ":intrinsics :aliases");
+            if (!(entry.getValue() instanceof Symbol)
+                || ((Symbol) entry.getValue()).getNamespace() != null) {
+              throw new HaraException("Intrinsic aliases must be unqualified symbols");
+            }
+            String previous = overrides.put(library, ((Symbol) entry.getValue()).getName());
+            if (previous != null) throw new HaraException("Duplicate intrinsic alias: " + library);
+          }
+        }
+      } else if ("require".equals(clauseName)) {
+        for (int i = 1; i < clause.count(); i++) requireSpecs.add(clause.nth(i));
+      } else {
+        throw new HaraException("Unsupported ns clause: :" + clauseName);
+      }
+    }
+    for (String library : overrides.keySet()) {
+      if (excluded.contains(library)) {
+        throw new HaraException(
+            "Intrinsic library cannot be both excluded and aliased: " + library);
+      }
+    }
+
+    Map<String, String> namespaceAliases =
+        aliases.computeIfAbsent(currentNamespace.name(), ignored -> new ConcurrentHashMap<>());
+    namespaceAliases
+        .entrySet()
+        .removeIf(entry -> GENERATED_LIBRARIES.containsValue(entry.getValue()));
+    for (Map.Entry<String, String> library : GENERATED_LIBRARIES.entrySet()) {
+      if (excluded.contains(library.getKey())) continue;
+      String alias =
+          overrides.getOrDefault(library.getKey(), DEFAULT_LIBRARY_ALIASES.get(library.getKey()));
+      putAlias(namespaceAliases, alias, library.getValue());
+    }
+    for (Object spec : requireSpecs) applyGeneratedRequire(spec, namespaceAliases);
+  }
+
+  private String libraryName(Object value, String operation) {
+    if (!(value instanceof Symbol) || ((Symbol) value).getNamespace() != null) {
+      throw new HaraException(operation + " expects unqualified library symbols");
+    }
+    String library = ((Symbol) value).getName();
+    if (!GENERATED_LIBRARIES.containsKey(library)) {
+      throw new HaraException("Unknown intrinsic library: " + library);
+    }
+    return library;
+  }
+
+  private void putAlias(Map<String, String> namespaceAliases, String alias, String target) {
+    String previous = namespaceAliases.putIfAbsent(alias, target);
+    if (previous != null && !previous.equals(target)) {
+      throw new HaraException("Namespace alias already refers to " + previous + ": " + alias);
+    }
+  }
+
+  private void applyGeneratedRequire(Object specValue, Map<String, String> namespaceAliases) {
+    if (!(specValue instanceof ILinearType<?>)) {
+      throw new HaraException(":require expects vectors such as [hara.lib.string :as str]");
+    }
+    ILinearType<?> spec = (ILinearType<?>) specValue;
+    if (spec.count() == 0 || !(spec.nth(0) instanceof Symbol)) {
+      throw new HaraException(":require namespace must be a symbol");
+    }
+    String target = ((Symbol) spec.nth(0)).display();
+    HaraNamespace required = namespaces.get(target);
+    if (required == null) throw new HaraException("Cannot require missing namespace: " + target);
+    for (int i = 1; i < spec.count(); i += 2) {
+      if (i + 1 >= spec.count() || !(spec.nth(i) instanceof Keyword)) {
+        throw new HaraException("Malformed :require options for " + target);
+      }
+      String option = ((Keyword) spec.nth(i)).getName();
+      Object value = spec.nth(i + 1);
+      if ("as".equals(option)) {
+        if (!(value instanceof Symbol) || ((Symbol) value).getNamespace() != null) {
+          throw new HaraException(":require :as expects an unqualified symbol");
+        }
+        putAlias(namespaceAliases, ((Symbol) value).getName(), target);
+      } else if ("refer".equals(option)) {
+        if (!(value instanceof ILinearType<?>)) {
+          throw new HaraException(":require :refer expects a vector of symbols");
+        }
+        for (Object referred : (ILinearType<?>) value) {
+          if (!(referred instanceof Symbol) || ((Symbol) referred).getNamespace() != null) {
+            throw new HaraException(":require :refer expects unqualified symbols");
+          }
+          String name = ((Symbol) referred).getName();
+          HaraVar variable = required.lookup(name);
+          if (variable == null) {
+            throw new HaraException("Cannot refer missing var " + name + " from " + target);
+          }
+          currentNamespace.refer(name, variable);
+        }
+      } else {
+        throw new HaraException("Unsupported :require option: :" + option);
+      }
+    }
   }
 
   @TruffleBoundary
@@ -88,7 +274,14 @@ public final class HaraContext {
 
   /** Names visible in the current namespace, used by interactive tooling. */
   public java.util.List<String> currentSymbolNames() {
-    return currentNamespace.symbolNames();
+    LinkedHashSet<String> names = new LinkedHashSet<>(currentNamespace.symbolNames());
+    for (Map.Entry<String, String> alias :
+        aliases.getOrDefault(currentNamespace.name(), Map.of()).entrySet()) {
+      HaraNamespace target = namespaces.get(alias.getValue());
+      if (target == null) continue;
+      for (String name : target.symbolNames()) names.add(alias.getKey() + "/" + name);
+    }
+    return new ArrayList<>(names);
   }
 
   @TruffleBoundary
@@ -181,10 +374,6 @@ public final class HaraContext {
     macros
         .computeIfAbsent(currentNamespace.name(), ignored -> new ConcurrentHashMap<>())
         .put(symbol.getName(), macro);
-  }
-
-  private void installNumericBuiltins() {
-    installNumericBuiltins(currentNamespace);
   }
 
   private void installNumericBuiltins(HaraNamespace target) {
@@ -301,6 +490,752 @@ public final class HaraContext {
         "pop",
         new UnaryBuiltin(
             "pop", value -> protocolCall("INavigation", "pop-first", new Object[] {value})));
+    target.define("str", new UnaryBuiltin("str", value -> String.valueOf(HaraBox.unwrap(value))));
+    target.define("promise", new UnaryBuiltin("promise", this::promiseRun));
+    target.define("array", new VariadicBuiltin("array", HaraArray::new));
+    target.define("object", new VariadicBuiltin("object", HaraObject::new));
+    target.define("bit-and", new VariadicBuiltin("bit-and", values -> bitOperation("and", values)));
+    target.define("bit-or", new VariadicBuiltin("bit-or", values -> bitOperation("or", values)));
+    target.define("bit-xor", new VariadicBuiltin("bit-xor", values -> bitOperation("xor", values)));
+    target.define("bit-not", new UnaryBuiltin("bit-not", value -> (long) ~int32(value, "bit-not")));
+    target.define(
+        "bit-shift-left", new VariadicBuiltin("bit-shift-left", values -> bitShift(values, true)));
+    target.define(
+        "bit-shift-right",
+        new VariadicBuiltin("bit-shift-right", values -> bitShift(values, false)));
+  }
+
+  private void installGeneratedLibraries() {
+    HaraNamespace string = namespace("hara.lib.string");
+    string.define(
+        "len", new UnaryBuiltin("str/len", value -> (long) stringValue(value, "str/len").length()));
+    string.define("comp", new VariadicBuiltin("str/comp", this::stringCompare));
+    string.define(
+        "lt?", new VariadicBuiltin("str/lt?", values -> ((Long) stringCompare(values)) < 0));
+    string.define(
+        "gt?", new VariadicBuiltin("str/gt?", values -> ((Long) stringCompare(values)) > 0));
+    string.define(
+        "pad-left", new VariadicBuiltin("str/pad-left", values -> padString(values, true)));
+    string.define(
+        "pad-right", new VariadicBuiltin("str/pad-right", values -> padString(values, false)));
+    string.define(
+        "starts-with?",
+        new VariadicBuiltin(
+            "str/starts-with?",
+            values -> {
+              String[] pair = stringPair(values, "str/starts-with?");
+              return pair[0].startsWith(pair[1]);
+            }));
+    string.define(
+        "ends-with?",
+        new VariadicBuiltin(
+            "str/ends-with?",
+            values -> {
+              String[] pair = stringPair(values, "str/ends-with?");
+              return pair[0].endsWith(pair[1]);
+            }));
+    string.define("char", new VariadicBuiltin("str/char", this::stringChar));
+    string.define("split", new VariadicBuiltin("str/split", this::stringSplit));
+    string.define("join", new VariadicBuiltin("str/join", this::stringJoin));
+    string.define("index-of", new VariadicBuiltin("str/index-of", this::stringIndexOf));
+    string.define("substring", new VariadicBuiltin("str/substring", this::stringSubstring));
+    string.define(
+        "to-upper",
+        new UnaryBuiltin(
+            "str/to-upper",
+            value -> stringValue(value, "str/to-upper").toUpperCase(java.util.Locale.ROOT)));
+    string.define(
+        "to-lower",
+        new UnaryBuiltin(
+            "str/to-lower",
+            value -> stringValue(value, "str/to-lower").toLowerCase(java.util.Locale.ROOT)));
+    string.define("to-fixed", new VariadicBuiltin("str/to-fixed", this::stringToFixed));
+    string.define("replace", new VariadicBuiltin("str/replace", this::stringReplace));
+    string.define(
+        "trim", new UnaryBuiltin("str/trim", value -> stringValue(value, "str/trim").trim()));
+    string.define(
+        "trim-left",
+        new UnaryBuiltin(
+            "str/trim-left", value -> stringValue(value, "str/trim-left").stripLeading()));
+    string.define(
+        "trim-right",
+        new UnaryBuiltin(
+            "str/trim-right", value -> stringValue(value, "str/trim-right").stripTrailing()));
+    string.define(
+        "encode",
+        new UnaryBuiltin(
+            "str/encode",
+            value -> stringValue(value, "str/encode").getBytes(StandardCharsets.UTF_8)));
+    string.define(
+        "decode",
+        new UnaryBuiltin(
+            "str/decode",
+            value -> new String(bytesValue(value, "str/decode"), StandardCharsets.UTF_8)));
+
+    HaraNamespace bytes = namespace("hara.lib.bytes");
+    bytes.define(
+        "count",
+        new UnaryBuiltin("bytes/count", value -> (long) bytesValue(value, "bytes/count").length));
+    bytes.define("get", new VariadicBuiltin("bytes/get", this::bytesGet));
+    bytes.define("set", new VariadicBuiltin("bytes/set", this::bytesSet));
+    bytes.define(
+        "copy", new UnaryBuiltin("bytes/copy", value -> bytesValue(value, "bytes/copy").clone()));
+    bytes.define("slice", new VariadicBuiltin("bytes/slice", this::bytesSlice));
+    bytes.define(
+        "u8", new UnaryBuiltin("bytes/u8", value -> (long) (byteNumber(value, "bytes/u8") & 0xff)));
+    bytes.define(
+        "s8", new UnaryBuiltin("bytes/s8", value -> (long) (byte) byteNumber(value, "bytes/s8")));
+
+    HaraNamespace promise = namespace("hara.lib.promise");
+    promise.define("run", new UnaryBuiltin("promise/run", this::promiseRun));
+    promise.define("new", new UnaryBuiltin("promise/new", this::promiseNew));
+    promise.define("all", new UnaryBuiltin("promise/all", this::promiseAll));
+    promise.define(
+        "then", new VariadicBuiltin("promise/then", values -> promiseThen(values, false)));
+    promise.define(
+        "catch", new VariadicBuiltin("promise/catch", values -> promiseThen(values, true)));
+    promise.define("finally", new VariadicBuiltin("promise/finally", this::promiseFinally));
+    promise.define(
+        "native?",
+        new UnaryBuiltin("promise/native?", value -> HaraBox.unwrap(value) instanceof HaraPromise));
+    promise.define("delay", new VariadicBuiltin("promise/delay", this::promiseDelay));
+
+    HaraNamespace file = namespace("hara.lib.file");
+    file.define("resolve", new VariadicBuiltin("file/resolve", this::fileResolve));
+    file.define("read", new UnaryBuiltin("file/read", this::fileRead));
+    file.define("write", new VariadicBuiltin("file/write", this::fileWrite));
+
+    HaraNamespace socket = namespace("hara.lib.socket");
+    socket.define("connect", new VariadicBuiltin("socket/connect", this::socketConnect));
+    socket.define("send", new VariadicBuiltin("socket/send", this::socketSend));
+    socket.define("close", new UnaryBuiltin("socket/close", this::socketClose));
+  }
+
+  private static int int32(Object value, String operation) {
+    Object input = HaraBox.unwrap(value);
+    if (!(input instanceof Number)) throw new HaraException(operation + " expects integers");
+    long number = ((Number) input).longValue();
+    if (number < Integer.MIN_VALUE || number > 0xffffffffL) {
+      throw new HaraException(operation + " expects a signed 32-bit value");
+    }
+    return (int) number;
+  }
+
+  private static Object bitOperation(String operation, Object[] values) {
+    if (values.length < 2) throw new HaraException("bit-" + operation + " expects two integers");
+    int result = int32(values[0], "bit-" + operation);
+    for (int i = 1; i < values.length; i++) {
+      int next = int32(values[i], "bit-" + operation);
+      if ("and".equals(operation)) result &= next;
+      else if ("or".equals(operation)) result |= next;
+      else result ^= next;
+    }
+    return (long) result;
+  }
+
+  private static Object bitShift(Object[] values, boolean left) {
+    String name = left ? "bit-shift-left" : "bit-shift-right";
+    if (values.length != 2) throw new HaraException(name + " expects two integers");
+    int value = int32(values[0], name);
+    int distance = int32(values[1], name);
+    if (distance < 0 || distance > 31) {
+      throw new HaraException(name + " distance must be in the range 0..31");
+    }
+    return (long) (left ? value << distance : value >> distance);
+  }
+
+  private static String stringValue(Object value, String operation) {
+    Object input = HaraBox.unwrap(value);
+    if (!(input instanceof String)) throw new HaraException(operation + " expects a string");
+    return (String) input;
+  }
+
+  private static String[] stringPair(Object[] values, String operation) {
+    if (values.length != 2) throw new HaraException(operation + " expects two strings");
+    return new String[] {stringValue(values[0], operation), stringValue(values[1], operation)};
+  }
+
+  private Object stringCompare(Object[] values) {
+    String[] pair = stringPair(values, "str/comp");
+    return (long) Integer.signum(pair[0].compareTo(pair[1]));
+  }
+
+  private Object padString(Object[] values, boolean left) {
+    String operation = left ? "str/pad-left" : "str/pad-right";
+    if (values.length != 3 || !(HaraBox.unwrap(values[1]) instanceof Number)) {
+      throw new HaraException(operation + " expects a string, length, and padding string");
+    }
+    String input = stringValue(values[0], operation);
+    int length = ((Number) HaraBox.unwrap(values[1])).intValue();
+    String padding = stringValue(values[2], operation);
+    if (padding.isEmpty() || input.length() >= length) return input;
+    StringBuilder fill = new StringBuilder();
+    while (fill.length() < length - input.length()) fill.append(padding);
+    String clipped = fill.substring(0, length - input.length());
+    return left ? clipped + input : input + clipped;
+  }
+
+  private Object stringChar(Object[] values) {
+    if (values.length != 2 || !(HaraBox.unwrap(values[1]) instanceof Number)) {
+      throw new HaraException("str/char expects a string and index");
+    }
+    String input = stringValue(values[0], "str/char");
+    int index = ((Number) HaraBox.unwrap(values[1])).intValue();
+    if (index < 0 || index >= input.length())
+      throw new HaraException("str/char index out of bounds");
+    return String.valueOf(input.charAt(index));
+  }
+
+  private Object stringSplit(Object[] values) {
+    String[] pair = stringPair(values, "str/split");
+    String[] parts = pair[0].split(java.util.regex.Pattern.quote(pair[1]), -1);
+    return new HaraArray(parts);
+  }
+
+  private Object stringJoin(Object[] values) {
+    if (values.length != 2) throw new HaraException("str/join expects a separator and collection");
+    String separator = stringValue(values[0], "str/join");
+    Iterator<?> iterator = (Iterator<?>) iterValue(values[1]);
+    StringBuilder output = new StringBuilder();
+    while (iterator.hasNext()) {
+      if (output.length() > 0) output.append(separator);
+      output.append(stringValue(iterator.next(), "str/join"));
+    }
+    return output.toString();
+  }
+
+  private Object stringIndexOf(Object[] values) {
+    if (values.length < 2 || values.length > 3) {
+      throw new HaraException("str/index-of expects a string, substring, and optional offset");
+    }
+    String input = stringValue(values[0], "str/index-of");
+    String part = stringValue(values[1], "str/index-of");
+    int offset = values.length == 2 ? 0 : ((Number) HaraBox.unwrap(values[2])).intValue();
+    return (long) input.indexOf(part, offset);
+  }
+
+  private Object stringSubstring(Object[] values) {
+    if (values.length < 2 || values.length > 3) {
+      throw new HaraException("str/substring expects a string, start, and optional end");
+    }
+    String input = stringValue(values[0], "str/substring");
+    int start = ((Number) HaraBox.unwrap(values[1])).intValue();
+    int end = values.length == 3 ? ((Number) HaraBox.unwrap(values[2])).intValue() : input.length();
+    try {
+      return input.substring(start, end);
+    } catch (IndexOutOfBoundsException error) {
+      throw new HaraException("str/substring range is out of bounds");
+    }
+  }
+
+  private Object stringToFixed(Object[] values) {
+    if (values.length != 2
+        || !(HaraBox.unwrap(values[0]) instanceof Number)
+        || !(HaraBox.unwrap(values[1]) instanceof Number)) {
+      throw new HaraException("str/to-fixed expects a number and precision");
+    }
+    int precision = ((Number) HaraBox.unwrap(values[1])).intValue();
+    if (precision < 0 || precision > 100) {
+      throw new HaraException("str/to-fixed precision must be in the range 0..100");
+    }
+    return String.format(
+        java.util.Locale.ROOT,
+        "%." + precision + "f",
+        ((Number) HaraBox.unwrap(values[0])).doubleValue());
+  }
+
+  private Object stringReplace(Object[] values) {
+    if (values.length != 3) {
+      throw new HaraException("str/replace expects a string, match, and replacement");
+    }
+    return stringValue(values[0], "str/replace")
+        .replace(stringValue(values[1], "str/replace"), stringValue(values[2], "str/replace"));
+  }
+
+  private static byte[] bytesValue(Object value, String operation) {
+    Object input = HaraBox.unwrap(value);
+    if (!(input instanceof byte[])) throw new HaraException(operation + " expects bytes");
+    return (byte[]) input;
+  }
+
+  private static int byteNumber(Object value, String operation) {
+    Object input = HaraBox.unwrap(value);
+    if (!(input instanceof Number)) throw new HaraException(operation + " expects a byte value");
+    long number = ((Number) input).longValue();
+    if (number < -128 || number > 255) {
+      throw new HaraException(operation + " expects a value in the range -128..255");
+    }
+    return (int) number;
+  }
+
+  private Object bytesGet(Object[] values) {
+    if (values.length < 2 || values.length > 3) {
+      throw new HaraException("bytes/get expects bytes, index, and optional fallback");
+    }
+    byte[] input = bytesValue(values[0], "bytes/get");
+    int index = ((Number) HaraBox.unwrap(values[1])).intValue();
+    if (index < 0 || index >= input.length) {
+      if (values.length == 3) return values[2];
+      throw new HaraException("bytes/get index out of bounds: " + index);
+    }
+    return (long) Byte.toUnsignedInt(input[index]);
+  }
+
+  private Object bytesSet(Object[] values) {
+    if (values.length != 3) throw new HaraException("bytes/set expects bytes, index, and value");
+    byte[] input = bytesValue(values[0], "bytes/set");
+    int index = ((Number) HaraBox.unwrap(values[1])).intValue();
+    if (index < 0 || index >= input.length) {
+      throw new HaraException("bytes/set index out of bounds: " + index);
+    }
+    int value = byteNumber(values[2], "bytes/set");
+    input[index] = (byte) value;
+    return input;
+  }
+
+  private Object bytesSlice(Object[] values) {
+    if (values.length < 2 || values.length > 3) {
+      throw new HaraException("bytes/slice expects bytes, start, and optional end");
+    }
+    byte[] input = bytesValue(values[0], "bytes/slice");
+    int start = ((Number) HaraBox.unwrap(values[1])).intValue();
+    int end = values.length == 3 ? ((Number) HaraBox.unwrap(values[2])).intValue() : input.length;
+    if (start < 0 || end < start || end > input.length) {
+      throw new HaraException("bytes/slice range is out of bounds");
+    }
+    return java.util.Arrays.copyOfRange(input, start, end);
+  }
+
+  private Object promiseRun(Object thunk) {
+    CompletableFuture<Object> future =
+        CompletableFuture.supplyAsync(
+                () -> {
+                  try {
+                    return invokeInContext(() -> invokeCallable(thunk, new Object[0]));
+                  } catch (RuntimeException error) {
+                    throw new CompletionException(error);
+                  }
+                })
+            .thenCompose(this::flatten);
+    return new HaraPromise(future);
+  }
+
+  private Object promiseNew(Object thunk) {
+    CompletableFuture<Object> future = new CompletableFuture<>();
+    Object resolve =
+        new UnaryBuiltin(
+            "promise-resolve",
+            value -> {
+              flatten(value)
+                  .whenComplete(
+                      (resolved, error) -> {
+                        if (error == null) future.complete(resolved);
+                        else future.completeExceptionally(error);
+                      });
+              return value;
+            });
+    Object reject =
+        new UnaryBuiltin(
+            "promise-reject",
+            value -> {
+              future.completeExceptionally(new HaraException(String.valueOf(value)));
+              return value;
+            });
+    try {
+      invokeCallable(thunk, new Object[] {resolve, reject});
+    } catch (RuntimeException error) {
+      future.completeExceptionally(error);
+    }
+    return new HaraPromise(future);
+  }
+
+  private HaraPromise requirePromise(Object value, String operation) {
+    Object input = HaraBox.unwrap(value);
+    if (!(input instanceof HaraPromise)) throw new HaraException(operation + " expects a promise");
+    return (HaraPromise) input;
+  }
+
+  private CompletableFuture<Object> flatten(Object value) {
+    Object input = HaraBox.unwrap(value);
+    return input instanceof HaraPromise
+        ? ((HaraPromise) input).future
+        : CompletableFuture.completedFuture(input);
+  }
+
+  private Object promiseAll(Object value) {
+    ArrayList<CompletableFuture<Object>> promises = new ArrayList<>();
+    Iterator<?> iterator = (Iterator<?>) iterValue(value);
+    while (iterator.hasNext()) promises.add(flatten(iterator.next()));
+    CompletableFuture<?>[] futures = promises.toArray(new CompletableFuture[0]);
+    CompletableFuture<Object> result =
+        CompletableFuture.allOf(futures)
+            .thenApply(
+                ignored -> new HaraArray(promises.stream().map(CompletableFuture::join).toArray()));
+    return new HaraPromise(result);
+  }
+
+  private Object promiseThen(Object[] values, boolean failure) {
+    String operation = failure ? "promise/catch" : "promise/then";
+    if (values.length != 2) throw new HaraException(operation + " expects a promise and function");
+    HaraPromise promise = requirePromise(values[0], operation);
+    CompletableFuture<Object> result;
+    if (failure) {
+      result =
+          promise
+              .future
+              .handle(
+                  (value, error) ->
+                      error == null
+                          ? CompletableFuture.completedFuture(value)
+                          : flatten(
+                              invokeInContext(
+                                  () ->
+                                      invokeCallable(
+                                          values[1],
+                                          new Object[] {
+                                            error.getCause() == null ? error : error.getCause()
+                                          }))))
+              .thenCompose(Function.identity());
+    } else {
+      result =
+          promise
+              .future
+              .thenApply(
+                  value ->
+                      flatten(
+                          invokeInContext(() -> invokeCallable(values[1], new Object[] {value}))))
+              .thenCompose(Function.identity());
+    }
+    return new HaraPromise(result);
+  }
+
+  private Object promiseFinally(Object[] values) {
+    if (values.length != 2) {
+      throw new HaraException("promise/finally expects a promise and function");
+    }
+    HaraPromise promise = requirePromise(values[0], "promise/finally");
+    CompletableFuture<Object> result =
+        promise
+            .future
+            .handle(
+                (value, error) ->
+                    flatten(invokeInContext(() -> invokeCallable(values[1], new Object[0])))
+                        .thenApply(
+                            ignored -> {
+                              if (error != null) throw new CompletionException(error);
+                              return value;
+                            }))
+            .thenCompose(Function.identity());
+    return new HaraPromise(result);
+  }
+
+  private Object promiseDelay(Object[] values) {
+    if (values.length != 2 || !(HaraBox.unwrap(values[0]) instanceof Number)) {
+      throw new HaraException("promise/delay expects milliseconds and a function");
+    }
+    long millis = ((Number) HaraBox.unwrap(values[0])).longValue();
+    if (millis < 0) throw new HaraException("promise/delay expects non-negative milliseconds");
+    CompletableFuture<Object> future =
+        CompletableFuture.supplyAsync(
+                () -> invokeInContext(() -> invokeCallable(values[1], new Object[0])),
+                CompletableFuture.delayedExecutor(millis, TimeUnit.MILLISECONDS))
+            .thenCompose(this::flatten);
+    return new HaraPromise(future);
+  }
+
+  private <T> T invokeInContext(Supplier<T> operation) {
+    Object previous = environment.getContext().enter(null);
+    try {
+      return operation.get();
+    } finally {
+      environment.getContext().leave(null, previous);
+    }
+  }
+
+  private void requireFileIO(String operation) {
+    if (!environment.isFileIOAllowed()) {
+      throw new HaraException(operation + " is unsupported or file access is denied");
+    }
+  }
+
+  private void requireSocketIO(String operation) {
+    if (!environment.isSocketIOAllowed()) {
+      throw new HaraException(operation + " is unsupported or network access is denied");
+    }
+  }
+
+  private Object fileResolve(Object[] values) {
+    requireFileIO("file/resolve");
+    if (values.length != 2) throw new HaraException("file/resolve expects a root and path");
+    return Path.of(stringValue(values[0], "file/resolve"), stringValue(values[1], "file/resolve"))
+        .normalize()
+        .toString();
+  }
+
+  private Object fileRead(Object value) {
+    requireFileIO("file/read");
+    String path = stringValue(value, "file/read");
+    return new HaraPromise(
+        CompletableFuture.supplyAsync(
+            () ->
+                invokeInContext(
+                    () -> {
+                      try {
+                        return environment.getPublicTruffleFile(path).readAllBytes();
+                      } catch (IOException error) {
+                        throw new CompletionException(error);
+                      }
+                    })));
+  }
+
+  private Object fileWrite(Object[] values) {
+    requireFileIO("file/write");
+    if (values.length != 2) throw new HaraException("file/write expects a path and bytes");
+    String path = stringValue(values[0], "file/write");
+    byte[] contents = bytesValue(values[1], "file/write").clone();
+    return new HaraPromise(
+        CompletableFuture.supplyAsync(
+            () ->
+                invokeInContext(
+                    () -> {
+                      try {
+                        try (OutputStream output =
+                            environment.getPublicTruffleFile(path).newOutputStream()) {
+                          output.write(contents);
+                        }
+                        return null;
+                      } catch (IOException error) {
+                        throw new CompletionException(error);
+                      }
+                    })));
+  }
+
+  private Object socketConnect(Object[] values) {
+    requireSocketIO("socket/connect");
+    if (values.length < 2 || values.length > 3) {
+      throw new HaraException("socket/connect expects a host, port, and optional options");
+    }
+    String host = stringValue(values[0], "socket/connect");
+    int port = ((Number) HaraBox.unwrap(values[1])).intValue();
+    return new HaraPromise(
+        CompletableFuture.supplyAsync(
+            () -> {
+              try {
+                Socket socket = new Socket();
+                socket.connect(new InetSocketAddress(host, port));
+                return new HaraSocket(socket);
+              } catch (IOException error) {
+                throw new CompletionException(error);
+              }
+            }));
+  }
+
+  private Object socketSend(Object[] values) {
+    requireSocketIO("socket/send");
+    if (values.length != 2 || !(HaraBox.unwrap(values[0]) instanceof HaraSocket)) {
+      throw new HaraException("socket/send expects a socket connection and bytes");
+    }
+    HaraSocket connection = (HaraSocket) HaraBox.unwrap(values[0]);
+    byte[] contents = bytesValue(values[1], "socket/send").clone();
+    return new HaraPromise(
+        CompletableFuture.supplyAsync(
+            () -> {
+              try {
+                connection.socket.getOutputStream().write(contents);
+                connection.socket.getOutputStream().flush();
+                return (long) contents.length;
+              } catch (IOException error) {
+                throw new CompletionException(error);
+              }
+            }));
+  }
+
+  private Object socketClose(Object value) {
+    requireSocketIO("socket/close");
+    Object input = HaraBox.unwrap(value);
+    if (!(input instanceof HaraSocket)) {
+      throw new HaraException("socket/close expects a socket connection");
+    }
+    HaraSocket connection = (HaraSocket) input;
+    return new HaraPromise(
+        CompletableFuture.supplyAsync(
+            () -> {
+              try {
+                connection.socket.close();
+                return null;
+              } catch (IOException error) {
+                throw new CompletionException(error);
+              }
+            }));
+  }
+
+  public Object invokeMarkerMethod(Object receiverValue, String method, Object[] arguments) {
+    Object receiver = HaraBox.unwrap(receiverValue);
+    if (receiver instanceof HaraArray) {
+      return invokeArrayMethod((HaraArray) receiver, method, arguments);
+    }
+    if (receiver instanceof HaraObject) {
+      return invokeObjectMethod((HaraObject) receiver, method, arguments);
+    }
+    throw new HaraException("Dot calls are only supported on values created by array or object");
+  }
+
+  private Object invokeArrayMethod(HaraArray array, String method, Object[] arguments) {
+    switch (method) {
+      case "get":
+        requireMethodArity(method, arguments, 1);
+        return array.get(arrayIndex(arguments[0], array.size(), false, method));
+      case "set":
+        requireMethodArity(method, arguments, 2);
+        array.set(arrayIndex(arguments[0], array.size(), false, method), arguments[1]);
+        return array;
+      case "push-last":
+        requireMethodArity(method, arguments, 1);
+        array.add(arguments[0]);
+        return array;
+      case "pop-last":
+        requireMethodArity(method, arguments, 0);
+        if (array.isEmpty()) return null;
+        return array.remove(array.size() - 1);
+      case "push-first":
+        requireMethodArity(method, arguments, 1);
+        array.add(0, arguments[0]);
+        return array;
+      case "pop-first":
+        requireMethodArity(method, arguments, 0);
+        if (array.isEmpty()) return null;
+        return array.remove(0);
+      case "insert":
+        requireMethodArity(method, arguments, 2);
+        array.add(arrayIndex(arguments[0], array.size(), true, method), arguments[1]);
+        return array;
+      case "remove":
+        requireMethodArity(method, arguments, 1);
+        return array.remove(arrayIndex(arguments[0], array.size(), false, method));
+      case "clone":
+        requireMethodArity(method, arguments, 0);
+        return new HaraArray(array.toArray());
+      case "slice":
+        {
+          if (arguments.length < 1 || arguments.length > 2) {
+            throw new HaraException("array.slice expects a start and optional end");
+          }
+          int start = arrayIndex(arguments[0], array.size(), true, method);
+          int end =
+              arguments.length == 2
+                  ? arrayIndex(arguments[1], array.size(), true, method)
+                  : array.size();
+          if (end < start) throw new HaraException("array.slice range is out of bounds");
+          return new HaraArray(array.subList(start, end).toArray());
+        }
+      case "map":
+        {
+          requireMethodArity(method, arguments, 1);
+          HaraArray output = new HaraArray();
+          for (Object value : array) output.add(invokeCallable(arguments[0], new Object[] {value}));
+          return output;
+        }
+      case "filter":
+        {
+          requireMethodArity(method, arguments, 1);
+          HaraArray output = new HaraArray();
+          for (Object value : array) {
+            if (truthy(invokeCallable(arguments[0], new Object[] {value}))) output.add(value);
+          }
+          return output;
+        }
+      case "fold-left":
+      case "fold-right":
+        requireMethodArity(method, arguments, 2);
+        Object result = arguments[1];
+        if ("fold-left".equals(method)) {
+          for (Object value : array) {
+            result = invokeCallable(arguments[0], new Object[] {result, value});
+          }
+        } else {
+          for (int i = array.size() - 1; i >= 0; i--) {
+            result = invokeCallable(arguments[0], new Object[] {array.get(i), result});
+          }
+        }
+        return result;
+      default:
+        throw new HaraException("Unsupported array method: " + method);
+    }
+  }
+
+  private Object invokeObjectMethod(HaraObject object, String method, Object[] arguments) {
+    switch (method) {
+      case "has?":
+        requireMethodArity(method, arguments, 1);
+        return object.containsKey(objectKey(arguments[0], method));
+      case "get":
+        if (arguments.length < 1 || arguments.length > 2) {
+          throw new HaraException("object.get expects a key and optional fallback");
+        }
+        String key = objectKey(arguments[0], method);
+        return object.containsKey(key)
+            ? object.get(key)
+            : arguments.length == 2 ? arguments[1] : null;
+      case "set":
+        requireMethodArity(method, arguments, 2);
+        object.put(objectKey(arguments[0], method), arguments[1]);
+        return object;
+      case "delete":
+        requireMethodArity(method, arguments, 1);
+        return object.remove(objectKey(arguments[0], method));
+      case "clone":
+        requireMethodArity(method, arguments, 0);
+        return new HaraObject(object);
+      case "assign":
+        requireMethodArity(method, arguments, 1);
+        Object source = HaraBox.unwrap(arguments[0]);
+        if (!(source instanceof HaraObject)) {
+          throw new HaraException("object.assign expects an object marker");
+        }
+        object.putAll((HaraObject) source);
+        return object;
+      case "keys":
+        requireMethodArity(method, arguments, 0);
+        return new HaraArray(object.keySet().toArray());
+      case "vals":
+        requireMethodArity(method, arguments, 0);
+        return new HaraArray(object.values().toArray());
+      case "pairs":
+        {
+          requireMethodArity(method, arguments, 0);
+          HaraArray pairs = new HaraArray();
+          for (Map.Entry<String, Object> entry : object.entrySet()) {
+            pairs.add(new HaraArray(new Object[] {entry.getKey(), entry.getValue()}));
+          }
+          return pairs;
+        }
+      default:
+        throw new HaraException("Unsupported object method: " + method);
+    }
+  }
+
+  private static void requireMethodArity(String method, Object[] arguments, int expected) {
+    if (arguments.length != expected) {
+      throw new HaraException(method + " expects " + expected + " arguments");
+    }
+  }
+
+  private static int arrayIndex(Object value, int size, boolean allowEnd, String operation) {
+    Object input = HaraBox.unwrap(value);
+    if (!(input instanceof Number)) throw new HaraException(operation + " expects a numeric index");
+    int index = ((Number) input).intValue();
+    if (index < 0 || index > size || (!allowEnd && index == size)) {
+      throw new HaraException(operation + " index out of bounds: " + index);
+    }
+    return index;
+  }
+
+  private static String objectKey(Object value, String operation) {
+    Object input = HaraBox.unwrap(value);
+    if (!(input instanceof String)) {
+      throw new HaraException("object." + operation + " expects a string key");
+    }
+    return (String) input;
   }
 
   @TruffleBoundary
@@ -474,14 +1409,14 @@ public final class HaraContext {
         relocateLoadedMacros(callerNamespace, callerMacrosBefore, loaded);
       }
       currentNamespace = namespace(callerNamespace);
-      installNumericBuiltins(currentNamespace);
+      initializeUserNamespace(currentNamespace);
       if (arguments.length == 2) {
         applyRequireOptions(arguments[1], modules.get(key));
       }
       return null;
     } finally {
       currentNamespace = namespace(callerNamespace);
-      installNumericBuiltins(currentNamespace);
+      initializeUserNamespace(currentNamespace);
     }
   }
 
@@ -1417,6 +2352,82 @@ public final class HaraContext {
         throw (HaraException) error;
       }
       throw new HaraException("Unable to evaluate Hara source " + name + ": " + error.getMessage());
+    }
+  }
+
+  private static final class HaraArray extends ArrayList<Object> {
+    private HaraArray() {}
+
+    private HaraArray(Object[] values) {
+      super(java.util.Arrays.asList(values));
+    }
+  }
+
+  private static final class HaraObject extends LinkedHashMap<String, Object> {
+    private HaraObject(Object[] values) {
+      if ((values.length & 1) != 0) {
+        throw new HaraException("object expects an even number of string key/value arguments");
+      }
+      for (int i = 0; i < values.length; i += 2) {
+        put(objectKey(values[i], "constructor"), values[i + 1]);
+      }
+    }
+
+    private HaraObject(HaraObject source) {
+      super(source);
+    }
+  }
+
+  private static final class HaraPromise implements IDeref<Object>, IDerefTimeout<Object> {
+    private final CompletableFuture<Object> future;
+
+    private HaraPromise(CompletableFuture<Object> future) {
+      this.future = future;
+    }
+
+    @Override
+    public Object deref() {
+      try {
+        return future.join();
+      } catch (CompletionException error) {
+        Throwable cause = error.getCause() == null ? error : error.getCause();
+        if (cause instanceof HaraException) throw (HaraException) cause;
+        throw new HaraException("Promise rejected: " + cause.getMessage());
+      }
+    }
+
+    @Override
+    public Object derefTimeout(long milliseconds, Object timeoutValue) {
+      try {
+        return future.get(milliseconds, TimeUnit.MILLISECONDS);
+      } catch (java.util.concurrent.TimeoutException error) {
+        return timeoutValue;
+      } catch (InterruptedException error) {
+        Thread.currentThread().interrupt();
+        throw new HaraException("Promise wait interrupted");
+      } catch (java.util.concurrent.ExecutionException error) {
+        Throwable cause = error.getCause() == null ? error : error.getCause();
+        if (cause instanceof HaraException) throw (HaraException) cause;
+        throw new HaraException("Promise rejected: " + cause.getMessage());
+      }
+    }
+
+    @Override
+    public String toString() {
+      return future.isDone() ? "#<promise realized>" : "#<promise pending>";
+    }
+  }
+
+  private static final class HaraSocket {
+    private final Socket socket;
+
+    private HaraSocket(Socket socket) {
+      this.socket = socket;
+    }
+
+    @Override
+    public String toString() {
+      return "#<socket " + socket.getRemoteSocketAddress() + ">";
     }
   }
 
