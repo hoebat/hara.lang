@@ -183,24 +183,6 @@
 				</configuration>
 			</plugin>
 			<plugin>
-				<groupId>com.theoryinpractise</groupId>
-				<artifactId>googleformatter-maven-plugin</artifactId>
-				<version>1.7.5</version>
-				<executions>
-					<execution>
-						<id>remove-unused-imports</id>
-						<phase>process-sources</phase>
-						<goals>
-							<goal>format</goal>
-						</goals>
-						<configuration>
-							<removeUnusedImports>true</removeUnusedImports>
-							<fixImportsOnly>true</fixImportsOnly>
-						</configuration>
-					</execution>
-				</executions>
-			</plugin>
-			<plugin>
 				<groupId>org.jacoco</groupId>
 				<artifactId>jacoco-maven-plugin</artifactId>
 				<version>0.8.12</version>

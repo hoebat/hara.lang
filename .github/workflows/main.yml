@@ -16,6 +16,13 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
       with:
         targets: wasm32-unknown-unknown
+        components: clippy
+    - name: Check Rust module layout
+      run: bash wasm/scripts/check-layout.sh
+    - name: Run Rust Clippy
+      run: cargo clippy --manifest-path wasm/Cargo.toml --all-targets -- -D clippy::too_many_lines
+    - name: Run Rust native tests
+      run: cargo test --manifest-path wasm/Cargo.toml
     - name: Verify generated parity corpus
       run: ./scripts/generate-wasm-truffle-parity && git diff --exit-code -- spec/hara/wasm-truffle-parity.edn
     - name: Build raw Rust WASM extension artifact

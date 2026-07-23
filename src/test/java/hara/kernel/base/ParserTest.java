@@ -141,6 +141,15 @@ public class ParserTest {
   }
 
   @Test
+  public void testReadMapMetadata() {
+    Object result = Parser.LispReader.readString("^{:tag \"fast\"} [1]", null);
+    assertTrue(result instanceof hara.lang.protocol.IObjType);
+    hara.lang.protocol.IObjType obj = (hara.lang.protocol.IObjType) result;
+    hara.lang.data.types.IMapType meta = (hara.lang.data.types.IMapType) obj.meta();
+    assertEquals("fast", meta.lookup(Keyword.create("tag")));
+  }
+
+  @Test
   public void testSyntaxQuote() {
     Object result = Parser.LispReader.readString("`a", null);
     assertTrue(result instanceof List);

@@ -14,13 +14,16 @@ public final class TaskRunner {
 
   public static TaskResult run(Task task, Duration timeout, Object... args) {
     long start = System.nanoTime();
+    java.util.concurrent.CompletableFuture<?> pending = null;
     try {
       Object value = task.invoke(args);
       if (value instanceof CompletionStage<?>) {
-        value = ((CompletionStage<?>) value).toCompletableFuture().get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        pending = ((CompletionStage<?>) value).toCompletableFuture();
+        value = pending.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
       }
       return TaskResult.returned(value, elapsed(start));
     } catch (java.util.concurrent.TimeoutException error) {
+      if (pending != null) pending.cancel(true);
       return TaskResult.timeout(elapsed(start));
     } catch (java.util.concurrent.CancellationException error) {
       return TaskResult.cancelled(elapsed(start));

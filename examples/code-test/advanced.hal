@@ -1,0 +1,12 @@
+; Matchers, fixtures, filtering, and metadata in code.test.
+(require 'code.test {:refer [anything contains contains-in throws use-fixtures]})
+
+(use-fixtures :before (fn [] true))
+
+(fact "matches a partial map" {:status :ready :count 2} => (contains {:status :ready}))
+(fact "matches nested data" {:user {:name "hara" :active true}} =>
+  (contains-in {:user {:name "hara"}}))
+(fact "accepts any value" (+ 20 22) => anything)
+(fact "captures failures" (/ 1 0) => (throws))
+
+(code.test/run! {:namespace "user"})

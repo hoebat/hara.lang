@@ -13,7 +13,10 @@ public final class ResourceSpec {
   private final Map<String, ResourceVariant> variants = new LinkedHashMap<>();
   private final Function<Map<String, Object>, Object> factory;
 
-  public ResourceSpec(String type, ResourceMode mode, Map<String, Object> config,
+  public ResourceSpec(
+      String type,
+      ResourceMode mode,
+      Map<String, Object> config,
       Function<Map<String, Object>, Object> factory) {
     this.type = Objects.requireNonNull(type, "type");
     this.mode = mode == null ? ResourceMode.GLOBAL : mode;
@@ -22,15 +25,33 @@ public final class ResourceSpec {
     variants.put("default", new ResourceVariant("default", Collections.emptyMap()));
   }
 
-  public String type() { return type; }
-  public ResourceMode mode() { return mode; }
-  public Map<String, Object> config() { return config; }
-  public Function<Map<String, Object>, Object> factory() { return factory; }
-  public synchronized void variant(ResourceVariant value) { variants.put(value.id(), value); }
+  public String type() {
+    return type;
+  }
+
+  public ResourceMode mode() {
+    return mode;
+  }
+
+  public Map<String, Object> config() {
+    return config;
+  }
+
+  public Function<Map<String, Object>, Object> factory() {
+    return factory;
+  }
+
+  public synchronized void variant(ResourceVariant value) {
+    variants.put(value.id(), value);
+  }
+
   public synchronized ResourceVariant variant(String id) {
     ResourceVariant value = variants.get(id == null ? "default" : id);
     if (value == null) throw new IllegalArgumentException("Unknown resource variant: " + id);
     return value;
   }
-  public synchronized Map<String, ResourceVariant> variants() { return Map.copyOf(variants); }
+
+  public synchronized Map<String, ResourceVariant> variants() {
+    return Map.copyOf(variants);
+  }
 }

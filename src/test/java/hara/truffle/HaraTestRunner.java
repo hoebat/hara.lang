@@ -33,6 +33,7 @@ public final class HaraTestRunner extends Runner {
   @Override
   public void run(RunNotifier notifier) {
     try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(require 'code.test)");
       for (String resource : resources) {
         context.eval(HaraLanguage.ID, "(require \"" + escape(resource) + "\")");
       }
@@ -65,8 +66,25 @@ public final class HaraTestRunner extends Runner {
     List<TestEntry> current = entries;
     if (current != null) return current;
     List<TestEntry> result = new ArrayList<>();
-    for (String resource : resources)
-      result.add(new TestEntry(resource, Description.createTestDescription(testClass, resource)));
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(require 'code.test)");
+      for (String resource : resources) {
+        context.eval(HaraLanguage.ID, "(require \"" + escape(resource) + "\")");
+      }
+      Value tests = context.eval(HaraLanguage.ID, "(code.test/tests)");
+      for (int i = 0; i < tests.getArraySize(); i++) {
+        Value test = tests.getArrayElement(i);
+        String namespace = test.getHashValue("namespace").asString();
+        String name = test.getHashValue("name").asString();
+        result.add(
+            new TestEntry(
+                namespace + "/" + name,
+                Description.createTestDescription(testClass, namespace + "/" + name)));
+      }
+    } catch (Throwable error) {
+      for (String resource : resources)
+        result.add(new TestEntry(resource, Description.createTestDescription(testClass, resource)));
+    }
     entries = List.copyOf(result);
     return entries;
   }
@@ -75,5 +93,13 @@ public final class HaraTestRunner extends Runner {
     return value.replace("\\", "\\\\").replace("\"", "\\\"");
   }
 
-  private record TestEntry(String name, Description description) {}
+  private static final class TestEntry {
+    private final String name;
+    private final Description description;
+
+    private TestEntry(String name, Description description) {
+      this.name = name;
+      this.description = description;
+    }
+  }
 }

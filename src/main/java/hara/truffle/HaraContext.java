@@ -32,6 +32,11 @@ import hara.lang.zip.Zip;
 import hara.lang.zip.Zipper;
 import hara.lang.test.HaraTestRegistry;
 import hara.lang.test.HaraTestResult;
+import hara.lang.test.HaraMatcher;
+import hara.lang.task.Task;
+import hara.lang.task.TaskFunction;
+import hara.lang.task.TaskProcess;
+import hara.lang.task.TaskBulk;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -107,6 +112,7 @@ public final class HaraContext {
       new NativeFlavorRegistry().register(JvmFlavorProvider.INSTANCE);
   private final HaraExtensionRegistry extensionRegistry =
       new HaraExtensionRegistry(HaraContext.class.getClassLoader());
+  private final HaraLibraryLoader libraryLoader = new HaraLibraryLoader();
   private final Map<String, HaraWasmExtension> loadedExtensions = new ConcurrentHashMap<>();
   private final Map<String, ModuleRecord> modules = new ConcurrentHashMap<>();
   private final Map<String, Set<String>> moduleDependencies = new ConcurrentHashMap<>();
@@ -127,7 +133,6 @@ public final class HaraContext {
     installNumericBuiltins(currentNamespace);
     installCoreBuiltins(namespace(CORE_NAMESPACE));
     installGeneratedLibraries();
-    installTestLibrary();
     installNativeLibraries();
     currentNamespace = namespace("user");
     initializeUserNamespace(currentNamespace);
@@ -377,6 +382,24 @@ public final class HaraContext {
     String target = ((Symbol) spec.nth(0)).display();
     HaraNamespace required = requiredNamespace(target);
     if (required == null) throw new HaraException("Cannot require missing namespace: " + target);
+    java.util.Set<String> excludedRefers = new java.util.HashSet<>();
+    for (int i = 1; i < spec.count(); i += 2) {
+      if (i + 1 >= spec.count() || !(spec.nth(i) instanceof Keyword)) {
+        throw new HaraException("Malformed :require options for " + target);
+      }
+      if ("exclude".equals(((Keyword) spec.nth(i)).getName())) {
+        Object excluded = spec.nth(i + 1);
+        if (!(excluded instanceof ILinearType<?>)) {
+          throw new HaraException(":require :exclude expects a vector of symbols");
+        }
+        for (Object value : (ILinearType<?>) excluded) {
+          if (!(value instanceof Symbol) || ((Symbol) value).getNamespace() != null) {
+            throw new HaraException(":require :exclude expects unqualified symbols");
+          }
+          excludedRefers.add(((Symbol) value).getName());
+        }
+      }
+    }
     for (int i = 1; i < spec.count(); i += 2) {
       if (i + 1 >= spec.count() || !(spec.nth(i) instanceof Keyword)) {
         throw new HaraException("Malformed :require options for " + target);
@@ -389,19 +412,26 @@ public final class HaraContext {
         }
         putAlias(namespaceAliases, ((Symbol) value).getName(), target);
       } else if ("refer".equals(option)) {
-        if (!(value instanceof ILinearType<?>)) {
-          throw new HaraException(":require :refer expects a vector of symbols");
-        }
-        for (Object referred : (ILinearType<?>) value) {
-          if (!(referred instanceof Symbol) || ((Symbol) referred).getNamespace() != null) {
-            throw new HaraException(":require :refer expects unqualified symbols");
+        if (value instanceof Keyword && "all".equals(((Keyword) value).getName())) {
+          for (String referred : required.symbolNames()) {
+            if (!excludedRefers.contains(referred)) currentNamespace.refer(referred, required.lookup(referred));
           }
-          String name = ((Symbol) referred).getName();
-          HaraVar variable = required.lookup(name);
-          if (variable == null) {
-            throw new HaraException("Cannot refer missing var " + name + " from " + target);
+        } else {
+          if (!(value instanceof ILinearType<?>)) {
+            throw new HaraException(":require :refer expects a vector of symbols or :all");
           }
-          currentNamespace.refer(name, variable);
+          for (Object referred : (ILinearType<?>) value) {
+            if (!(referred instanceof Symbol) || ((Symbol) referred).getNamespace() != null) {
+              throw new HaraException(":require :refer expects unqualified symbols");
+            }
+            String name = ((Symbol) referred).getName();
+            if (excludedRefers.contains(name)) continue;
+            HaraVar variable = required.lookup(name);
+            if (variable == null) {
+              throw new HaraException("Cannot refer missing var " + name + " from " + target);
+            }
+            currentNamespace.refer(name, variable);
+          }
         }
       } else {
         throw new HaraException("Unsupported :require option: :" + option);
@@ -410,6 +440,7 @@ public final class HaraContext {
   }
 
   private synchronized HaraNamespace requiredNamespace(String target) {
+    libraryLoader.ensure(this, target);
     HaraNamespace existing = namespaces.get(target);
     if (existing != null) return existing;
     if (PORTABLE_LIBRARY_RESOURCES.containsKey(target)) {
@@ -581,7 +612,18 @@ public final class HaraContext {
     if (symbol.getNamespace() != null && !symbol.getNamespace().equals(currentNamespace.name())) {
       throw new HaraException("Cannot define a var in another namespace: " + symbol.display());
     }
-    return currentNamespace.define(symbol.getName(), value, symbol.meta());
+    IMetadata metadata = symbol.meta();
+    if (metadata == null && value instanceof Task task) {
+      java.util.ArrayList<Object> entries = new java.util.ArrayList<>();
+      Object doc = task.config().get("doc");
+      if (doc != null) { entries.add(Keyword.create("doc")); entries.add(doc); }
+      if (task.arglists() != null) {
+        entries.add(Keyword.create("arglists"));
+        entries.add(task.arglists());
+      }
+      if (!entries.isEmpty()) metadata = hara.lang.data.Map.Standard.from(null, entries.toArray());
+    }
+    return currentNamespace.define(symbol.getName(), value, metadata);
   }
 
   public HaraProtocol ifnProtocol() {
@@ -693,6 +735,11 @@ public final class HaraContext {
     String namespaceName = namespace == null ? currentNamespace.name() : namespace;
     Map<String, HaraMacro> namespaceMacros = macros.get(namespaceName);
     HaraMacro macro = namespaceMacros == null ? null : namespaceMacros.get(symbol.getName());
+    if (macro == null && namespace == null && "fact".equals(symbol.getName())) {
+      libraryLoader.ensure(this, "code.test");
+      namespaceMacros = macros.get(namespaceName);
+      macro = namespaceMacros == null ? null : namespaceMacros.get(symbol.getName());
+    }
     if (macro != null || INTRINSIC_NAMESPACE.equals(namespaceName)) return macro;
     Map<String, HaraMacro> intrinsicMacros = macros.get(INTRINSIC_NAMESPACE);
     return intrinsicMacros == null ? null : intrinsicMacros.get(symbol.getName());
@@ -705,6 +752,16 @@ public final class HaraContext {
     macros
         .computeIfAbsent(currentNamespace.name(), ignored -> new ConcurrentHashMap<>())
         .put(symbol.getName(), macro);
+  }
+
+  private void defineIntrinsicMacro(Symbol symbol, HaraMacro macro) {
+    HaraNamespace previous = currentNamespace;
+    try {
+      currentNamespace = namespace(INTRINSIC_NAMESPACE);
+      defineMacro(symbol, macro);
+    } finally {
+      currentNamespace = previous;
+    }
   }
 
   private void installNumericBuiltins(HaraNamespace target) {
@@ -842,17 +899,21 @@ public final class HaraContext {
             "pop", value -> protocolCall("INavigation", "pop-first", new Object[] {value})));
   }
 
-  private void installTestLibrary() {
+  void installTestLibrary() {
     HaraNamespace tests = namespace("code.test");
     tests.define(
         "register!",
         new VariadicBuiltin(
             "code.test/register!",
             values -> {
-              if (values.length != 2 || !(values[1] instanceof HaraFunction)) {
-                throw new HaraException("code.test/register! expects a name and function");
+              if ((values.length != 2 && values.length != 3) || !(values[1] instanceof HaraFunction)) {
+                throw new HaraException("code.test/register! expects a name, function, and optional metadata");
               }
-              testRegistry.register(currentNamespace.name(), String.valueOf(values[0]), null, (HaraFunction) values[1]);
+              testRegistry.register(
+                  currentNamespace.name(),
+                  String.valueOf(values[0]),
+                  values.length == 3 ? values[2] : null,
+                  (HaraFunction) values[1]);
               return null;
             }));
     tests.define(
@@ -860,30 +921,1099 @@ public final class HaraContext {
         new VariadicBuiltin(
             "code.test/run!",
             values -> {
+              if (values.length > 1) throw new HaraException("code.test/run! accepts at most one options map");
+              IMapType<?, ?> options = values.length == 1 && values[0] instanceof IMapType<?, ?>
+                  ? (IMapType<?, ?>) values[0] : null;
+              Object selector = options == null ? null : lookupValue(options, Keyword.create("filter"));
+              Object namespaceSelector = options == null ? null : lookupValue(options, Keyword.create("namespace"));
+              Object nameSelector = options == null ? null : lookupValue(options, Keyword.create("name"));
+              Object metadataSelector = options == null ? null : lookupValue(options, Keyword.create("metadata"));
+              Object onlySelector = options == null ? null : lookupValue(options, Keyword.create("only"));
+              Object excludeSelector = options == null ? null : lookupValue(options, Keyword.create("exclude"));
+              Object hidden = options == null ? null : lookupValue(options, Keyword.create("hidden"));
+              Object clear = options == null ? null : lookupValue(options, Keyword.create("clear"));
+              if (Boolean.TRUE.equals(clear)) testRegistry.clear();
               ArrayList<Object> results = new ArrayList<>();
-              for (HaraTestResult result : testRegistry.runAll()) {
+              for (HaraTestResult result : testRegistry.runAll(test ->
+                  testSelector(selector, test)
+                      && testSelector(namespaceSelector, test.namespace())
+                      && testSelector(nameSelector, test.name())
+                      && testSelector(onlySelector, test)
+                      && (excludeSelector == null || !testSelector(excludeSelector, test))
+                      && metadataMatches(metadataSelector, test.metadata())
+                      && (Boolean.TRUE.equals(hidden) || !metadataFlag(test.metadata(), "hidden")))) {
+                java.util.Map<Object, Object> resultMap = new LinkedHashMap<>();
+                resultMap.put("status", result.status().name());
+                resultMap.put("name", result.test().name());
+                resultMap.put("namespace", result.test().namespace());
+                resultMap.put("elapsed", result.elapsedMillis());
+                if (result.error() != null) resultMap.put("error", String.valueOf(result.error().getMessage()));
+                if (result.test().metadata() != null) resultMap.put("metadata", result.test().metadata());
                 results.add(
-                    Map.of(
-                        "status", result.status().name(),
-                        "name", result.test().name(),
-                        "elapsed", result.elapsedMillis()));
+                    resultMap);
               }
               return results;
             }));
+    tests.define("run", tests.lookup("run!").get());
+    tests.define("run-tests", tests.lookup("run!").get());
+    tests.define("tests", new VariadicBuiltin("code.test/tests", values -> {
+      if (values.length != 0) throw new HaraException("code.test/tests expects no arguments");
+      ArrayList<Object> entries = new ArrayList<>();
+      for (hara.lang.test.HaraTestCase test : testRegistry.tests()) {
+        java.util.Map<String, Object> entry = new LinkedHashMap<>();
+        entry.put("namespace", test.namespace());
+        entry.put("name", test.name());
+        entry.put("metadata", test.metadata());
+        entries.add(entry);
+      }
+      return entries;
+    }));
+    tests.define("registry", new VariadicBuiltin("code.test/registry", values -> {
+      if (values.length != 0) throw new HaraException("code.test/registry expects no arguments");
+      java.util.Map<String, Object> result = new LinkedHashMap<>();
+      for (java.util.Map.Entry<String, java.util.Map<String, hara.lang.test.HaraTestCase>> namespace
+          : testRegistry.snapshot().entrySet()) {
+        java.util.Map<String, Object> facts = new LinkedHashMap<>();
+        for (java.util.Map.Entry<String, hara.lang.test.HaraTestCase> fact : namespace.getValue().entrySet()) {
+          java.util.Map<String, Object> entry = new LinkedHashMap<>();
+          entry.put("name", fact.getValue().name());
+          entry.put("metadata", fact.getValue().metadata());
+          facts.put(fact.getKey(), entry);
+        }
+        result.put(namespace.getKey(), facts);
+      }
+      return result;
+    }));
+    tests.define("all-facts", new VariadicBuiltin("code.test/all-facts", values -> {
+      String selectedNamespace = values.length == 0 ? null : testNamespace(values[0]);
+      java.util.Map<String, Object> result = new LinkedHashMap<>();
+      for (hara.lang.test.HaraTestCase test : testRegistry.tests()) {
+        if (selectedNamespace != null && !selectedNamespace.equals(test.namespace())) continue;
+        result.put(test.namespace() + "/" + test.name(), testRecord(test));
+      }
+      return result;
+    }));
+    tests.define("list-facts", new VariadicBuiltin("code.test/list-facts", values -> {
+      String selectedNamespace = values.length == 0 ? currentNamespace.name() : testNamespace(values[0]);
+      ArrayList<Object> result = new ArrayList<>();
+      for (hara.lang.test.HaraTestCase test : testRegistry.tests()) {
+        if (selectedNamespace.equals(test.namespace())) result.add(Symbol.create(test.name()));
+      }
+      return result;
+    }));
+    tests.define("get-fact", new VariadicBuiltin("code.test/get-fact", values -> {
+      if (values.length == 0) throw new HaraException("get-fact expects a name");
+      String namespace = values.length > 1 ? testNamespace(values[0]) : currentNamespace.name();
+      Object name = values.length > 1 ? values[1] : values[0];
+      hara.lang.test.HaraTestCase test = testRegistry.find(namespace, String.valueOf(name));
+      return test == null ? null : testRecord(test);
+    }));
+    tests.define("remove-fact", new VariadicBuiltin("code.test/remove-fact", values -> {
+      if (values.length == 0 || values.length > 2) throw new HaraException("remove-fact expects a name");
+      String namespace = values.length == 2 ? testNamespace(values[0]) : currentNamespace.name();
+      Object name = values.length == 2 ? values[1] : values[0];
+      hara.lang.test.HaraTestCase test = testRegistry.find(namespace, String.valueOf(name));
+      if (test != null) testRegistry.remove(namespace, String.valueOf(name));
+      return test != null;
+    }));
+    tests.define("purge-facts", new VariadicBuiltin("code.test/purge-facts", values -> {
+      testRegistry.clearNamespace(values.length == 0 ? currentNamespace.name() : testNamespace(values[0]));
+      return null;
+    }));
+    tests.define("purge-all", new VariadicBuiltin("code.test/purge-all", values -> {
+      if (values.length == 0) testRegistry.clear();
+      else testRegistry.clearNamespace(testNamespace(values[0]));
+      return null;
+    }));
+    tests.define("fact-id", new UnaryBuiltin("code.test/fact-id", value ->
+        "test-" + String.valueOf(value).replace('.', '_').replace('/', '_').replace('-', '_')));
+    tests.define("get-global", new VariadicBuiltin("code.test/get-global", values -> {
+      boolean firstIsKey = values.length == 1 && values[0] instanceof Keyword;
+      String namespace = values.length == 0 || firstIsKey ? currentNamespace.name() : testNamespace(values[0]);
+      Object result = testRegistry.globals(namespace);
+      int keyStart = firstIsKey ? 0 : (values.length == 0 ? 0 : 1);
+      for (int i = keyStart; i < values.length; i++) {
+        if (!(result instanceof java.util.Map<?, ?> map)) return null;
+        result = map.get(keyName(values[i]));
+      }
+      return result;
+    }));
+    tests.define("set-global", new VariadicBuiltin("code.test/set-global", values -> {
+      String namespace = values.length > 1 ? testNamespace(values[0]) : currentNamespace.name();
+      Object value = values.length > 1 ? values[1] : values[0];
+      return testRegistry.setGlobals(namespace, asStringMap(value));
+    }));
+    tests.define("set-flag", new VariadicBuiltin("code.test/set-flag", values -> {
+      if (values.length == 3) {
+        String first = testNamespace(values[0]);
+        String flag = keyName(values[1]);
+        boolean value = Boolean.TRUE.equals(values[2]);
+        // Preserve the public Hara namespace form, while accepting the source
+        // runtime's (fact-id flag value) form when the fact exists locally.
+        if (testRegistry.find(currentNamespace.name(), first) != null) {
+          return testRegistry.setFactFlag(currentNamespace.name(), first, flag, value);
+        }
+        return testRegistry.setFlag(first, flag, value);
+      }
+      if (values.length == 4) {
+        return testRegistry.setFactFlag(
+            testNamespace(values[0]), testNamespace(values[1]), keyName(values[2]),
+            Boolean.TRUE.equals(values[3]));
+      }
+      throw new HaraException("set-flag expects fact, flag, value or namespace, fact, flag, value");
+    }));
+    tests.define("get-flag", new VariadicBuiltin("code.test/get-flag", values -> {
+      if (values.length == 2) {
+        String first = testNamespace(values[0]);
+        String flag = keyName(values[1]);
+        if (testRegistry.find(currentNamespace.name(), first) != null) {
+          return testRegistry.factFlag(currentNamespace.name(), first, flag);
+        }
+        return testRegistry.flag(first, flag);
+      }
+      if (values.length == 3) {
+        return testRegistry.factFlag(
+            testNamespace(values[0]), testNamespace(values[1]), keyName(values[2]));
+      }
+      throw new HaraException("get-flag expects fact, flag or namespace, fact, flag");
+    }));
+    tests.define("setup-fact", new UnaryBuiltin("code.test/setup-fact", value -> {
+      hara.lang.test.HaraTestCase test = testRegistry.find(currentNamespace.name(), String.valueOf(value));
+      if (test != null) testRegistry.runFixtures(test.namespace(), "before");
+      return test == null ? null : testRecord(test);
+    }));
+    tests.define("teardown-fact", new UnaryBuiltin("code.test/teardown-fact", value -> {
+      hara.lang.test.HaraTestCase test = testRegistry.find(currentNamespace.name(), String.valueOf(value));
+      if (test != null) testRegistry.runFixtures(test.namespace(), "after");
+      return test == null ? null : testRecord(test);
+    }));
+    tests.define("fact:list", tests.lookup("tests").get());
+    tests.define("fact:get", tests.lookup("get-fact").get());
+    tests.define("fact:remove", tests.lookup("remove-fact").get());
+    tests.define("fact:purge", tests.lookup("purge-facts").get());
+    tests.define("fact:setup", tests.lookup("setup-fact").get());
+    tests.define("fact:teardown", tests.lookup("teardown-fact").get());
+    tests.define("fact:setup?", tests.lookup("get-flag").get());
+    tests.define("fact:all", tests.lookup("run!").get());
+    tests.define("fact:global", tests.lookup("get-global").get());
+    tests.define("summarise", new UnaryBuiltin("code.test/summarise", value -> summariseTestResults(value)));
+    tests.define("fact:ns", new VariadicBuiltin("code.test/fact:ns", values -> values));
+    tests.define("fact:ns-load", new UnaryBuiltin("code.test/fact:ns-load", value -> value));
+    tests.define("fact:symbol", new UnaryBuiltin("code.test/fact:symbol", value -> value));
+    tests.define("fact:missing", new VariadicBuiltin("code.test/fact:missing", values -> hara.lang.data.Vector.Standard.EMPTY));
+    tests.define("fact:exec", new VariadicBuiltin("code.test/fact:exec", values -> {
+      if (values.length == 0) return null;
+      hara.lang.test.HaraTestCase test = testRegistry.find(currentNamespace.name(), String.valueOf(values[0]));
+      if (test == null) return null;
+      return test.body().callTarget().call(test.body().callArguments(new Object[0]));
+    }));
+    tests.define("capture", new VariadicBuiltin("code.test/capture", values ->
+        values.length == 0 ? HaraMatcher.anything() : values[0]));
+    tests.define("with-new-context", new VariadicBuiltin("code.test/with-new-context", values -> {
+      if (values.length == 0) return hara.lang.data.Map.Standard.EMPTY;
+      Object body = values[values.length - 1];
+      return body instanceof HaraFunction ? invokeCallable(body, new Object[0]) : body;
+    }));
+    tests.define("run:interrupt", tests.lookup("run!").get());
+    tests.define("run:current", tests.lookup("run!").get());
+    tests.define("run:load", tests.lookup("run!").get());
+    tests.define("run:unload", tests.lookup("run!").get());
+    tests.define("run:test", tests.lookup("run!").get());
+    tests.define("run-errored", tests.lookup("run!").get());
+    tests.define("print-options", new VariadicBuiltin("code.test/print-options", values ->
+        hara.lang.data.Set.Standard.from(null, Keyword.create("help"), Keyword.create("current"), Keyword.create("default"), Keyword.create("disable"), Keyword.create("all"))));
+    tests.define("-main", tests.lookup("run!").get());
+    tests.define("=>", Symbol.create("=>"));
+
     tests.define(
         "assert!",
         new VariadicBuiltin(
             "code.test/assert!",
             values -> {
               if (values.length != 2) throw new HaraException("code.test/assert! expects actual and expected");
-              if (!Eq.eq(HaraBox.unwrap(values[0]), HaraBox.unwrap(values[1]))) {
+              Object actual = HaraBox.unwrap(values[0]);
+              Object expected = HaraBox.unwrap(values[1]);
+              boolean matched;
+              if (expected instanceof HaraMatcher) {
+                matched = ((HaraMatcher) expected).matches(actual);
+              } else if (expected instanceof HaraFunction function) {
+                matched = Boolean.TRUE.equals(function.callTarget().call(function.callArguments(new Object[] {actual})));
+              } else if (expected instanceof Class<?> type) {
+                matched = actual != null && type.isInstance(actual);
+              } else {
+                matched = Eq.eq(actual, expected);
+              }
+              if (!matched) {
                 throw new HaraException("Assertion failed: expected " + values[1] + ", received " + values[0]);
               }
               return true;
             }));
-    defineMacro(
-        Symbol.create("fact"),
-        HaraMacro.nativeMacro(Symbol.create("fact"), this::expandFact));
+    tests.define("assert-throws!", new VariadicBuiltin("code.test/assert-throws!", values -> {
+      if (values.length != 2 || !(values[0] instanceof HaraFunction)) {
+        throw new HaraException("code.test/assert-throws! expects a function and matcher");
+      }
+      try {
+        HaraFunction function = (HaraFunction) values[0];
+        function.callTarget().call(function.callArguments(new Object[0]));
+      } catch (Throwable error) {
+        Object matcher = HaraBox.unwrap(values[1]);
+        if (matcher instanceof HaraMatcher && ((HaraMatcher) matcher).matches(error)) return true;
+        if (matcher instanceof HaraFunction predicate
+            && Boolean.TRUE.equals(predicate.callTarget().call(predicate.callArguments(new Object[] {error})))) {
+          return true;
+        }
+        if (matcher instanceof Class<?> type && type.isInstance(error)) return true;
+        if (matcher instanceof HaraMatcher && ((HaraMatcher) matcher).kind() == HaraMatcher.Kind.THROWS) return true;
+        throw new HaraException("Unexpected exception: " + error.getMessage());
+      }
+      throw new HaraException("Expected expression to throw");
+    }));
+    tests.define("checker?", new UnaryBuiltin("code.test/checker?", value -> value instanceof HaraMatcher));
+    tests.define("->checker", new UnaryBuiltin("code.test/->checker", value ->
+        value instanceof HaraMatcher ? value : HaraMatcher.satisfies(value)));
+    tests.define("verify", new VariadicBuiltin("code.test/verify", values -> {
+      if (values.length != 2 || !(values[0] instanceof HaraMatcher)) {
+        throw new HaraException("verify expects a checker and value");
+      }
+      HaraMatcher checker = (HaraMatcher) values[0];
+      boolean matched;
+      Throwable error = null;
+      try {
+        matched = checker.matches(HaraBox.unwrap(values[1]));
+      } catch (Throwable throwable) {
+        matched = false;
+        error = throwable;
+      }
+      java.util.Map<String, Object> result = new LinkedHashMap<>();
+      result.put("status", error == null ? Keyword.create("success") : Keyword.create("exception"));
+      result.put("data", error == null ? matched : error);
+      result.put("checker", checker);
+      result.put("actual", values[1]);
+      return result;
+    }));
+    tests.define("succeeded?", new UnaryBuiltin("code.test/succeeded?", value -> {
+      Object status;
+      Object data;
+      if (value instanceof IMapType<?, ?> map) {
+        status = lookupValue(map, Keyword.create("status"));
+        data = lookupValue(map, Keyword.create("data"));
+      } else if (value instanceof java.util.Map<?, ?> map) {
+        status = map.get("status");
+        data = map.get("data");
+      } else return false;
+      return (status instanceof Keyword && "success".equals(((Keyword) status).getName())
+          || "success".equals(String.valueOf(status))) && Boolean.TRUE.equals(data);
+    }));
+    tests.define("anything", HaraMatcher.anything());
+    tests.define("contains", new VariadicBuiltin("code.test/contains", values -> {
+      if (values.length < 1) throw new HaraException("contains expects a value");
+      return HaraMatcher.contains(values[0], matcherOption(values, "in-any-order"), matcherOption(values, "gaps-ok"));
+    }));
+    tests.define("contains-in", new VariadicBuiltin("code.test/contains-in", values -> {
+      if (values.length < 1) throw new HaraException("contains-in expects a value");
+      return HaraMatcher.containsIn(values[0], matcherOption(values, "in-any-order"), matcherOption(values, "gaps-ok"));
+    }));
+    tests.define("just", new VariadicBuiltin("code.test/just", values -> {
+      if (values.length < 1) throw new HaraException("just expects a value");
+      return HaraMatcher.just(values[0], matcherOption(values, "in-any-order"), matcherOption(values, "gaps-ok"));
+    }));
+    tests.define("just-in", new UnaryBuiltin("code.test/just-in", HaraMatcher::justIn));
+    tests.define("exactly", new VariadicBuiltin("code.test/exactly", values -> {
+      if (values.length < 1 || values.length > 2) throw new HaraException("exactly expects a value and optional projection");
+      return HaraMatcher.exactly(values[0]);
+    }));
+    tests.define("approx", new VariadicBuiltin("code.test/approx", values -> {
+      if (values.length < 1 || values.length > 2 || !(values[0] instanceof Number)) {
+        throw new HaraException("approx expects a numeric value and optional threshold");
+      }
+      double threshold = values.length == 2 ? ((Number) values[1]).doubleValue() : 0.001d;
+      return HaraMatcher.approximate(values[0], threshold);
+    }));
+    tests.define("satisfies", new UnaryBuiltin("code.test/satisfies", HaraMatcher::satisfies));
+    tests.define("stores", new UnaryBuiltin("code.test/stores", HaraMatcher::stores));
+    tests.define("any", new VariadicBuiltin("code.test/any", HaraMatcher::any));
+    tests.define("all", new VariadicBuiltin("code.test/all", HaraMatcher::all));
+    tests.define("is-not", new UnaryBuiltin("code.test/is-not", HaraMatcher::isNot));
+    tests.define("is", new UnaryBuiltin("code.test/is", HaraMatcher::predicate));
+    tests.define("nil?", new UnaryBuiltin("code.test/nil?", value -> value == null));
+    tests.define("string?", new UnaryBuiltin("code.test/string?", value -> value instanceof String));
+    tests.define("number?", new UnaryBuiltin("code.test/number?", value -> value instanceof Number));
+    tests.define("integer?", new UnaryBuiltin("code.test/integer?", value -> value instanceof Byte || value instanceof Short || value instanceof Integer || value instanceof Long));
+    tests.define("boolean?", new UnaryBuiltin("code.test/boolean?", value -> value instanceof Boolean));
+    tests.define("map?", new UnaryBuiltin("code.test/map?", value -> value instanceof IMapType<?, ?> || value instanceof java.util.Map<?, ?>));
+    tests.define("vector?", new UnaryBuiltin("code.test/vector?", value -> value instanceof hara.lang.data.Vector<?>));
+    tests.define("seq?", new UnaryBuiltin("code.test/seq?", value -> value instanceof ILinearType<?>));
+    tests.define("coll?", new UnaryBuiltin("code.test/coll?", value -> value instanceof ILinearType<?> || value instanceof IMapType<?, ?> || value instanceof Iterable<?>));
+    tests.define("fn?", new UnaryBuiltin("code.test/fn?", value -> value instanceof HaraFunction));
+    tests.define("var?", new UnaryBuiltin("code.test/var?", value -> value instanceof HaraVar));
+    tests.define("any?", new UnaryBuiltin("code.test/any?", value -> {
+      if (value instanceof Iterable<?> iterable) return iterable.iterator().hasNext();
+      return false;
+    }));
+    tests.define("empty?", new UnaryBuiltin("code.test/empty?", value -> {
+      if (value == null) return true;
+      if (value instanceof ICount count) return count.count() == 0;
+      if (value instanceof Iterable<?> iterable) return !iterable.iterator().hasNext();
+      return false;
+    }));
+    tests.define("throws", new VariadicBuiltin("code.test/throws", values -> {
+      if (values.length > 1) throw new HaraException("throws expects an optional predicate");
+      return HaraMatcher.throwsMatcher(values.length == 0 ? null : values[0]);
+    }));
+    tests.define("throws-info", new VariadicBuiltin("code.test/throws-info", values -> {
+      if (values.length > 1) throw new HaraException("throws-info expects an optional map");
+      return HaraMatcher.throwsInfo(values.length == 0 ? null : values[0]);
+    }));
+    tests.define("use-fixtures", new VariadicBuiltin("code.test/use-fixtures", values -> {
+      if (values.length != 2 || !(values[0] instanceof Keyword) || !(values[1] instanceof HaraFunction)) {
+        throw new HaraException("code.test/use-fixtures expects a phase keyword and function");
+      }
+      String phase = ((Keyword) values[0]).getName();
+      if (!phase.equals("before") && !phase.equals("after")
+          && !phase.equals("before-all") && !phase.equals("after-all")) {
+        throw new HaraException(
+            "code.test/use-fixtures phase must be :before, :after, :before-all, or :after-all");
+      }
+      testRegistry.registerFixture(currentNamespace.name(), phase, (HaraFunction) values[1]);
+      return null;
+    }));
+    tests.define("clear!", new VariadicBuiltin("code.test/clear!", values -> {
+      if (values.length == 0) testRegistry.clear();
+      else if (values.length == 1) {
+        Object namespace = values[0] instanceof Symbol ? ((Symbol) values[0]).display() : values[0];
+        testRegistry.clearNamespace(String.valueOf(namespace));
+      } else throw new HaraException("code.test/clear! expects no arguments or a namespace");
+      return null;
+    }));
+    HaraMacro factMacro = HaraMacro.nativeMacro(Symbol.create("fact"), this::expandFact);
+    defineIntrinsicMacro(Symbol.create("fact"), factMacro);
+    tests.define("fact", factMacro);
+    tests.define("fact:template", factMacro);
+
+    HaraNamespace runtime = namespace("code.test.base.runtime");
+    for (String name : new String[] {
+      "all-facts", "list-facts", "get-fact", "remove-fact", "purge-facts", "purge-all",
+      "get-global", "set-global", "get-flag", "set-flag", "setup-fact", "teardown-fact",
+      "fact-id", "summarise"
+    }) runtime.define(name, tests.lookup(name).get());
+    HaraNamespace commonChecker = namespace("code.test.checker.common");
+    for (String name : new String[] {"anything", "exactly", "approx", "satisfies", "stores", "throws", "throws-info", "checker?", "verify", "succeeded?", "->checker"}) {
+      commonChecker.define(name, tests.lookup(name).get());
+    }
+    HaraNamespace collectionChecker = namespace("code.test.checker.collection");
+    for (String name : new String[] {"contains", "contains-in", "just", "just-in"}) {
+      collectionChecker.define(name, tests.lookup(name).get());
+    }
+    HaraNamespace logicChecker = namespace("code.test.checker.logic");
+    for (String name : new String[] {"any", "all", "is-not"}) logicChecker.define(name, tests.lookup(name).get());
+    HaraNamespace executive = namespace("code.test.base.executive");
+    executive.define("summarise", tests.lookup("summarise").get());
+    executive.define("run-namespace", tests.lookup("run!").get());
+    executive.define("run-current", tests.lookup("run!").get());
+    executive.define("test-namespace", tests.lookup("run!").get());
+    HaraNamespace compile = namespace("code.test.compile");
+    for (String name : new String[] {
+      "fact", "fact:all", "fact:purge", "fact:list", "fact:symbol", "fact:get",
+      "fact:missing", "fact:exec", "fact:setup", "fact:setup?", "fact:teardown",
+      "fact:remove", "fact:template", "=>"
+    }) compile.define(name, tests.lookup(name).get());
+    HaraNamespace context = namespace("code.test.base.context");
+    context.define("new-context", new VariadicBuiltin("code.test.base.context/new-context", values ->
+        hara.lang.data.Map.Standard.EMPTY));
+    HaraNamespace match = namespace("code.test.base.match");
+    match.define("match-include", new VariadicBuiltin("code.test.base.match/match-include", values -> values.length > 1));
+    match.define("match-exclude", new VariadicBuiltin("code.test.base.match/match-exclude", values -> false));
+    match.define("match-options", new VariadicBuiltin("code.test.base.match/match-options", values -> true));
+    HaraNamespace codeTestTask = namespace("code.test.task");
+    codeTestTask.define("run", tests.lookup("run!").get());
+    codeTestTask.define("run:test", tests.lookup("run!").get());
+    codeTestTask.define("run:current", tests.lookup("run!").get());
+  }
+
+  void installTaskLibrary() {
+    HaraNamespace taskNamespace = namespace("std.task");
+    taskNamespace.define("task", new VariadicBuiltin("std.task/task", this::createTask));
+    taskNamespace.define("map->Task", new UnaryBuiltin("std.task/map->Task", value -> {
+      if (!(value instanceof IMapType<?, ?>)) throw new HaraException("map->Task expects a map");
+      return createTask(new Object[] {value});
+    }));
+    taskNamespace.define("task?", new UnaryBuiltin("std.task/task?", value -> value instanceof Task));
+    taskNamespace.define("task-status", new UnaryBuiltin("std.task/task-status", value -> {
+      if (!(value instanceof Task task)) throw new HaraException("task-status expects a task");
+      return Keyword.create(task.type());
+    }));
+    taskNamespace.define("task-info", new UnaryBuiltin("std.task/task-info", value -> {
+      if (!(value instanceof Task task)) throw new HaraException("task-info expects a task");
+      return hara.lang.data.Map.Standard.from(null, Keyword.create("fn"), Symbol.create(task.name()));
+    }));
+    taskNamespace.define("task-defaults", new UnaryBuiltin("std.task/task-defaults", value ->
+        hara.lang.data.Map.Standard.from(null,
+            Keyword.create("main"),
+            hara.lang.data.Map.Standard.from(null,
+                Keyword.create("arglists"),
+                hara.lang.data.List.Standard.from(null,
+                    hara.lang.data.Vector.Standard.EMPTY,
+                hara.lang.data.Vector.Standard.from(null, Symbol.create("entry")))))));
+    taskNamespace.define("single-function-print", new UnaryBuiltin("std.task/single-function-print", this::singleFunctionPrint));
+    taskNamespace.define("process-ns-args", new VariadicBuiltin("std.task/process-ns-args", values -> {
+      ArrayList<String> arguments = new ArrayList<>();
+      if (values.length == 1 && values[0] instanceof Iterable<?> iterable) {
+        for (Object value : iterable) arguments.add(String.valueOf(value));
+      } else {
+        for (Object value : values) arguments.add(String.valueOf(value));
+      }
+      String[] args = arguments.toArray(String[]::new);
+      return TaskProcess.processNamespaceArgs(args);
+    }));
+    taskNamespace.define("invoke-intern-task", new VariadicBuiltin("std.task/invoke-intern-task", values -> {
+      if (values.length < 2 || !(values[0] instanceof Symbol)) {
+        throw new HaraException("invoke-intern-task expects a name and configuration");
+      }
+      Object config = values[1];
+      Object type = config instanceof IMapType<?, ?> map ? lookupValue(map, Keyword.create("template")) : Keyword.create("default");
+      Symbol definedName = (Symbol) values[0];
+      if (config instanceof IMapType<?, ?> map) {
+        Object doc = lookupValue(map, Keyword.create("doc"));
+        Object arglists = lookupValue(map, Keyword.create("arglists"));
+        if (arglists == null) {
+          arglists = hara.lang.data.List.Standard.from(null,
+              hara.lang.data.Vector.Standard.EMPTY,
+              hara.lang.data.Vector.Standard.from(null, Symbol.create("entry")));
+        }
+        ArrayList<Object> metadata = new ArrayList<>();
+        if (doc != null) { metadata.add(Keyword.create("doc")); metadata.add(doc); }
+        if (arglists != null) { metadata.add(Keyword.create("arglists")); metadata.add(arglists); }
+        if (!metadata.isEmpty()) {
+          definedName = definedName.withMeta(hara.lang.data.Map.Standard.from(null, metadata.toArray()));
+        }
+      }
+      return List.Standard.from(null, Symbol.create("def"), definedName,
+          List.Standard.from(null, Symbol.create("std.task", "task"), type, ((Symbol) values[0]).getName(), config));
+    }));
+    taskNamespace.define("invoke", new VariadicBuiltin("std.task/invoke", values -> {
+      if (values.length < 1 || !(values[0] instanceof Task task)) {
+        throw new HaraException("std.task/invoke expects a task");
+      }
+      try {
+        return TaskProcess.invoke(task, java.util.Arrays.copyOfRange(values, 1, values.length));
+      } catch (Exception error) {
+        throw new HaraException("Task invocation failed: " + error.getMessage());
+      }
+    }));
+    HaraMacro deftaskMacro = HaraMacro.nativeMacro(Symbol.create("deftask"), this::expandDeftask);
+    defineIntrinsicMacro(Symbol.create("deftask"), deftaskMacro);
+    taskNamespace.define("deftask", deftaskMacro);
+
+    HaraNamespace process = namespace("std.task.process");
+    process.define("select-filter", new VariadicBuiltin("std.task.process/select-filter", values -> {
+      if (values.length != 2) throw new HaraException("select-filter expects selector and id");
+      try { return TaskProcess.selectFilter(values[0], values[1]); }
+      catch (RuntimeException error) { throw new HaraException(error.getMessage()); }
+    }));
+    process.define("select-inputs", new VariadicBuiltin("std.task.process/select-inputs", values -> {
+      if (values.length != 4 || !(values[0] instanceof Task)) {
+        throw new HaraException("select-inputs expects task, lookup, environment, and selector");
+      }
+      try {
+        return TaskProcess.selectInputs((Task) values[0], values[1], values[2], values[3]);
+      } catch (Exception error) {
+        throw new HaraException("Unable to select task inputs: " + error.getMessage());
+      }
+    }));
+    process.define("invoke", taskNamespace.lookup("invoke").get());
+    process.define("task-inputs", new VariadicBuiltin("std.task.process/task-inputs", values -> {
+      if (values.length < 1 || !(values[0] instanceof Task)) throw new HaraException("task-inputs expects a task");
+      try {
+        return TaskProcess.taskInputs((Task) values[0], java.util.Arrays.copyOfRange(values, 1, values.length));
+      } catch (Exception error) {
+        throw new HaraException("Unable to construct task inputs: " + error.getMessage());
+      }
+    }));
+    process.define("main-function", new VariadicBuiltin("std.task.process/main-function", values -> {
+      if (values.length != 2 || (!(values[0] instanceof TaskFunction) && !(values[0] instanceof HaraFunction))
+          || !(values[1] instanceof Number)) {
+        throw new HaraException("main-function expects a function and count");
+      }
+      TaskFunction function = values[0] instanceof TaskFunction
+          ? (TaskFunction) values[0] : toTaskFunction(values[0]);
+      return TaskProcess.mainFunction(function, ((Number) values[1]).intValue());
+    }));
+    process.define("wrap-execute", new VariadicBuiltin("std.task.process/wrap-execute", values -> {
+      if (values.length != 2 || !(values[1] instanceof Task)) {
+        throw new HaraException("wrap-execute expects a function and task");
+      }
+      return wrapExecuteFunction(values[0], (Task) values[1]);
+    }));
+    process.define("wrap-input", new VariadicBuiltin("std.task.process/wrap-input", values -> {
+      if (values.length != 2 || !(values[1] instanceof Task)) {
+        throw new HaraException("wrap-input expects a function and task");
+      }
+      Object execute = wrapExecuteFunction(values[0], (Task) values[1]);
+      return new VariadicBuiltin("std.task.process/wrap-input", inputValues -> {
+        if (inputValues.length < 4) throw new HaraException("wrapped task expects input, params, lookup, and env");
+        Object input = inputValues[0];
+        if (input instanceof Keyword && "list".equals(((Keyword) input).getName())) {
+          Object listFunction = taskConfig((Task) values[1], "item", "list");
+          return invokeCallable(listFunction, new Object[] {inputValues[2], inputValues[3]});
+        }
+        if (input instanceof Keyword || input instanceof hara.lang.data.Vector<?>
+            || input instanceof hara.lang.data.List<?> || input instanceof hara.lang.data.Set<?>) {
+          try {
+            java.util.List<?> selected = TaskProcess.selectInputs(
+                (Task) values[1], inputValues[2], inputValues[3], input);
+            ArrayList<Object> results = new ArrayList<>();
+            for (Object selectedInput : selected) {
+              Object[] forwarded = inputValues.clone();
+              forwarded[0] = selectedInput;
+              results.add(invokeCallable(execute, forwarded));
+            }
+            return results;
+          } catch (Exception error) {
+            throw new HaraException("Unable to select task inputs: " + error.getMessage());
+          }
+        }
+        return invokeCallable(execute, inputValues);
+      });
+    }));
+
+    HaraNamespace bulk = namespace("std.task.bulk");
+    bulk.define("bulk-display", new VariadicBuiltin("std.task.bulk/bulk-display", values -> {
+      if (values.length != 2) throw new HaraException("bulk-display expects index and input lengths");
+      java.util.Map<String, Object> display = new LinkedHashMap<>();
+      display.put("padding", 1);
+      display.put("spacing", 1);
+      ArrayList<Object> columns = new ArrayList<>();
+      columns.add(java.util.Map.of("id", "index", "length", values[0], "align", "right"));
+      columns.add(java.util.Map.of("id", "input", "length", values[1]));
+      columns.add(java.util.Map.of("id", "data", "length", 60));
+      columns.add(java.util.Map.of("id", "time", "length", 10));
+      display.put("columns", columns);
+      return display;
+    }));
+    bulk.define("bulk-process-item", new VariadicBuiltin("std.task.bulk/bulk-process-item", values -> {
+      if (values.length < 2 || !(values[0] instanceof HaraFunction)) {
+        throw new HaraException("bulk-process-item expects a function and context");
+      }
+      Object context = values[1];
+      Object input = context instanceof IMapType<?, ?> map ? lookupValue(map, Keyword.create("input")) : null;
+      Object params = values.length > 2 ? values[2] : hara.lang.data.Map.Standard.EMPTY;
+      Object lookup = values.length > 3 ? values[3] : hara.lang.data.Map.Standard.EMPTY;
+      Object env = values.length > 4 ? values[4] : hara.lang.data.Map.Standard.EMPTY;
+      Object[] functionArgs = new Object[4 + Math.max(0, values.length - 5)];
+      functionArgs[0] = input;
+      functionArgs[1] = params;
+      functionArgs[2] = lookup;
+      functionArgs[3] = env;
+      if (values.length > 5) System.arraycopy(values, 5, functionArgs, 4, values.length - 5);
+      long start = System.nanoTime();
+      try {
+        Object returned = HaraBox.unwrap(invokeCallable(values[0], functionArgs));
+        if (returned instanceof ILinearType<?> pair && pair.count() == 2) {
+          Object result = pair.nth(1);
+          if (result instanceof IMapType<?, ?> map) {
+            Object withTime = ((IMapType) map).assoc(
+                Keyword.create("time"), (System.nanoTime() - start) / 1_000_000L);
+            return hara.lang.data.List.Standard.from(null, pair.nth(0), withTime);
+          }
+          if (result instanceof java.util.Map<?, ?> javaMap) {
+            java.util.Map<Object, Object> withTime = new LinkedHashMap<>(javaMap);
+            withTime.put("time", (System.nanoTime() - start) / 1_000_000L);
+            return hara.lang.data.List.Standard.from(null, pair.nth(0), withTime);
+          }
+          return returned;
+        }
+        java.util.Map<String, Object> item = new LinkedHashMap<>();
+        item.put("input", input);
+        item.put("status", "RETURN");
+        item.put("data", returned);
+        item.put("time", (System.nanoTime() - start) / 1_000_000L);
+        return hara.lang.data.List.Standard.from(null, input, item);
+      } catch (Throwable error) {
+        java.util.Map<String, Object> item = new LinkedHashMap<>();
+        item.put("input", input);
+        item.put("status", "ERROR");
+        item.put("data", "errored");
+        item.put("error", String.valueOf(error.getMessage()));
+        item.put("time", (System.nanoTime() - start) / 1_000_000L);
+        return hara.lang.data.List.Standard.from(null, input, item);
+      }
+    }));
+    bulk.define("bulk-items", new VariadicBuiltin("std.task.bulk/bulk-items", values -> bulkItems(values, false)));
+    bulk.define("bulk-items-single", new VariadicBuiltin("std.task.bulk/bulk-items-single", values -> bulkItems(values, false)));
+    bulk.define("bulk-items-parallel", new VariadicBuiltin("std.task.bulk/bulk-items-parallel", values -> bulkItems(values, true)));
+    bulk.define("bulk-warnings", new VariadicBuiltin("std.task.bulk/bulk-warnings", values -> {
+      if (values.length == 0) throw new HaraException("bulk-warnings expects parameters and items");
+      return filterBulkResults(values[values.length - 1], "WARN");
+    }));
+    bulk.define("bulk-errors", new VariadicBuiltin("std.task.bulk/bulk-errors", values -> {
+      if (values.length == 0) throw new HaraException("bulk-errors expects parameters and items");
+      return filterBulkResults(values[values.length - 1], "ERROR");
+    }));
+    bulk.define("bulk-results", new VariadicBuiltin("std.task.bulk/bulk-results", values -> {
+      if (values.length == 0) throw new HaraException("bulk-results expects parameters and items");
+      if (values.length >= 3 && !(values[values.length - 1] instanceof java.util.Map<?, ?>)) {
+        Object value = values[values.length - 1];
+        if (value instanceof Iterable<?> iterable) {
+          ArrayList<Object> results = new ArrayList<>();
+          for (Object item : iterable) {
+            if (!(item instanceof ILinearType<?> pair) || pair.count() != 2) continue;
+            Object result = pair.nth(1);
+            Object status;
+            Object data;
+            if (result instanceof IMapType<?, ?> map) {
+              status = lookupValue(map, Keyword.create("status"));
+              data = lookupValue(map, Keyword.create("data"));
+            } else if (result instanceof java.util.Map<?, ?> map) {
+              status = map.get("status");
+              data = map.get("data");
+            } else {
+              continue;
+            }
+            String name = status instanceof Keyword ? ((Keyword) status).getName() : String.valueOf(status);
+            if ("return".equalsIgnoreCase(name)) {
+              java.util.Map<String, Object> output = new LinkedHashMap<>();
+              output.put("key", pair.nth(0));
+              output.put("data", data);
+              results.add(output);
+            }
+          }
+          return results;
+        }
+      }
+      return filterBulkResults(values[values.length - 1], "RETURN");
+    }));
+    bulk.define("prepare-columns", new VariadicBuiltin("std.task.bulk/prepare-columns", values -> {
+      if (values.length != 2) throw new HaraException("prepare-columns expects columns and outputs");
+      return TaskBulk.prepareColumns(asBulkMaps(values[0]), asObjects(values[1]));
+    }));
+    bulk.define("bulk-summary", new VariadicBuiltin("std.task.bulk/bulk-summary", values -> {
+      if (values.length == 0) throw new HaraException("bulk-summary expects item results");
+      if (values.length >= 7 && values[0] instanceof Task) {
+        java.util.List<Object> items = asObjects(values[2]);
+        java.util.List<Object> results = asObjects(values[3]);
+        java.util.List<Object> warnings = asObjects(values[4]);
+        java.util.List<Object> errors = asObjects(values[5]);
+        long cumulative = 0L;
+        for (Object item : items) {
+          if (item instanceof ILinearType<?> pair && pair.count() == 2
+              && pair.nth(1) instanceof IMapType<?, ?> map) {
+            Object time = lookupValue(map, Keyword.create("time"));
+            if (time instanceof Number number) cumulative += number.longValue();
+          }
+        }
+        java.util.Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("items", items.size());
+        summary.put("results", results.size());
+        summary.put("warnings", warnings.size());
+        summary.put("errors", errors.size());
+        summary.put("cumulative", cumulative);
+        summary.put("elapsed", values[6]);
+        return summary;
+      }
+      return TaskBulk.summary(asBulkMaps(values[values.length - 1]));
+    }));
+    bulk.define("bulk-package", new VariadicBuiltin("std.task.bulk/bulk-package", values -> {
+      int bundleIndex = values.length > 0 && values[0] instanceof Task ? 1 : 0;
+      if (values.length < bundleIndex + 2
+          || (!(values[bundleIndex] instanceof Map<?, ?>) && !(values[bundleIndex] instanceof IMapType<?, ?>))) {
+        throw new HaraException("bulk-package expects a bundle");
+      }
+      String returnMode = values[bundleIndex + 1] instanceof Keyword
+          ? ((Keyword) values[bundleIndex + 1]).getName() : String.valueOf(values[bundleIndex + 1]);
+      String packageMode = values.length > bundleIndex + 2 && values[bundleIndex + 2] instanceof Keyword
+          ? ((Keyword) values[bundleIndex + 2]).getName() : "map";
+      Map<String, Object> converted = new LinkedHashMap<>();
+      if (values[bundleIndex] instanceof Map<?, ?> bundle) bundle.forEach((key, value) -> converted.put(keyName(key), value));
+      else for (Object object : (IMapType<?, ?>) values[bundleIndex]) {
+        java.util.Map.Entry<?, ?> entry = (java.util.Map.Entry<?, ?>) object;
+        converted.put(keyName(entry.getKey()), entry.getValue());
+      }
+      return packageBulkValue(converted, returnMode, packageMode);
+    }));
+    bulk.define("bulk", new VariadicBuiltin("std.task.bulk/bulk", values -> {
+      if (values.length >= 6 && values[0] instanceof Task
+          && (values[1] instanceof HaraFunction || values[1] instanceof TaskFunction)) {
+        Task task = (Task) values[0];
+        Object function = values[1];
+        Object inputValue = values[2];
+        Object params = values[3];
+        Object lookup = values[4];
+        Object env = values[5];
+        Object[] bulkArgs = new Object[6 + Math.max(0, values.length - 6)];
+        bulkArgs[0] = function;
+        bulkArgs[1] = inputValue;
+        bulkArgs[2] = hara.lang.data.Map.Standard.EMPTY;
+        bulkArgs[3] = params;
+        bulkArgs[4] = lookup;
+        bulkArgs[5] = env;
+        if (values.length > 6) System.arraycopy(values, 6, bulkArgs, 6, values.length - 6);
+        boolean parallel = optionTrue(params, "parallel");
+        Object items = bulkItems(bulkArgs, parallel);
+        Object warnings = filterBulkResults(items, "WARN");
+        Object errors = filterBulkResults(items, "ERROR");
+        Object results = filterBulkResults(items, "RETURN");
+        java.util.Map<String, Object> bundle = new LinkedHashMap<>();
+        bundle.put("items", items);
+        bundle.put("warnings", warnings);
+        bundle.put("errors", errors);
+        bundle.put("results", results);
+        bundle.put("summary", TaskBulk.summary(asBulkMaps(items)));
+        Object returnMode = params instanceof IMapType<?, ?> map
+            ? lookupValue(map, Keyword.create("return")) : null;
+        String mode = returnMode instanceof Keyword ? ((Keyword) returnMode).getName() : "results";
+        return packageBulkValue(bundle, mode, "map");
+      }
+      if (values.length < 2 || !(values[0] instanceof Task)) throw new HaraException("bulk expects task and inputs");
+      java.util.List<Object> inputs = new ArrayList<>();
+      if (values[1] instanceof Iterable<?> iterable) iterable.forEach(inputs::add);
+      else inputs.add(values[1]);
+      java.util.List<Map<String, Object>> items = TaskBulk.items((Task) values[0], inputs);
+      return java.util.Map.of("items", items, "summary", TaskBulk.summary(items), "results", items);
+    }));
+  }
+
+  @SuppressWarnings("rawtypes")
+  private boolean optionTrue(Object options, String name) {
+    if (options instanceof IMapType<?, ?> map) return Boolean.TRUE.equals(lookupValue(map, Keyword.create(name)));
+    if (options instanceof java.util.Map<?, ?> map) return Boolean.TRUE.equals(map.get(name));
+    return false;
+  }
+
+  private Object filterBulkResults(Object value, String status) {
+    if (!(value instanceof Iterable<?> iterable)) throw new HaraException("bulk result filter expects items");
+    ArrayList<Object> results = new ArrayList<>();
+    for (Object item : iterable) {
+      if (item instanceof java.util.Map<?, ?> map) {
+        Object rawStatus = map.get("status");
+        String actual = rawStatus instanceof Keyword
+            ? ((Keyword) rawStatus).getName().toUpperCase()
+            : String.valueOf(rawStatus).replace(":", "").toUpperCase();
+        if (status.equals(actual) || ("ERROR".equals(status) && "CRITICAL".equals(actual))) {
+          results.add(item);
+        }
+      } else if (item instanceof ILinearType<?> pair && pair.count() == 2) {
+        Object result = pair.nth(1);
+        if (result instanceof IMapType<?, ?> map) {
+          Object rawStatus = lookupValue(map, Keyword.create("status"));
+          String actual = rawStatus instanceof Keyword
+              ? ((Keyword) rawStatus).getName().toUpperCase()
+              : String.valueOf(rawStatus).replace(":", "").toUpperCase();
+          if (status.equals(actual) || ("ERROR".equals(status) && "CRITICAL".equals(actual))) {
+            results.add(item);
+          }
+        } else if (result instanceof java.util.Map<?, ?> map) {
+          Object rawStatus = map.get("status");
+          String actual = rawStatus instanceof Keyword
+              ? ((Keyword) rawStatus).getName().toUpperCase()
+              : String.valueOf(rawStatus).replace(":", "").toUpperCase();
+          if (status.equals(actual) || ("ERROR".equals(status) && "CRITICAL".equals(actual))) {
+            results.add(item);
+          }
+        }
+      }
+    }
+    return results;
+  }
+
+  private Object packageBulkValue(java.util.Map<String, Object> bundle, String returnMode, String packageMode) {
+    if ("all".equals(returnMode)) {
+      java.util.Map<String, Object> all = new LinkedHashMap<>();
+      for (String key : java.util.List.of("items", "warnings", "errors", "results", "summary")) {
+        if (bundle.containsKey(key)) all.put(key, packageBulkValue(bundle, key, packageMode));
+      }
+      return all;
+    }
+    Object selected = bundle.get(returnMode);
+    if (!(selected instanceof Iterable<?> iterable)
+        || "warnings".equals(returnMode) || "errors".equals(returnMode)) return selected;
+    ArrayList<Object> vector = new ArrayList<>();
+    java.util.Map<Object, Object> map = new LinkedHashMap<>();
+    for (Object value : iterable) {
+      Object key = null;
+      Object data = value;
+      if (value instanceof ILinearType<?> pair && pair.count() == 2) {
+        key = pair.nth(0);
+        data = pair.nth(1);
+        if (data instanceof IMapType<?, ?> haraMap) data = lookupValue(haraMap, Keyword.create("data"));
+        else if (data instanceof java.util.Map<?, ?> javaMap) data = javaMap.get("data");
+      } else if (value instanceof IMapType<?, ?> haraMap) {
+        key = lookupValue(haraMap, Keyword.create("key"));
+        if (key == null) key = lookupValue(haraMap, Keyword.create("input"));
+        if (lookupValue(haraMap, Keyword.create("data")) != null) {
+          data = lookupValue(haraMap, Keyword.create("data"));
+        }
+      } else if (value instanceof java.util.Map<?, ?> javaMap) {
+        key = javaMap.get("key");
+        if (key == null) key = javaMap.get("input");
+        if (javaMap.containsKey("data")) data = javaMap.get("data");
+      }
+      if ("vector".equals(packageMode)) {
+        vector.add(hara.lang.data.List.Standard.from(null, key, data));
+      } else {
+        map.put(key, data);
+      }
+    }
+    return "vector".equals(packageMode) ? vector : map;
+  }
+
+  private Object bulkItems(Object[] values, boolean parallel) {
+    if (values.length >= 2 && values[0] instanceof HaraFunction) {
+      Object function = values[0];
+      java.util.List<Object> inputs = asObjects(values[1]);
+      Object params = values.length > 3 ? values[3] : hara.lang.data.Map.Standard.EMPTY;
+      Object lookup = values.length > 4 ? values[4] : hara.lang.data.Map.Standard.EMPTY;
+      Object env = values.length > 5 ? values[5] : hara.lang.data.Map.Standard.EMPTY;
+      int extraStart = Math.min(values.length, 6);
+      java.util.function.Function<Object, Object> process = input -> {
+        Object[] callArgs = new Object[4 + Math.max(0, values.length - extraStart)];
+        callArgs[0] = input;
+        callArgs[1] = params;
+        callArgs[2] = lookup;
+        callArgs[3] = env;
+        if (values.length > extraStart) {
+          System.arraycopy(values, extraStart, callArgs, 4, values.length - extraStart);
+        }
+        long start = System.nanoTime();
+        try {
+          Object returned = HaraBox.unwrap(invokeCallable(function, callArgs));
+          if (returned instanceof ILinearType<?> pair && pair.count() == 2) {
+            Object resultValue = pair.nth(1);
+            long elapsed = (System.nanoTime() - start) / 1_000_000L;
+            if (resultValue instanceof IMapType<?, ?> resultMap) {
+              return hara.lang.data.List.Standard.from(null, pair.nth(0),
+                  ((IMapType) resultMap).assoc(Keyword.create("time"), elapsed));
+            }
+            if (resultValue instanceof java.util.Map<?, ?> resultMap) {
+              java.util.Map<Object, Object> withTime = new LinkedHashMap<>(resultMap);
+              withTime.put("time", elapsed);
+              return hara.lang.data.List.Standard.from(null, pair.nth(0), withTime);
+            }
+            return returned;
+          }
+          java.util.Map<String, Object> result = new LinkedHashMap<>();
+          result.put("status", "RETURN");
+          result.put("data", returned);
+          result.put("time", (System.nanoTime() - start) / 1_000_000L);
+          return hara.lang.data.List.Standard.from(null, input, result);
+        } catch (Throwable error) {
+          java.util.Map<String, Object> result = new LinkedHashMap<>();
+          result.put("status", "ERROR");
+          result.put("data", "errored");
+          result.put("error", String.valueOf(error.getMessage()));
+          result.put("time", (System.nanoTime() - start) / 1_000_000L);
+          return hara.lang.data.List.Standard.from(null, input, result);
+        }
+      };
+      if (parallel) {
+        return inputs.parallelStream().map(process).toList();
+      }
+      return inputs.stream().map(process).toList();
+    }
+    if (values.length < 2 || !(values[0] instanceof Task)) throw new HaraException("bulk-items expects a task and inputs");
+    Task task = (Task) values[0];
+    Object inputValue;
+    if (values.length >= 3 && (values[1] instanceof HaraFunction || values[1] instanceof TaskFunction)) {
+      task = new Task(task.type(), task.name(), toTaskFunction(values[1]), task.arglists(), task.config());
+      inputValue = values[2];
+    } else {
+      inputValue = values[1];
+    }
+    java.util.List<Object> inputs = asObjects(inputValue);
+    return parallel ? TaskBulk.itemsParallel(task, inputs) : TaskBulk.items(task, inputs);
+  }
+
+  private java.util.List<Object> asObjects(Object value) {
+    java.util.List<Object> objects = new ArrayList<>();
+    if (value instanceof Iterable<?> iterable) iterable.forEach(objects::add);
+    else objects.add(value);
+    return objects;
+  }
+
+  @SuppressWarnings("unchecked")
+  private java.util.List<Map<String, Object>> asBulkMaps(Object value) {
+    java.util.List<Map<String, Object>> maps = new ArrayList<>();
+    for (Object item : asObjects(value)) {
+      Map<String, Object> converted = new LinkedHashMap<>();
+      if (item instanceof Map<?, ?> map) {
+        map.forEach((key, nested) -> converted.put(keyName(key), nested));
+      } else if (item instanceof ILinearType<?> pair && pair.count() == 2) {
+        Object result = pair.nth(1);
+        converted.put("input", pair.nth(0));
+        if (result instanceof IMapType<?, ?> haraMap) {
+          for (Object entryObject : haraMap) {
+            Map.Entry<?, ?> entry = (Map.Entry<?, ?>) entryObject;
+            converted.put(keyName(entry.getKey()), entry.getValue());
+          }
+        } else if (result instanceof Map<?, ?> map) {
+          map.forEach((key, nested) -> converted.put(keyName(key), nested));
+        }
+      } else continue;
+      maps.add(converted);
+    }
+    return maps;
+  }
+
+  private boolean matcherOption(Object[] values, String name) {
+    for (int i = 1; i < values.length; i++) {
+      if (values[i] instanceof Keyword keyword && name.equals(keyword.getName())) return true;
+      if (values[i] instanceof Symbol symbol && name.equals(symbol.getName())) return true;
+    }
+    return false;
+  }
+
+  private static String keyName(Object key) {
+    if (key instanceof Keyword) return ((Keyword) key).getName();
+    return String.valueOf(key).replaceFirst("^:", "");
+  }
+
+  private Object wrapExecuteFunction(Object function, Task task) {
+    return new VariadicBuiltin("std.task.process/wrapped-execute", values -> {
+      if (values.length < 4) throw new HaraException("wrapped task expects input, params, lookup, and env");
+      Object input = values[0];
+      Object params = values[1];
+      Object lookup = values[2];
+      Object env = values[3];
+      Object pre = taskConfig(task, "item", "pre");
+      Object post = taskConfig(task, "item", "post");
+      Object output = taskConfig(task, "item", "output");
+      if (pre != null) input = invokeCallable(pre, new Object[] {input});
+      Object[] callArgs = new Object[values.length];
+      System.arraycopy(values, 0, callArgs, 0, values.length);
+      callArgs[0] = input;
+      Object result = invokeCallable(function, callArgs);
+      if (post != null) result = invokeCallable(post, new Object[] {result});
+      boolean bulk = params instanceof IMapType<?, ?> haraParams
+          ? Boolean.TRUE.equals(lookupValue(haraParams, Keyword.create("bulk")))
+          : params instanceof Map<?, ?> javaParams && Boolean.TRUE.equals(javaParams.get("bulk"));
+      if (bulk) {
+        java.util.Map<String, Object> packaged = new LinkedHashMap<>();
+        packaged.put("status", "RETURN");
+        packaged.put("data", result);
+        return hara.lang.data.List.Standard.from(null, input, packaged);
+      }
+      if (output != null) result = invokeCallable(output, new Object[] {result});
+      return result;
+    });
+  }
+
+  private Object taskConfig(Task task, String first, String second) {
+    Object group = task.config().get(first);
+    return group instanceof java.util.Map<?, ?> map ? map.get(second) : null;
+  }
+
+  private Object createTask(Object[] values) {
+    if (values.length == 1 && values[0] instanceof IMapType<?, ?> map) {
+      Object type = lookupValue(map, Keyword.create("type"));
+      Object name = lookupValue(map, Keyword.create("name"));
+      Object main = lookupValue(map, Keyword.create("main"));
+      Object function = main instanceof IMapType<?, ?> mainMap
+          ? lookupValue(mainMap, Keyword.create("fn")) : main;
+      return newTask(type, name, function, toJavaMap(map));
+    }
+    if (values.length != 3) throw new HaraException("std.task/task expects type, name, and function/config");
+    Object config = values[2];
+    Object function = config instanceof IMapType<?, ?> map
+        ? lookupValue(map, Keyword.create("main")) == null
+            ? null : lookupValue((IMapType<?, ?>) lookupValue(map, Keyword.create("main")), Keyword.create("fn"))
+        : config;
+    return newTask(values[0], values[1], function, config instanceof IMapType<?, ?> map ? toJavaMap(map) : java.util.Map.of());
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private Object singleFunctionPrint(Object value) {
+    if (!(value instanceof IMapType<?, ?> map)) throw new HaraException("single-function-print expects a map");
+    Object bulk = lookupValue(map, Keyword.create("bulk"));
+    Object print = lookupValue(map, Keyword.create("print"));
+    if (Boolean.TRUE.equals(bulk)) return value;
+    if (print instanceof IMapType<?, ?> printMap) {
+      if (lookupValue(printMap, Keyword.create("function")) != null) return value;
+      return ((IMapType) map).assoc(Keyword.create("print"),
+          ((IMapType) printMap).assoc(Keyword.create("function"), Boolean.TRUE));
+    }
+    return ((IMapType) map).assoc(
+        Keyword.create("print"),
+        hara.lang.data.Map.Standard.from(null, Keyword.create("function"), Boolean.TRUE));
+  }
+
+  private Task newTask(Object type, Object name, Object function, java.util.Map<String, Object> config) {
+    if (name == null || function == null) throw new HaraException("std.task/task requires a name and function");
+    String taskType = type instanceof Keyword ? ((Keyword) type).getName() : String.valueOf(type);
+    String taskName = String.valueOf(name);
+    Object arglists = config.get("arglists");
+    Object main = config.get("main");
+    if (arglists == null && main instanceof java.util.Map<?, ?> mainMap) arglists = mainMap.get("arglists");
+    if (arglists == null) {
+      arglists = hara.lang.data.List.Standard.from(null,
+          hara.lang.data.Vector.Standard.EMPTY,
+          hara.lang.data.Vector.Standard.from(null, Symbol.create("entry")));
+    }
+    return new Task(taskType, taskName, toTaskFunction(function), arglists, config);
+  }
+
+  private TaskFunction toTaskFunction(Object function) {
+    if (function instanceof TaskFunction taskFunction) return taskFunction;
+    if (!(function instanceof HaraFunction haraFunction)) {
+      throw new HaraException("std.task requires a Hara function");
+    }
+    return new TaskFunction() {
+      @Override
+      public Object apply(Object[] arguments) {
+        return haraFunction.callTarget().call(haraFunction.callArguments(arguments));
+      }
+
+      @Override
+      public int minimumArity() { return haraFunction.arity() < 0 ? 4 : Math.max(1, haraFunction.arity()); }
+
+      @Override
+      public boolean variadic() { return haraFunction.variadic(); }
+    };
+  }
+
+  private java.util.Map<String, Object> toJavaMap(IMapType<?, ?> map) {
+    java.util.Map<String, Object> result = new LinkedHashMap<>();
+    for (Object object : map) {
+      java.util.Map.Entry<?, ?> entry = (java.util.Map.Entry<?, ?>) object;
+      String key = entry.getKey() instanceof Keyword
+          ? ((Keyword) entry.getKey()).getName() : String.valueOf(entry.getKey());
+      Object value = entry.getValue();
+      result.put(key, value instanceof IMapType<?, ?> nested ? toJavaMap(nested) : value);
+    }
+    return result;
+  }
+
+  private Object expandDeftask(List<?> invocation) {
+    if (invocation.count() < 3 || !(invocation.nth(1) instanceof Symbol)) {
+      throw new HaraException("deftask expects a name and configuration");
+    }
+    Symbol name = (Symbol) invocation.nth(1);
+    Object config = invocation.nth(2);
+    Object type = config instanceof IMapType<?, ?> map ? lookupValue(map, Keyword.create("template")) : Keyword.create("default");
+    Object main = config instanceof IMapType<?, ?> map ? lookupValue(map, Keyword.create("main")) : null;
+    if (main instanceof IMapType<?, ?> map) main = lookupValue(map, Keyword.create("fn"));
+    if (main == null) throw new HaraException("deftask configuration requires :main");
+    Symbol definedName = name;
+    if (config instanceof IMapType<?, ?> configMap) {
+      Object doc = lookupValue(configMap, Keyword.create("doc"));
+      Object arglists = lookupValue(configMap, Keyword.create("arglists"));
+      Object mainConfig = lookupValue(configMap, Keyword.create("main"));
+      if (arglists == null) {
+        arglists = mainConfig instanceof IMapType<?, ?> mainMap
+            ? lookupValue(mainMap, Keyword.create("arglists")) : null;
+      }
+      if (arglists == null) {
+        arglists = hara.lang.data.List.Standard.from(null,
+            hara.lang.data.Vector.Standard.EMPTY,
+            hara.lang.data.Vector.Standard.from(null, Symbol.create("entry")));
+      }
+      if (doc != null || arglists != null) {
+        java.util.ArrayList<Object> metadata = new java.util.ArrayList<>();
+        if (doc != null) { metadata.add(Keyword.create("doc")); metadata.add(doc); }
+        if (arglists != null) { metadata.add(Keyword.create("arglists")); metadata.add(arglists); }
+        definedName = name.withMeta(hara.lang.data.Map.Standard.from(null, metadata.toArray()));
+      }
+    }
+    return List.Standard.from(null, Symbol.create("def"), definedName,
+        List.Standard.from(null, Symbol.create("std.task", "task"), type, name.getName(), config));
   }
 
   private Object expandFact(List<?> invocation) {
@@ -900,7 +2030,16 @@ public final class HaraContext {
       if (i + 2 < invocation.count()
           && invocation.nth(i + 1) instanceof Symbol
           && "=>".equals(((Symbol) invocation.nth(i + 1)).getName())) {
-        body.add(List.Standard.from(null, Symbol.create("code.test", "assert!"), form, invocation.nth(i + 2)));
+        Object expected = invocation.nth(i + 2);
+        if (expected instanceof List<?> expectedForm
+            && expectedForm.count() > 0
+            && expectedForm.nth(0) instanceof Symbol
+            && "throws".equals(((Symbol) expectedForm.nth(0)).getName())) {
+          body.add(List.Standard.from(null, Symbol.create("code.test", "assert-throws!"),
+              List.Standard.from(null, Symbol.create("fn"), hara.lang.data.Vector.Standard.EMPTY, form), expected));
+        } else {
+          body.add(List.Standard.from(null, Symbol.create("code.test", "assert!"), form, expected));
+        }
         i += 2;
       } else {
         body.add(form);
@@ -918,11 +2057,146 @@ public final class HaraContext {
       forms.add(List.Standard.from(null, prepend(Symbol.create("do"), body)));
       fnBody = forms.toArray();
     }
+    IMetadata metadata = invocation instanceof hara.lang.protocol.IObjType
+        ? ((hara.lang.protocol.IObjType) invocation).meta() : null;
+    if (metadata != null) {
+      return List.Standard.from(
+          null,
+          Symbol.create("code.test", "register!"),
+          name,
+          List.Standard.from(null, fnBody),
+          metadata);
+    }
     return List.Standard.from(
         null,
         Symbol.create("code.test", "register!"),
         name,
         List.Standard.from(null, fnBody));
+  }
+
+  private boolean testSelector(Object selector, hara.lang.test.HaraTestCase test) {
+    if (selector == null) return true;
+    String id = test.namespace() + "/" + test.name();
+    return testSelector(selector, id);
+  }
+
+  private boolean metadataMatches(Object expected, Object metadata) {
+    if (expected == null) return true;
+    if (expected instanceof HaraMatcher matcher) return matcher.matches(metadata);
+    if (expected instanceof HaraFunction function) {
+      return Boolean.TRUE.equals(function.callTarget().call(function.callArguments(new Object[] {metadata})));
+    }
+    if (expected instanceof IMapType<?, ?> expectedMap && metadata instanceof IMapType<?, ?> actualMap) {
+      for (Object object : expectedMap) {
+        java.util.Map.Entry<?, ?> entry = (java.util.Map.Entry<?, ?>) object;
+        Object actual = lookupValue(actualMap, entry.getKey());
+        if (actual == null) return false;
+        if (!Eq.eq(actual, entry.getValue())) return false;
+      }
+      return true;
+    }
+    if (expected instanceof java.util.Map<?, ?> expectedMap && metadata instanceof java.util.Map<?, ?> actualMap) {
+      for (java.util.Map.Entry<?, ?> entry : expectedMap.entrySet()) {
+        if (!actualMap.containsKey(entry.getKey()) || !Eq.eq(actualMap.get(entry.getKey()), entry.getValue())) {
+          return false;
+        }
+      }
+      return true;
+    }
+    return Eq.eq(expected, metadata);
+  }
+
+  private String testNamespace(Object value) {
+    if (value instanceof Symbol symbol) return symbol.display();
+    return String.valueOf(value);
+  }
+
+  private java.util.Map<String, Object> testRecord(hara.lang.test.HaraTestCase test) {
+    java.util.Map<String, Object> record = new LinkedHashMap<>();
+    record.put("namespace", test.namespace());
+    record.put("name", test.name());
+    record.put("metadata", test.metadata());
+    return record;
+  }
+
+  private java.util.Map<String, Object> summariseTestResults(Object value) {
+    long passed = 0;
+    long failed = 0;
+    long errored = 0;
+    long total = 0;
+    if (value instanceof Iterable<?> iterable) {
+      for (Object item : iterable) {
+        total++;
+        Object status = null;
+        if (item instanceof IMapType<?, ?> map) status = lookupValue(map, Keyword.create("status"));
+        else if (item instanceof java.util.Map<?, ?> map) status = map.get("status");
+        String name = status instanceof Keyword ? ((Keyword) status).getName() : String.valueOf(status);
+        if ("pass".equalsIgnoreCase(name) || "success".equalsIgnoreCase(name)) passed++;
+        else if ("fail".equalsIgnoreCase(name) || "failed".equalsIgnoreCase(name)) failed++;
+        else errored++;
+      }
+    }
+    java.util.Map<String, Object> result = new LinkedHashMap<>();
+    result.put("total", total);
+    result.put("passed", passed);
+    result.put("failed", failed);
+    result.put("errored", errored);
+    result.put("success", failed == 0 && errored == 0);
+    return result;
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private java.util.Map<String, Object> asStringMap(Object value) {
+    java.util.Map<String, Object> result = new LinkedHashMap<>();
+    if (value instanceof java.util.Map<?, ?> map) {
+      map.forEach((key, nested) -> result.put(keyName(key), nested));
+    } else if (value instanceof IMapType<?, ?> map) {
+      for (Object object : map) {
+        java.util.Map.Entry entry = (java.util.Map.Entry) object;
+        result.put(keyName(entry.getKey()), entry.getValue());
+      }
+    }
+    return result;
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private boolean metadataFlag(Object metadata, String name) {
+    if (!(metadata instanceof IMapType<?, ?> map)) return false;
+    return Boolean.TRUE.equals(((IMapType) map).lookup(Keyword.create(name)));
+  }
+
+  private boolean testSelector(Object selector, String id) {
+    if (selector == null) return true;
+    if (selector instanceof java.util.function.Predicate<?> predicate) {
+      @SuppressWarnings("unchecked") java.util.function.Predicate<Object> test =
+          (java.util.function.Predicate<Object>) predicate;
+      return test.test(id);
+    }
+    if (selector instanceof HaraFunction function) {
+      return Boolean.TRUE.equals(function.callTarget().call(function.callArguments(new Object[] {id})));
+    }
+    if (selector instanceof java.util.regex.Pattern pattern) return pattern.matcher(id).find();
+    if (selector instanceof hara.lang.data.types.ISetType<?> set) {
+      @SuppressWarnings("rawtypes") hara.lang.data.types.ISetType rawSet = (hara.lang.data.types.ISetType) set;
+      return rawSet.find(id) != null;
+    }
+    if (selector instanceof hara.lang.data.Vector<?> vector) {
+      for (Object item : vector) if (testSelector(item, id)) return true;
+      return false;
+    }
+    if (selector instanceof hara.lang.data.List<?> list) {
+      for (Object item : list) if (!testSelector(item, id)) return false;
+      return true;
+    }
+    if (selector instanceof String) return id.startsWith((String) selector);
+    if (selector instanceof Symbol) return id.startsWith(((Symbol) selector).display());
+    if (selector instanceof Keyword) return id.startsWith(((Keyword) selector).getName());
+    return false;
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private static Object lookupValue(IMapType<?, ?> map, Object key) {
+    return ((IMapType) map).lookup(key);
   }
 
   private static Object[] prepend(Object first, java.util.List<Object> rest) {
@@ -1982,10 +3256,10 @@ public final class HaraContext {
 
   @TruffleBoundary
   public Object requireModule(Object[] arguments) {
-    if (arguments.length == 1) {
+    if (arguments.length == 1 || arguments.length == 2) {
       Object requestedNamespace = unwrapQuoted(arguments[0]);
       if (requestedNamespace instanceof Symbol) {
-        return requireNamespace((Symbol) requestedNamespace);
+        return requireNamespace((Symbol) requestedNamespace, arguments.length == 2 ? arguments[1] : null);
       }
     }
     if (arguments.length < 1 || arguments.length > 2 || !(arguments[0] instanceof String)) {
@@ -2040,15 +3314,52 @@ public final class HaraContext {
   }
 
   @TruffleBoundary
-  private Object requireNamespace(Symbol symbol) {
+  private Object requireNamespace(Symbol symbol, Object options) {
     if (symbol.getNamespace() != null) {
       throw new HaraException("require expects an unqualified namespace symbol");
     }
     String target = symbol.display();
-    if (requiredNamespace(target) == null) {
+    HaraNamespace required = requiredNamespace(target);
+    if (required == null) {
       throw new HaraException("Cannot require missing namespace: " + target);
     }
+    if (options != null) applyNamespaceOptions(target, required, options);
     return null;
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private void applyNamespaceOptions(String target, HaraNamespace required, Object options) {
+    if (!(options instanceof IMapType<?, ?> map)) throw new HaraException("require options expect a map");
+    Object alias = unwrapQuoted(((IMapType) map).lookup(Keyword.create("as")));
+    if (alias != null) {
+      if (!(alias instanceof Symbol) || ((Symbol) alias).getNamespace() != null) {
+        throw new HaraException("require :as expects an unqualified symbol");
+      }
+      defineAlias((Symbol) alias, Symbol.create(target));
+    }
+    Object refer = unwrapQuoted(((IMapType) map).lookup(Keyword.create("refer")));
+    if (refer != null) {
+      java.util.List<Object> symbols = new ArrayList<>();
+      if (refer instanceof Keyword keyword && "all".equals(keyword.getName())) {
+        symbols.addAll(required.symbolNames());
+      } else if (refer instanceof ILinearType<?>) {
+        for (Object value : (ILinearType<?>) refer) symbols.add(value);
+      } else {
+        throw new HaraException("require :refer expects a sequential collection of symbols or :all");
+      }
+      for (Object value : symbols) {
+        if (value instanceof String) value = Symbol.create((String) value);
+        if (!(value instanceof Symbol) || ((Symbol) value).getNamespace() != null) {
+          throw new HaraException("require :refer expects unqualified symbols");
+        }
+        String name = ((Symbol) value).getName();
+        HaraVar variable = required.lookup(name);
+        if (variable == null) throw new HaraException("Cannot refer missing var " + name + " from " + target);
+        currentNamespace.refer(name, variable);
+        HaraMacro macro = macros.getOrDefault(target, Map.of()).get(name);
+        if (macro != null) macros.computeIfAbsent(currentNamespace.name(), ignored -> new ConcurrentHashMap<>()).put(name, macro);
+      }
+    }
   }
 
   private void applyRequireOptions(Object options, ModuleRecord module) {

@@ -2,6 +2,12 @@
 mod core;
 #[path = "../../../src/hta.rs"]
 mod hta;
+#[path = "../../../src/kernel.rs"]
+mod kernel;
+#[path = "../../../src/lang.rs"]
+mod lang;
+#[path = "../../../src/task.rs"]
+mod task;
 
 use core::Value;
 use std::cell::RefCell;
@@ -52,7 +58,7 @@ fn error(message: String) -> Value {
         (Value::Keyword("message".into()), Value::String(message)),
         (Value::Keyword("origin".into()), Value::Keyword("wasm".into())),
         (Value::Keyword("retryable".into()), Value::Bool(false)),
-    ])
+    ].into_iter().collect())
 }
 
 #[no_mangle]

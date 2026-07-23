@@ -69,5 +69,32 @@ public final class ResourceRegistry {
   }
   private static String variantName(String value) { return value == null ? "default" : value; }
   private static Object key(ResourceMode mode, Object scope) { return mode == ResourceMode.GLOBAL ? null : scope; }
-  private record ResourceKey(ResourceMode mode, String type, String variant, Object key) {}
+  private static final class ResourceKey {
+    private final ResourceMode mode;
+    private final String type;
+    private final String variant;
+    private final Object key;
+
+    private ResourceKey(ResourceMode mode, String type, String variant, Object key) {
+      this.mode = mode;
+      this.type = type;
+      this.variant = variant;
+      this.key = key;
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      if (!(other instanceof ResourceKey)) return false;
+      ResourceKey value = (ResourceKey) other;
+      return java.util.Objects.equals(mode, value.mode)
+          && java.util.Objects.equals(type, value.type)
+          && java.util.Objects.equals(variant, value.variant)
+          && java.util.Objects.equals(key, value.key);
+    }
+
+    @Override
+    public int hashCode() {
+      return java.util.Objects.hash(mode, type, variant, key);
+    }
+  }
 }

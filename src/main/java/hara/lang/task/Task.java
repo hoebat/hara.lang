@@ -17,12 +17,17 @@ public final class Task {
     this.name = Objects.requireNonNull(name, "name");
     this.function = Objects.requireNonNull(function, "function");
     this.arglists = arglists;
-    this.config = config == null ? Collections.emptyMap() : Map.copyOf(config);
+    if (config == null || config.isEmpty()) {
+      this.config = Collections.emptyMap();
+    } else {
+      this.config = Collections.unmodifiableMap(new java.util.LinkedHashMap<>(config));
+    }
   }
   public String type() { return type; }
   public String name() { return name; }
   public Object arglists() { return arglists; }
   public Map<String, Object> config() { return config; }
+  public TaskFunction function() { return function; }
   public Object invoke(Object... args) throws Exception { return function.apply(args == null ? new Object[0] : args); }
   public TaskResult run(Object... args) {
     long start = System.nanoTime();
@@ -30,7 +35,13 @@ public final class Task {
     catch (Throwable error) { return TaskResult.failed(error, elapsed(start)); }
   }
   public boolean task() { return true; }
-  public Map<String, Object> info() { return Map.of("type", type, "name", name, "arglists", arglists); }
+  public Map<String, Object> info() {
+    Map<String, Object> result = new java.util.LinkedHashMap<>();
+    result.put("type", type);
+    result.put("name", name);
+    result.put("arglists", arglists);
+    return result;
+  }
   private static long elapsed(long start) { return (System.nanoTime() - start) / 1_000_000L; }
   @Override public String toString() { return "#task[" + type + " " + name + " " + Arrays.toString(new Object[] {arglists}) + "]"; }
 }

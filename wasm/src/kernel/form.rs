@@ -1,0 +1,20 @@
+#[derive(Debug, Clone, PartialEq)]
+pub enum Form {
+    Nil,
+    Bool(bool),
+    Number(i64),
+    Float(f64),
+    BigInteger(String),
+    Decimal(String),
+    Character(char),
+    Regex(String),
+    Tagged(String, Box<Form>),
+    Metadata(Box<Form>, Box<Form>),
+    Symbol(String),
+    Keyword(String),
+    String(String),
+    Map(Vec<(Form, Form)>),
+    Set(Vec<Form>),
+    Vector(Vec<Form>),
+    List(Vec<Form>),
+}
