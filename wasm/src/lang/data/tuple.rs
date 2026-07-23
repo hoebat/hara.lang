@@ -1,3 +1,7 @@
+use std::rc::Rc;
+
+use crate::lang::protocol::{IEmpty, IMetadata};
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Tuple<E> {
     Tup0,
@@ -9,6 +13,7 @@ pub enum Tuple<E> {
     Tup6([E; 6]),
     Tup7([E; 7]),
     Tup8([E; 8]),
+    WithMeta(Rc<str>, Box<Tuple<E>>),
 }
 
 impl<E: Clone> Tuple<E> {
@@ -23,10 +28,11 @@ impl<E: Clone> Tuple<E> {
             Self::Tup6(_) => 6,
             Self::Tup7(_) => 7,
             Self::Tup8(_) => 8,
+            Self::WithMeta(_, tuple) => tuple.len(),
         }
     }
     pub fn is_empty(&self) -> bool {
-        matches!(self, Self::Tup0)
+        self.len() == 0
     }
     pub fn get(&self, index: usize) -> Option<&E> {
         match self {
@@ -39,6 +45,7 @@ impl<E: Clone> Tuple<E> {
             Self::Tup6(v) => v.get(index),
             Self::Tup7(v) => v.get(index),
             Self::Tup8(v) => v.get(index),
+            Self::WithMeta(_, tuple) => tuple.get(index),
         }
     }
     pub fn iter(&self) -> impl Iterator<Item = &E> {
@@ -84,12 +91,16 @@ impl<E: Clone> Tuple<E> {
     }
     pub fn push_first(&self, value: E) -> Result<Self, String> {
         Self::from_values(std::iter::once(value).chain(self.iter().cloned()).collect())
+            .map(|tuple| tuple.with_meta(self.meta().cloned()))
     }
     pub fn push_last(&self, value: E) -> Result<Self, String> {
         Self::from_values(self.iter().cloned().chain(std::iter::once(value)).collect())
+            .map(|tuple| tuple.with_meta(self.meta().cloned()))
     }
     pub fn pop_first(&self) -> Self {
-        Self::from_values(self.iter().skip(1).cloned().collect()).expect("smaller tuple")
+        Self::from_values(self.iter().skip(1).cloned().collect())
+            .expect("smaller tuple")
+            .with_meta(self.meta().cloned())
     }
     pub fn pop_last(&self) -> Self {
         Self::from_values(
@@ -99,12 +110,38 @@ impl<E: Clone> Tuple<E> {
                 .collect(),
         )
         .expect("smaller tuple")
+        .with_meta(self.meta().cloned())
     }
     pub fn peek_first(&self) -> Option<&E> {
         self.get(0)
     }
     pub fn peek_last(&self) -> Option<&E> {
         self.len().checked_sub(1).and_then(|i| self.get(i))
+    }
+}
+impl<E: Clone> IMetadata for Tuple<E> {
+    type Metadata = Rc<str>;
+    fn meta(&self) -> Option<&Self::Metadata> {
+        match self {
+            Self::WithMeta(metadata, _) => Some(metadata),
+            _ => None,
+        }
+    }
+    fn with_meta(&self, metadata: Option<Self::Metadata>) -> Self {
+        let base = match self {
+            Self::WithMeta(_, tuple) => tuple.as_ref(),
+            _ => self,
+        };
+        metadata.map_or_else(
+            || base.clone(),
+            |metadata| Self::WithMeta(metadata, Box::new(base.clone())),
+        )
+    }
+}
+impl<E: Clone> IEmpty for Tuple<E> {
+    type Output = Self;
+    fn empty(&self) -> Self::Output {
+        Self::Tup0.with_meta(self.meta().cloned())
     }
 }
 impl<E: Clone> Default for Tuple<E> {
@@ -116,6 +153,9 @@ impl<E: Clone> Default for Tuple<E> {
 #[cfg(test)]
 mod tests {
     use super::Tuple;
+    use crate::lang::protocol::{IEmpty, IMetadata};
+    use std::rc::Rc;
+
     #[test]
     fn covers_all_java_arities_and_linear_operations() {
         let mut t = Tuple::Tup0;
@@ -128,5 +168,22 @@ mod tests {
         assert_eq!(t.peek_last(), Some(&7));
         assert_eq!(t.pop_first().peek_first(), Some(&1));
         assert_eq!(t.pop_last().peek_last(), Some(&6));
+    }
+
+    #[test]
+    fn preserves_metadata_across_persistent_operations() {
+        let tuple = Tuple::Tup2([1, 2]).with_meta(Some(Rc::from("doc")));
+
+        for result in [
+            tuple.push_first(0).unwrap(),
+            tuple.push_last(3).unwrap(),
+            tuple.pop_first(),
+            tuple.pop_last(),
+            tuple.empty(),
+        ] {
+            assert_eq!(result.meta().map(|m| m.as_ref()), Some("doc"));
+        }
+        assert_eq!(tuple.push_first(0).unwrap().len(), 3);
+        assert_eq!(tuple.empty().len(), 0);
     }
 }

@@ -1,8 +1,12 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::lang::data::Tuple;
+use crate::lang::protocol::{ICount, IEmpty, IMetadata, IPersistent, IPopFirst};
+
 #[derive(Clone)]
 pub struct Seq<E> {
+    metadata: Option<Rc<str>>,
     state: Rc<RefCell<State<E>>>,
     offset: usize,
 }
@@ -14,6 +18,7 @@ struct State<E> {
 impl<E: Clone + 'static> Seq<E> {
     pub fn new(source: impl Iterator<Item = E> + 'static) -> Self {
         Self {
+            metadata: None,
             state: Rc::new(RefCell::new(State {
                 source: Some(Box::new(source)),
                 realized: Vec::new(),
@@ -41,6 +46,7 @@ impl<E: Clone + 'static> Seq<E> {
     }
     pub fn pop_first(&self) -> Self {
         Self {
+            metadata: self.metadata.clone(),
             state: self.state.clone(),
             offset: self.offset + usize::from(self.peek_first().is_some()),
         }
@@ -60,6 +66,38 @@ impl<E: Clone + 'static> Seq<E> {
         }
     }
 }
+impl<E: Clone + 'static> ICount for Seq<E> {
+    fn count(&self) -> usize {
+        Seq::count(self)
+    }
+}
+impl<E: Clone + 'static> IPopFirst for Seq<E> {
+    type Output = Self;
+    fn pop_first(&self) -> Self::Output {
+        Seq::pop_first(self)
+    }
+}
+impl<E: Clone + 'static> IEmpty for Seq<E> {
+    type Output = Tuple<E>;
+    fn empty(&self) -> Self::Output {
+        Tuple::Tup0.with_meta(self.metadata.clone())
+    }
+}
+impl<E: Clone + 'static> IMetadata for Seq<E> {
+    type Metadata = Rc<str>;
+    fn meta(&self) -> Option<&Self::Metadata> {
+        self.metadata.as_ref()
+    }
+    fn with_meta(&self, metadata: Option<Self::Metadata>) -> Self {
+        Self {
+            metadata,
+            state: self.state.clone(),
+            offset: self.offset,
+        }
+    }
+}
+impl<E: Clone + 'static> IPersistent for Seq<E> {}
+
 pub struct SeqIter<E> {
     seq: Seq<E>,
     index: usize,
@@ -86,6 +124,7 @@ impl<E> std::fmt::Debug for Seq<E> {
 #[cfg(test)]
 mod tests {
     use super::Seq;
+    use crate::lang::protocol::{IEmpty, IMetadata, IPopFirst};
     use std::cell::Cell;
     use std::rc::Rc;
     #[test]
@@ -100,5 +139,13 @@ mod tests {
         assert_eq!(seq.peek_first(), Some(0));
         assert_eq!(calls.get(), 1);
         assert_eq!(seq.pop_first().iter().collect::<Vec<_>>(), vec![1, 2]);
+
+        let documented = seq.with_meta(Some(Rc::from("doc")));
+        assert_eq!(
+            IPopFirst::pop_first(&documented).meta().map(|m| m.as_ref()),
+            Some("doc")
+        );
+        assert!(documented.empty().is_empty());
+        assert_eq!(documented.empty().meta().map(|m| m.as_ref()), Some("doc"));
     }
 }

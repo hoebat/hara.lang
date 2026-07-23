@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 
-use crate::lang::protocol::{IDisplay, ILookup, INamespaced};
+use crate::lang::protocol::{IDisplay, ILookup, IMetadata, INamespaced};
 
 thread_local! {
     static INTERNED: RefCell<HashMap<String, Weak<Data>>> = RefCell::new(HashMap::new());
@@ -89,6 +89,17 @@ impl INamespaced for Keyword {
         self.0.namespace.as_deref()
     }
 }
+impl IMetadata for Keyword {
+    type Metadata = Rc<str>;
+
+    fn meta(&self) -> Option<&Self::Metadata> {
+        None
+    }
+
+    fn with_meta(&self, _metadata: Option<Self::Metadata>) -> Self {
+        self.clone()
+    }
+}
 impl IDisplay for Keyword {
     fn display(&self) -> String {
         format!(":{}", self.0.full)
@@ -137,7 +148,8 @@ mod tests {
     use super::Keyword;
     use crate::lang::data::Map;
     use crate::lang::protocol::IAssoc;
-    use crate::lang::protocol::{IDisplay, INamespaced};
+    use crate::lang::protocol::{IDisplay, IMetadata, INamespaced};
+    use std::rc::Rc;
 
     #[test]
     fn matches_java_validation_namespace_and_interning() {
@@ -154,5 +166,9 @@ mod tests {
         let values = Map::new().assoc(first.clone(), 42);
         assert_eq!(first.lookup(&values), Some(42));
         assert_eq!(Keyword::from("missing").lookup_or(&values, 7), 7);
+
+        let documented = first.with_meta(Some(Rc::from("ignored")));
+        assert!(documented.meta().is_none());
+        assert!(documented.same_identity(&first));
     }
 }

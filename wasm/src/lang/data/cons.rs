@@ -71,7 +71,7 @@ impl<E: Clone> IPopFirst for Cons<E> {
 impl<E: Clone> IEmpty for Cons<E> {
     type Output = Tuple<E>;
     fn empty(&self) -> Self::Output {
-        Tuple::Tup0
+        Tuple::Tup0.with_meta(self.metadata.clone())
     }
 }
 impl<E: Clone> IMetadata for Cons<E> {
@@ -92,7 +92,7 @@ impl<E: Clone> IPersistent for Cons<E> {}
 mod tests {
     use super::Cons;
     use crate::lang::data::List;
-    use crate::lang::protocol::{ICons, ICount, IMetadata, INth, IPopFirst, IPushFirst};
+    use crate::lang::protocol::{ICons, ICount, IEmpty, IMetadata, INth, IPopFirst, IPushFirst};
     use std::rc::Rc;
     #[test]
     fn linked_navigation() {
@@ -108,5 +108,7 @@ mod tests {
             Some("doc")
         );
         assert_eq!(documented.cons(0).meta(), None);
+        assert!(documented.empty().is_empty());
+        assert_eq!(documented.empty().meta().map(|m| m.as_ref()), Some("doc"));
     }
 }
