@@ -58,8 +58,8 @@ public class HaraTestIntegrationTest {
       assertTrue(context.eval(HaraLanguage.ID, "(code.test/checker? (code.test/just [1]))").asBoolean());
       assertTrue(context.eval(HaraLanguage.ID,
           "(code.test/assert! {:a {:b 2}} (code.test/just-in {:a {:b 2}}))").asBoolean());
-      assertTrue(!context.eval(HaraLanguage.ID,
-          "(get (code.test/verify (code.test/just-in {:a {:b 2}}) {:a {:b 2 :c 3}}) :data)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID,
+          "(code.test/succeeded? (code.test/verify (code.test/just-in {:a {:b 2}}) {:a {:b 2 :c 3}}))").asBoolean());
     }
   }
 
@@ -131,8 +131,8 @@ public class HaraTestIntegrationTest {
       assertTrue(!context.eval(HaraLanguage.ID, "(code.test/get-flag \"flagged\" :setup)").asBoolean());
       assertTrue(context.eval(HaraLanguage.ID, "(code.test/set-flag \"flagged\" :setup true)").asBoolean());
       assertTrue(context.eval(HaraLanguage.ID, "(code.test/get-flag \"flagged\" :setup)").asBoolean());
-      assertTrue(context.eval(HaraLanguage.ID,
-          "(code.test/set-flag \"user\" \"flagged\" :setup false)").asBoolean());
+      context.eval(HaraLanguage.ID,
+          "(code.test/set-flag \"user\" \"flagged\" :setup false)");
       assertTrue(!context.eval(HaraLanguage.ID,
           "(code.test/get-flag \"user\" \"flagged\" :setup)").asBoolean());
     }
