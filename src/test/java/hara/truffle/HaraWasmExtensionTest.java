@@ -18,16 +18,17 @@ public class HaraWasmExtensionTest {
   };
 
   @Test
-  public void descriptorAndWasmGenerateARequireableNamespace() throws Exception {
+  public void descriptorAndWasmGenerateTheDeclaredNoirNamespace() throws Exception {
     Path root = Files.createTempDirectory("hara-wasm-extension-");
-    Path extension = root.resolve("test/math");
+    Path extension = root.resolve("blockchain/proof/noir");
     Files.createDirectories(extension);
     Files.writeString(
         extension.resolve("hara.extension.edn"),
-        "{:namespace \"test.math\" :version \"1.0.0\" :provider :wasm "
-            + ":module \"math.wasm\" :abi :core-v1 "
-            + ":exports {\"add\" {:args [:i32 :i32] :returns :i32}} :capabilities []}");
-    Files.write(extension.resolve("math.wasm"), ADD_WASM);
+        "{:namespace \"blockchain.proof.noir\" :version \"1.0.0\" :provider :wasm "
+            + ":module \"noir.wasm\" :abi :core-v1 "
+            + ":exports {\"add\" {:args [:i32 :i32] :returns :i32 :async true}} "
+            + ":capabilities []}");
+    Files.write(extension.resolve("noir.wasm"), ADD_WASM);
     String previous = System.getProperty("hara.extensions.path");
     System.setProperty("hara.extensions.path", root.toString());
     try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
@@ -36,20 +37,21 @@ public class HaraWasmExtensionTest {
           context
               .eval(
                   HaraLanguage.ID,
-                  "(ns app (:require [test.math :as math :refer [add]])) "
-                      + "(+ (math/add 20 22) (add 1 2))")
+                  "(ns app (:require [blockchain.proof.noir :as noir :refer [add]])) "
+                      + "(+ (deref (noir/add 20 22)) (deref (add 1 2)))")
               .asLong());
       PolyglotException arity =
           assertThrows(
-              PolyglotException.class, () -> context.eval(HaraLanguage.ID, "(math/add 1)"));
+              PolyglotException.class, () -> context.eval(HaraLanguage.ID, "(deref (noir/add 1))"));
       assertTrue(arity.getMessage().contains("expects 2 arguments"));
     } finally {
       if (previous == null) System.clearProperty("hara.extensions.path");
       else System.setProperty("hara.extensions.path", previous);
-      Files.deleteIfExists(extension.resolve("math.wasm"));
+      Files.deleteIfExists(extension.resolve("noir.wasm"));
       Files.deleteIfExists(extension.resolve("hara.extension.edn"));
       Files.deleteIfExists(extension);
       Files.deleteIfExists(extension.getParent());
+      Files.deleteIfExists(extension.getParent().getParent());
       Files.deleteIfExists(root);
     }
   }
@@ -63,7 +65,7 @@ public class HaraWasmExtensionTest {
               () ->
                   context.eval(
                       HaraLanguage.ID, "(ns app (:require [blockchain.proof.noir :as noir]))"));
-      assertTrue(error.getMessage().contains("extension/module-unavailable"));
+      assertTrue(error.getMessage().contains("Cannot require missing namespace"));
     }
   }
 }

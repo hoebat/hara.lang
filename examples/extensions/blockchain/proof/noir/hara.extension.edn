@@ -1,0 +1,9 @@
+{:namespace "blockchain.proof.noir"
+ :version "0.1.0"
+ :provider :wasm
+ :module "noir.wasm"
+ :abi :core-v1
+ :exports
+ {"version" {:args [] :returns :i32}
+  "add"     {:args [:i32 :i32] :returns :i32}}
+ :capabilities []}

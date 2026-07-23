@@ -36,14 +36,15 @@ An extension package contains a `hara.extension.edn` manifest beside its provide
 {:namespace "crypto.hash"
  :version "0.1.0"
  :provider :wasm
- :module "crypto.wasm"
- :exports {"sha256" {:args [:bytes] :returns :bytes :async true}}
+ :module "math.wasm"
+ :abi :core-v1
+ :exports {"add" {:args [:i32 :i32] :returns :i32 :async true}}
  :capabilities []}
 ```
 
-The portable fields are `namespace`, `version`, `provider`, `module`, `exports`, and
+The portable fields are `namespace`, `version`, `provider`, `module`, `abi`, `exports`, and
 `capabilities`. The manifest is metadata, not executable Hara code. Extension namespaces are
-runtime-generated namespaces, not `.hara` source files.
+runtime-generated namespaces, not `.hal` source files.
 
 ## Provider lifecycle
 
@@ -106,23 +107,26 @@ namespace can therefore be backed by a pod or WASM provider without changing the
 
 ## Packaged Noir proof provider
 
-The first classpath package is `hara.extensions.blockchain.proof.noir`. Its manifest lives at
-`META-INF/hara/extensions/hara/extensions/blockchain/proof/noir/hara.extension.edn`, selects the
-`:wasm` provider,
-and exports the Noir compile/prove/verify boundary without exposing compiler or WASM objects:
+The extension is named `blockchain.proof.noir`. A runnable descriptor template lives at
+`examples/extensions/blockchain/proof/noir/hara.extension.edn`; an installed bundle places that
+descriptor beside `noir.wasm` under the same namespace-derived directory. Requiring the extension
+generates its namespace directly from the declared WASM exports:
 
 ```hal
 (ns proof.example
-  (:require [hara.extensions.blockchain.proof.noir :as noir]))
+  (:require [blockchain.proof.noir :as noir]))
 
-(def program
-  (noir/program
-    "square"
-    "fn main(secret: Field, expected: pub Field) { assert(secret * secret == expected); }"))
+(noir/add 20 22)
 ```
 
-No `noir/*` alias is installed implicitly. Applications opt into this surface through `:require`;
-`hara.lib.noir` remains an internal runtime namespace used by the provider adapter.
+No `noir/*` alias or `hara.lib.noir` adapter is installed implicitly. Applications opt into the
+WASM surface through `:require`. Runtime bundles can also be installed under an explicit root in
+`hara.extensions.path` or `HARA_EXTENSION_PATH`, using the same namespace-derived directory layout.
+
+The template works with the repository's raw Rust fixture copied as `noir.wasm`. The initial
+`:core-v1` ABI supports import-free core-WASM functions using `:i32`, `:i64`, `:f32`, `:f64`,
+`:boolean`, and `:void`. Noir compile/prove/verify still needs a standalone artifact implementing a
+future memory-based ABI; its existing JavaScript/worker bundle is not treated as that artifact.
 
 Classpath discovery rejects duplicate namespace packages, malformed manifests, unknown providers,
 unknown modules, and denied capability requests before installing any exported vars.

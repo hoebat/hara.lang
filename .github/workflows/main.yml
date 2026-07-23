@@ -52,6 +52,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Set up Rust WASM toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: wasm32-unknown-unknown
+    - name: Build raw Rust WASM extension artifact
+      run: ./scripts/build-hara-wasm-raw
     - name: Set up GraalVM
       uses: graalvm/setup-graalvm@v1
       with:
@@ -71,7 +77,13 @@ jobs:
         } 2>&1 | tee target/native-image-metrics.txt
     - name: Run a Native Image smoke test
       run: |
+        mkdir -p target/native-extensions/blockchain/proof/noir
+        cp wasm/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm \
+          target/native-extensions/blockchain/proof/noir/noir.wasm
+        cp examples/extensions/blockchain/proof/noir/hara.extension.edn \
+          target/native-extensions/blockchain/proof/noir/hara.extension.edn
         test "$(target/hara-truffle conformance)" = "L0 conformance passed: 64 cases"
+        test "$(HARA_EXTENSION_PATH="$PWD/target/native-extensions" target/hara-truffle eval '(ns app (:require [blockchain.proof.noir :as noir])) (noir/add 20 22)')" = "42"
         test "$(target/hara-truffle eval '(+ 19 23)')" = "42"
         test "$(target/hara-truffle eval '(bytes/u8 -1)')" = "255"
         test "$(target/hara-truffle eval '(protocol-call ICount count (bytes 1 2 3))')" = "3"

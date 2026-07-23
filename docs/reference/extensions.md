@@ -16,8 +16,9 @@ An extension package contains a `hara.extension.edn` manifest beside its provide
 {:namespace "crypto.hash"
  :version "0.1.0"
  :provider :wasm
- :module "crypto.wasm"
- :exports {"sha256" {:args [:bytes] :returns :bytes}}
+ :module "math.wasm"
+ :abi :core-v1
+ :exports {"add" {:args [:i32 :i32] :returns :i32}}
  :capabilities []}
 ```
 

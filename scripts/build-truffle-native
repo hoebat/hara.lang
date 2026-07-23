@@ -7,7 +7,7 @@ DEPENDENCIES="$ROOT/target/truffle-dependencies"
 
 cd "$ROOT"
 
-mvn -Ptruffle -DskipTests compile dependency:copy-dependencies \
+mvn -Ptruffle -DskipTests clean compile dependency:copy-dependencies \
   -DincludeScope=runtime \
   -DoutputDirectory="$DEPENDENCIES"
 
