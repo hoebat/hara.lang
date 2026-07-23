@@ -405,6 +405,25 @@ public final class HaraContext {
   public java.util.List<String> currentSymbolNames() {
     LinkedHashSet<String> names = new LinkedHashSet<>(currentNamespace.symbolNames());
     names.addAll(MARKER_METHOD_NAMES);
+    nativeImports
+        .getOrDefault(currentNamespace.name(), Map.of())
+        .forEach(
+            (simpleName, type) -> {
+              names.add(simpleName);
+              if (!(type instanceof Class<?>)) return;
+              Class<?> cls = (Class<?>) type;
+              java.util.Arrays.stream(cls.getFields())
+                  .filter(field -> java.lang.reflect.Modifier.isStatic(field.getModifiers()))
+                  .forEach(field -> names.add(simpleName + "/" + field.getName()));
+              java.util.Arrays.stream(cls.getMethods())
+                  .filter(method -> java.lang.reflect.Modifier.isStatic(method.getModifiers()))
+                  .forEach(method -> names.add(simpleName + "/" + method.getName()));
+            });
+    namespaces.forEach(
+        (namespaceName, namespace) -> {
+          if (!namespaceName.startsWith("hara.native.")) return;
+          for (String name : namespace.symbolNames()) names.add(namespaceName + "/" + name);
+        });
     for (Map.Entry<String, String> alias :
         aliases.getOrDefault(currentNamespace.name(), Map.of()).entrySet()) {
       HaraNamespace target = namespaces.get(alias.getValue());
@@ -500,6 +519,14 @@ public final class HaraContext {
   private NativeFlavorProvider nativeProvider() {
     String flavor = nativeFlavors.get(currentNamespace.name());
     return flavor == null ? null : nativeFlavorRegistry.require(flavor);
+  }
+
+  private JvmFlavorProvider jvmProvider() {
+    NativeFlavorProvider provider = nativeProvider();
+    if (!(provider instanceof JvmFlavorProvider)) {
+      throw new HaraException("JVM native operation requires an ns :flavor :jvm declaration");
+    }
+    return (JvmFlavorProvider) provider;
   }
 
   public boolean hasNativeSymbol(Symbol symbol) {
@@ -736,6 +763,82 @@ public final class HaraContext {
     namespace("hara.native.jvm.reflect");
     namespace("hara.native.jvm.classpath");
     namespace("hara.native.jvm.compiler");
+    installJvmNativeLibraries();
+  }
+
+  private void installJvmNativeLibraries() {
+    HaraNamespace reflect = namespace("hara.native.jvm.reflect");
+    reflect.define(
+        "type",
+        new UnaryBuiltin(
+            "reflect/type", value -> jvmProvider().type(HaraBox.unwrap(value), nativeAccess())));
+    reflect.define(
+        "name",
+        new UnaryBuiltin(
+            "reflect/name",
+            value -> jvmProvider().typeName(HaraBox.unwrap(value), nativeAccess())));
+    reflect.define(
+        "instance?",
+        new VariadicBuiltin(
+            "reflect/instance?",
+            values -> {
+              requireMethodArity("reflect/instance?", values, 2);
+              return jvmProvider()
+                  .isInstance(HaraBox.unwrap(values[0]), HaraBox.unwrap(values[1]), nativeAccess());
+            }));
+    reflect.define(
+        "fields",
+        new UnaryBuiltin(
+            "reflect/fields",
+            value -> jvmProvider().fields(HaraBox.unwrap(value), nativeAccess())));
+    reflect.define(
+        "methods",
+        new UnaryBuiltin(
+            "reflect/methods",
+            value -> jvmProvider().methods(HaraBox.unwrap(value), nativeAccess())));
+
+    HaraNamespace classpath = namespace("hara.native.jvm.classpath");
+    classpath.define(
+        "paths",
+        new VariadicBuiltin(
+            "classpath/paths",
+            values -> {
+              requireMethodArity("classpath/paths", values, 0);
+              return jvmProvider().classPath(nativeAccess());
+            }));
+    classpath.define(
+        "add!",
+        new UnaryBuiltin(
+            "classpath/add!",
+            value ->
+                jvmProvider().addClassPath(String.valueOf(HaraBox.unwrap(value)), nativeAccess())));
+
+    HaraNamespace compiler = namespace("hara.native.jvm.compiler");
+    compiler.define(
+        "compile",
+        new UnaryBuiltin(
+            "compiler/compile",
+            value -> jvmProvider().compile(HaraBox.unwrap(value), nativeAccess())));
+    compiler.define(
+        "define!",
+        new UnaryBuiltin(
+            "compiler/define!",
+            value -> {
+              Object bytecode = HaraBox.unwrap(value);
+              if (!(bytecode instanceof byte[])) {
+                throw new HaraException("compiler/define! expects bytes");
+              }
+              return jvmProvider().defineClass((byte[]) bytecode, nativeAccess());
+            }));
+    compiler.define(
+        "compile!",
+        new UnaryBuiltin(
+            "compiler/compile!",
+            value -> {
+              JvmFlavorProvider provider = jvmProvider();
+              return provider.defineClass(
+                  provider.compile(HaraBox.unwrap(value), nativeAccess()), nativeAccess());
+            }));
   }
 
   private void installGeneratedLibraries() {

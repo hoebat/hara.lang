@@ -125,7 +125,8 @@ public final class JvmFlavorProvider implements NativeFlavorProvider {
 
   public String typeName(Object value, NativeFlavorAccess access) {
     requireReflection(access);
-    Class<?> type = value instanceof Class<?> ? (Class<?>) value : value == null ? null : value.getClass();
+    Class<?> type =
+        value instanceof Class<?> ? (Class<?>) value : value == null ? null : value.getClass();
     return type == null ? "nil" : type.getName();
   }
 
@@ -136,12 +137,20 @@ public final class JvmFlavorProvider implements NativeFlavorProvider {
 
   public String[] fields(Object value, NativeFlavorAccess access) {
     requireReflection(access);
-    return Arrays.stream(asType(value).getFields()).map(Field::getName).distinct().sorted().toArray(String[]::new);
+    return Arrays.stream(asType(value).getFields())
+        .map(Field::getName)
+        .distinct()
+        .sorted()
+        .toArray(String[]::new);
   }
 
   public String[] methods(Object value, NativeFlavorAccess access) {
     requireReflection(access);
-    return Arrays.stream(asType(value).getMethods()).map(Method::getName).distinct().sorted().toArray(String[]::new);
+    return Arrays.stream(asType(value).getMethods())
+        .map(Method::getName)
+        .distinct()
+        .sorted()
+        .toArray(String[]::new);
   }
 
   public String[] classPath(NativeFlavorAccess access) {
@@ -162,7 +171,9 @@ public final class JvmFlavorProvider implements NativeFlavorProvider {
     if (!(expression instanceof hara.lang.data.List)) {
       throw unsupported("JVM compilation expects a quoted fn form");
     }
-    return (byte[]) invoke("compile JVM function", () -> new Compiler().compile((hara.lang.data.List) expression));
+    return (byte[])
+        invoke(
+            "compile JVM function", () -> new Compiler().compile((hara.lang.data.List) expression));
   }
 
   public Class<?> defineClass(byte[] bytecode, NativeFlavorAccess access) {

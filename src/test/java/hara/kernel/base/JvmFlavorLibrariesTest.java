@@ -79,6 +79,27 @@ public class JvmFlavorLibrariesTest {
     }
   }
 
+  @Test
+  public void nativeModeReportsDynamicJvmServicesAsUnavailable() {
+    String previous = System.getProperty(NativeMode.PROPERTY);
+    try {
+      System.setProperty(NativeMode.PROPERTY, "true");
+      RT.Instance<Object> runtime = runtime(EnumSet.allOf(NativeCapability.class));
+      NativeFlavorException error =
+          assertThrows(
+              NativeFlavorException.class,
+              () -> runtime.eval(runtime.readString("(hara.native.jvm.classpath/paths)")));
+      assertEquals(NativeFlavorException.Kind.UNSUPPORTED, error.kind());
+      assertTrue(error.getMessage().contains("Native mode does not support classpath inspection"));
+    } finally {
+      if (previous == null) {
+        System.clearProperty(NativeMode.PROPERTY);
+      } else {
+        System.setProperty(NativeMode.PROPERTY, previous);
+      }
+    }
+  }
+
   private static RT.Instance<Object> runtime(EnumSet<NativeCapability> capabilities) {
     RT.Instance<Object> runtime = new RT.Instance<>(null, "jvm-libraries-test", capabilities);
     runtime.eval(

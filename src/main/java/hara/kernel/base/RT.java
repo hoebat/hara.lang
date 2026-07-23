@@ -7,6 +7,7 @@ import hara.kernel.flavor.NativeFlavorAccess;
 import hara.kernel.flavor.NativeFlavorProvider;
 import hara.kernel.flavor.NativeFlavorRegistry;
 import hara.kernel.jvm.JvmFlavorProvider;
+import hara.kernel.jvm.JvmRuntimeAccess;
 import hara.kernel.jvm.JvmSetFunction;
 import hara.kernel.protocol.IEnv;
 import hara.kernel.protocol.IRuntime;
@@ -430,14 +431,10 @@ public interface RT {
       this.out = new PrefixStream(System.out, "[" + key + "] ");
       _loader = new Loader();
       _nativeFlavors = new NativeFlavorRegistry().register(JvmFlavorProvider.INSTANCE);
-      _nativeAccess = NativeFlavorAccess.of(_loader, nativeCapabilities);
+      _nativeAccess = new JvmRuntimeAccess(_loader, nativeCapabilities);
       _rootEnv = new RootEnv<>(null, this);
       _userEnv = new UserEnv<>(_rootEnv, this);
-      Namespace jvmNamespace = addNamespace(Symbol.create("hara.native.jvm"));
-      jvmNamespace.mappings.put(Symbol.create("set!"), new Var("set!", new JvmSetFunction(this)));
-      addNamespace(Symbol.create("hara.native.jvm.reflect"));
-      addNamespace(Symbol.create("hara.native.jvm.classpath"));
-      addNamespace(Symbol.create("hara.native.jvm.compiler"));
+      installJvmLibraries();
       _stack =
           new ThreadLocal() {
             @Override
@@ -445,6 +442,15 @@ public interface RT {
               return BuiltinStruct.list(Array.objects(_userEnv));
             }
           };
+    }
+
+    private void installJvmLibraries() {
+      Namespace jvm = addNamespace(Symbol.create("hara.native.jvm"));
+      jvm.mappings.put(Symbol.create("set!"), new Var("set!", new JvmSetFunction(this)));
+      addNamespace(Symbol.create("hara.native.jvm.reflect"));
+      addNamespace(Symbol.create("hara.native.jvm.classpath"));
+      addNamespace(Symbol.create("hara.native.jvm.compiler"));
+      JvmNativeLibraries.install(this);
     }
 
     public Namespace getCurrentNs() {
