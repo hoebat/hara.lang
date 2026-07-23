@@ -1,3 +1,4 @@
-pub trait IPushLast<E>: Sized {
-    fn push_last(&self, value: E) -> Self;
+pub trait IPushLast<E> {
+    type Output;
+    fn push_last(&self, value: E) -> Self::Output;
 }

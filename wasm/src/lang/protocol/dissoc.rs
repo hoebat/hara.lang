@@ -1,3 +1,4 @@
-pub trait IDissoc<K>: Sized {
-    fn dissoc(&self, key: &K) -> Self;
+pub trait IDissoc<K> {
+    type Output;
+    fn dissoc(&self, key: &K) -> Self::Output;
 }

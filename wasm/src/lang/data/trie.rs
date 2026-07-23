@@ -158,16 +158,19 @@ impl<V: Clone> ILookup<String, V> for Standard<V> {
     }
 }
 impl<V: Clone> IAssoc<String, V> for Standard<V> {
+    type Output = Self;
     fn assoc(&self, k: String, v: V) -> Self {
         self.assoc_value(k, v)
     }
 }
 impl<V: Clone> IDissoc<String> for Standard<V> {
+    type Output = Self;
     fn dissoc(&self, k: &String) -> Self {
         self.dissoc_value(k)
     }
 }
 impl<V: Clone + Default> IConj<String> for Standard<V> {
+    type Output = Self;
     fn conj(&self, k: String) -> Self {
         self.assoc_value(k, V::default())
     }

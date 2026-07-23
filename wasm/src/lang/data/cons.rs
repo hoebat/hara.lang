@@ -1,23 +1,23 @@
 use crate::lang::data::{List, Tuple};
 use crate::lang::protocol::{
-    ICons, ICount, IEmpty, IMetadata, INth, IPersistent, IPopFirst, IPushFirst,
+    IConj, ICons, ICount, IEmpty, IMetadata, INth, IPersistent, IPopFirst, IPushFirst,
 };
 use std::rc::Rc;
 
 #[derive(Debug, Clone)]
-pub struct Cons<E> {
+pub struct Cons<E, M = List<E>> {
     metadata: Option<Rc<str>>,
     first: E,
-    more: List<E>,
+    more: M,
 }
 
-impl<E: Clone + PartialEq> PartialEq for Cons<E> {
+impl<E: Clone + PartialEq, M: Clone + PartialEq> PartialEq for Cons<E, M> {
     fn eq(&self, other: &Self) -> bool {
         self.first == other.first && self.more == other.more
     }
 }
-impl<E: Clone> Cons<E> {
-    pub fn new(first: E, more: List<E>) -> Self {
+impl<E: Clone, M: Clone + IntoIterator<Item = E>> Cons<E, M> {
+    pub fn new(first: E, more: M) -> Self {
         Self {
             metadata: None,
             first,
@@ -27,16 +27,26 @@ impl<E: Clone> Cons<E> {
     pub fn peek_first(&self) -> &E {
         &self.first
     }
-    pub fn iter(&self) -> impl Iterator<Item = &E> {
-        std::iter::once(&self.first).chain(self.more.iter())
+    pub fn iter(&self) -> impl Iterator<Item = E> {
+        std::iter::once(self.first.clone()).chain(self.more.clone())
     }
     pub fn to_list(&self) -> List<E> {
-        self.iter().cloned().collect()
+        self.iter().collect()
     }
 }
-impl<E: Clone> ICount for Cons<E> {
+impl<E: Clone, M: Clone + IntoIterator<Item = E>> IntoIterator for Cons<E, M> {
+    type Item = E;
+    type IntoIter = std::vec::IntoIter<E>;
+    fn into_iter(self) -> Self::IntoIter {
+        std::iter::once(self.first)
+            .chain(self.more)
+            .collect::<Vec<_>>()
+            .into_iter()
+    }
+}
+impl<E: Clone, M: Clone + IntoIterator<Item = E>> ICount for Cons<E, M> {
     fn count(&self) -> usize {
-        1 + self.more.len()
+        1 + self.more.clone().into_iter().count()
     }
 }
 impl<E: Clone> INth<E> for Cons<E> {
@@ -48,33 +58,45 @@ impl<E: Clone> INth<E> for Cons<E> {
         }
     }
 }
-impl<E: Clone> IPushFirst<E> for Cons<E> {
-    fn push_first(&self, value: E) -> Self {
-        Self {
+impl<E: Clone, M: Clone> IPushFirst<E> for Cons<E, M> {
+    type Output = Cons<E, Self>;
+    fn push_first(&self, value: E) -> Self::Output {
+        Cons {
             metadata: self.metadata.clone(),
             first: value,
-            more: self.to_list(),
+            more: self.clone(),
         }
     }
 }
-impl<E: Clone> ICons<E> for Cons<E> {
-    fn cons(&self, value: E) -> Self {
-        Self::new(value, self.to_list())
+impl<E: Clone, M: Clone> IConj<E> for Cons<E, M> {
+    type Output = Cons<E, Self>;
+    fn conj(&self, value: E) -> Self::Output {
+        self.push_first(value)
     }
 }
-impl<E: Clone> IPopFirst for Cons<E> {
-    type Output = List<E>;
+impl<E: Clone, M: Clone> ICons<E> for Cons<E, M> {
+    type Output = Cons<E, Self>;
+    fn cons(&self, value: E) -> Self::Output {
+        Cons {
+            metadata: None,
+            first: value,
+            more: self.clone(),
+        }
+    }
+}
+impl<E: Clone, M: Clone> IPopFirst for Cons<E, M> {
+    type Output = M;
     fn pop_first(&self) -> Self::Output {
         self.more.clone()
     }
 }
-impl<E: Clone> IEmpty for Cons<E> {
+impl<E: Clone, M: Clone> IEmpty for Cons<E, M> {
     type Output = Tuple<E>;
     fn empty(&self) -> Self::Output {
         Tuple::Tup0.with_meta(self.metadata.clone())
     }
 }
-impl<E: Clone> IMetadata for Cons<E> {
+impl<E: Clone, M: Clone> IMetadata for Cons<E, M> {
     type Metadata = Rc<str>;
     fn meta(&self) -> Option<&Self::Metadata> {
         self.metadata.as_ref()
@@ -86,13 +108,15 @@ impl<E: Clone> IMetadata for Cons<E> {
         }
     }
 }
-impl<E: Clone> IPersistent for Cons<E> {}
+impl<E: Clone, M: Clone> IPersistent for Cons<E, M> {}
 
 #[cfg(test)]
 mod tests {
     use super::Cons;
     use crate::lang::data::List;
-    use crate::lang::protocol::{ICons, ICount, IEmpty, IMetadata, INth, IPopFirst, IPushFirst};
+    use crate::lang::protocol::{
+        IConj, ICons, ICount, IEmpty, IMetadata, INth, IPopFirst, IPushFirst,
+    };
     use std::rc::Rc;
     #[test]
     fn linked_navigation() {
@@ -107,7 +131,15 @@ mod tests {
             documented.push_first(0).meta().map(|m| m.as_ref()),
             Some("doc")
         );
-        assert_eq!(documented.cons(0).meta(), None);
+        let pushed = documented.push_first(0);
+        assert_eq!(pushed.peek_first(), &0);
+        assert_eq!(pushed.pop_first(), documented);
+        let conjoined = documented.conj(0);
+        assert_eq!(conjoined.pop_first(), documented);
+        assert_eq!(conjoined.meta().map(|m| m.as_ref()), Some("doc"));
+        let consed = documented.cons(0);
+        assert_eq!(consed.meta(), None);
+        assert_eq!(consed.pop_first(), documented);
         assert!(documented.empty().is_empty());
         assert_eq!(documented.empty().meta().map(|m| m.as_ref()), Some("doc"));
     }

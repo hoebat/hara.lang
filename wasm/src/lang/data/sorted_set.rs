@@ -75,11 +75,13 @@ impl<E: Clone + Ord> IFind<E> for Standard<E> {
     }
 }
 impl<E: Clone + Ord> IConj<E> for Standard<E> {
+    type Output = Self;
     fn conj(&self, v: E) -> Self {
         self.conj_value(v)
     }
 }
 impl<E: Clone + Ord> IDissoc<E> for Standard<E> {
+    type Output = Self;
     fn dissoc(&self, k: &E) -> Self {
         self.dissoc_value(k)
     }

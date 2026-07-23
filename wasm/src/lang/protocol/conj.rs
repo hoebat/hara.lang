@@ -1,3 +1,4 @@
-pub trait IConj<E>: Sized {
-    fn conj(&self, value: E) -> Self;
+pub trait IConj<E> {
+    type Output;
+    fn conj(&self, value: E) -> Self::Output;
 }

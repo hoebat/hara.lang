@@ -89,11 +89,13 @@ impl<E: Clone + Eq + Hash> IFind<E> for Standard<E> {
     }
 }
 impl<E: Clone + Eq + Hash> IConj<E> for Standard<E> {
+    type Output = Self;
     fn conj(&self, value: E) -> Self {
         self.conj_value(value)
     }
 }
 impl<E: Clone + Eq + Hash> IDissoc<E> for Standard<E> {
+    type Output = Self;
     fn dissoc(&self, key: &E) -> Self {
         self.dissoc_value(key)
     }

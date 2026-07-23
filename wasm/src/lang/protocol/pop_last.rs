@@ -1,3 +1,4 @@
-pub trait IPopLast: Sized {
-    fn pop_last(&self) -> Self;
+pub trait IPopLast {
+    type Output;
+    fn pop_last(&self) -> Self::Output;
 }

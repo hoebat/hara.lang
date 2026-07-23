@@ -382,6 +382,7 @@ impl<E: Clone> INth<E> for Standard<E> {
 }
 
 impl<E: Clone> IAssoc<usize, E> for Standard<E> {
+    type Output = Self;
     fn assoc(&self, index: usize, value: E) -> Self {
         self.assoc_value(index, value)
             .expect("vector index out of bounds")
@@ -389,18 +390,21 @@ impl<E: Clone> IAssoc<usize, E> for Standard<E> {
 }
 
 impl<E: Clone> IPushLast<E> for Standard<E> {
+    type Output = Self;
     fn push_last(&self, value: E) -> Self {
         Standard::push_last(self, value)
     }
 }
 
 impl<E: Clone> IPopLast for Standard<E> {
+    type Output = Self;
     fn pop_last(&self) -> Self {
         self.pop_last_value().expect("cannot pop empty vector")
     }
 }
 
 impl<E: Clone> IConj<E> for Standard<E> {
+    type Output = Self;
     fn conj(&self, value: E) -> Self {
         self.push_last(value)
     }

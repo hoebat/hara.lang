@@ -123,11 +123,13 @@ impl<K: Clone + Eq + Hash, V: Clone> ILookup<K, V> for Standard<K, V> {
     }
 }
 impl<K: Clone + Eq + Hash, V: Clone> IAssoc<K, V> for Standard<K, V> {
+    type Output = Self;
     fn assoc(&self, k: K, v: V) -> Self {
         self.assoc_value(k, v)
     }
 }
 impl<K: Clone + Eq + Hash, V: Clone> IDissoc<K> for Standard<K, V> {
+    type Output = Self;
     fn dissoc(&self, k: &K) -> Self {
         self.dissoc_value(k)
     }

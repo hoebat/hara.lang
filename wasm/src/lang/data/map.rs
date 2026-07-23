@@ -433,11 +433,13 @@ impl<K: Clone + Eq + Hash, V: Clone> ICount for Standard<K, V> {
     }
 }
 impl<K: Clone + Eq + Hash, V: Clone> IAssoc<K, V> for Standard<K, V> {
+    type Output = Self;
     fn assoc(&self, key: K, value: V) -> Self {
         self.assoc_value(key, value)
     }
 }
 impl<K: Clone + Eq + Hash, V: Clone> IDissoc<K> for Standard<K, V> {
+    type Output = Self;
     fn dissoc(&self, key: &K) -> Self {
         self.dissoc_value(key)
     }

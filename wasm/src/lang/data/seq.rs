@@ -2,7 +2,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::lang::data::Tuple;
-use crate::lang::protocol::{ICount, IEmpty, IMetadata, IPersistent, IPopFirst};
+use crate::lang::protocol::{
+    IConj, ICons, ICount, IEmpty, IMetadata, IPersistent, IPopFirst, IPushFirst,
+};
 
 #[derive(Clone)]
 pub struct Seq<E> {
@@ -71,6 +73,24 @@ impl<E: Clone + 'static> ICount for Seq<E> {
         Seq::count(self)
     }
 }
+impl<E: Clone + 'static> IPushFirst<E> for Seq<E> {
+    type Output = crate::lang::data::Cons<E, Self>;
+    fn push_first(&self, value: E) -> Self::Output {
+        crate::lang::data::Cons::new(value, self.clone()).with_meta(self.metadata.clone())
+    }
+}
+impl<E: Clone + 'static> ICons<E> for Seq<E> {
+    type Output = crate::lang::data::Cons<E, Self>;
+    fn cons(&self, value: E) -> Self::Output {
+        crate::lang::data::Cons::new(value, self.clone())
+    }
+}
+impl<E: Clone + 'static> IConj<E> for Seq<E> {
+    type Output = crate::lang::data::Cons<E, Self>;
+    fn conj(&self, value: E) -> Self::Output {
+        self.push_first(value)
+    }
+}
 impl<E: Clone + 'static> IPopFirst for Seq<E> {
     type Output = Self;
     fn pop_first(&self) -> Self::Output {
@@ -98,6 +118,17 @@ impl<E: Clone + 'static> IMetadata for Seq<E> {
 }
 impl<E: Clone + 'static> IPersistent for Seq<E> {}
 
+impl<E: Clone + 'static> IntoIterator for Seq<E> {
+    type Item = E;
+    type IntoIter = SeqIter<E>;
+    fn into_iter(self) -> Self::IntoIter {
+        SeqIter {
+            seq: self,
+            index: 0,
+        }
+    }
+}
+
 pub struct SeqIter<E> {
     seq: Seq<E>,
     index: usize,
@@ -124,7 +155,7 @@ impl<E> std::fmt::Debug for Seq<E> {
 #[cfg(test)]
 mod tests {
     use super::Seq;
-    use crate::lang::protocol::{IEmpty, IMetadata, IPopFirst};
+    use crate::lang::protocol::{ICons, IEmpty, IMetadata, IPopFirst, IPushFirst};
     use std::cell::Cell;
     use std::rc::Rc;
     #[test]
@@ -147,5 +178,14 @@ mod tests {
         );
         assert!(documented.empty().is_empty());
         assert_eq!(documented.empty().meta().map(|m| m.as_ref()), Some("doc"));
+
+        let pushed = documented.push_first(-1);
+        assert_eq!(pushed.peek_first(), &-1);
+        let tail = pushed.pop_first();
+        assert_eq!(tail.peek_first(), Some(0));
+        assert_eq!(tail.meta().map(|m| m.as_ref()), Some("doc"));
+        let consed = documented.cons(-1);
+        assert_eq!(consed.meta(), None);
+        assert_eq!(consed.pop_first().peek_first(), Some(0));
     }
 }
