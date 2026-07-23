@@ -43,23 +43,34 @@ pub struct Function {
 }
 
 #[derive(Debug, Clone)]
+enum IteratorGenerator { Constant(Value), Repeated(Rc<Function>), Iterate(Rc<Function>, Value) }
+
+#[derive(Debug, Clone)]
 pub struct IteratorState {
     values: Vec<Value>,
     index: usize,
     closed: bool,
     cycle: bool,
+    generator: Option<IteratorGenerator>,
 }
 
 impl IteratorState {
-    fn new(values: Vec<Value>) -> Self { Self { values, index: 0, closed: false, cycle: false } }
-    fn has_next(&self) -> bool { !self.closed && !self.values.is_empty() && (self.cycle || self.index < self.values.len()) }
+    fn new(values: Vec<Value>) -> Self { Self { values, index: 0, closed: false, cycle: false, generator: None } }
+    fn generated(generator: IteratorGenerator) -> Self { Self { values: Vec::new(), index: 0, closed: false, cycle: false, generator: Some(generator) } }
+    fn has_next(&self) -> bool { !self.closed && (self.generator.is_some() || (!self.values.is_empty() && (self.cycle || self.index < self.values.len()))) }
     fn next(&mut self) -> Result<Value, String> {
-        if self.closed || self.values.is_empty() { return Err("iter-next reached the end of the iterator".into()); }
+        if self.closed { return Err("iter-next reached the end of the iterator".into()); }
+        if let Some(generator)=&mut self.generator {
+            return match generator {
+                IteratorGenerator::Constant(value) => Ok(value.clone()),
+                IteratorGenerator::Repeated(function) => call_function(function, Vec::new()),
+                IteratorGenerator::Iterate(function, current) => { let output=current.clone(); *current=call_function(function, vec![current.clone()])?; Ok(output) },
+            };
+        }
+        if self.values.is_empty() { return Err("iter-next reached the end of the iterator".into()); }
         if self.cycle && self.index >= self.values.len() { self.index = 0; }
         if self.index >= self.values.len() { return Err("iter-next reached the end of the iterator".into()); }
-        let value = self.values[self.index].clone();
-        self.index += 1;
-        Ok(value)
+        let value = self.values[self.index].clone(); self.index += 1; Ok(value)
     }
     fn close(&mut self) { self.closed = true; }
 }
@@ -736,9 +747,8 @@ fn iterator_values(value: Value) -> Result<Vec<Value>, String> {
         Value::Iterator(iterator) => {
             let mut state = iterator.borrow_mut();
             if state.closed { return Ok(Vec::new()); }
-            let values = state.values[state.index..].to_vec();
-            state.index = state.values.len();
-            Ok(values)
+            if state.generator.is_some() { return Err("cannot materialize an infinite iterator".into()); }
+            let values = state.values[state.index..].to_vec(); state.index = state.values.len(); Ok(values)
         }
         _ => Err("iter expects a collection".into()),
     }
@@ -750,8 +760,13 @@ fn make_iterator(value: Value) -> Result<Value, String> {
 
 fn iterator_from_values(values: Vec<Value>) -> Value { Value::Iterator(Rc::new(RefCell::new(IteratorState::new(values)))) }
 
+fn iterator_constant(value: Value) -> Value { Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::Constant(value))))) }
+fn iterator_repeated(function: Rc<Function>) -> Value { Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::Repeated(function))))) }
+fn iterator_iterate(function: Rc<Function>, seed: Value) -> Value { Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::Iterate(function, seed))))) }
+fn iterator_take(value: Value, amount: usize) -> Result<Value, String> { let mut output=Vec::new(); for _ in 0..amount { match iterator_next(&value) { Ok(item)=>output.push(item), Err(_) => break } } Ok(iterator_from_values(output)) }
+
 fn iterator_cycle(value: Value) -> Result<Value, String> {
-    let values = iterator_values(value)?; let state = IteratorState { values, index: 0, closed: false, cycle: true }; Ok(Value::Iterator(Rc::new(RefCell::new(state))))
+    let values = iterator_values(value)?; let state = IteratorState { values, index: 0, closed: false, cycle: true, generator: None }; Ok(Value::Iterator(Rc::new(RefCell::new(state))))
 }
 
 fn iterator_has_next(value: &Value) -> Result<Value, String> {
@@ -827,6 +842,8 @@ fn collection_get(value: &Value, key: &Value, default: Value) -> Result<Value, S
 }
 
 fn collection_nth(value: &Value, key: &Value) -> Result<Value, String> {
+    let index=value_index(key)?;
+    if let Value::Iterator(iterator)=value { let mut state=iterator.borrow_mut(); for _ in 0..index { let _=state.next()?; } return state.next().map_err(|_| "nth index out of bounds".into()); }
     let missing = Value::Nil;
     collection_get(value, key, missing).and_then(|result| if result == Value::Nil { Err("nth index out of bounds".into()) } else { Ok(result) })
 }
@@ -1064,7 +1081,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 Ok(iterator_from_values(output))
             }
             Form::Symbol(n) if ["iter-take", "take"].contains(&n.as_str()) => {
-                if fs.len()!=3 { return Err(format!("{n} expects an amount and collection")); } let amount=value_index(&eval(&fs[1], env)?)?; let values=iterator_values(eval(&fs[2], env)?)?; Ok(iterator_from_values(values.into_iter().take(amount).collect()))
+                if fs.len()!=3 { return Err(format!("{n} expects an amount and collection")); } let amount=value_index(&eval(&fs[1], env)?)?; iterator_take(eval(&fs[2], env)?, amount)
             }
             Form::Symbol(n) if ["iter-drop", "drop"].contains(&n.as_str()) => {
                 if fs.len()!=3 { return Err(format!("{n} expects an amount and collection")); } let amount=value_index(&eval(&fs[1], env)?)?; let values=iterator_values(eval(&fs[2], env)?)?; Ok(iterator_from_values(values.into_iter().skip(amount).collect()))
@@ -1123,8 +1140,24 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 if fs.len()!=2 && fs.len()!=3 { return Err("repeat expects a value or amount and value".into()); }
                 let (amount, form) = if fs.len()==2 { (None, &fs[1]) } else { (Some(value_index(&eval(&fs[1], env)?)?), &fs[2]) };
                 let value=eval(form, env)?;
-                if amount.is_none() { return iterator_cycle(Value::Vector(vec![value])); }
+                if amount.is_none() { return Ok(iterator_constant(value)); }
                 let count=amount.unwrap(); Ok(iterator_from_values((0..count).map(|_| value.clone()).collect()))
+            }
+            Form::Symbol(n) if n == "repeatedly" => {
+                if fs.len()!=2 && fs.len()!=3 { return Err("repeatedly expects a function or amount and function".into()); }
+                let (amount, form)=if fs.len()==2 {(None,&fs[1])} else {(Some(value_index(&eval(&fs[1], env)?)?),&fs[2])}; let function=match eval(form, env)? { Value::Function(function)=>function, _=>return Err("repeatedly expects a function".into()) }; let generated=iterator_repeated(function); if let Some(amount)=amount { iterator_take(generated,amount) } else { Ok(generated) }
+            }
+            Form::Symbol(n) if n == "iterate" => {
+                if fs.len()!=3 { return Err("iterate expects a function and seed".into()); } let function=match eval(&fs[1], env)? { Value::Function(function)=>function, _=>return Err("iterate expects a function".into()) }; Ok(iterator_iterate(function,eval(&fs[2], env)?))
+            }
+            Form::Symbol(n) if n == "iter-constantly" => {
+                if fs.len()!=2 { return Err("iter-constantly expects a value".into()); } Ok(iterator_constant(eval(&fs[1], env)?))
+            }
+            Form::Symbol(n) if n == "iter-repeatedly" => {
+                if fs.len()!=2 { return Err("iter-repeatedly expects a function".into()); } match eval(&fs[1], env)? { Value::Function(function)=>Ok(iterator_repeated(function)), _=>Err("iter-repeatedly expects a function".into()) }
+            }
+            Form::Symbol(n) if n == "iter-iterate" => {
+                if fs.len()!=3 { return Err("iter-iterate expects a function and seed".into()); } let function=match eval(&fs[1], env)? { Value::Function(function)=>function, _=>return Err("iter-iterate expects a function".into()) }; Ok(iterator_iterate(function,eval(&fs[2], env)?))
             }
             Form::Symbol(n) if ["bit-and", "bit-or", "bit-xor", "bit-not", "bit-shift-left", "bit-shift-right"].contains(&n.as_str()) => bit_operation(n, &fs[1..], env),
             Form::Symbol(n) if ["inc", "dec"].contains(&n.as_str()) => {
@@ -1153,7 +1186,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
             }
             Form::Symbol(n) if n == "constantly" => {
                 if fs.len()!=2 { return Err("constantly expects one value".into()); }
-                let value=eval(&fs[1], env)?; let mut captured=env.clone(); captured.insert("__constant".into(), value); Ok(Value::Function(Rc::new(Function { params: vec!["ignored".into()], variadic: Some("_rest".into()), body: vec![Form::Symbol("__constant".into())], captured: Rc::new(RefCell::new(captured)) })))
+                let value=eval(&fs[1], env)?; let mut captured=env.clone(); captured.insert("__constant".into(), value); Ok(Value::Function(Rc::new(Function { params: Vec::new(), variadic: Some("_rest".into()), body: vec![Form::Symbol("__constant".into())], captured: Rc::new(RefCell::new(captured)) })))
             }
             Form::Symbol(n) if n == "complement" => {
                 if fs.len()!=2 { return Err("complement expects one function".into()); }

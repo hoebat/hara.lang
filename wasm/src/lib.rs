@@ -603,6 +603,16 @@ mod tests {
     }
 
     #[test]
+    fn lazy_iterator_generators_are_bounded_by_consumers() {
+        let mut runtime = Runtime::new();
+        assert_eq!(runtime.eval_text("(count (take 4 (repeat :x)))").unwrap(), "4");
+        assert_eq!(runtime.eval_text("(count (take 3 (repeatedly (constantly 7))))").unwrap(), "3");
+        assert_eq!(runtime.eval_text("(count (take 5 (iterate (fn [x] (+ x 2)) 0)))").unwrap(), "5");
+        assert_eq!(runtime.eval_text("(first (take 4 (iterate (fn [x] (+ x 2)) 0)))").unwrap(), "0");
+        assert_eq!(runtime.eval_text("(nth (take 4 (iterate (fn [x] (+ x 2)) 0)) 3)").unwrap(), "6");
+    }
+
+    #[test]
     fn function_combinators_capture_values_and_functions() {
         let mut runtime = Runtime::new();
         assert_eq!(runtime.eval_text("((constantly 42) 1 2 3)").unwrap(), "42");
