@@ -3,8 +3,9 @@ use std::rc::Rc;
 
 use crate::lang::protocol::hash::HashType;
 use crate::lang::protocol::{
-    IAssoc, IConj, ICount, IDisplay, IEmpty, IEquality, IHash, IMetadata, IMutable, INth,
-    IPeekFirst, IPeekLast, IPersistent, IPopLast, IPushLast, IToMutable, IToPersistent,
+    IAssoc, IColl, IConj, ICount, IDisplay, IEmpty, IEquality, IHash, IMetadata, IMutable, INth,
+    IObjType, IPeekFirst, IPeekLast, IPersistent, IPopLast, IPushLast, IToMutable, IToPersistent,
+    ObjType,
 };
 
 const NODE_SHIFT: usize = 5;
@@ -349,6 +350,14 @@ impl<E: Clone> From<Vec<E>> for Standard<E> {
     }
 }
 
+impl<E: Clone> IntoIterator for Standard<E> {
+    type Item = E;
+    type IntoIter = std::vec::IntoIter<E>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter().cloned().collect::<Vec<_>>().into_iter()
+    }
+}
+
 impl<E: Clone> std::ops::Index<usize> for Standard<E> {
     type Output = E;
 
@@ -476,6 +485,23 @@ impl<E: Clone + std::hash::Hash> IHash for Standard<E> {
         let mut state = std::collections::hash_map::DefaultHasher::new();
         self.iter().for_each(|value| value.hash(&mut state));
         state.finish()
+    }
+}
+
+impl<E: Clone + std::fmt::Debug> IObjType for Standard<E> {
+    fn obj_type(&self) -> ObjType {
+        ObjType::Vector
+    }
+}
+impl<E> IColl<E> for Standard<E>
+where
+    E: Clone + PartialEq + std::fmt::Debug + std::hash::Hash,
+{
+    fn start_string(&self) -> &'static str {
+        "["
+    }
+    fn end_string(&self) -> &'static str {
+        "]"
     }
 }
 

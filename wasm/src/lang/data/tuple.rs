@@ -1,6 +1,7 @@
 use crate::lang::protocol::{
-    IConj, ICons, ICount, IEmpty, IMetadata, INth, IPeekFirst, IPeekLast, IPersistent, IPopFirst,
-    IPopLast, IPushFirst, IPushLast,
+    HashType, IColl, IConj, ICons, ICount, IDisplay, IEmpty, IEquality, IHash, IMetadata, INth,
+    IObjType, IPeekFirst, IPeekLast, IPersistent, IPopFirst, IPopLast, IPushFirst, IPushLast,
+    ObjType,
 };
 use std::rc::Rc;
 
@@ -219,6 +220,55 @@ impl<E: Clone> IEmpty for Tuple<E> {
 impl<E: Clone> Default for Tuple<E> {
     fn default() -> Self {
         Self::Tup0
+    }
+}
+
+impl<E: Clone> IntoIterator for Tuple<E> {
+    type Item = E;
+    type IntoIter = std::vec::IntoIter<E>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter().cloned().collect::<Vec<_>>().into_iter()
+    }
+}
+impl<E: Clone + PartialEq> IEquality for Tuple<E> {
+    fn equality(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+impl<E: Clone + std::fmt::Debug> IDisplay for Tuple<E> {
+    fn display(&self) -> String {
+        format!(
+            "[{}]",
+            self.iter()
+                .map(|v| format!("{v:?}"))
+                .collect::<Vec<_>>()
+                .join(" ")
+        )
+    }
+}
+impl<E: Clone + std::hash::Hash> IHash for Tuple<E> {
+    fn hash_calc(&self, _hash_type: HashType) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut state = std::collections::hash_map::DefaultHasher::new();
+        "::TUPLE".hash(&mut state);
+        self.iter().for_each(|value| value.hash(&mut state));
+        state.finish()
+    }
+}
+impl<E: Clone + std::fmt::Debug> IObjType for Tuple<E> {
+    fn obj_type(&self) -> ObjType {
+        ObjType::Tuple
+    }
+}
+impl<E> IColl<E> for Tuple<E>
+where
+    E: Clone + PartialEq + std::fmt::Debug + std::hash::Hash,
+{
+    fn start_string(&self) -> &'static str {
+        "["
+    }
+    fn end_string(&self) -> &'static str {
+        "]"
     }
 }
 

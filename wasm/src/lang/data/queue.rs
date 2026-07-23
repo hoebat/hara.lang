@@ -1,7 +1,8 @@
 use crate::lang::data::{List, Vector};
 use crate::lang::protocol::{
-    IConj, ICount, IEmpty, IMetadata, IMutable, INth, IPeekFirst, IPeekLast, IPersistent,
-    IPopFirst, IPopLast, IPushLast, IToMutable, IToPersistent,
+    HashType, IColl, IConj, ICount, IDisplay, IEmpty, IEquality, IHash, IMetadata, IMutable, INth,
+    IObjType, IPeekFirst, IPeekLast, IPersistent, IPopFirst, IPopLast, IPushLast, IToMutable,
+    IToPersistent, ObjType,
 };
 use std::rc::Rc;
 
@@ -234,6 +235,55 @@ impl<E: Clone> IMetadata for Standard<E> {
     }
 }
 impl<E: Clone> IPersistent for Standard<E> {}
+
+impl<E: Clone> IntoIterator for Standard<E> {
+    type Item = E;
+    type IntoIter = std::vec::IntoIter<E>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter().cloned().collect::<Vec<_>>().into_iter()
+    }
+}
+impl<E: Clone + PartialEq> IEquality for Standard<E> {
+    fn equality(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+impl<E: Clone + std::fmt::Debug> IDisplay for Standard<E> {
+    fn display(&self) -> String {
+        format!(
+            "[{}]",
+            self.iter()
+                .map(|v| format!("{v:?}"))
+                .collect::<Vec<_>>()
+                .join(" ")
+        )
+    }
+}
+impl<E: Clone + std::hash::Hash> IHash for Standard<E> {
+    fn hash_calc(&self, _hash_type: HashType) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut state = std::collections::hash_map::DefaultHasher::new();
+        "::SEQUENTIAL".hash(&mut state);
+        self.iter().for_each(|value| value.hash(&mut state));
+        state.finish()
+    }
+}
+impl<E: Clone + std::fmt::Debug> IObjType for Standard<E> {
+    fn obj_type(&self) -> ObjType {
+        ObjType::Sequential
+    }
+}
+impl<E> IColl<E> for Standard<E>
+where
+    E: Clone + PartialEq + std::fmt::Debug + std::hash::Hash,
+{
+    fn start_string(&self) -> &'static str {
+        "["
+    }
+    fn end_string(&self) -> &'static str {
+        "]"
+    }
+}
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Mutable<E: Clone> {

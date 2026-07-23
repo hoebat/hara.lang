@@ -3,8 +3,8 @@ use std::hash::Hash;
 
 use crate::lang::data::Map;
 use crate::lang::protocol::{
-    IConj, ICount, IDissoc, IEmpty, IFind, IMetadata, IMutable, IPersistent, IToMutable,
-    IToPersistent,
+    HashType, IColl, IConj, ICount, IDisplay, IDissoc, IEmpty, IEquality, IFind, IHash, IMetadata,
+    IMutable, IObjType, IPersistent, IToMutable, IToPersistent, ObjType,
 };
 
 #[derive(Debug, Clone)]
@@ -114,6 +114,49 @@ impl<E: Clone + Eq + Hash> IMetadata for Standard<E> {
     }
 }
 impl<E: Clone + Eq + Hash> IPersistent for Standard<E> {}
+impl<E: Clone + Eq + Hash> IEquality for Standard<E> {
+    fn equality(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+impl<E: Clone + Eq + Hash + std::fmt::Debug> IDisplay for Standard<E> {
+    fn display(&self) -> String {
+        format!(
+            "#{{{}}}",
+            self.iter()
+                .map(|v| format!("{v:?}"))
+                .collect::<Vec<_>>()
+                .join(" ")
+        )
+    }
+}
+impl<E: Clone + Eq + Hash> IHash for Standard<E> {
+    fn hash_calc(&self, _hash_type: HashType) -> u64 {
+        self.iter()
+            .map(|v| {
+                let mut s = std::collections::hash_map::DefaultHasher::new();
+                v.hash(&mut s);
+                std::hash::Hasher::finish(&s)
+            })
+            .fold(0u64, u64::wrapping_add)
+    }
+}
+impl<E: Clone + Eq + Hash + std::fmt::Debug> IObjType for Standard<E> {
+    fn obj_type(&self) -> ObjType {
+        ObjType::Set
+    }
+}
+impl<E> IColl<E> for Standard<E>
+where
+    E: Clone + Eq + Hash + std::fmt::Debug,
+{
+    fn start_string(&self) -> &'static str {
+        "#{"
+    }
+    fn end_string(&self) -> &'static str {
+        "}"
+    }
+}
 impl<E: Clone + Eq + Hash> IToMutable for Standard<E> {
     type Mutable = Mutable<E>;
     fn to_mutable(&self) -> Mutable<E> {

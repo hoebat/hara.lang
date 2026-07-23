@@ -1,6 +1,7 @@
 use crate::lang::protocol::{
-    IAssoc, IConj, ICons, ICount, IEmpty, IMetadata, IMutable, INth, IPeekFirst, IPeekLast,
-    IPersistent, IPopFirst, IPopLast, IPushFirst, IPushLast, IToMutable, IToPersistent,
+    HashType, IAssoc, IColl, IConj, ICons, ICount, IDisplay, IEmpty, IEquality, IHash, IMetadata,
+    IMutable, INth, IObjType, IPeekFirst, IPeekLast, IPersistent, IPopFirst, IPopLast, IPushFirst,
+    IPushLast, IToMutable, IToPersistent, ObjType,
 };
 use std::rc::Rc;
 
@@ -271,6 +272,48 @@ impl<E: Clone> IMetadata for Standard<E> {
     }
 }
 impl<E: Clone> IPersistent for Standard<E> {}
+
+impl<E: Clone + PartialEq> IEquality for Standard<E> {
+    fn equality(&self, other: &Self) -> bool {
+        self == other
+    }
+}
+impl<E: Clone + std::fmt::Debug> IDisplay for Standard<E> {
+    fn display(&self) -> String {
+        format!(
+            "({})",
+            self.iter()
+                .map(|v| format!("{v:?}"))
+                .collect::<Vec<_>>()
+                .join(" ")
+        )
+    }
+}
+impl<E: Clone + std::hash::Hash> IHash for Standard<E> {
+    fn hash_calc(&self, _hash_type: HashType) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut state = std::collections::hash_map::DefaultHasher::new();
+        "::LIST".hash(&mut state);
+        self.iter().for_each(|value| value.hash(&mut state));
+        state.finish()
+    }
+}
+impl<E: Clone + std::fmt::Debug> IObjType for Standard<E> {
+    fn obj_type(&self) -> ObjType {
+        ObjType::List
+    }
+}
+impl<E> IColl<E> for Standard<E>
+where
+    E: Clone + PartialEq + std::fmt::Debug + std::hash::Hash,
+{
+    fn start_string(&self) -> &'static str {
+        "("
+    }
+    fn end_string(&self) -> &'static str {
+        ")"
+    }
+}
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Mutable<E> {
