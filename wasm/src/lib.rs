@@ -1117,6 +1117,49 @@ mod tests {
     }
 
     #[test]
+    fn atoms_match_java_identity_and_mutation_semantics() {
+        let mut runtime = Runtime::new();
+        assert_eq!(runtime.eval_text("(let [a (atom 1)] @a)").unwrap(), "1");
+        assert_eq!(
+            runtime
+                .eval_text("(let [a (atom 1)] (do (reset! a 2) @a))")
+                .unwrap(),
+            "2"
+        );
+        assert_eq!(
+            runtime
+                .eval_text("(let [a (atom 1)] (do (swap! a (fn [x y] (+ x y)) 4) @a))")
+                .unwrap(),
+            "5"
+        );
+        assert_eq!(
+            runtime
+                .eval_text("(let [a (atom 1)] [(compare:set! a 1 2) @a])")
+                .unwrap(),
+            "[true 2]"
+        );
+        assert_eq!(
+            runtime
+                .eval_text("(let [a (atom 1)] [(compare:set! a 0 2) @a])")
+                .unwrap(),
+            "[false 1]"
+        );
+        assert_eq!(
+            runtime.eval_text("(let [a (atom 1) b a] (= a b))").unwrap(),
+            "true"
+        );
+        assert_eq!(runtime.eval_text("(= (atom 1) (atom 1))").unwrap(), "false");
+        assert_eq!(
+            runtime.eval_text("(reset! 1 2)").unwrap_err(),
+            "reset! expects an atom"
+        );
+        assert_eq!(
+            runtime.eval_text("(swap! (atom 1) 2)").unwrap_err(),
+            "swap! expects a function"
+        );
+    }
+
+    #[test]
     fn keywords_maps_and_sets_match_java_callable_semantics() {
         let mut runtime = Runtime::new();
         assert_eq!(runtime.eval_text("(:answer {:answer 42})").unwrap(), "42");

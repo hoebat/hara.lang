@@ -6,9 +6,9 @@ pub use crate::kernel::Form;
 use crate::kernel::{NamespaceRegistry, Var as KernelVar};
 use crate::lang::data::List as PList;
 use crate::lang::data::{
-    Keyword, Map as PMap, OrderedMap as POrderedMap, OrderedSet as POrderedSet, Queue as PQueue,
-    Set as PSet, SortedMap as PSortedMap, SortedSet as PSortedSet, Symbol, Trie as PTrie,
-    Tuple as PTuple, Vector as PVector,
+    Atom as PAtom, Keyword, Map as PMap, OrderedMap as POrderedMap, OrderedSet as POrderedSet,
+    Queue as PQueue, Set as PSet, SortedMap as PSortedMap, SortedSet as PSortedSet, Symbol,
+    Trie as PTrie, Tuple as PTuple, Vector as PVector,
 };
 use crate::lang::data::{Metadata, MetadataValue};
 use crate::lang::protocol::{IDisplay, IMetadata, INamespaced};
@@ -44,6 +44,7 @@ pub enum Value {
     Array(Rc<RefCell<Vec<Value>>>),
     Object(Rc<RefCell<Vec<(String, Value)>>>),
     Promise(Promise),
+    Atom(Box<PAtom<Value>>),
     Recur(Vec<Value>),
     Map(PMap<Value, Value>),
     OrderedMap(Box<POrderedMap<Value, Value>>),
@@ -547,6 +548,7 @@ impl PartialEq for Value {
             (Value::Array(a), Value::Array(b)) => Rc::ptr_eq(a, b),
             (Value::Object(a), Value::Object(b)) => Rc::ptr_eq(a, b),
             (Value::Promise(a), Value::Promise(b)) => a.same_identity(b),
+            (Value::Atom(a), Value::Atom(b)) => a.same_identity(b),
             (Value::Recur(a), Value::Recur(b)) => a == b,
             (Value::Map(a), Value::Map(b)) => a == b,
             (Value::Set(a), Value::Set(b)) => a == b,
@@ -609,6 +611,7 @@ impl Ord for Value {
                 Value::Array(_) => 17,
                 Value::Object(_) => 18,
                 Value::Promise(_) => 19,
+                Value::Atom(_) => 26,
                 Value::Recur(_) => 20,
                 Value::Function(_) => 21,
                 Value::Iterator(_) => 22,
@@ -692,6 +695,7 @@ impl Value {
                     .join(" ")
             ),
             Self::Promise(_) => "<promise>".into(),
+            Self::Atom(value) => format!("#atom <{}>", value.deref_value().display()),
             Self::Recur(values) => format!(
                 "<recur {}>",
                 values
@@ -784,6 +788,7 @@ impl Value {
                 Value::Array(_) => 6,
                 Value::Object(_) => 7,
                 Value::Promise(_) => 8,
+                Value::Atom(_) => 28,
                 Value::Recur(_) => 9,
                 Value::Map(_) | Value::OrderedMap(_) | Value::SortedMap(_) | Value::Trie(_) => 10,
                 Value::Set(_) | Value::OrderedSet(_) | Value::SortedSet(_) => 11,
@@ -824,6 +829,7 @@ impl Value {
                     hash_value(item, state);
                 }),
                 Value::Promise(v) => v.identity_address().hash(state),
+                Value::Atom(v) => v.identity_address().hash(state),
                 Value::Recur(v) => v.iter().for_each(|item| hash_value(item, state)),
                 value @ (Value::Map(_)
                 | Value::OrderedMap(_)
@@ -1752,6 +1758,7 @@ pub fn receiver_category(value: &Value) -> &'static str {
         Value::Array(_) => "array",
         Value::Object(_) => "object",
         Value::Promise(_) => "promise",
+        Value::Atom(_) => "atom",
         Value::Recur(_) => "recur",
         Value::List(_) => "list",
         Value::Queue(_) => "queue",
@@ -4127,6 +4134,66 @@ fn eval_namespace_operation(
     }
 }
 
+fn eval_atom_form(
+    operation: &str,
+    forms: &[Form],
+    env: &mut HashMap<String, Value>,
+) -> Result<Value, String> {
+    match operation {
+        "atom" | "atom:basic" => {
+            if forms.len() != 2 {
+                return Err(format!("{operation} expects one value"));
+            }
+            Ok(Value::Atom(Box::new(PAtom::new(eval(&forms[1], env)?))))
+        }
+        "reset!" => {
+            if forms.len() != 3 {
+                return Err("reset! expects an atom and value".into());
+            }
+            let atom = match eval(&forms[1], env)? {
+                Value::Atom(atom) => atom,
+                _ => return Err("reset! expects an atom".into()),
+            };
+            atom.reset(eval(&forms[2], env)?)
+        }
+        "compare:set!" => {
+            if forms.len() != 4 {
+                return Err("compare:set! expects an atom, old value, and new value".into());
+            }
+            let atom = match eval(&forms[1], env)? {
+                Value::Atom(atom) => atom,
+                _ => return Err("compare:set! expects an atom".into()),
+            };
+            let old = eval(&forms[2], env)?;
+            Ok(Value::Bool(
+                atom.compare_and_set(&old, eval(&forms[3], env)?)?,
+            ))
+        }
+        "swap!" => {
+            if forms.len() < 3 {
+                return Err("swap! expects an atom, function, and optional arguments".into());
+            }
+            let atom = match eval(&forms[1], env)? {
+                Value::Atom(atom) => atom,
+                _ => return Err("swap! expects an atom".into()),
+            };
+            let function = match eval(&forms[2], env)? {
+                Value::Function(function) => function,
+                _ => return Err("swap! expects a function".into()),
+            };
+            let mut arguments = vec![atom.deref_value()];
+            arguments.extend(
+                forms[3..]
+                    .iter()
+                    .map(|form| eval(form, env))
+                    .collect::<Result<Vec<_>, _>>()?,
+            );
+            atom.reset(call_function(&function, arguments)?)
+        }
+        _ => unreachable!("eval_atom_form called for an unknown operation"),
+    }
+}
+
 pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, String> {
     match form {
         Form::Number(v) => Ok(Value::Number(*v)),
@@ -4225,6 +4292,12 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     binding_var(env, name).ok_or_else(|| format!("unbound symbol: {name}"))?;
                 Ok(Value::Var(cell))
             }
+            Form::Symbol(n)
+                if ["atom", "atom:basic", "reset!", "compare:set!", "swap!"]
+                    .contains(&n.as_str()) =>
+            {
+                eval_atom_form(n, fs, env)
+            }
             Form::Symbol(n) if n == "deref" => {
                 if fs.len() != 2 {
                     return Err("deref expects a var".into());
@@ -4238,6 +4311,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 };
                 match target {
                     Value::Var(value) => Ok(value.deref_value()),
+                    Value::Atom(value) => Ok(value.deref_value()),
                     Value::Promise(promise) => match promise.state() {
                         PromiseState::Fulfilled(value) => Ok(value),
                         PromiseState::Rejected(error) => Err(error),
@@ -4245,7 +4319,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                             "deref cannot block on a pending promise outside an HTA fiber".into(),
                         ),
                     },
-                    _ => Err("deref expects a var or promise".into()),
+                    _ => Err("deref expects a var, atom, or promise".into()),
                 }
             }
             Form::Symbol(n) if n == "set!" || n == "var/set" => {

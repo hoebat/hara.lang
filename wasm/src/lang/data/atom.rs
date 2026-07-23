@@ -27,6 +27,12 @@ impl<V> Atom<V> {
             watches: Arc::new(Mutex::new(Vec::new())),
         }
     }
+    pub fn same_identity(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.state, &other.state)
+    }
+    pub fn identity_address(&self) -> usize {
+        Arc::as_ptr(&self.state) as usize
+    }
     pub fn with_validator(
         value: V,
         validator: impl Fn(&V) -> bool + Send + Sync + 'static,
