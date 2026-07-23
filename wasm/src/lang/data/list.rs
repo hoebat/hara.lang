@@ -204,6 +204,7 @@ impl<E: Clone> IPushLast<E> for Standard<E> {
     }
 }
 impl<E: Clone> IPopFirst for Standard<E> {
+    type Output = Self;
     fn pop_first(&self) -> Self {
         self.pop_first_value()
     }
