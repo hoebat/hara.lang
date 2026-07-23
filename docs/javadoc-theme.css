@@ -71,6 +71,14 @@ footer[role="contentinfo"] { width: min(1180px, calc(100% - 48px)); margin: 0 au
 footer[role="contentinfo"] hr { border: 0; border-top: 1px solid var(--hara-line); }
 .legal-copy { font: 10px ui-monospace, SFMono-Regular, monospace; }
 
+.summary-table.three-column-summary { grid-template-columns: minmax(170px,.65fr) minmax(260px,1.25fr) minmax(220px,1fr); }
+.summary-table.four-column-summary { grid-template-columns: repeat(4, minmax(130px, 1fr)); }
+.summary-table .col-first, .summary-table .col-second, .summary-table .col-last { min-width: 0; overflow-wrap: anywhere; }
+.summary-table code { background: transparent; border: 0; padding: 0; }
+.class-description { margin: 26px 0 30px; padding: 24px; background: rgba(11,16,27,.78); border: 1px solid var(--hara-line); }
+.type-signature, .member-signature { padding: 15px 18px; background: #070d16; border: 1px solid var(--hara-line); color: var(--hara-text); font: 13px ui-monospace, SFMono-Regular, monospace; overflow-x: auto; }
+.method-summary, .method-details { margin-top: 30px; }
+.method-summary h2, .method-details h2 { color: var(--hara-cyan); font-size: 1.35rem; }
 @media (max-width: 700px) {
   .flex-content, footer[role="contentinfo"] { width: calc(100% - 28px); }
   .top-nav ul.nav-list { overflow-x: auto; padding-inline: 14px; }
