@@ -48,6 +48,7 @@ pub extern "C" fn hta_abi_version() -> i32 {
 
 struct Runtime {
     env: HashMap<String, Value>,
+    namespaces: kernel::NamespaceRegistry<Value>,
     next_task: u64,
     next_call: u64,
     events: Rc<RefCell<VecDeque<Vec<u8>>>>,
@@ -60,6 +61,7 @@ impl Runtime {
     fn new() -> Self {
         Self {
             env: HashMap::new(),
+            namespaces: kernel::NamespaceRegistry::new("user"),
             next_task: 1,
             next_call: 1,
             events: Rc::new(RefCell::new(VecDeque::new())),
@@ -121,7 +123,10 @@ impl Runtime {
     }
     fn start_fiber(&mut self, task: u64, source: &str) -> Result<(), String> {
         let (handler, pending, next) = self.host_handler(task);
-        let fiber = core::with_host_calls(handler, || EvalFiber::start(source, self.env.clone()))?;
+        let namespaces = self.namespaces.clone();
+        let fiber = core::with_namespace_registry(&namespaces, || {
+            core::with_host_calls(handler, || EvalFiber::start(source, self.env.clone()))
+        })?;
         self.collect_calls(task, pending, next);
         self.drive(task, fiber);
         Ok(())
@@ -131,8 +136,11 @@ impl Runtime {
             return;
         };
         let (handler, pending, next) = self.host_handler(task);
-        core::with_host_calls(handler, || {
-            fiber.resume(state);
+        let namespaces = self.namespaces.clone();
+        core::with_namespace_registry(&namespaces, || {
+            core::with_host_calls(handler, || {
+                fiber.resume(state);
+            });
         });
         self.collect_calls(task, pending, next);
         self.drive(task, fiber);
@@ -154,6 +162,8 @@ impl Runtime {
             }
             EvalFiberState::Completed(value) => {
                 self.env = fiber.environment();
+                core::save_namespace_environment(&self.namespaces, &mut self.env);
+                core::refresh_namespace_environment(&self.namespaces, &mut self.env);
                 self.event(event(0, task, value));
             }
             EvalFiberState::Failed(error) => {
@@ -391,7 +401,9 @@ fn error_code(error: &str) -> i32 {
 fn evaluate(source: &str) -> Result<i64, i32> {
     kernel::parse_forms(source).map_err(|_| 1)?;
     let mut env = HashMap::new();
-    let value = core::eval_text(source, &mut env).map_err(|error| error_code(&error))?;
+    let namespaces = kernel::NamespaceRegistry::new("user");
+    let value = core::with_namespace_registry(&namespaces, || core::eval_text(source, &mut env))
+        .map_err(|error| error_code(&error))?;
     value.parse::<i64>().map_err(|_| 4)
 }
 
@@ -412,7 +424,8 @@ pub extern "C" fn eval_error_code(source_ptr: *const u8, source_len: usize) -> i
                 return 1;
             }
             let mut env = HashMap::new();
-            match core::eval_text(source, &mut env) {
+            let namespaces = kernel::NamespaceRegistry::new("user");
+            match core::with_namespace_registry(&namespaces, || core::eval_text(source, &mut env)) {
                 Ok(_) => 0,
                 Err(error) => error_code(&error),
             }
@@ -423,7 +436,10 @@ pub extern "C" fn eval_error_code(source_ptr: *const u8, source_len: usize) -> i
 
 #[cfg(test)]
 mod tests {
-    use super::{eval_error_code, evaluate};
+    use super::{eval_error_code, evaluate, Runtime};
+    use crate::core::Value;
+    use crate::lang::data::Symbol;
+    use crate::lang::protocol::IDeref;
 
     #[test]
     fn parser_failures_have_the_stable_parse_code() {
@@ -436,6 +452,34 @@ mod tests {
             );
         }
         assert_eq!(eval_error_code(b"(+ 1 2)".as_ptr(), 7), 0);
+    }
+
+    #[test]
+    fn fibers_persist_namespace_selection_defs_and_var_identity() {
+        let mut runtime = Runtime::new();
+        runtime
+            .start_fiber(1, "(ns example.lib) (def answer 42)")
+            .unwrap();
+
+        assert_eq!(runtime.namespaces.current().name().as_str(), "example.lib");
+        let namespace = runtime.namespaces.find("example.lib").unwrap();
+        let answer = namespace.resolve(&Symbol::parse("answer")).unwrap();
+        assert_eq!(answer.symbol().as_str(), "example.lib/answer");
+        assert_eq!(answer.deref(), Value::Number(42));
+        assert!(
+            matches!(runtime.env.get("answer"), Some(Value::Var(var)) if var.same_identity(&answer))
+        );
+
+        runtime.start_fiber(2, "(ns user) (def local 7)").unwrap();
+        assert_eq!(runtime.namespaces.current().name().as_str(), "user");
+        assert_eq!(answer.deref(), Value::Number(42));
+        assert!(runtime
+            .namespaces
+            .find("example.lib")
+            .unwrap()
+            .resolve(&Symbol::parse("answer"))
+            .unwrap()
+            .same_identity(&answer));
     }
 }
 

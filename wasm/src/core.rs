@@ -3,7 +3,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 
 pub use crate::kernel::Form;
-use crate::kernel::Var as KernelVar;
+use crate::kernel::{NamespaceRegistry, Var as KernelVar};
 use crate::lang::data::List as PList;
 use crate::lang::data::{
     Keyword, OrderedMap as PMap, OrderedSet as PSet, Symbol, Tuple as PTuple, Vector as PVector,
@@ -52,6 +52,7 @@ pub enum Value {
     Vector(PVector<Value>),
     Iterator(Rc<RefCell<IteratorState>>),
     Var(KernelVar<Value>),
+    Namespace(Rc<crate::kernel::Namespace<Value>>),
     Extension(ExtensionValue),
     Nil,
 }
@@ -412,6 +413,7 @@ impl PartialEq for Value {
             (Value::Vector(a), Value::Vector(b)) => a == b,
             (Value::Iterator(a), Value::Iterator(b)) => Rc::ptr_eq(a, b),
             (Value::Var(a), Value::Var(b)) => a.same_identity(b),
+            (Value::Namespace(a), Value::Namespace(b)) => a.same_identity(b),
             (Value::Extension(a), Value::Extension(b)) => a == b,
             (Value::Nil, Value::Nil) => true,
             _ => false,
@@ -547,6 +549,7 @@ impl Value {
                 }
             }
             Self::Var(value) => value.display(),
+            Self::Namespace(value) => format!("#namespace[{}]", value.name().as_str()),
             Self::Extension(value) => format!("#ht[:handle {}]", value.handle),
             Self::Nil => "nil".into(),
         }
@@ -577,6 +580,7 @@ impl Value {
                 Value::Vector(_) => 15,
                 Value::Iterator(_) => 16,
                 Value::Var(_) => 17,
+                Value::Namespace(_) => 27,
                 Value::Extension(_) => 18,
                 Value::Nil => 19,
                 Value::Float(_) => 20,
@@ -641,6 +645,7 @@ impl Value {
                 Value::Function(v) => Rc::as_ptr(v).hash(state),
                 Value::Iterator(v) => Rc::as_ptr(v).hash(state),
                 Value::Var(v) => v.identity_address().hash(state),
+                Value::Namespace(v) => v.identity_address().hash(state),
                 Value::Extension(v) => {
                     v.provider.hash(state);
                     v.type_name.hash(state);
@@ -730,10 +735,91 @@ impl ProtocolRegistry {
 
 thread_local! {
     static ACTIVE_PROTOCOLS: RefCell<Option<ProtocolRegistry>> = const { RefCell::new(None) };
+    static ACTIVE_NAMESPACES: RefCell<Option<NamespaceRegistry<Value>>> = const { RefCell::new(None) };
     static ACTIVE_PROMISE_PROVIDER: RefCell<Option<Rc<dyn PromiseProvider>>> = const { RefCell::new(None) };
     static ACTIVE_FILE_PROVIDER: RefCell<Option<Rc<dyn FileProvider>>> = const { RefCell::new(None) };
     static ACTIVE_SOCKET_PROVIDER: RefCell<Option<Rc<dyn SocketProvider>>> = const { RefCell::new(None) };
     static HOST_CALL_HANDLER: RefCell<Option<Rc<dyn Fn(String, String, Vec<Value>) -> Result<Value, String>>>> = const { RefCell::new(None) };
+}
+
+/// Runs an evaluation with a namespace registry available to namespace builtins.
+pub fn with_namespace_registry<R>(
+    registry: &NamespaceRegistry<Value>,
+    operation: impl FnOnce() -> R,
+) -> R {
+    ACTIVE_NAMESPACES.with(|active| {
+        let previous = active.replace(Some(registry.clone()));
+        let result = operation();
+        active.replace(previous);
+        result
+    })
+}
+
+fn namespace_registry() -> Result<NamespaceRegistry<Value>, String> {
+    ACTIVE_NAMESPACES
+        .with(|active| active.borrow().clone())
+        .ok_or_else(|| "namespace runtime is unavailable".into())
+}
+
+/// Saves all unqualified evaluator bindings into the registry current namespace.
+pub fn save_namespace_environment(
+    registry: &NamespaceRegistry<Value>,
+    env: &mut HashMap<String, Value>,
+) {
+    let namespace = registry.current();
+    let namespace_name = namespace.name().as_str().to_owned();
+    let locals = env
+        .iter()
+        .filter(|(name, _)| !name.contains('/'))
+        .map(|(name, value)| (name.clone(), value.clone()))
+        .collect::<Vec<_>>();
+    for (name, value) in locals {
+        let path = format!("{namespace_name}/{name}");
+        let var = match value {
+            Value::Var(var) if var.symbol().as_str() == path => var,
+            Value::Var(var) => var.requalify(&path),
+            value => namespace.intern(&name, value),
+        };
+        namespace.map_var(crate::lang::data::Symbol::parse(&name), var.clone());
+        env.insert(name, Value::Var(var));
+    }
+}
+
+/// Rebuilds qualified and aliased bindings without changing local bindings.
+pub fn refresh_namespace_environment(
+    registry: &NamespaceRegistry<Value>,
+    env: &mut HashMap<String, Value>,
+) {
+    env.retain(|name, _| !name.contains('/'));
+    for namespace in registry.all() {
+        for (_, var) in namespace.mappings() {
+            env.insert(var.symbol().as_str().to_owned(), Value::Var(var));
+        }
+    }
+    for (alias, namespace) in registry.current().aliases() {
+        for (local, var) in namespace.mappings() {
+            env.insert(
+                format!("{}/{}", alias.as_str(), local.as_str()),
+                Value::Var(var),
+            );
+        }
+    }
+}
+
+/// Saves the current namespace, selects name, and loads its bindings.
+pub fn select_namespace_environment(
+    registry: &NamespaceRegistry<Value>,
+    env: &mut HashMap<String, Value>,
+    name: &str,
+) {
+    save_namespace_environment(registry, env);
+    let namespace = registry.set_current(name);
+    *env = namespace
+        .mappings()
+        .into_iter()
+        .map(|(name, var)| (name.as_str().to_owned(), Value::Var(var)))
+        .collect();
+    refresh_namespace_environment(registry, env);
 }
 
 /// Runs an evaluation with a registry available to protocol dispatch.
@@ -1457,6 +1543,7 @@ pub fn receiver_category(value: &Value) -> &'static str {
         Value::Set(_) => "set",
         Value::Iterator(_) => "iterator",
         Value::Var(_) => "var",
+        Value::Namespace(_) => "namespace",
         Value::Extension(_) => "extension",
     }
 }
@@ -3577,6 +3664,82 @@ fn syntax_quote_value(form: &Form, env: &mut HashMap<String, Value>) -> Result<V
     }
 }
 
+#[inline(never)]
+fn eval_namespace_operation(
+    operation: &str,
+    forms: &[Form],
+    env: &mut HashMap<String, Value>,
+) -> Result<Value, String> {
+    let registry = namespace_registry()?;
+    match operation {
+        "ns:name" => match forms {
+            [_, value] => match eval(value, env)? {
+                Value::Namespace(namespace) => Ok(Value::Symbol(namespace.name().clone())),
+                _ => Err("ns:name expects a namespace".into()),
+            },
+            _ => Err("ns:name expects one namespace".into()),
+        },
+        "ns:map" | "ns:aliases" | "ns:imports" => {
+            if forms.len() != 2 {
+                return Err(format!("{operation} expects one namespace"));
+            }
+            let namespace = match eval(&forms[1], env)? {
+                Value::Namespace(namespace) => namespace,
+                _ => return Err(format!("{operation} expects a namespace")),
+            };
+            let entries: Vec<(Value, Value)> = match operation {
+                "ns:map" => namespace
+                    .mappings()
+                    .into_iter()
+                    .map(|(name, value)| (Value::Symbol(name), Value::Var(value)))
+                    .collect(),
+                "ns:aliases" => namespace
+                    .aliases()
+                    .into_iter()
+                    .map(|(name, value)| (Value::Symbol(name), Value::Namespace(Rc::new(value))))
+                    .collect(),
+                "ns:imports" => namespace
+                    .imports()
+                    .into_iter()
+                    .map(|(name, value)| (Value::Symbol(name), Value::String(value)))
+                    .collect(),
+                _ => unreachable!(),
+            };
+            Ok(Value::Map(PMap::from_iter(entries)))
+        }
+        "ns:find" | "ns:create" => {
+            if forms.len() != 2 {
+                return Err(format!("{operation} expects one symbol"));
+            }
+            let name = match eval(&forms[1], env)? {
+                Value::Symbol(name) if name.get_namespace().is_none() => name,
+                _ => return Err(format!("{operation} expects an unqualified symbol")),
+            };
+            let namespace = if operation == "ns:create" {
+                Some(registry.find_or_create(name.as_str()))
+            } else {
+                registry.find(name.as_str())
+            };
+            Ok(namespace
+                .map(|value| Value::Namespace(Rc::new(value)))
+                .unwrap_or(Value::Nil))
+        }
+        "ns:list" => {
+            if forms.len() != 1 {
+                return Err("ns:list expects no arguments".into());
+            }
+            Ok(iterator_from_values(
+                registry
+                    .all()
+                    .into_iter()
+                    .map(|value| Value::Namespace(Rc::new(value)))
+                    .collect(),
+            ))
+        }
+        _ => Err(format!("unsupported namespace operation: {operation}")),
+    }
+}
+
 pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, String> {
     match form {
         Form::Number(v) => Ok(Value::Number(*v)),
@@ -3871,7 +4034,11 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     return Err("ns expects a namespace symbol".into());
                 }
                 match &fs[1] {
-                    Form::Symbol(_) => Ok(Value::Nil),
+                    Form::Symbol(name) if !name.contains('/') => {
+                        let registry = namespace_registry()?;
+                        select_namespace_environment(&registry, env, name);
+                        Ok(Value::Nil)
+                    }
                     _ => Err("ns expects a namespace symbol".into()),
                 }
             }
@@ -4071,6 +4238,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 };
                 Ok(Value::Promise(promise_chain(source, n, function)))
             }
+            Form::Symbol(n) if n.starts_with("ns:") => eval_namespace_operation(n, fs, env),
             Form::Symbol(n) if n == "keyword" || n == "symbol" => {
                 if fs.len() != 2 && fs.len() != 3 {
                     return Err(format!("{n} expects a name or namespace and name"));

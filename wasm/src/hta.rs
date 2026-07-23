@@ -16,6 +16,8 @@ const VECTOR: u8 = 9;
 const SET: u8 = 10;
 const MAP: u8 = 11;
 const HANDLE: u8 = 12;
+const NAMESPACE: u8 = 13;
+const VAR: u8 = 14;
 
 pub fn encode(value: &Value) -> Result<Vec<u8>, String> {
     let mut output = MAGIC.to_vec();
@@ -90,6 +92,15 @@ fn encode_bare(value: &Value, output: &mut Vec<u8>) -> Result<(), String> {
                 output.extend_from_slice(&key);
                 output.extend_from_slice(&value);
             }
+        }
+        Value::Namespace(value) => {
+            output.push(NAMESPACE);
+            encode_bytes(value.name().as_str().as_bytes(), output)?;
+        }
+        Value::Var(value) => {
+            output.push(VAR);
+            encode_bare(&Value::Symbol(value.symbol().clone()), output)?;
+            encode_bare(&value.deref_value(), output)?;
         }
         Value::Extension(value) => {
             output.push(HANDLE);
@@ -174,6 +185,21 @@ impl Reader<'_> {
                 }
                 Ok(Value::Map(values.into_iter().collect()))
             }
+            NAMESPACE => {
+                let name = String::from_utf8(self.data()?.to_vec())
+                    .map_err(|_| "hta/value-malformed: invalid namespace name")?;
+                Ok(Value::Namespace(std::rc::Rc::new(
+                    crate::kernel::Namespace::new(name),
+                )))
+            }
+            VAR => {
+                let symbol = match self.value()? {
+                    Value::Symbol(symbol) => symbol,
+                    _ => return Err("hta/value-malformed: invalid var symbol".into()),
+                };
+                let value = self.value()?;
+                Ok(Value::Var(crate::kernel::Var::new(symbol.as_str(), value)))
+            }
             HANDLE => {
                 let provider = String::from_utf8(self.data()?.to_vec())
                     .map_err(|_| "hta/value-malformed: invalid handle owner")?;
@@ -257,6 +283,37 @@ mod tests {
         );
         assert_eq!(encode(&a).unwrap(), encode(&b).unwrap());
     }
+    #[test]
+    fn namespaces_and_vars_round_trip_as_snapshots() {
+        let namespace = crate::kernel::Namespace::new("example.lib");
+        let var = namespace.intern("answer", Value::Number(42));
+        let value = Value::Map(
+            vec![
+                (
+                    Value::Keyword("namespace".into()),
+                    Value::Namespace(std::rc::Rc::new(namespace)),
+                ),
+                (Value::Keyword("var".into()), Value::Var(var)),
+            ]
+            .into_iter()
+            .collect(),
+        );
+        let decoded = decode(&encode(&value).unwrap()).unwrap();
+        let Value::Map(decoded) = decoded else {
+            panic!("map snapshot")
+        };
+        let Value::Namespace(namespace) = decoded.get(&Value::Keyword("namespace".into())).unwrap()
+        else {
+            panic!("namespace snapshot")
+        };
+        assert_eq!(namespace.name().as_str(), "example.lib");
+        let Value::Var(var) = decoded.get(&Value::Keyword("var".into())).unwrap() else {
+            panic!("var snapshot")
+        };
+        assert_eq!(var.symbol().as_str(), "example.lib/answer");
+        assert_eq!(var.deref_value(), Value::Number(42));
+    }
+
     #[test]
     fn opaque_handles_round_trip() {
         let value = Value::Extension(crate::core::ExtensionValue {

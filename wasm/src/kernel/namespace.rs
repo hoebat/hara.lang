@@ -27,6 +27,12 @@ impl<V> Namespace<V> {
     pub fn name(&self) -> &Symbol {
         &self.name
     }
+    pub fn same_identity(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.mappings, &other.mappings)
+    }
+    pub fn identity_address(&self) -> usize {
+        Rc::as_ptr(&self.mappings) as usize
+    }
     pub fn intern(&self, name: impl AsRef<str>, value: V) -> Var<V>
     where
         V: Clone + 'static,

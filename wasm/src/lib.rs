@@ -117,12 +117,14 @@ impl Runtime {
                 self.providers.socket(),
                 || {
                     core::with_promise_provider(self.providers.promise(), || {
-                        core::with_protocols(&self.protocols, || {
-                            if traced {
-                                core::eval_traced(&resolved, &mut self.env)
-                            } else {
-                                core::eval(&resolved, &mut self.env)
-                            }
+                        core::with_namespace_registry(&self.namespace_registry, || {
+                            core::with_protocols(&self.protocols, || {
+                                if traced {
+                                    core::eval_traced(&resolved, &mut self.env)
+                                } else {
+                                    core::eval(&resolved, &mut self.env)
+                                }
+                            })
                         })
                     })
                 },
@@ -143,42 +145,11 @@ impl Runtime {
     }
 
     fn refresh_qualified_bindings(&mut self) {
-        self.env.retain(|name, _| !name.contains('/'));
-        for namespace in self.namespace_registry.all() {
-            for (_, var) in namespace.mappings() {
-                self.env
-                    .insert(var.symbol().as_str().to_owned(), core::Value::Var(var));
-            }
-        }
-        for (alias, namespace) in self.namespace_registry.current().aliases() {
-            for (local, var) in namespace.mappings() {
-                self.env.insert(
-                    format!("{}/{}", alias.as_str(), local.as_str()),
-                    core::Value::Var(var),
-                );
-            }
-        }
+        core::refresh_namespace_environment(&self.namespace_registry, &mut self.env);
     }
 
     fn save_namespace(&mut self) {
-        let namespace = self.namespace_registry.current();
-        let namespace_name = namespace.name().as_str().to_owned();
-        let locals = self
-            .env
-            .iter()
-            .filter(|(name, _)| !name.contains('/'))
-            .map(|(name, value)| (name.clone(), value.clone()))
-            .collect::<Vec<_>>();
-        for (name, value) in locals {
-            let path = format!("{namespace_name}/{name}");
-            let var = match value {
-                core::Value::Var(var) if var.symbol().as_str() == path => var,
-                core::Value::Var(var) => var.requalify(&path),
-                value => namespace.intern(&name, value),
-            };
-            namespace.map_var(crate::lang::data::Symbol::parse(&name), var.clone());
-            self.env.insert(name, core::Value::Var(var));
-        }
+        core::save_namespace_environment(&self.namespace_registry, &mut self.env);
     }
 
     pub fn create_namespace(&mut self, name: &str) -> bool {
@@ -193,14 +164,7 @@ impl Runtime {
         if name.is_empty() {
             return false;
         }
-        self.save_namespace();
-        let namespace = self.namespace_registry.set_current(name);
-        self.env = namespace
-            .mappings()
-            .into_iter()
-            .map(|(name, var)| (name.as_str().to_owned(), core::Value::Var(var)))
-            .collect();
-        self.refresh_qualified_bindings();
+        core::select_namespace_environment(&self.namespace_registry, &mut self.env, name);
         true
     }
 
@@ -1072,6 +1036,45 @@ mod tests {
             runtime.eval_text("({} :a :b :c)").unwrap_err(),
             "map invocation expects one or two arguments"
         );
+    }
+
+    #[test]
+    fn namespace_values_and_operations_match_java_registry_semantics() {
+        let mut runtime = Runtime::new();
+        assert_eq!(
+            runtime
+                .eval_text("(ns:name (ns:create (quote example.lib)))")
+                .unwrap(),
+            "example.lib"
+        );
+        assert_eq!(
+            runtime
+                .eval_text("(= (ns:create (quote example.lib)) (ns:create (quote example.lib)))")
+                .unwrap(),
+            "true"
+        );
+        assert_eq!(
+            runtime
+                .eval_text("(ns example.lib) (def answer 42) (ns user) (deref (get (ns:map (ns:find (quote example.lib))) (quote answer)))")
+                .unwrap(),
+            "42"
+        );
+        assert_eq!(runtime.eval_text("(count (ns:list))").unwrap(), "2");
+        assert_eq!(
+            runtime.eval_text("(ns:find (quote missing.lib))").unwrap(),
+            "nil"
+        );
+        runtime.alias_namespace("lib", "example.lib");
+        assert_eq!(
+            runtime
+                .eval_text("(= (get (ns:aliases (ns:find (quote user))) (quote lib)) (ns:find (quote example.lib)))")
+                .unwrap(),
+            "true"
+        );
+        assert!(runtime
+            .eval_text("(ns:create (quote bad/name))")
+            .unwrap_err()
+            .contains("unqualified symbol"));
     }
 
     #[test]
