@@ -42,9 +42,9 @@ An extension package contains a `hara.extension.edn` manifest beside its provide
  :capabilities []}
 ```
 
-The portable fields are `namespace`, `version`, `provider`, `module`, `abi`, `exports`, and
-`capabilities`. The manifest is metadata, not executable Hara code. Extension namespaces are
-runtime-generated namespaces, not `.hal` source files.
+The portable fields are `namespace`, `version`, `provider`, `module`, `abi`, `exports`,
+`capabilities`, and the optional `host-calls` allowlist. The manifest is metadata, not executable
+Hara code. Extension namespaces are runtime-generated namespaces, not `.hal` source files.
 
 ## Provider lifecycle
 
@@ -75,18 +75,62 @@ limits, separate stderr, and explicit shutdown. Protobuf is the initial pod wire
 must not require callers to construct protocol messages manually.
 
 WASM providers use a host engine. Compilation, instantiation, export calls, and memory access
-remain behind the provider boundary:
+remain behind the provider boundary. `:core-v1` is the direct scalar ABI. `:hta-v1` is the Hara
+Transport Adaptor for stateful, promise-returning modules.
+
+## HTA v1
+
+HTA modules remain import-free. The host drives an exported mailbox rather than injecting ambient
+WASM imports:
 
 ```text
-WASM module
-    |
-    v
-+-----------+       explicit imports       +----------------+
-| WASM host | <---------------------------- | capability set |
-+-----------+                              +----------------+
-    |
-    +--> memory / export call / result
+Hara call -> hta_start -> task
+                         |
+                 hta_next_event
+                    /          \
+             settlement      host-call
+                                 |
+                   descriptor :host-calls check
+                                 |
+                        hta_deliver result/error
 ```
+
+The required exports are `hta_abi_version`, `hta_alloc`, `hta_dealloc`, `hta_start`,
+`hta_next_event`, `hta_deliver`, `hta_poll`, `hta_cancel`, and `hta_drop_task`. Frames use the
+canonical binary `HTA1` value encoding. Its portable value intersection is nil, booleans, signed
+64-bit integers, UTF-8 strings, bytes, keywords, symbols, lists, vectors, sets, and maps. Map and
+set elements are ordered by their encoded bytes so Rust, Java, and JavaScript produce identical
+frames.
+
+Each Truffle extension instance has one Java virtual-thread actor which exclusively owns its
+nested GraalWasm context. Browser instances use one Web Worker per context. Both actors block on a
+mailbox while idle; neither polls in a spin loop. Package completions enqueue a delivery back to
+the owner before any WASM export is called.
+
+Host calls are explicit Hara operations such as:
+
+```hal
+(host/call "crypto.hash.sha256" "digest" input)
+```
+
+They are denied unless the descriptor contains, for example,
+`:host-calls {"crypto.hash.sha256" ["digest"]}`. Rejections cross HTA as structured values with
+`code`, `message`, `data`, `origin`, `retryable`, `stack`, and `cause` fields as applicable. Host
+stack traces are not transported. A rejected settlement realizes the corresponding Hara promise
+exceptionally; it is not a Rust panic or a Java exception thrown through WASM.
+
+The reference package at `examples/extensions/crypto/hash/sha256` is a real, import-free Rust WASM
+extension:
+
+```hal
+(ns crypto.example
+  (:require [crypto.hash.sha256 :as sha]))
+
+(deref (sha/digest (bytes 97 98 99)))
+```
+
+Build its artifact with `scripts/build-crypto-hash-sha256-wasm` and install the resulting `.wasm`
+beside the example descriptor as `sha256.wasm`.
 
 Loading a manifest does not grant authority:
 

@@ -76,12 +76,12 @@ export class HtaContext {
     worker.addEventListener("error", error=>this.fail(error));
     worker.postMessage({type:"init",moduleUrl,moduleBytes});
   }
-  async call(target, args=[]) { await this.ready; const id=this.next++; let cancel;
-    const promise=new Promise((resolve,reject)=>{this.pending.set(id,{resolve,reject});cancel=()=>this.worker.postMessage({type:"cancel",id});});
-    promise.cancel=cancel;this.worker.postMessage({type:"call",id,frame:encodeHta([target,args])});return promise;
+  call(target, args=[]) { let id=null,cancelled=false;
+    const promise=new Promise((resolve,reject)=>{this.ready.then(()=>{id=this.next++;this.pending.set(id,{resolve,reject});this.worker.postMessage({type:"call",id,frame:encodeHta([target,args])});if(cancelled)this.worker.postMessage({type:"cancel",id});},reject);});
+    promise.cancel=()=>{cancelled=true;if(id!==null)this.worker.postMessage({type:"cancel",id});};return promise;
   }
   async message(message) {
-    if(message.type==="ready"){this.readyResolve();return;}if(message.type==="fatal"){this.fail(errorFrom(message.error));return;}
+    if(message.type==="ready"){this.readyResolve();return;}if(message.type==="fatal"){this.fail(new Error(message.error?.message??"HTA worker failed"));return;}
     if(message.type==="result"){const pending=this.pending.get(message.id);if(!pending)return;this.pending.delete(message.id);message.ok?pending.resolve(decodeHta(message.frame)):pending.reject(errorFrom(decodeHta(message.frame)));return;}
     if(message.type==="host-call"){const key=`${message.service}/${message.method}`,handler=this.hostCalls[key];try{if(!handler)throw new Error(`hta/host-call-denied: ${key}`);const value=await handler(...decodeHta(message.frame));this.worker.postMessage({type:"delivery",call:message.call,ok:true,frame:encodeHta(value)});}catch(error){this.worker.postMessage({type:"delivery",call:message.call,ok:false,frame:encodeHta(errorValue(error))});}}
   }

@@ -24,7 +24,7 @@ An extension package contains a `hara.extension.edn` manifest beside its provide
 
 The runtime discovers manifests from configured extension roots, validates the provider handshake,
 and generates the requested namespace during `:require`. Extension namespaces are runtime
-generated and are not `.hara` source files.
+generated and are not `.hal` source files.
 
 Pods and WASM providers implement the same lifecycle:
 
@@ -37,8 +37,11 @@ Pods are long-lived subprocesses using a versioned, length-delimited protocol wi
 limits, separate stderr, and explicit shutdown. Protobuf is the initial pod wire profile.
 
 WASM providers use a host WASM engine. Compilation, instantiation, export calls, and memory
-access remain behind the provider boundary. Imports are explicit capabilities rather than ambient
-filesystem, socket, clock, or process access.
+access remain behind the provider boundary. `:core-v1` invokes low-level scalar exports directly.
+`:hta-v1` uses an import-free, host-driven mailbox and returns Hara promises. On the JVM one virtual
+thread owns each nested GraalWasm context; in a browser one Web Worker owns each context. Explicit
+`host/call` events are checked against the descriptor's optional `host-calls` allowlist before a
+result or structured rejection is delivered to the module.
 
 Loading a manifest does not grant authority. The host applies capability policy and resource
 limits, preserving distinct errors for unsupported providers, denied capabilities, malformed
