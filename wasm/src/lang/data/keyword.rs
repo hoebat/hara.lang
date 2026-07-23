@@ -22,29 +22,34 @@ pub struct Keyword(Rc<Data>);
 
 impl Keyword {
     pub fn create(namespace: Option<&str>, name: &str) -> Result<Self, String> {
-        Self::parse(
-            &namespace
-                .map(|ns| format!("{ns}/{name}"))
-                .unwrap_or_else(|| name.into()),
-        )
+        let full = namespace
+            .map(|ns| format!("{ns}/{name}"))
+            .unwrap_or_else(|| name.into());
+        Ok(Self::intern(namespace, name, &full))
     }
 
     pub fn parse(full: &str) -> Result<Self, String> {
         validate(full)?;
+        let slash = full.find(char::from(47));
+        Ok(Self::intern(
+            slash.map(|i| &full[..i]),
+            slash.map(|i| &full[i + 1..]).unwrap_or(full),
+            full,
+        ))
+    }
+
+    fn intern(namespace: Option<&str>, name: &str, full: &str) -> Self {
         INTERNED.with(|cache| {
             if let Some(value) = cache.borrow().get(full).and_then(Weak::upgrade) {
-                return Ok(Self(value));
+                return Self(value);
             }
-            let slash = full.find('/');
             let data = Rc::new(Data {
-                namespace: slash.map(|i| full[..i].into()),
-                name: slash
-                    .map(|i| full[i + 1..].into())
-                    .unwrap_or_else(|| full.into()),
+                namespace: namespace.map(str::to_owned),
+                name: name.into(),
                 full: full.into(),
             });
             cache.borrow_mut().insert(full.into(), Rc::downgrade(&data));
-            Ok(Self(data))
+            Self(data)
         })
     }
 
@@ -185,6 +190,12 @@ mod tests {
         let values = Map::new().assoc(first.clone(), 42);
         assert_eq!(first.lookup(&values), Some(42));
         assert_eq!(Keyword::from("missing").lookup_or(&values, 7), 7);
+
+        let multipart = Keyword::create(Some("constructor/namespace"), "name").unwrap();
+        assert_eq!(multipart.as_str(), "constructor/namespace/name");
+        assert_eq!(multipart.get_namespace(), Some("constructor/namespace"));
+        assert_eq!(multipart.get_name(), "name");
+        assert!(Keyword::parse("constructor/namespace/name").is_err());
 
         let documented = first.with_meta(Some(crate::lang::data::Metadata::document("ignored")));
         assert!(documented.meta().is_none());

@@ -23,14 +23,26 @@ pub struct Symbol {
 
 impl Symbol {
     pub fn create(namespace: Option<&str>, name: &str) -> Self {
-        Self::parse(
-            &namespace
-                .map(|ns| format!("{ns}/{name}"))
-                .unwrap_or_else(|| name.into()),
-        )
+        let full = namespace
+            .map(|ns| format!("{ns}/{name}"))
+            .unwrap_or_else(|| name.into());
+        Self::intern(namespace, name, &full)
     }
 
     pub fn parse(full: &str) -> Self {
+        let slash = if full == "/" {
+            None
+        } else {
+            full.find(char::from(47))
+        };
+        Self::intern(
+            slash.map(|i| &full[..i]),
+            slash.map(|i| &full[i + 1..]).unwrap_or(full),
+            full,
+        )
+    }
+
+    fn intern(namespace: Option<&str>, name: &str, full: &str) -> Self {
         INTERNED.with(|cache| {
             if let Some(value) = cache.borrow().get(full).and_then(Weak::upgrade) {
                 return Self {
@@ -38,12 +50,9 @@ impl Symbol {
                     metadata: None,
                 };
             }
-            let slash = if full == "/" { None } else { full.find('/') };
             let data = Rc::new(Data {
-                namespace: slash.map(|i| full[..i].into()),
-                name: slash
-                    .map(|i| full[i + 1..].into())
-                    .unwrap_or_else(|| full.into()),
+                namespace: namespace.map(str::to_owned),
+                name: name.into(),
                 full: full.into(),
             });
             cache.borrow_mut().insert(full.into(), Rc::downgrade(&data));
@@ -153,6 +162,14 @@ mod tests {
         assert_eq!(nested.get_namespace(), Some("a"));
         assert_eq!(nested.get_name(), "b/c");
         assert_eq!(nested.as_str(), "a/b/c");
+
+        let multipart = Symbol::create(Some("constructor/namespace"), "name");
+        assert_eq!(multipart.as_str(), "constructor/namespace/name");
+        assert_eq!(multipart.get_namespace(), Some("constructor/namespace"));
+        assert_eq!(multipart.get_name(), "name");
+        let interned = Symbol::parse("constructor/namespace/name");
+        assert!(multipart.same_identity(&interned));
+        assert_eq!(interned.get_namespace(), Some("constructor/namespace"));
 
         let documented = first.with_meta(Some(crate::lang::data::Metadata::document("doc")));
         assert_eq!(documented.meta().and_then(|value| value.doc()), Some("doc"));
