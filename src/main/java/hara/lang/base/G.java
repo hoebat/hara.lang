@@ -15,6 +15,20 @@ import java.util.regex.Pattern;
 
 public interface G {
 
+  /** Prints a regex without repeatedly escaping its backslashes. */
+  public static String displayRegex(Pattern value) {
+    String pattern = value.pattern();
+    StringBuilder display = new StringBuilder("#\"");
+    int backslashes = 0;
+    for (int index = 0; index < pattern.length(); index++) {
+      char character = pattern.charAt(index);
+      if (character == '"' && backslashes % 2 == 0) display.append('\\');
+      display.append(character);
+      backslashes = character == '\\' ? backslashes + 1 : 0;
+    }
+    return display.append('"').toString();
+  }
+
   public static class Exception extends RuntimeException {
     public Exception() {}
 
@@ -87,7 +101,13 @@ public interface G {
     } else if (e instanceof byte[]) {
       return displayBytes((byte[]) e);
     } else if (e instanceof Pattern) {
-      return "#\"" + Str.escapeJava(e.toString()) + "\"";
+      return displayRegex((Pattern) e);
+    } else if (e instanceof Double || e instanceof Float) {
+      double value = ((Number) e).doubleValue();
+      if (Double.isNaN(value)) return "##NaN";
+      if (value == Double.POSITIVE_INFINITY) return "##Inf";
+      if (value == Double.NEGATIVE_INFINITY) return "##-Inf";
+      return e.toString();
     } else if (e instanceof BigInteger) {
       return e.toString() + "N";
     } else if (e instanceof BigDecimal) {

@@ -1,5 +1,6 @@
 use super::{parse_forms, read_forms};
 use crate::kernel::Form;
+use std::fs;
 #[test]
 fn tracks_spans_comments_commas_and_reader_macros() {
     let forms = read_forms("; hi\n[1, 2] #'x #_gone :ok").unwrap();
@@ -321,4 +322,74 @@ fn matches_java_symbol_and_number_macro_termination() {
             )
         ]
     );
+}
+
+#[test]
+fn shared_reader_corpus_matches_canonical_forms_and_errors() {
+    let path = format!(
+        "{}/../spec/hara/reader-parity.edn",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let manifest_source = fs::read_to_string(path).unwrap();
+    let manifest = parse_forms(&manifest_source).unwrap().remove(0);
+    let Form::Map(manifest) = manifest else {
+        panic!("reader parity manifest must be a map");
+    };
+    let cases = map_value(&manifest, "cases").expect("manifest must contain :cases");
+    let Form::Vector(cases) = cases else {
+        panic!("reader parity :cases must be a vector");
+    };
+
+    for case in cases {
+        let Form::Map(case) = case else {
+            panic!("reader parity case must be a map");
+        };
+        let id = map_value(case, "id").expect("case must contain :id");
+        let source = string_value(case, "source");
+        let readable = map_value(case, "rust-readable").or_else(|| map_value(case, "readable"));
+        match (readable, map_value(case, "error")) {
+            (Some(Form::String(readable)), None) => {
+                let forms = parse_forms(source)
+                    .unwrap_or_else(|error| panic!("{id} unexpectedly failed: {error}"));
+                let actual = forms
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                assert_eq!(&actual, readable, "{id}");
+                let round_trip = parse_forms(&actual)
+                    .unwrap()
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                assert_eq!(round_trip, actual, "{id} canonical output must round-trip");
+            }
+            (None, Some(Form::String(expected))) => {
+                let error = match parse_forms(source) {
+                    Ok(_) => panic!("{id} should fail"),
+                    Err(error) => error,
+                };
+                assert!(
+                    error.contains(expected),
+                    "{id}: expected <{expected}> in <{error}>"
+                );
+            }
+            _ => panic!("{id} must contain exactly one of :readable or :error"),
+        }
+    }
+}
+
+fn map_value<'a>(entries: &'a [(Form, Form)], name: &str) -> Option<&'a Form> {
+    entries.iter().find_map(|(key, value)| match key {
+        Form::Keyword(keyword) if keyword == name => Some(value),
+        _ => None,
+    })
+}
+
+fn string_value<'a>(entries: &'a [(Form, Form)], name: &str) -> &'a str {
+    match map_value(entries, name) {
+        Some(Form::String(value)) => value,
+        _ => panic!("case must contain string :{name}"),
+    }
 }

@@ -583,7 +583,7 @@ public interface Parser {
       @Override
       public Object apply(Reader r, Map opts) {
         int ch = readSingle(r);
-        if (ch == -1) throw new Ex.Runtime("EOF while reading character");
+        if (ch == -1) throw new Ex.Runtime("EOF while reading hash dispatch");
         BiFunction fn = dispatchMacros[ch];
 
         if (fn != null) return fn.apply(r, opts);

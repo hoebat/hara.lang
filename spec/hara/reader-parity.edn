@@ -1,0 +1,46 @@
+{:version 1
+ :cases
+ [{:id :nil :source "nil" :readable "nil"}
+  {:id :booleans :source "[true false]" :readable "[true false]"}
+  {:id :escaped-string :source "\"line\\n\\t\\\"\\\\\"" :readable "\"line\\n\\t\\\"\\\\\""}
+  {:id :named-characters
+   :source "[\\newline \\space \\tab \\backspace \\formfeed \\return]"
+   :readable "[\\newline \\space \\tab \\backspace \\formfeed \\return]"}
+  {:id :unicode-character :source "\\λ" :readable "\\λ"}
+  {:id :symbols-and-keywords
+   :source "[plain ns/name :plain :ns/name]"
+   :readable "[plain ns/name :plain :ns/name]"}
+  {:id :numbers
+   :source "[0 -1 9223372036854775808 42N 1.25 1.250M]"
+   :readable "[0 -1 9223372036854775808N 42N 1.25 1.25M]"}
+  {:id :collections
+   :source "({:a [1 2] :b #{:x :y}})"
+   :readable "({:a [1 2] :b #{:x :y}})"}
+  {:id :reader-prefixes
+   :source "['x `y ~z ~@items @state #'root]"
+   :readable "[(quote x) (syntax-quote y) (unquote z) (unquote-splicing items) (deref state) (var root)]"}
+  {:id :metadata
+   :source "^:private [1]"
+   :readable "[1]"
+   :rust-readable "^{:private true} [1]"}
+  {:id :discard :source "[1 #_2 3]" :readable "[1 3]"}
+  {:id :regex :source "#\"a\\\\d+\"" :readable "#\"a\\\\d+\""}
+  {:id :symbolic-values
+   :source "[##Inf ##-Inf ##NaN]"
+   :readable "[##Inf ##-Inf ##NaN]"}
+
+  {:id :unmatched-delimiter :source ")" :error "Unmatched delimiter"}
+  {:id :unterminated-string :source "\"" :error "EOF while reading string"}
+  {:id :invalid-string-escape :source "\"\\q\"" :error "Unsupported escape character"}
+  {:id :invalid-unicode-escape :source "\"\\u12X4\"" :error "Invalid digit"}
+  {:id :odd-map :source "{:a 1 :b}" :error "even number of forms"}
+  {:id :duplicate-map-key :source "{:a 1 :a 2}" :error "Duplicate key"}
+  {:id :duplicate-set-item :source "#{1 1}" :error "Duplicate item"}
+  {:id :unterminated-dispatch :source "#" :error "EOF while reading hash dispatch"}
+  {:id :unknown-dispatch :source "#&" :error "No dispatch macro for: &"}
+  {:id :invalid-metadata-value :source "^1 [2]" :error "Metadata must be"}
+  {:id :invalid-metadata-target
+   :source "^:private 1"
+   :error "Metadata can only be applied"}
+  {:id :missing-metadata-target :source "^:private" :error "EOF"}
+  {:id :unsupported-ratio :source "1/2" :error "Ratios are not supported"}]}
