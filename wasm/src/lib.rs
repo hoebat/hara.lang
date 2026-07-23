@@ -603,6 +603,15 @@ mod tests {
     }
 
     #[test]
+    fn map_and_zip_support_multiple_collections() {
+        let mut runtime = Runtime::new();
+        assert_eq!(runtime.eval_text("(nth (map (fn [x y] (+ x y)) [1 2] [10 20]) 1)").unwrap(), "22");
+        assert_eq!(runtime.eval_text("(count (map (fn [x y z] (+ x (+ y z))) [1 2] [10 20] [100 200]))").unwrap(), "2");
+        assert_eq!(runtime.eval_text("(nth (zip [1 2] [:a :b] [true false]) 0)").unwrap(), "[1 :a true]");
+        assert_eq!(runtime.eval_text("(count (zip [1 2 3] [:a :b]))").unwrap(), "2");
+    }
+
+    #[test]
     fn lazy_iterator_generators_are_bounded_by_consumers() {
         let mut runtime = Runtime::new();
         assert_eq!(runtime.eval_text("(count (take 4 (repeat :x)))").unwrap(), "4");

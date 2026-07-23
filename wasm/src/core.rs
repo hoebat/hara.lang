@@ -1075,9 +1075,15 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
             }
             Form::Symbol(n) if ["iter-map", "map", "iter-filter", "filter"].contains(&n.as_str()) => {
                 let is_map = n == "iter-map" || n == "map";
-                if fs.len() != 3 { return Err(format!("{n} expects a function and collection")); }
-                let function = eval(&fs[1], env)?; let values = iterator_values(eval(&fs[2], env)?)?; let mut output = Vec::new();
-                for value in values { let mapped = match &function { Value::Function(f) => call_function(f, vec![value.clone()])?, _ => return Err(format!("{n} expects a function")) }; if is_map || mapped.truthy() { output.push(if is_map { mapped } else { value }); } }
+                if fs.len() < 3 { return Err(format!("{n} expects a function and collection")); }
+                let function = eval(&fs[1], env)?; let collections = fs[2..].iter().map(|form| eval(form, env).and_then(iterator_values)).collect::<Result<Vec<_>,_>>()?; let mut output = Vec::new();
+                if is_map {
+                    let limit=collections.iter().map(Vec::len).min().unwrap_or(0);
+                    for index in 0..limit { let args=collections.iter().map(|values| values[index].clone()).collect(); let mapped=match &function { Value::Function(f) => call_function(f,args)?, _ => return Err(format!("{n} expects a function")) }; output.push(mapped); }
+                } else {
+                    if collections.len()!=1 { return Err(format!("{n} expects one collection")); }
+                    for value in collections.into_iter().next().unwrap() { let mapped=match &function { Value::Function(f) => call_function(f, vec![value.clone()])?, _ => return Err(format!("{n} expects a function")) }; if mapped.truthy() { output.push(value); } }
+                }
                 Ok(iterator_from_values(output))
             }
             Form::Symbol(n) if ["iter-take", "take"].contains(&n.as_str()) => {
@@ -1122,7 +1128,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 if fs.len()!=2 { return Err(format!("{n} expects one collection")); } let values=iterator_values(eval(&fs[1], env)?)?; Ok(iterator_from_values(values.chunks(2).filter(|chunk| chunk.len()==2).map(|chunk| Value::Vector(chunk.to_vec())).collect()))
             }
             Form::Symbol(n) if ["iter-zip", "zip"].contains(&n.as_str()) => {
-                if fs.len()!=3 { return Err(format!("{n} expects two collections")); } let left=iterator_values(eval(&fs[1], env)?)?; let right=iterator_values(eval(&fs[2], env)?)?; Ok(iterator_from_values(left.into_iter().zip(right).map(|(a,b)| Value::Vector(vec![a,b])).collect()))
+                if fs.len()<3 { return Err(format!("{n} expects collections")); } let collections=fs[1..].iter().map(|form| eval(form, env).and_then(iterator_values)).collect::<Result<Vec<_>,_>>()?; let limit=collections.iter().map(Vec::len).min().unwrap_or(0); let mut output=Vec::new(); for index in 0..limit { output.push(Value::Vector(collections.iter().map(|values| values[index].clone()).collect())); } Ok(iterator_from_values(output))
             }
             Form::Symbol(n) if n == "iter-cycle" || n == "cycle" => {
                 if fs.len()!=2 { return Err(format!("{n} expects one collection")); } iterator_cycle(eval(&fs[1], env)?)
