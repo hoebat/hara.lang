@@ -20,9 +20,11 @@ import hara.lang.protocol.*;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.Arrays;
 import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
@@ -467,6 +469,34 @@ public interface RT {
       Namespace ns = new Namespace(name);
       _userEnv._namespaces.putIfAbsent(name, ns);
       return _userEnv._namespaces.get(name);
+    }
+
+    public java.util.List<String> currentSymbolNames() {
+      LinkedHashSet<String> names = new LinkedHashSet<>();
+      Iterator<Symbol> visible = _userEnv.keys();
+      while (visible.hasNext()) names.add(visible.next().display());
+      Namespace current = getCurrentNs();
+      if (current != null) {
+        current.imports.forEach(
+            (symbol, type) -> {
+              names.add(symbol.display());
+              Arrays.stream(type.getFields())
+                  .filter(field -> java.lang.reflect.Modifier.isStatic(field.getModifiers()))
+                  .forEach(field -> names.add(symbol.display() + "/" + field.getName()));
+              Arrays.stream(type.getMethods())
+                  .filter(method -> java.lang.reflect.Modifier.isStatic(method.getModifiers()))
+                  .forEach(method -> names.add(symbol.display() + "/" + method.getName()));
+            });
+      }
+      _userEnv._namespaces.forEach(
+          (namespaceName, namespace) -> {
+            if (!namespaceName.getName().startsWith("hara.native.")) return;
+            namespace
+                .mappings
+                .keySet()
+                .forEach(symbol -> names.add(namespaceName.display() + "/" + symbol.display()));
+          });
+      return new java.util.ArrayList<>(names);
     }
 
     @Override

@@ -3,7 +3,6 @@ package hara.kernel;
 import hara.kernel.base.RT;
 import hara.kernel.base.completion.ClasspathScanner;
 import hara.kernel.base.completion.PackageTree;
-import hara.lang.protocol.IDisplay;
 import org.jline.reader.Candidate;
 import org.jline.reader.Completer;
 import org.jline.reader.LineReader;
@@ -37,14 +36,8 @@ public class ReplCompleter implements Completer {
     String word = extractWord(line.line(), line.cursor());
 
     // 1. Symbol Completion
-    var it = rt.getEnv().keys();
-    while (it.hasNext()) {
-      Object key = it.next();
-      String name = (key instanceof IDisplay) ? ((IDisplay) key).display() : key.toString();
-
-      if (name.startsWith(word)) {
-        candidates.add(new Candidate(name));
-      }
+    for (String name : rt.currentSymbolNames()) {
+      if (name.startsWith(word)) candidates.add(new Candidate(name));
     }
 
     // 2. Package/Class Completion

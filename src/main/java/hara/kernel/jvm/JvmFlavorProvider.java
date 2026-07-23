@@ -1,5 +1,7 @@
 package hara.kernel.jvm;
 
+import hara.compiler.Compiler;
+import hara.kernel.NativeMode;
 import hara.kernel.base.Reflect;
 import hara.kernel.flavor.NativeCapability;
 import hara.kernel.flavor.NativeFlavorAccess;
@@ -7,7 +9,10 @@ import hara.kernel.flavor.NativeFlavorException;
 import hara.kernel.flavor.NativeFlavorProvider;
 import hara.lang.base.primitive.Array;
 import hara.lang.protocol.ILookup;
+import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.Arrays;
 
 /** JVM implementation of the native flavor SPI. */
 public final class JvmFlavorProvider implements NativeFlavorProvider {
@@ -113,15 +118,88 @@ public final class JvmFlavorProvider implements NativeFlavorProvider {
     return asClass(type).isInstance(unwrap(throwable));
   }
 
+  public Object type(Object value, NativeFlavorAccess access) {
+    requireReflection(access);
+    return value instanceof Class<?> ? value : value == null ? null : value.getClass();
+  }
+
+  public String typeName(Object value, NativeFlavorAccess access) {
+    requireReflection(access);
+    Class<?> type = value instanceof Class<?> ? (Class<?>) value : value == null ? null : value.getClass();
+    return type == null ? "nil" : type.getName();
+  }
+
+  public boolean isInstance(Object type, Object value, NativeFlavorAccess access) {
+    requireReflection(access);
+    return asClass(type).isInstance(value);
+  }
+
+  public String[] fields(Object value, NativeFlavorAccess access) {
+    requireReflection(access);
+    return Arrays.stream(asType(value).getFields()).map(Field::getName).distinct().sorted().toArray(String[]::new);
+  }
+
+  public String[] methods(Object value, NativeFlavorAccess access) {
+    requireReflection(access);
+    return Arrays.stream(asType(value).getMethods()).map(Method::getName).distinct().sorted().toArray(String[]::new);
+  }
+
+  public String[] classPath(NativeFlavorAccess access) {
+    requireCapability(access, NativeCapability.CLASSPATH, "JVM classpath");
+    requireDynamicRuntime("classpath inspection");
+    return access.classPath();
+  }
+
+  public String addClassPath(String location, NativeFlavorAccess access) {
+    requireCapability(access, NativeCapability.CLASSPATH, "JVM classpath");
+    requireDynamicRuntime("classpath mutation");
+    return access.addClassPath(location);
+  }
+
+  public byte[] compile(Object expression, NativeFlavorAccess access) {
+    requireCapability(access, NativeCapability.COMPILATION, "JVM compilation");
+    requireDynamicRuntime("runtime compilation");
+    if (!(expression instanceof hara.lang.data.List)) {
+      throw unsupported("JVM compilation expects a quoted fn form");
+    }
+    return (byte[]) invoke("compile JVM function", () -> new Compiler().compile((hara.lang.data.List) expression));
+  }
+
+  public Class<?> defineClass(byte[] bytecode, NativeFlavorAccess access) {
+    requireCapability(access, NativeCapability.COMPILATION, "JVM compilation");
+    requireDynamicRuntime("runtime class definition");
+    return access.defineClass(bytecode);
+  }
+
+  private static Class<?> asType(Object value) {
+    if (value instanceof Class<?>) return (Class<?>) value;
+    if (value != null) return value.getClass();
+    throw unsupported("Expected a JVM class or value, received nil");
+  }
+
   private static Class<?> asClass(Object value) {
     if (value instanceof Class<?>) return (Class<?>) value;
     throw unsupported("Expected a JVM class, received " + className(value));
   }
 
   private static void requireReflection(NativeFlavorAccess access) {
-    if (!access.allows(NativeCapability.REFLECTION)) {
+    requireCapability(access, NativeCapability.REFLECTION, "JVM reflection");
+  }
+
+  private static void requireCapability(
+      NativeFlavorAccess access, NativeCapability capability, String feature) {
+    if (!access.allows(capability)) {
       throw new NativeFlavorException(
-          NativeFlavorException.Kind.DENIED, "JVM reflection capability is not granted");
+          NativeFlavorException.Kind.DENIED, feature + " capability is not granted");
+    }
+  }
+
+  private static void requireDynamicRuntime(String feature) {
+    if (NativeMode.enabled()) {
+      throw unsupported(
+          "Native mode does not support "
+              + feature
+              + ". Use the default JVM runtime for dynamic runtime behavior.");
     }
   }
 
