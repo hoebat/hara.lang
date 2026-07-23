@@ -1150,6 +1150,24 @@ mod tests {
         );
         assert_eq!(runtime.eval_text("(= (atom 1) (atom 1))").unwrap(), "false");
         assert_eq!(
+            runtime.eval_text("(let [a (atom 1) seen (atom nil)] (do (watch:add a :log (fn [ref key old new] (reset! seen [@ref key old new]))) (reset! a 2) @seen))").unwrap(),
+            "[2 :log 1 2]"
+        );
+        assert_eq!(
+            runtime.eval_text("(let [a (atom 1)] (do (watch:add a :log (fn [ref key old new] new)) (watch:add a :log (fn [ref key old new] old)) (count (watch:list a))))").unwrap(),
+            "1"
+        );
+        assert_eq!(
+            runtime.eval_text("(let [a (atom 1) seen (atom nil)] (do (watch:add a :log (fn [ref key old new] (reset! seen new))) (watch:remove a :log) (reset! a 2) @seen))").unwrap(),
+            "nil"
+        );
+        assert_eq!(
+            runtime
+                .eval_text("(watch:add (atom:basic 1) :log (fn [ref key old new] new))")
+                .unwrap_err(),
+            "watch:add expects a standard atom"
+        );
+        assert_eq!(
             runtime.eval_text("(reset! 1 2)").unwrap_err(),
             "reset! expects an atom"
         );

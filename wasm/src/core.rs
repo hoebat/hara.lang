@@ -44,7 +44,7 @@ pub enum Value {
     Array(Rc<RefCell<Vec<Value>>>),
     Object(Rc<RefCell<Vec<(String, Value)>>>),
     Promise(Promise),
-    Atom(Box<PAtom<Value>>),
+    Atom(Box<RuntimeAtom>),
     Recur(Vec<Value>),
     Map(PMap<Value, Value>),
     OrderedMap(Box<POrderedMap<Value, Value>>),
@@ -85,6 +85,99 @@ impl std::fmt::Debug for Function {
             .field("name", &self.name)
             .field("native", &self.native.is_some())
             .finish()
+    }
+}
+
+#[derive(Clone)]
+pub struct RuntimeAtom {
+    value: PAtom<Value>,
+    watches: Rc<RefCell<Vec<(Value, Rc<Function>)>>>,
+    watchable: bool,
+}
+
+impl RuntimeAtom {
+    fn new(value: Value, watchable: bool) -> Self {
+        Self {
+            value: PAtom::new(value),
+            watches: Rc::new(RefCell::new(Vec::new())),
+            watchable,
+        }
+    }
+    fn same_identity(&self, other: &Self) -> bool {
+        self.value.same_identity(&other.value)
+    }
+    fn identity_address(&self) -> usize {
+        self.value.identity_address()
+    }
+    fn deref_value(&self) -> Value {
+        self.value.deref_value()
+    }
+    fn reset(&self, new_value: Value) -> Result<Value, String> {
+        let old_value = self.value.deref_value();
+        let result = self.value.reset(new_value.clone())?;
+        self.notify(old_value, new_value)?;
+        Ok(result)
+    }
+    fn compare_and_set(&self, old: &Value, new_value: Value) -> Result<bool, String> {
+        let prior = self.value.deref_value();
+        let changed = self.value.compare_and_set(old, new_value.clone())?;
+        if changed {
+            self.notify(prior, new_value)?;
+        }
+        Ok(changed)
+    }
+    fn add_watch(&self, key: Value, function: Rc<Function>) -> Result<(), String> {
+        if !self.watchable {
+            return Err("watch:add expects a standard atom".into());
+        }
+        let mut watches = self.watches.borrow_mut();
+        watches.retain(|(candidate, _)| candidate != &key);
+        watches.push((key, function));
+        Ok(())
+    }
+    fn remove_watch(&self, key: &Value) -> Result<(), String> {
+        if !self.watchable {
+            return Err("watch:remove expects a standard atom".into());
+        }
+        self.watches
+            .borrow_mut()
+            .retain(|(candidate, _)| candidate != key);
+        Ok(())
+    }
+    fn watch_entries(&self) -> Result<Vec<Value>, String> {
+        if !self.watchable {
+            return Err("watch:list expects a standard atom".into());
+        }
+        self.watches
+            .borrow()
+            .iter()
+            .map(|(key, function)| {
+                vector_literal(vec![key.clone(), Value::Function(function.clone())])
+            })
+            .collect()
+    }
+    fn notify(&self, old_value: Value, new_value: Value) -> Result<(), String> {
+        let watches = self.watches.borrow().clone();
+        for (key, function) in watches {
+            call_function(
+                &function,
+                vec![
+                    Value::Atom(Box::new(self.clone())),
+                    key,
+                    old_value.clone(),
+                    new_value.clone(),
+                ],
+            )?;
+        }
+        Ok(())
+    }
+}
+
+impl std::fmt::Debug for RuntimeAtom {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("RuntimeAtom")
+            .finish_non_exhaustive()
     }
 }
 
@@ -4186,7 +4279,10 @@ fn eval_atom_form(
             if forms.len() != 2 {
                 return Err(format!("{operation} expects one value"));
             }
-            Ok(Value::Atom(Box::new(PAtom::new(eval(&forms[1], env)?))))
+            Ok(Value::Atom(Box::new(RuntimeAtom::new(
+                eval(&forms[1], env)?,
+                operation == "atom",
+            ))))
         }
         "reset!" => {
             if forms.len() != 3 {
@@ -4210,6 +4306,43 @@ fn eval_atom_form(
             Ok(Value::Bool(
                 atom.compare_and_set(&old, eval(&forms[3], env)?)?,
             ))
+        }
+        "watch:add" => {
+            if forms.len() != 4 {
+                return Err("watch:add expects an atom, key, and function".into());
+            }
+            let atom = match eval(&forms[1], env)? {
+                Value::Atom(atom) => atom,
+                _ => return Err("watch:add expects an atom".into()),
+            };
+            let key = eval(&forms[2], env)?;
+            let function = match eval(&forms[3], env)? {
+                Value::Function(function) => function,
+                _ => return Err("watch:add expects a function".into()),
+            };
+            atom.add_watch(key, function)?;
+            Ok(Value::Atom(atom))
+        }
+        "watch:remove" => {
+            if forms.len() != 3 {
+                return Err("watch:remove expects an atom and key".into());
+            }
+            let atom = match eval(&forms[1], env)? {
+                Value::Atom(atom) => atom,
+                _ => return Err("watch:remove expects an atom".into()),
+            };
+            atom.remove_watch(&eval(&forms[2], env)?)?;
+            Ok(Value::Atom(atom))
+        }
+        "watch:list" => {
+            if forms.len() != 2 {
+                return Err("watch:list expects an atom".into());
+            }
+            let atom = match eval(&forms[1], env)? {
+                Value::Atom(atom) => atom,
+                _ => return Err("watch:list expects an atom".into()),
+            };
+            Ok(iterator_from_values(atom.watch_entries()?))
         }
         "swap!" => {
             if forms.len() < 3 {
@@ -4338,8 +4471,17 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 eval_basic_object_form(n, fs, env)
             }
             Form::Symbol(n)
-                if ["atom", "atom:basic", "reset!", "compare:set!", "swap!"]
-                    .contains(&n.as_str()) =>
+                if [
+                    "atom",
+                    "atom:basic",
+                    "reset!",
+                    "compare:set!",
+                    "swap!",
+                    "watch:add",
+                    "watch:remove",
+                    "watch:list",
+                ]
+                .contains(&n.as_str()) =>
             {
                 eval_atom_form(n, fs, env)
             }
