@@ -1991,51 +1991,30 @@ fn dot_call(
                     return Err("object/delete expects a key".into());
                 }
                 let key = marker_key(&args[0], "object/delete")?;
-                object
-                    .borrow_mut()
-                    .retain(|(candidate, _)| candidate != &key);
-                Ok(Value::Object(object))
-            }
-            "keys" => {
-                if !args.is_empty() {
-                    return Err("object/keys expects no arguments".into());
+                let mut values = object.borrow_mut();
+                if let Some(index) = values.iter().position(|(candidate, _)| candidate == &key) {
+                    Ok(values.remove(index).1)
+                } else {
+                    Ok(Value::Nil)
                 }
-                Ok(Value::Vector(
-                    object
-                        .borrow()
-                        .iter()
-                        .map(|(key, _)| Value::String(key.clone()))
-                        .collect(),
-                ))
             }
-            "vals" => {
+            "keys" | "vals" | "pairs" => {
                 if !args.is_empty() {
-                    return Err("object/vals expects no arguments".into());
+                    return Err(format!("object/{name} expects no arguments"));
                 }
-                Ok(Value::Vector(
-                    object
-                        .borrow()
-                        .iter()
-                        .map(|(_, value)| value.clone())
-                        .collect(),
-                ))
-            }
-            "pairs" => {
-                if !args.is_empty() {
-                    return Err("object/pairs expects no arguments".into());
-                }
-                Ok(Value::Vector(
-                    object
-                        .borrow()
-                        .iter()
-                        .map(|(key, value)| {
-                            Value::Vector(PVector::from_iter([
-                                Value::String(key.clone()),
-                                value.clone(),
-                            ]))
-                        })
-                        .collect(),
-                ))
+                let output = object
+                    .borrow()
+                    .iter()
+                    .map(|(key, value)| match name {
+                        "keys" => Value::String(key.clone()),
+                        "vals" => value.clone(),
+                        _ => Value::Array(Rc::new(RefCell::new(vec![
+                            Value::String(key.clone()),
+                            value.clone(),
+                        ]))),
+                    })
+                    .collect();
+                Ok(Value::Array(Rc::new(RefCell::new(output))))
             }
             "assign" => {
                 if args.len() != 1 {
@@ -2058,9 +2037,14 @@ fn dot_call(
                 drop(values);
                 Ok(Value::Object(object))
             }
-            "clone" => Ok(Value::Object(Rc::new(RefCell::new(
-                object.borrow().clone(),
-            )))),
+            "clone" => {
+                if !args.is_empty() {
+                    return Err("object/clone expects no arguments".into());
+                }
+                Ok(Value::Object(Rc::new(RefCell::new(
+                    object.borrow().clone(),
+                ))))
+            }
             _ => Err(format!("unsupported object method: {name}")),
         },
         _ => Err("dot calls require an array or object marker".into()),
