@@ -3,8 +3,8 @@ use std::hash::Hash;
 
 use crate::lang::data::{Map, Vector};
 use crate::lang::protocol::{
-    IAssoc, ICount, IDissoc, IEmpty, IFind, ILookup, IMutable, INth, IPersistent, IToMutable,
-    IToPersistent,
+    IAssoc, ICount, IDissoc, IEmpty, IFind, ILookup, IMetadata, IMutable, INth, IPersistent,
+    IToMutable, IToPersistent,
 };
 
 const COMPACT_MINIMUM: usize = 32;
@@ -82,7 +82,10 @@ impl<K: Clone + Eq + Hash, V: Clone> Standard<K, V> {
         if self.order.len() <= COMPACT_MINIMUM || self.order.len() <= 2 * self.lookup.len() {
             return self;
         }
-        self.iter().cloned().collect()
+        self.iter()
+            .cloned()
+            .collect::<Self>()
+            .with_meta(self.lookup.meta().cloned())
     }
 }
 
@@ -136,7 +139,19 @@ impl<K: Clone + Eq + Hash, V: Clone> INth<(K, V)> for Standard<K, V> {
 }
 impl<K: Clone + Eq + Hash, V: Clone> IEmpty for Standard<K, V> {
     fn empty(&self) -> Self {
-        Self::new()
+        Self::new().with_meta(self.lookup.meta().cloned())
+    }
+}
+impl<K: Clone + Eq + Hash, V: Clone> IMetadata for Standard<K, V> {
+    type Metadata = std::rc::Rc<str>;
+    fn meta(&self) -> Option<&Self::Metadata> {
+        self.lookup.meta()
+    }
+    fn with_meta(&self, metadata: Option<Self::Metadata>) -> Self {
+        Self {
+            lookup: self.lookup.with_meta(metadata.clone()),
+            order: self.order.with_meta(metadata),
+        }
     }
 }
 impl<K: Clone + Eq + Hash, V: Clone> IPersistent for Standard<K, V> {}
@@ -196,9 +211,15 @@ mod tests {
             map.iter().cloned().collect::<Vec<_>>(),
             vec![("a", 3), ("b", 2)]
         );
-        let original = (0..80).map(|n| (n, n)).collect::<Standard<_, _>>();
+        use crate::lang::protocol::IMetadata;
+        use std::rc::Rc;
+        let original = (0..80)
+            .map(|n| (n, n))
+            .collect::<Standard<_, _>>()
+            .with_meta(Some(Rc::from("doc")));
         let reduced = (0..60).fold(original.clone(), |map, key| map.dissoc_value(&key));
         assert_eq!(original.len(), 80);
+        assert_eq!(reduced.meta().map(|m| m.as_ref()), Some("doc"));
         assert_eq!(
             reduced.iter().map(|(key, _)| *key).collect::<Vec<_>>(),
             (60..80).collect::<Vec<_>>()

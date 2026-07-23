@@ -3,7 +3,8 @@ use std::hash::Hash;
 
 use crate::lang::data::{Map, Vector};
 use crate::lang::protocol::{
-    IConj, ICount, IDissoc, IEmpty, IFind, IMutable, INth, IPersistent, IToMutable, IToPersistent,
+    IConj, ICount, IDissoc, IEmpty, IFind, IMetadata, IMutable, INth, IPersistent, IToMutable,
+    IToPersistent,
 };
 
 const COMPACT_MINIMUM: usize = 32;
@@ -64,7 +65,10 @@ impl<E: Clone + Eq + Hash> Standard<E> {
         if self.order.len() <= COMPACT_MINIMUM || self.order.len() <= 2 * self.lookup.len() {
             return self;
         }
-        self.iter().cloned().collect()
+        self.iter()
+            .cloned()
+            .collect::<Self>()
+            .with_meta(self.lookup.meta().cloned())
     }
 }
 impl<E: Clone + Eq + Hash> FromIterator<E> for Standard<E> {
@@ -101,7 +105,19 @@ impl<E: Clone + Eq + Hash> INth<E> for Standard<E> {
 }
 impl<E: Clone + Eq + Hash> IEmpty for Standard<E> {
     fn empty(&self) -> Self {
-        Self::new()
+        Self::new().with_meta(self.lookup.meta().cloned())
+    }
+}
+impl<E: Clone + Eq + Hash> IMetadata for Standard<E> {
+    type Metadata = std::rc::Rc<str>;
+    fn meta(&self) -> Option<&Self::Metadata> {
+        self.lookup.meta()
+    }
+    fn with_meta(&self, metadata: Option<Self::Metadata>) -> Self {
+        Self {
+            lookup: self.lookup.with_meta(metadata.clone()),
+            order: self.order.with_meta(metadata),
+        }
     }
 }
 impl<E: Clone + Eq + Hash> IPersistent for Standard<E> {}
@@ -151,6 +167,18 @@ impl<E: Clone + Eq + Hash> IToPersistent for Mutable<E> {
 #[cfg(test)]
 mod tests {
     use super::Standard;
+    #[test]
+    fn compaction_and_empty_preserve_metadata() {
+        use crate::lang::protocol::{IEmpty, IMetadata};
+        use std::rc::Rc;
+        let original = (0..80)
+            .collect::<Standard<_>>()
+            .with_meta(Some(Rc::from("doc")));
+        let reduced = (0..60).fold(original, |set, value| set.dissoc_value(&value));
+        assert_eq!(reduced.meta().map(|m| m.as_ref()), Some("doc"));
+        assert_eq!(reduced.empty().meta().map(|m| m.as_ref()), Some("doc"));
+    }
+
     #[test]
     fn is_unique_ordered_and_persistent() {
         let original = [3, 1, 3, 2].into_iter().collect::<Standard<_>>();
