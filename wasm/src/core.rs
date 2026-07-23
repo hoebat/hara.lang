@@ -3196,6 +3196,30 @@ fn binding_var(env: &mut HashMap<String, Value>, name: &str) -> Option<KernelVar
     }
 }
 
+fn call_value(callable: Value, arguments: Vec<Value>) -> Result<Value, String> {
+    let lookup =
+        |target: &Value, key: &Value, fallback: Value| collection_get(target, key, fallback);
+    match callable {
+        Value::Function(function) => call_function(&function, arguments),
+        Value::Keyword(keyword) => match arguments.as_slice() {
+            [target] => lookup(target, &Value::Keyword(keyword), Value::Nil),
+            [target, fallback] => lookup(target, &Value::Keyword(keyword), fallback.clone()),
+            _ => Err("keyword invocation expects one or two arguments".into()),
+        },
+        Value::Map(values) => match arguments.as_slice() {
+            [key] => Ok(values.get(key).cloned().unwrap_or(Value::Nil)),
+            [key, fallback] => Ok(values.get(key).cloned().unwrap_or_else(|| fallback.clone())),
+            _ => Err("map invocation expects one or two arguments".into()),
+        },
+        Value::Set(values) => match arguments.as_slice() {
+            [key] => Ok(values.get(key).cloned().unwrap_or(Value::Nil)),
+            [key, fallback] => Ok(values.get(key).cloned().unwrap_or_else(|| fallback.clone())),
+            _ => Err("set invocation expects one or two arguments".into()),
+        },
+        _ => Err("value is not callable".into()),
+    }
+}
+
 fn call_function(function: &Function, arguments: Vec<Value>) -> Result<Value, String> {
     if let Some(native) = &function.native {
         if function.params.len() != arguments.len() {
@@ -5011,10 +5035,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     .iter()
                     .map(|form| eval(form, env))
                     .collect::<Result<Vec<_>, _>>()?;
-                match function {
-                    Value::Function(function) => call_function(&function, arguments),
-                    _ => Err("value is not callable".into()),
-                }
+                call_value(function, arguments)
             }
         },
     }

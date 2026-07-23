@@ -934,6 +934,29 @@ mod tests {
     }
 
     #[test]
+    fn keywords_maps_and_sets_match_java_callable_semantics() {
+        let mut runtime = Runtime::new();
+        assert_eq!(runtime.eval_text("(:answer {:answer 42})").unwrap(), "42");
+        assert_eq!(runtime.eval_text("(:missing {:answer 42})").unwrap(), "nil");
+        assert_eq!(runtime.eval_text("(:missing nil 7)").unwrap(), "7");
+        assert_eq!(runtime.eval_text("({:answer 42} :answer)").unwrap(), "42");
+        assert_eq!(runtime.eval_text("({:answer 42} :missing 7)").unwrap(), "7");
+        assert_eq!(
+            runtime.eval_text("(#{:answer} :answer)").unwrap(),
+            ":answer"
+        );
+        assert_eq!(runtime.eval_text("(#{:answer} :missing 7)").unwrap(), "7");
+        assert_eq!(
+            runtime.eval_text("(:answer)").unwrap_err(),
+            "keyword invocation expects one or two arguments"
+        );
+        assert_eq!(
+            runtime.eval_text("({} :a :b :c)").unwrap_err(),
+            "map invocation expects one or two arguments"
+        );
+    }
+
+    #[test]
     fn reader_vectors_use_java_tuple_arity_selection() {
         let mut env = HashMap::new();
         let small = core::eval(&kernel::parse("[1 2 3]").unwrap(), &mut env).unwrap();
