@@ -1,10 +1,15 @@
-name: Publish Hara site
+name: Publish Hara documentation
 
 on:
   push:
     branches: [master]
     paths:
-      - "site/**"
+      - "docs/**"
+      - "spec/hara/**"
+      - "overrides/**"
+      - "mkdocs.yml"
+      - "requirements-docs.txt"
+      - "pom.xml"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -19,7 +24,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Deploy static site
+    name: Build and deploy documentation
     runs-on: ubuntu-latest
     environment:
       name: github-pages
@@ -28,13 +33,40 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install MkDocs Material
+        run: pip install -r requirements-docs.txt
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: "21"
+          distribution: temurin
+          cache: maven
+
+      - name: Generate Java API documentation
+        run: mvn -q -Pjavadoc javadoc:javadoc
+
+      - name: Build MkDocs site
+        run: mkdocs build --strict --site-dir site-build
+
+      - name: Add Java API documentation
+        run: |
+          mkdir -p site-build/api/java
+          cp -R target/site/apidocs/. site-build/api/java/
+          cat docs/javadoc-theme.css >> site-build/api/java/stylesheet.css
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
-      - name: Upload site artifact
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: site-build
 
       - name: Deploy to GitHub Pages
         id: deployment
