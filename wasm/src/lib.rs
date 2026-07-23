@@ -43,6 +43,7 @@ impl PromiseHandle {
 pub struct Runtime {
     env: HashMap<String, core::Value>,
     protocols: core::ProtocolRegistry,
+    extensions: core::ExtensionRegistry,
     providers: core::ProviderRegistry,
     resources: HashMap<String, String>,
     loaded_resources: HashSet<String>,
@@ -58,6 +59,7 @@ impl Runtime {
         Runtime {
             env: HashMap::new(),
             protocols: core::ProtocolRegistry::core(),
+            extensions: core::ExtensionRegistry::new(),
             providers: core::ProviderRegistry::new(),
             resources: HashMap::new(),
             loaded_resources: HashSet::new(),
@@ -172,6 +174,12 @@ impl Runtime {
         provider.write(path, bytes).map(PromiseHandle::from_promise).map_err(|error| JsValue::from_str(&format!("file/{}", error.code())))
     }
 
+    pub fn extension_available(&self, name: &str) -> bool { self.extensions.contains(name) }
+
+    pub fn require_extension(&mut self, name: &str) -> Result<String, JsValue> {
+        self.extensions.require(name, &mut self.protocols).map_err(|error| JsValue::from_str(&error))
+    }
+
     /// Registers a host-supplied Hara resource. Resources are source text, not executable host code.
     pub fn register_resource(&mut self, name: &str, source: &str) { self.resources.insert(name.into(), source.into()); }
 
@@ -184,6 +192,11 @@ impl Runtime {
     /// Loads a resource once; subsequent requires return the current loaded marker.
     pub fn require_resource(&mut self, name: &str) -> Result<String, JsValue> {
         if self.loaded_resources.contains(name) { return Ok(":loaded".into()); }
+        if self.extensions.contains(name) {
+            let result = self.require_extension(name)?;
+            self.loaded_resources.insert(name.into());
+            return Ok(result);
+        }
         let result = self.load_resource(name)?;
         self.loaded_resources.insert(name.into());
         Ok(result)
@@ -272,6 +285,20 @@ mod tests {
         assert_eq!(provider.read(&resolved).unwrap().state(), core::PromiseState::Fulfilled(core::Value::Bytes(vec![4, 5, 6])));
         std::fs::remove_file(resolved).unwrap();
         std::fs::remove_dir(path).unwrap();
+    }
+
+    #[test]
+    fn extension_provider_values_load_and_iterate_through_protocols() {
+        let mut runtime = Runtime::new();
+        runtime.extensions.install(RangeExtension);
+        assert!(runtime.extension_available("range"));
+        assert_eq!(runtime.require_resource("range").unwrap(), ":loaded");
+        let value = runtime.extensions.construct("range", "range", &[core::Value::Number(3)]).unwrap();
+        assert_eq!(core::receiver_category(&value), "extension");
+        runtime.env.insert("r".into(), value);
+        assert_eq!(runtime.eval_text("(iter-next (iter r))").unwrap(), "0");
+        assert_eq!(runtime.eval_text("(iter-next (iter r))").unwrap(), "0");
+        assert_eq!(runtime.require_resource("range").unwrap(), ":loaded");
     }
 
     #[test]
@@ -480,6 +507,27 @@ mod tests {
         assert_eq!(runtime.eval_text("(let (source [1 2]) (count source))").unwrap(), "2");
         assert_eq!(runtime.eval_text("(let (source (rest [1 2])) (count (conj source 2)))").unwrap(), "2");
         assert_eq!(runtime.eval_text("(let (source (rest [1 2])) (count source))").unwrap(), "1");
+    }
+
+    struct RangeExtension;
+
+    impl core::ExtensionProvider for RangeExtension {
+        fn name(&self) -> &str { "range" }
+
+        fn install(&self, protocols: &mut core::ProtocolRegistry) {
+            protocols.register("IIter", "iter", |arguments| match arguments.first() {
+                Some(core::Value::Extension(value)) if value.provider == "range" && value.type_name == "range" => {
+                    Ok(core::iterator_from_values((0..value.handle).map(|index| core::Value::Number(index as i64)).collect()))
+                }
+                _ => Err("range/IIter does not accept this value".into()),
+            });
+        }
+
+        fn construct(&self, type_name: &str, arguments: &[core::Value]) -> Result<core::Value, String> {
+            if type_name != "range" { return Err("range/type-not-found".into()); }
+            let count = match arguments.first() { Some(core::Value::Number(count)) if *count >= 0 => *count as u64, _ => return Err("range expects a non-negative count".into()) };
+            Ok(core::Value::Extension(core::ExtensionValue { provider: "range".into(), type_name: "range".into(), handle: count }))
+        }
     }
 
     fn protocol_identity(arguments: &[core::Value]) -> Result<core::Value, String> {

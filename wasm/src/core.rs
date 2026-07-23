@@ -1,5 +1,5 @@
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use im_rc::Vector as PVector;
 use std::rc::Rc;
 
@@ -13,6 +13,13 @@ pub enum Form {
     Set(Vec<Form>),
     Vector(Vec<Form>),
     List(Vec<Form>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExtensionValue {
+    pub provider: String,
+    pub type_name: String,
+    pub handle: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -35,6 +42,7 @@ pub enum Value {
     Vector(PVector<Value>),
     Iterator(Rc<RefCell<IteratorState>>),
     Var(Rc<RefCell<Value>>),
+    Extension(ExtensionValue),
     Nil,
 }
 
@@ -109,6 +117,7 @@ impl PartialEq for Value {
             (Value::Vector(a), Value::Vector(b)) => a == b,
             (Value::Iterator(a), Value::Iterator(b)) => Rc::ptr_eq(a, b),
             (Value::Var(a), Value::Var(b)) => Rc::ptr_eq(a, b),
+            (Value::Extension(a), Value::Extension(b)) => a == b,
             (Value::Nil, Value::Nil) => true,
             _ => false,
         }
@@ -136,6 +145,7 @@ impl Value {
             Self::Vector(values) => format!("[{}]", values.iter().map(Value::display).collect::<Vec<_>>().join(" ")),
             Self::Iterator(_) => "<iterator>".into(),
             Self::Var(_) => "<var>".into(),
+            Self::Extension(value) => format!("<extension:{}/{}#{}>", value.provider, value.type_name, value.handle),
             Self::Nil => "nil".into(),
         }
     }
@@ -144,28 +154,34 @@ impl Value {
     }
 }
 
-pub type ProtocolFn = fn(&[Value]) -> Result<Value, String>;
+pub type ProtocolFn = Rc<dyn Fn(&[Value]) -> Result<Value, String>>;
 
 #[derive(Default, Clone)]
 pub struct ProtocolRegistry {
-    methods: HashMap<(String, String), ProtocolFn>,
+    methods: HashMap<(String, String), Vec<ProtocolFn>>,
 }
 
 #[allow(dead_code)]
 impl ProtocolRegistry {
     pub fn new() -> Self { Self::default() }
 
-    pub fn register(&mut self, protocol: impl Into<String>, method: impl Into<String>, function: ProtocolFn) {
-        self.methods.insert((protocol.into(), method.into()), function);
+    pub fn register<F>(&mut self, protocol: impl Into<String>, method: impl Into<String>, function: F)
+    where F: Fn(&[Value]) -> Result<Value, String> + 'static {
+        self.methods.entry((protocol.into(), method.into())).or_default().push(Rc::new(function));
     }
 
     pub fn invoke(&self, protocol: &str, method: &str, arguments: &[Value]) -> Result<Value, String> {
-        self.methods.get(&(protocol.to_string(), method.to_string())).copied()
-            .ok_or_else(|| format!("missing protocol method: {protocol}/{method}"))?(arguments)
+        let implementations = self.methods.get(&(protocol.to_string(), method.to_string()))
+            .ok_or_else(|| format!("missing protocol method: {protocol}/{method}"))?;
+        let mut last_error = format!("missing protocol implementation: {protocol}/{method}");
+        for implementation in implementations {
+            match implementation(arguments) { Ok(value) => return Ok(value), Err(error) => last_error = error }
+        }
+        Err(last_error)
     }
 
     pub fn contains(&self, protocol: &str, method: &str) -> bool {
-        self.methods.contains_key(&(protocol.to_string(), method.to_string()))
+        self.methods.get(&(protocol.to_string(), method.to_string())).is_some_and(|implementations| !implementations.is_empty())
     }
 
     /// Returns the built-in collection protocol registry used by evaluator dispatch.
@@ -194,6 +210,38 @@ pub fn with_protocols<R>(registry: &ProtocolRegistry, operation: impl FnOnce() -
         active.replace(previous);
         result
     })
+}
+
+pub trait ExtensionProvider {
+    fn name(&self) -> &str;
+    fn install(&self, protocols: &mut ProtocolRegistry);
+    fn construct(&self, type_name: &str, arguments: &[Value]) -> Result<Value, String>;
+}
+
+#[derive(Default, Clone)]
+pub struct ExtensionRegistry {
+    providers: HashMap<String, Rc<dyn ExtensionProvider>>,
+    loaded: HashSet<String>,
+}
+
+impl ExtensionRegistry {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn install<P: ExtensionProvider + 'static>(&mut self, provider: P) {
+        self.providers.insert(provider.name().to_string(), Rc::new(provider));
+    }
+
+    pub fn contains(&self, name: &str) -> bool { self.providers.contains_key(name) }
+
+    pub fn require(&mut self, name: &str, protocols: &mut ProtocolRegistry) -> Result<String, String> {
+        let provider = self.providers.get(name).cloned().ok_or_else(|| format!("extension/not-found: {name}"))?;
+        if self.loaded.insert(name.to_string()) { provider.install(protocols); }
+        Ok(if self.loaded.len() == 1 { ":loaded".into() } else { ":loaded".into() })
+    }
+
+    pub fn construct(&self, provider: &str, type_name: &str, arguments: &[Value]) -> Result<Value, String> {
+        self.providers.get(provider).ok_or_else(|| format!("extension/not-found: {provider}"))?.construct(type_name, arguments)
+    }
 }
 
 #[allow(dead_code)]
@@ -533,6 +581,7 @@ pub fn receiver_category(value: &Value) -> &'static str {
         Value::Set(_) => "set",
         Value::Iterator(_) => "iterator",
         Value::Var(_) => "var",
+        Value::Extension(_) => "extension",
     }
 }
 
