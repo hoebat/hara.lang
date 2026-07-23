@@ -206,6 +206,38 @@ not L0 numeric categories. They may be explicit library or host values later.
 
 ## 7. Protocols, structs, and multimethods
 
+### 7.1 Collection operation matrix
+
+The collection profile distinguishes language values from dispatch categories. A
+Java object participates only when it implements a Hara protocol adapter; being
+a `java.util.Collection` does not implicitly grant language operations. Foreign
+polyglot values likewise require an explicit protocol extension.
+
+| Receiver family | Lookup / invocation | Persistent update | Count / empty | Indexed access | Iteration |
+| --- | --- | --- | --- | --- | --- |
+| Persistent maps (HAMT, ordered, sorted, trie) | keys preserve present-`nil` versus missing fallback; maps are callable | `assoc`/`dissoc` return the same concrete family and preserve the original | supported; `empty` preserves the family | unsupported unless the concrete ordered/sorted contract declares it | entries are Hara `IPair` values |
+| Persistent sets (HAMT, ordered, sorted) | callable membership returns the stored value or fallback | `conj`/removal return the same family and preserve the original | supported; `empty` preserves the family | ordered/sorted forms expose only their declared indexed contract | yields unique values |
+| Vector | callable `nth` | `assoc` and `conj` return a new vector | supported | supported; negative and past-end indexes fail | insertion order |
+| List | lookup and `nth` through its sequential contract | `cons`/`push-first` prepend; navigation returns new lists | supported | supported by its declared sequential contract | head to tail |
+| Queue | sequential lookup | `conj`/`push-last` enqueue and preserve the original | supported | supported by its declared sequential contract | head to tail |
+| Tuple | callable `nth` | fixed-arity operations return the canonical resulting tuple arity | supported; empty is canonical `Tup0` | supported | tuple order |
+| Mutable Hara collections and `array`/`object` markers | supported only by their declared protocols or restricted dot methods | mutation returns the same identity and is immediately visible | declared collection protocols only | arrays support indexed access; objects use string keys | declared protocol only |
+| Bytes | byte lookup supports a fallback; `INth` exposes signed storage | `bytes/set` mutates the byte buffer and returns its identity | count supported | checked bounds | byte order |
+| `nil` | lookup returns `nil` or the supplied fallback | `conj` creates a singleton list; `assoc` is unsupported | count is zero and empty is `nil` | unsupported | empty iterator where explicitly requested |
+| Primitive scalar | no collection lookup or update | unsupported | unsupported unless explicitly extended | unsupported | unsupported |
+| Foreign polyglot value | only explicitly installed foreign extensions | only explicitly installed foreign extensions | only explicitly installed foreign extensions | only explicitly installed foreign extensions | only explicitly installed foreign extensions |
+
+Duplicate map keys retain one entry with the last associated value. Duplicate set
+items retain one value. Invalid indexes and missing protocol implementations are
+errors identifying the protocol/method, receiver category, and searched dispatch
+path. Mutable and persistent operations must never silently cross their identity
+boundary.
+
+Hara remains iterator-first: this matrix does not imply Clojure `ISeq`,
+transducers, `transduce`, or `eduction` semantics.
+
+### 7.2 Protocol dispatch and language extensions
+
 Protocols are language descriptors with context-local dispatch registries.
 Java interfaces are optional adapters and fast paths, not the language
 definition. `defprotocol` declares methods; `extend-type` installs language
