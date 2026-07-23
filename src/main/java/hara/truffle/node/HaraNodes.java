@@ -2032,7 +2032,8 @@ public final class HaraNodes {
     @TruffleBoundary
     private HaraException noImplementation(HaraProtocol haraProtocol, Object receiverValue) {
       return new HaraException(
-          "No " + haraProtocol.name() + "/" + method + " implementation for " + receiverValue,
+          "No " + haraProtocol.name() + "/" + method + " implementation ("
+              + hara.truffle.HaraDispatchKey.describeReceiver(receiverValue) + ")",
           this);
     }
 

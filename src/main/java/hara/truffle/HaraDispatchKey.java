@@ -100,6 +100,31 @@ public final class HaraDispatchKey {
         && !(value instanceof HaraBox);
   }
 
+  public static String describeReceiver(Object value) {
+    if (value == null) {
+      return "category=nil, dispatch=nil -> default";
+    }
+    if (value instanceof HaraStruct) {
+      HaraType type = ((HaraStruct) value).type();
+      return "category=hara-type, type=" + type.name()
+          + ", class=" + value.getClass().getName()
+          + ", dispatch=hara-type -> java-class -> default";
+    }
+    if (isForeign(value)) {
+      return "category=foreign, class=" + value.getClass().getName()
+          + ", dispatch=foreign -> java-class -> default";
+    }
+    PrimitiveCategory category = primitiveCategory(value);
+    if (category != null) {
+      return "category=" + category.name().toLowerCase()
+          + ", class=" + value.getClass().getName()
+          + ", dispatch=java-class -> primitive:" + category.name().toLowerCase()
+          + " -> default";
+    }
+    return "category=java-class, class=" + value.getClass().getName()
+        + ", dispatch=java-class -> default";
+  }
+
   @Override
   public boolean equals(Object other) {
     if (!(other instanceof HaraDispatchKey)) {

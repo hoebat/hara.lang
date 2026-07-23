@@ -111,7 +111,8 @@ public final class HaraProtocol implements TruffleObject {
     }
     HaraProtocolImplementation implementation = implementation(receiver, methodName);
     if (implementation == null) {
-      throw new HaraException("No " + name + "/" + methodName + " implementation for " + receiver);
+      throw new HaraException("No " + name + "/" + methodName + " implementation ("
+          + HaraDispatchKey.describeReceiver(receiver) + ")");
     }
     return implementation.invoke(receiver, arguments);
   }

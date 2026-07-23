@@ -54,5 +54,23 @@ public class HaraProtocolTest {
     assertTrue(error.getMessage().contains("expects 1 arguments"));
   }
 
+
+  @Test
+  public void missingImplementationsIdentifyTheDispatchPath() {
+    HaraProtocol protocol = new HaraProtocol("Readable", Map.of("read", 1));
+    HaraException primitive =
+        assertThrows(HaraException.class, () -> protocol.invoke("read", 42L, new Object[0]));
+    assertTrue(primitive.getMessage().contains("Readable/read"));
+    assertTrue(primitive.getMessage().contains("category=number"));
+    assertTrue(primitive.getMessage().contains("primitive:number"));
+
+    HaraException foreign =
+        assertThrows(
+            HaraException.class,
+            () -> protocol.invoke("read", new ForeignValue(), new Object[0]));
+    assertTrue(foreign.getMessage().contains("category=foreign"));
+    assertTrue(foreign.getMessage().contains("dispatch=foreign"));
+  }
+
   private static final class ForeignValue implements TruffleObject {}
 }
