@@ -23,7 +23,7 @@ After the public classes have complete lifecycle and capability Javadocs, genera
 mvn -Pjavadoc javadoc:javadoc
 ```
 
-The generated output is written under `target/site/apidocs/`. In the published documentation site, the generated API is available at [`/api/java/`](../api/java/index.html) alongside the Material pages.
+The generated output is written under `target/site/apidocs/`. In the published documentation site, the generated API is available at [`/api/java/`](https://hoebat.github.io/hara.lang/api/java/index.html) alongside the Material pages.
 
 ## Required Javadoc topics
 

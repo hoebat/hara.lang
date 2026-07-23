@@ -53,4 +53,4 @@ mvn -q -Ptruffle -Dtest=hara.truffle.HaraL0ConformanceTest test
 ```
 
 For contributor workflows, test slices, native-image builds, and troubleshooting, read the
-[developer guide](docs/development.md).
+[developer guide](development.md).

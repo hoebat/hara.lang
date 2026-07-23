@@ -46,7 +46,7 @@ manifest -> validate -> provider handshake -> Hara namespace -> promise/error bo
 
 Providers must not change Hara call sites. Keep transport-specific details inside the provider and
 preserve stable errors for malformed manifests, denied capabilities, timeouts, cancellation, and
-crashes. See [the extension contract](../reference/extensions-contract.md).
+crashes. See [the extension contract](reference/extensions-contract.md).
 
 ## Java API documentation
 
