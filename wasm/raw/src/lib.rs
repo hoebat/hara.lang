@@ -455,6 +455,17 @@ mod tests {
     }
 
     #[test]
+    fn iterator_lifecycle_matches_native_core_in_raw_wasm() {
+        for source in [
+            "(let (it (iter-cycle [1 2])) (do (iter-next it) (iter-close it) (if (iter-has? it) 0 42)))",
+            "(let (it (iter-zip [1 2] [3 4])) (do (iter-close it) (if (iter-has? it) 0 42)))",
+            "(let (it (iter-map (fn [x] x) [1 2])) (do (iter-close it) (if (iter-has? it) 0 42)))",
+        ] {
+            assert_eq!(evaluate(source), Ok(42), "{source}");
+        }
+    }
+
+    #[test]
     fn fibers_persist_namespace_selection_defs_and_var_identity() {
         let mut runtime = Runtime::new();
         runtime
