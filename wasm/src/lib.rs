@@ -1,5 +1,7 @@
 #![allow(clippy::too_many_lines)] // Temporary compatibility facade during Java-port split.
 mod core;
+pub mod extension;
+pub mod hta;
 pub mod kernel;
 pub mod lang;
 pub mod task;
@@ -62,6 +64,7 @@ pub struct Runtime {
     env: HashMap<String, core::Value>,
     protocols: core::ProtocolRegistry,
     extensions: core::ExtensionRegistry,
+    wasm_extensions: HashMap<String, extension::WasmExtension>,
     providers: core::ProviderRegistry,
     resources: HashMap<String, String>,
     loaded_resources: HashSet<String>,
@@ -77,6 +80,7 @@ impl Runtime {
             env: HashMap::new(),
             protocols: core::ProtocolRegistry::core(),
             extensions: core::ExtensionRegistry::new(),
+            wasm_extensions: HashMap::new(),
             providers: core::ProviderRegistry::new(),
             resources: HashMap::new(),
             loaded_resources: HashSet::new(),
@@ -99,7 +103,19 @@ impl Runtime {
                         Some(Form::Symbol(name)) if !name.contains('/') => name.clone(),
                         _ => return Err("ns expects an unqualified namespace symbol".into()),
                     };
-                    let config = kernel::GeneratedNamespaceConfig::configure(&values[2..])?;
+                    let config =
+                        kernel::GeneratedNamespaceConfig::configure_with(&values[2..], |target| {
+                            self.wasm_extensions.contains_key(target)
+                        })?;
+                    let required_extensions = config
+                        .required_namespaces()
+                        .iter()
+                        .filter(|target| self.wasm_extensions.contains_key(target.as_str()))
+                        .cloned()
+                        .collect::<Vec<_>>();
+                    for target in required_extensions {
+                        self.load_wasm_extension_namespace(&target)?;
+                    }
                     self.use_namespace(&name);
                     self.generated_configs.insert(name, config);
                     result = core::Value::Nil;
@@ -267,10 +283,15 @@ impl Runtime {
     }
 
     pub fn extension_available(&self, name: &str) -> bool {
-        self.extensions.contains(name)
+        self.extensions.contains(name) || self.wasm_extensions.contains_key(name)
     }
 
     pub fn require_extension(&mut self, name: &str) -> Result<String, JsValue> {
+        if self.wasm_extensions.contains_key(name) {
+            return self
+                .load_wasm_extension_namespace(name)
+                .map_err(|error| JsValue::from_str(&error));
+        }
         self.extensions
             .require(name, &mut self.protocols)
             .map_err(|error| JsValue::from_str(&error))
@@ -299,6 +320,13 @@ impl Runtime {
         }
         if self.extensions.contains(name) {
             let result = self.require_extension(name)?;
+            self.loaded_resources.insert(name.into());
+            return Ok(result);
+        }
+        if self.wasm_extensions.contains_key(name) {
+            let result = self
+                .load_wasm_extension_namespace(name)
+                .map_err(|error| JsValue::from_str(&error))?;
             self.loaded_resources.insert(name.into());
             return Ok(result);
         }
@@ -369,6 +397,58 @@ impl Runtime {
     #[cfg(any(not(target_arch = "wasm32"), target_os = "wasi"))]
     pub fn eval_native_traced(&mut self, source: &str) -> Result<String, String> {
         self.eval_text_mode(source, true)
+    }
+}
+
+impl Runtime {
+    pub fn install_wasm_extension<P: extension::WasmExtensionProvider + 'static>(
+        &mut self,
+        manifest_source: &str,
+        origin: &str,
+        provider: P,
+    ) -> Result<(), String> {
+        let manifest = extension::ExtensionManifest::parse(manifest_source, origin)?;
+        let namespace = manifest.namespace.clone();
+        if self.wasm_extensions.contains_key(&namespace)
+            || self.extensions.contains(&namespace)
+            || self.resources.contains_key(&namespace)
+        {
+            return Err(format!(
+                "extension/ambiguous: namespace already registered: {namespace}"
+            ));
+        }
+        let extension = extension::WasmExtension::new(manifest, provider)?;
+        self.wasm_extensions.insert(namespace, extension);
+        Ok(())
+    }
+
+    pub fn cancel_wasm_extension(&self, name: &str, request: u64) -> Result<(), String> {
+        self.wasm_extensions
+            .get(name)
+            .ok_or_else(|| format!("extension/not-found: {name}"))?
+            .cancel(request)
+    }
+
+    fn load_wasm_extension_namespace(&mut self, name: &str) -> Result<String, String> {
+        let bindings = self
+            .wasm_extensions
+            .get_mut(name)
+            .ok_or_else(|| format!("extension/not-found: {name}"))?
+            .require()?;
+        let namespace = self.namespace_registry.find_or_create(name);
+        for binding in bindings {
+            let arity = binding.specification.arguments.len();
+            let function_name = format!("{name}/{}", binding.name);
+            let binding_name = binding.name.clone();
+            namespace.intern(
+                &binding_name,
+                core::native_function(&function_name, arity, move |arguments| {
+                    binding.invoke(&arguments)
+                }),
+            );
+        }
+        self.refresh_qualified_bindings();
+        Ok(":loaded".into())
     }
 }
 

@@ -184,7 +184,7 @@ impl std::fmt::Debug for RuntimeAtom {
     }
 }
 
-fn native_function(
+pub(crate) fn native_function(
     name: &str,
     arity: usize,
     callback: impl Fn(Vec<Value>) -> Result<Value, String> + 'static,

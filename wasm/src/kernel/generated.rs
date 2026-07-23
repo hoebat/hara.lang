@@ -14,6 +14,7 @@ const LIBRARIES: &[(&str, &str, &str)] = &[
 pub struct GeneratedNamespaceConfig {
     aliases: HashMap<String, String>,
     refers: HashMap<String, String>,
+    required_namespaces: Vec<String>,
 }
 
 impl GeneratedNamespaceConfig {
@@ -25,10 +26,18 @@ impl GeneratedNamespaceConfig {
         Self {
             aliases,
             refers: HashMap::new(),
+            required_namespaces: Vec::new(),
         }
     }
 
     pub fn configure(clauses: &[Form]) -> Result<Self, String> {
+        Self::configure_with(clauses, known_namespace)
+    }
+
+    pub fn configure_with(
+        clauses: &[Form],
+        available: impl Fn(&str) -> bool,
+    ) -> Result<Self, String> {
         let mut excluded = HashSet::new();
         let mut overrides = HashMap::new();
         let mut requires = Vec::new();
@@ -76,9 +85,13 @@ impl GeneratedNamespaceConfig {
             config.put_alias(alias, namespace)?;
         }
         for require in requires {
-            config.apply_require(&require)?;
+            config.apply_require(&require, &available)?;
         }
         Ok(config)
+    }
+
+    pub fn required_namespaces(&self) -> &[String] {
+        &self.required_namespaces
     }
 
     pub fn rewrite(&self, form: Form) -> Form {
@@ -160,7 +173,11 @@ impl GeneratedNamespaceConfig {
         Ok(())
     }
 
-    fn apply_require(&mut self, form: &Form) -> Result<(), String> {
+    fn apply_require(
+        &mut self,
+        form: &Form,
+        available: &impl Fn(&str) -> bool,
+    ) -> Result<(), String> {
         let spec = vector(
             form,
             ":require expects vectors such as [hara.lib.string :as str]",
@@ -174,10 +191,13 @@ impl GeneratedNamespaceConfig {
         } else {
             target
         };
-        if !known_namespace(target) {
+        if !known_namespace(target) && !available(target) {
             return Err(format!(
                 "Cannot require missing generated namespace: {target}"
             ));
+        }
+        if !self.required_namespaces.iter().any(|value| value == target) {
+            self.required_namespaces.push(target.into());
         }
         if (spec.len() - 1) % 2 != 0 {
             return Err(format!("Malformed :require options for {target}"));
@@ -318,7 +338,7 @@ fn canonical(namespace: &str, method: &str) -> String {
         ("hara.lib.bytes", method) => format!("bytes/{method}"),
         ("hara.lib.socket", method) => format!("socket/{method}"),
         ("hara.lib.file", method) => format!("file/{method}"),
-        (_, method) => method.into(),
+        (namespace, method) => format!("{namespace}/{method}"),
     }
 }
 
