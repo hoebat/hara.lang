@@ -232,7 +232,7 @@ public interface Iter {
   }
 
   public static <E, R> Iterator<R> map(Iterator<E> it, Function<E, R> f) {
-    return from(it::hasNext, () -> f.apply(it.next()));
+    return closeable(from(it::hasNext, () -> f.apply(it.next())), it);
   }
 
   public static <E> Consumer<Iterator<E>> each(Consumer<E> f) {
@@ -290,7 +290,7 @@ public interface Iter {
   }
 
   public static <E> Iterator<E> filter(Iterator<E> it, Predicate<E> f) {
-    return new Iterator<E>() {
+    return closeable(new Iterator<E>() {
 
       private E _val = null;
       private State _state = State.NOT_SET;
@@ -323,7 +323,7 @@ public interface Iter {
         _state = State.NOT_SET;
         return _val;
       }
-    };
+    }, it);
   }
 
   //
@@ -562,7 +562,7 @@ public interface Iter {
   }
 
   public static <E> Iterator<E> drop(Iterator<E> it, int n) {
-    return new Iterator<E>() {
+    return closeable(new Iterator<E>() {
 
       long _n = n;
 
@@ -587,7 +587,7 @@ public interface Iter {
         }
         return it.next();
       }
-    };
+    }, it);
   }
 
   public static <E> Function<Iterator<E>, Iterator<E>> take(int n) {
@@ -595,7 +595,7 @@ public interface Iter {
   }
 
   public static <E> Iterator<E> take(Iterator<E> it, int n) {
-    return new Iterator<E>() {
+    return closeable(new Iterator<E>() {
       long _n = n;
 
       @Override
@@ -611,7 +611,7 @@ public interface Iter {
         _n--;
         return it.next();
       }
-    };
+    }, it);
   }
 
   @SuppressWarnings({"unchecked", "rawtypes"})
@@ -747,6 +747,7 @@ public interface Iter {
       }
 
 
+      @Override
       public E next() {
         initialize();
         if (_closed) {
@@ -769,6 +770,7 @@ public interface Iter {
       }
 
 
+      @Override
       public void close() {
         if (_closed) return;
         _closed = true;
@@ -841,7 +843,7 @@ public interface Iter {
   }
 
   public static <E> Iterator<Entry<E, E>> partitionPair(Iterator<E> it) {
-    return new Iterator<Entry<E, E>>() {
+    return closeable(new Iterator<Entry<E, E>>() {
       E _v0;
       State _state = State.NOT_SET;
 
@@ -873,6 +875,33 @@ public interface Iter {
           return pair;
         }
         throw new Ex.NoSuchElement();
+      }
+    }, it);
+  }
+
+  private static <E> Iterator<E> closeable(Iterator<E> iterator, Iterator<?>... sources) {
+    return new CloseableIterator<E>() {
+      private boolean closed;
+
+      @Override
+      public boolean hasNext() {
+        if (closed) return false;
+        boolean available = iterator.hasNext();
+        if (!available) close();
+        return available;
+      }
+
+
+      public E next() {
+        if (!hasNext()) throw new Ex.NoSuchElement();
+        return iterator.next();
+      }
+
+
+      public void close() {
+        if (closed) return;
+        closed = true;
+        for (Iterator<?> source : sources) Iter.close(source);
       }
     };
   }
