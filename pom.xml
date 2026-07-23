@@ -246,6 +246,35 @@
 					</execution>
 				</executions>
 			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-javadoc-plugin</artifactId>
+				<version>3.10.1</version>
+				<configuration>
+					<release>21</release>
+					<doclint>none</doclint>
+				</configuration>
+				<executions>
+					<execution>
+						<id>generate-javadocs-on-build</id>
+						<phase>prepare-package</phase>
+						<goals><goal>javadoc</goal></goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-antrun-plugin</artifactId>
+				<version>3.1.0</version>
+				<executions>
+					<execution>
+						<id>theme-generated-javadocs</id>
+						<phase>prepare-package</phase>
+						<configuration><target><concat destfile="/reports/apidocs/stylesheet.css" append="true"><fileset dir="/docs" includes="javadoc-theme.css"/></concat></target></configuration>
+						<goals><goal>run</goal></goals>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>
 	<profiles>
