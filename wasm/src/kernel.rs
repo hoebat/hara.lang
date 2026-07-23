@@ -1,5 +1,7 @@
 #[path = "kernel/form.rs"]
 pub mod form;
+#[path = "kernel/generated.rs"]
+pub mod generated;
 #[path = "kernel/namespace.rs"]
 pub mod namespace;
 #[path = "kernel/parser.rs"]
@@ -10,6 +12,7 @@ pub mod reader;
 pub mod var;
 
 pub use form::Form;
+pub use generated::GeneratedNamespaceConfig;
 pub use namespace::Namespace;
 pub use parser::{parse, parse_forms, read_forms, ParseError, Parser, Span, SpannedForm};
 pub use reader::{Position, Reader};

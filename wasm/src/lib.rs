@@ -3,6 +3,7 @@ mod core;
 pub mod kernel;
 pub mod lang;
 pub mod task;
+use crate::kernel::Form;
 use std::collections::{HashMap, HashSet};
 use wasm_bindgen::prelude::*;
 
@@ -66,6 +67,7 @@ pub struct Runtime {
     namespaces: HashMap<String, HashMap<String, core::Value>>,
     current_namespace: String,
     namespace_aliases: HashMap<String, String>,
+    generated_configs: HashMap<String, kernel::GeneratedNamespaceConfig>,
 }
 
 #[wasm_bindgen]
@@ -82,15 +84,45 @@ impl Runtime {
             namespaces: HashMap::new(),
             current_namespace: "user".into(),
             namespace_aliases: HashMap::new(),
+            generated_configs: HashMap::from([(
+                "user".into(),
+                kernel::GeneratedNamespaceConfig::defaults(),
+            )]),
         }
     }
 
     fn eval_text(&mut self, source: &str) -> Result<String, String> {
         self.refresh_qualified_bindings();
-        let result =
-            core::with_protocols(&self.protocols, || core::eval_text(source, &mut self.env));
+        let forms = kernel::parse_forms(source)?;
+        let mut result = core::Value::Nil;
+        for form in forms {
+            if let Form::List(values) = &form {
+                if matches!(values.first(), Some(Form::Symbol(name)) if name == "ns") {
+                    let name = match values.get(1) {
+                        Some(Form::Symbol(name)) if !name.contains('/') => name.clone(),
+                        _ => return Err("ns expects an unqualified namespace symbol".into()),
+                    };
+                    let config = kernel::GeneratedNamespaceConfig::configure(&values[2..])?;
+                    self.use_namespace(&name);
+                    self.generated_configs.insert(name, config);
+                    result = core::Value::Nil;
+                    continue;
+                }
+            }
+            let config = self
+                .generated_configs
+                .get(&self.current_namespace)
+                .cloned()
+                .unwrap_or_else(kernel::GeneratedNamespaceConfig::defaults);
+            let resolved = config.rewrite(form);
+            result =
+                core::with_protocols(&self.protocols, || core::eval(&resolved, &mut self.env))?;
+            if matches!(result, core::Value::Recur(_)) {
+                return Err("recur must be inside loop".into());
+            }
+        }
         self.refresh_qualified_bindings();
-        result
+        Ok(result.display())
     }
 
     fn refresh_qualified_bindings(&mut self) {
@@ -647,6 +679,49 @@ mod tests {
         assert_eq!(runtime.eval_text("(answer)").unwrap(), "42");
         runtime.use_namespace("math");
         assert_eq!(runtime.eval_text("(answer)").unwrap(), "7");
+    }
+
+    #[test]
+    fn generated_namespaces_configure_aliases_refers_and_intrinsics_without_sources() {
+        let mut runtime = Runtime::new();
+        assert_eq!(
+            runtime.eval_text("(str/trim \"  hara  \")").unwrap(),
+            "\"hara\""
+        );
+        assert_eq!(
+            runtime
+                .eval_text(
+                    "(ns app (:intrinsics {:exclude [bytes] :aliases {string text}})                       (:require [hara.lib.string :as s :refer [trim]]))                       (trim (s/trim (text/to-upper \" x \")))"
+                )
+                .unwrap(),
+            "\"X\""
+        );
+        assert!(runtime
+            .eval_text("(bytes/count (bytes 1))")
+            .unwrap_err()
+            .contains("bytes/count"));
+        assert_eq!(
+            runtime
+                .eval_text("(ns core-user (:require [hara.lib.core :as core])) (core/bit-not 0)")
+                .unwrap(),
+            "-1"
+        );
+    }
+
+    #[test]
+    fn generated_namespace_require_never_falls_back_to_registered_source() {
+        let mut runtime = Runtime::new();
+        runtime.register_resource("hara.lib.string", "(def poisoned 42)");
+        assert_eq!(
+            runtime
+                .eval_text("(ns app (:require [hara.lib.string :as text])) (text/trim \" x \")")
+                .unwrap(),
+            "\"x\""
+        );
+        assert!(runtime
+            .eval_text("poisoned")
+            .unwrap_err()
+            .contains("unbound symbol"));
     }
 
     #[test]
