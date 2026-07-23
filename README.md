@@ -70,6 +70,8 @@ Automatic extensions are documented in
 ordinary `:require`; its manifest selects a pod or WASM provider, and the runtime generates
 the requested namespace without exposing provider-specific loading forms.
 
+The detailed provider contract and lifecycle diagrams are in [`spec/hara/extensions-contract.md`](spec/hara/extensions-contract.md). REPL history, completion, documentation, and slash-command semantics are specified in [`spec/hara/repl.md`](spec/hara/repl.md).
+
 The collection model is iterator-first and does not require `ISeq`, transducers, `transduce`, or `eduction`. Host interop is disabled unless the embedding context grants it. The Native Image workflow runs the verified fallback-runtime profile; optimized Truffle host compilation remains a separate runtime-quality task because the current generic host paths violate GraalVM’s blocklist checks.
 
 The normative L0 contract is maintained in [`spec/hara/l0-language.md`](spec/hara/l0-language.md), with executable examples in [`spec/hara/l0-conformance.edn`](spec/hara/l0-conformance.edn).
