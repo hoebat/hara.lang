@@ -2,7 +2,9 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 
-use crate::lang::protocol::{IDisplay, ILookup, IMetadata, INamespaced, IObjType, ObjType};
+use crate::lang::protocol::{
+    HashType, IDisplay, IHash, ILookup, IMetadata, INamespaced, IObjType, ObjType,
+};
 
 thread_local! {
     static INTERNED: RefCell<HashMap<String, Weak<Data>>> = RefCell::new(HashMap::new());
@@ -110,6 +112,15 @@ impl IObjType for Keyword {
         ObjType::Keyword
     }
 }
+impl IHash for Keyword {
+    fn hash_calc(&self, _hash_type: HashType) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut state = std::collections::hash_map::DefaultHasher::new();
+        self.hash_seed().hash(&mut state);
+        self.0.full.hash(&mut state);
+        state.finish()
+    }
+}
 impl PartialEq for Keyword {
     fn eq(&self, other: &Self) -> bool {
         self.0.full == other.0.full
@@ -153,7 +164,9 @@ mod tests {
     use super::Keyword;
     use crate::lang::data::Map;
     use crate::lang::protocol::IAssoc;
-    use crate::lang::protocol::{IDisplay, IMetadata, INamespaced, IObjType, ObjType};
+    use crate::lang::protocol::{
+        HashType, IDisplay, IHash, IMetadata, INamespaced, IObjType, ObjType,
+    };
 
     #[test]
     fn matches_java_validation_namespace_and_interning() {

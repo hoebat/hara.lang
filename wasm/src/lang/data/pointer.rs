@@ -1,5 +1,5 @@
 use crate::lang::data::Symbol;
-use crate::lang::protocol::{IDisplay, IMetadata, INamespaced, IObjType, ObjType};
+use crate::lang::protocol::{HashType, IDisplay, IHash, IMetadata, INamespaced, IObjType, ObjType};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
@@ -43,9 +43,18 @@ impl IObjType for Pointer {
         ObjType::Pointer
     }
 }
+impl IHash for Pointer {
+    fn hash_calc(&self, _hash_type: HashType) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut state = std::collections::hash_map::DefaultHasher::new();
+        self.hash_seed().hash(&mut state);
+        self.0.as_str().hash(&mut state);
+        state.finish()
+    }
+}
 impl Hash for Pointer {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.hash(state)
+        Hash::hash(&self.0, state)
     }
 }
 impl fmt::Display for Pointer {
