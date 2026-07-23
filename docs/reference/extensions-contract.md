@@ -1,7 +1,7 @@
 # Hara extension contract
 
-This document describes the provider boundary behind ordinary `:require` forms. A Hara program
-does not construct pod messages or call a WASM engine directly.
+This document describes the WASM provider boundary behind ordinary `:require` forms. A Hara
+program does not construct transport messages or call a WASM engine directly.
 
 ## Discovery
 
@@ -165,8 +165,9 @@ manifest requests capability
 ```
 
 The runtime preserves distinct errors for missing or malformed manifests, unsupported providers,
-denied capabilities, crashes, timeouts, cancellation, and remote failures. The same Hara
-namespace can therefore be backed by a pod or WASM provider without changing the call site.
+denied capabilities, crashes, timeouts, cancellation, and remote failures. The Hara namespace is
+backed by a capability-checked WASM provider without exposing the engine or HTA mailbox at the
+call site.
 
 ## Packaged Noir proof provider
 

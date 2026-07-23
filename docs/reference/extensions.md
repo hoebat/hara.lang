@@ -1,7 +1,7 @@
 # Hara extensions
 
-Hara extensions are loaded through ordinary namespace clauses. The program does not need to know
-whether an extension is implemented by a subprocess pod, a WASM module, or another host provider.
+Hara extensions are loaded through ordinary namespace clauses. Runtime extensions are packaged
+as WASM modules; the program does not construct an engine or transport directly.
 
 ```clojure
 (ns app
