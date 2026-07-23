@@ -82,13 +82,29 @@ impl<'a> Parser<'a> {
             }
         }
     }
-    fn token(&mut self, first: char) -> String {
+    fn symbol_token(&mut self, first: char) -> String {
         let mut token = String::from(first);
-        token.push_str(
-            &self
-                .reader
-                .read_while(|ch| !ch.is_whitespace() && ch != ',' && !"()[]{}\";".contains(ch)),
-        );
+        token.push_str(&self.reader.read_while(|ch| {
+            !ch.is_whitespace()
+                && ch as u32 != 44
+                && !matches!(
+                    ch as u32,
+                    34 | 59 | 94 | 40 | 41 | 91 | 93 | 123 | 125 | 92 | 64 | 96 | 126
+                )
+        }));
+        token
+    }
+
+    fn number_token(&mut self, first: char) -> String {
+        let mut token = String::from(first);
+        token.push_str(&self.reader.read_while(|ch| {
+            !ch.is_whitespace()
+                && ch as u32 != 44
+                && !matches!(
+                    ch as u32,
+                    34 | 59 | 94 | 40 | 41 | 91 | 93 | 123 | 125 | 92 | 35 | 39 | 64 | 96 | 126
+                )
+        }));
         token
     }
     fn string(&mut self) -> Result<String> {
@@ -365,7 +381,7 @@ impl<'a> Parser<'a> {
                 if !ch.is_alphabetic() {
                     return self.error(format!("No dispatch macro for: {ch}"));
                 }
-                let tag = self.token(ch);
+                let tag = self.symbol_token(ch);
                 if tag.is_empty() {
                     return self.error(format!("No dispatch macro for: {ch}"));
                 }
@@ -559,7 +575,17 @@ impl<'a> Parser<'a> {
             }
             '#' => self.dispatch()?,
             other => {
-                let token = self.token(other);
+                let numeric = other.is_ascii_digit()
+                    || ((other == '+' || other == '-')
+                        && self
+                            .reader
+                            .peek_char()
+                            .is_some_and(|ch| ch.is_ascii_digit()));
+                let token = if numeric {
+                    self.number_token(other)
+                } else {
+                    self.symbol_token(other)
+                };
                 Some((self.atom(token)?, Vec::new()))
             }
         };

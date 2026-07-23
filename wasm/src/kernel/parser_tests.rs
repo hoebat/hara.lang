@@ -273,3 +273,52 @@ fn ports_java_reference_dispatch_forms() {
         .unwrap_err()
         .contains("expects a list"));
 }
+
+#[test]
+fn matches_java_symbol_and_number_macro_termination() {
+    assert_eq!(
+        parse_forms("1#_2 3").unwrap(),
+        vec![Form::Number(1), Form::Number(3)]
+    );
+    assert_eq!(
+        parse_forms("1\u{27}foo").unwrap(),
+        vec![
+            Form::Number(1),
+            Form::List(vec![
+                Form::Symbol("quote".into()),
+                Form::Symbol("foo".into())
+            ])
+        ]
+    );
+    assert_eq!(
+        parse_forms("foo\u{27}bar").unwrap(),
+        vec![Form::Symbol("foo\u{27}bar".into())]
+    );
+    assert_eq!(
+        parse_forms("foo#bar 1").unwrap(),
+        vec![Form::Symbol("foo#bar".into()), Form::Number(1)]
+    );
+    assert_eq!(
+        parse_forms("foo@bar").unwrap(),
+        vec![
+            Form::Symbol("foo".into()),
+            Form::List(vec![
+                Form::Symbol("deref".into()),
+                Form::Symbol("bar".into())
+            ])
+        ]
+    );
+    assert_eq!(
+        parse_forms("foo^:tag [1]").unwrap(),
+        vec![
+            Form::Symbol("foo".into()),
+            Form::Metadata(
+                Box::new(Form::Map(vec![(
+                    Form::Keyword("tag".into()),
+                    Form::Bool(true)
+                )])),
+                Box::new(Form::Vector(vec![Form::Number(1)]))
+            )
+        ]
+    );
+}
