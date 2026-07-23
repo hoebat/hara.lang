@@ -3,8 +3,8 @@ use std::cmp::Ordering;
 use std::rc::Rc;
 
 use crate::lang::protocol::{
-    IAssoc, ICount, IDissoc, IEmpty, IFind, IIndexedKV, ILookup, IMutable, INth, IPersistent,
-    IToMutable, IToPersistent,
+    IAssoc, ICount, IDissoc, IEmpty, IFind, IIndexedKV, ILookup, IMetadata, IMutable, INth,
+    IPersistent, IToMutable, IToPersistent,
 };
 
 type Link<K, V> = Option<Rc<Node<K, V>>>;
@@ -168,11 +168,15 @@ fn dissoc<K: Clone + Ord, V: Clone>(root: &Link<K, V>, key: &K) -> Link<K, V> {
 
 #[derive(Debug, Clone)]
 pub struct Standard<K, V> {
+    metadata: Option<Rc<str>>,
     root: Link<K, V>,
 }
 impl<K, V> Default for Standard<K, V> {
     fn default() -> Self {
-        Self { root: None }
+        Self {
+            metadata: None,
+            root: None,
+        }
     }
 }
 impl<K: Clone + Ord, V: Clone> Standard<K, V> {
@@ -201,11 +205,13 @@ impl<K: Clone + Ord, V: Clone> Standard<K, V> {
     }
     pub fn assoc_value(&self, key: K, value: V) -> Self {
         Self {
+            metadata: self.metadata.clone(),
             root: assoc(&self.root, key, value),
         }
     }
     pub fn dissoc_value(&self, key: &K) -> Self {
         Self {
+            metadata: self.metadata.clone(),
             root: dissoc(&self.root, key),
         }
     }
@@ -260,10 +266,14 @@ impl<K: Clone + Ord, V: Clone> Standard<K, V> {
         self.iter()
             .filter(|(key, _)| *key >= min && *key <= max)
             .map(|(k, v)| (k.clone(), v.clone()))
-            .collect()
+            .collect::<Self>()
+            .with_meta(self.metadata.clone())
     }
     pub fn map_values<U: Clone>(&self, f: impl Fn(&K, &V) -> U) -> Standard<K, U> {
-        self.iter().map(|(k, v)| (k.clone(), f(k, v))).collect()
+        self.iter()
+            .map(|(k, v)| (k.clone(), f(k, v)))
+            .collect::<Standard<K, U>>()
+            .with_meta(self.metadata.clone())
     }
 }
 impl<K: Clone + Ord, V: Clone> FromIterator<(K, V)> for Standard<K, V> {
@@ -324,7 +334,19 @@ impl<K: Clone + Ord, V: Clone + PartialEq> IIndexedKV<K, V> for Standard<K, V> {
 }
 impl<K: Clone + Ord, V: Clone> IEmpty for Standard<K, V> {
     fn empty(&self) -> Self {
-        Self::new()
+        Self::new().with_meta(self.metadata.clone())
+    }
+}
+impl<K: Clone + Ord, V: Clone> IMetadata for Standard<K, V> {
+    type Metadata = Rc<str>;
+    fn meta(&self) -> Option<&Self::Metadata> {
+        self.metadata.as_ref()
+    }
+    fn with_meta(&self, metadata: Option<Self::Metadata>) -> Self {
+        Self {
+            metadata,
+            ..self.clone()
+        }
     }
 }
 impl<K: Clone + Ord, V: Clone> IPersistent for Standard<K, V> {}
@@ -399,6 +421,35 @@ impl<K: Clone + Ord, V: Clone> IToPersistent for Mutable<K, V> {
 #[cfg(test)]
 mod tests {
     use super::Standard;
+    #[test]
+    fn tree_updates_slices_maps_empty_and_mutable_preserve_metadata() {
+        use crate::lang::protocol::{IEmpty, IMetadata, IToMutable, IToPersistent};
+        use std::rc::Rc;
+        let map = [(1, 10), (2, 20), (3, 30)]
+            .into_iter()
+            .collect::<Standard<_, _>>()
+            .with_meta(Some(Rc::from("doc")));
+        assert_eq!(
+            map.assoc_value(4, 40).meta().map(|m| m.as_ref()),
+            Some("doc")
+        );
+        assert_eq!(map.dissoc_value(&1).meta().map(|m| m.as_ref()), Some("doc"));
+        assert_eq!(map.slice(&1, &2).meta().map(|m| m.as_ref()), Some("doc"));
+        assert_eq!(
+            map.map_values(|_, value| value + 1)
+                .meta()
+                .map(|m| m.as_ref()),
+            Some("doc")
+        );
+        assert_eq!(map.empty().meta().map(|m| m.as_ref()), Some("doc"));
+        let mut mutable = map.to_mutable();
+        mutable.assoc(4, 40);
+        assert_eq!(
+            mutable.to_persistent().meta().map(|m| m.as_ref()),
+            Some("doc")
+        );
+    }
+
     #[test]
     fn stays_sorted_indexed_and_persistent() {
         let a = [(5, "e"), (1, "a"), (3, "c"), (2, "b"), (4, "d")]
