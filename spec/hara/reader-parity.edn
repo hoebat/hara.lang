@@ -89,6 +89,7 @@
   {:id :mismatched-vector :source "[1)" :error "Unmatched delimiter"}
   {:id :unreadable-form :source "#<opaque>" :error "Unreadable form"}
   {:id :unknown-symbolic :source "##Missing" :error "Unknown symbolic value"}
+  {:id :unsupported-queue-dispatch :source "#[1 2]" :error "No dispatch macro for: ["}
   {:id :invalid-symbolic :source "##[1]" :error "Invalid"}
   {:id :invalid-hex :source "0xGG" :error "Invalid number"}
   {:id :invalid-radix-low :source "1r1" :error "Radix out of range" :rust-error "Invalid number"}

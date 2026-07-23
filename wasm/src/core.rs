@@ -385,8 +385,24 @@ impl IteratorState {
     }
 }
 
+#[inline(never)]
+fn sequential_equality(left: &Value, right: &Value) -> Option<bool> {
+    fn items(value: &Value) -> Option<Vec<&Value>> {
+        match value {
+            Value::List(values) => Some(values.iter().collect()),
+            Value::Tuple(values) => Some(values.iter().collect()),
+            Value::Vector(values) => Some(values.iter().collect()),
+            _ => None,
+        }
+    }
+    Some(items(left)? == items(right)?)
+}
+
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
+        if let Some(equal) = sequential_equality(self, other) {
+            return equal;
+        }
         match (self, other) {
             (Value::Number(a), Value::Number(b)) => a == b,
             (Value::Float(a), Value::Float(b)) => a.to_bits() == b.to_bits(),
@@ -574,10 +590,9 @@ impl Value {
                 Value::Recur(_) => 9,
                 Value::Map(_) => 10,
                 Value::Set(_) => 11,
-                Value::List(_) => 12,
+                Value::List(_) | Value::Tuple(_) | Value::Vector(_) => 12,
                 Value::Symbol(_) => 13,
                 Value::Function(_) => 14,
-                Value::Vector(_) => 15,
                 Value::Iterator(_) => 16,
                 Value::Var(_) => 17,
                 Value::Namespace(_) => 27,
@@ -589,7 +604,6 @@ impl Value {
                 Value::Character(_) => 23,
                 Value::Regex(_) => 24,
                 Value::Tagged(_, _) => 25,
-                Value::Tuple(_) => 26,
             };
             type_tag.hash(state);
             match value {
@@ -3384,6 +3398,42 @@ fn attach_metadata(value: Value, metadata: Rc<Metadata>) -> Result<Value, String
     })
 }
 
+fn eval_sequential_constructor(
+    name: &str,
+    forms: &[Form],
+    env: &mut HashMap<String, Value>,
+) -> Result<Value, String> {
+    let maximum = match name {
+        "pair" => Some(2),
+        "tup" => Some(5),
+        _ => None,
+    };
+    if let Some(maximum) = maximum {
+        let valid = if name == "pair" {
+            forms.len() == maximum
+        } else {
+            forms.len() <= maximum
+        };
+        if !valid {
+            return Err(if name == "pair" {
+                format!("pair expects two arguments, got {}", forms.len())
+            } else {
+                format!("tup expects at most 5 arguments, got {}", forms.len())
+            });
+        }
+    }
+    let values = forms
+        .iter()
+        .map(|form| eval(form, env))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(match name {
+        "list" => Value::List(values.into()),
+        "vector" => Value::Vector(values.into()),
+        "pair" | "tup" => Value::Tuple(Box::new(PTuple::from_values(values)?)),
+        _ => unreachable!("guarded sequential constructor"),
+    })
+}
+
 fn vector_literal(values: Vec<Value>) -> Result<Value, String> {
     if values.len() <= 5 {
         Ok(Value::Tuple(Box::new(PTuple::from_values(values)?)))
@@ -4263,6 +4313,9 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     }
                     _ => unreachable!(),
                 }
+            }
+            Form::Symbol(n) if ["list", "vector", "pair", "tup"].contains(&n.as_str()) => {
+                eval_sequential_constructor(n, &fs[1..], env)
             }
             Form::Symbol(n) if n == "set" => Ok(Value::Set(
                 unique_values(

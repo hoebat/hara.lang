@@ -113,14 +113,9 @@ fn preserves_metadata_and_rejects_unknown_dispatch_forms() {
             Box::new(Form::Vector(vec![Form::Number(1)]))
         )]
     );
-    assert_eq!(
-        parse_forms("#[1 2]").unwrap(),
-        vec![Form::List(vec![
-            Form::Symbol("do".into()),
-            Form::Number(1),
-            Form::Number(2)
-        ])]
-    );
+    assert!(parse_forms("#[1 2]")
+        .unwrap_err()
+        .contains("No dispatch macro for: ["));
 }
 #[test]
 fn matches_extended_canonical_reader_categories() {

@@ -304,12 +304,7 @@ impl<'a> Parser<'a> {
                 };
                 Ok(Some((form, vec![value])))
             }
-            Some('[') => {
-                let children = self.delimited(']', "root")?;
-                let mut forms = vec![Form::Symbol("do".into())];
-                forms.extend(children.iter().map(|child| child.form.clone()));
-                Ok(Some((Form::List(forms), children)))
-            }
+
             Some(ch) => {
                 if !ch.is_alphabetic() {
                     return self.error(format!("No dispatch macro for: {ch}"));

@@ -154,6 +154,7 @@
   {:id :loops/nested-013 :group :loops :origin :curated :source "(loop [x 0 acc 0] (if (< x 14) (recur (+ x 1) (+ acc 14)) acc))" :expect {:value 196 :type :integer}}
   {:id :loops/nested-014 :group :loops :origin :curated :source "(loop [x 0 acc 0] (if (< x 15) (recur (+ x 1) (+ acc 15)) acc))" :expect {:value 225 :type :integer}}
   {:id :loops/nested-015 :group :loops :origin :curated :source "(loop [x 0 acc 0] (if (< x 16) (recur (+ x 1) (+ acc 16)) acc))" :expect {:value 256 :type :integer}}
+  {:id :collections/sequential-equality-000 :group :collections :origin :curated :source "(if (= [1 2] '(1 2)) 1 0)" :expect {:value 1 :type :integer}}
   {:id :collections/count-000 :group :collections :origin :curated :source "(count [0])" :expect {:value 1 :type :integer}}
   {:id :collections/count-001 :group :collections :origin :curated :source "(count [0 1])" :expect {:value 2 :type :integer}}
   {:id :collections/count-002 :group :collections :origin :curated :source "(count [0 1 2])" :expect {:value 3 :type :integer}}
@@ -177,7 +178,6 @@
   {:id :collections/count-020 :group :collections :origin :curated :source "(count [])" :expect {:value 0 :type :integer}}
   {:id :collections/count-021 :group :collections :origin :curated :source "(count [0])" :expect {:value 1 :type :integer}}
   {:id :collections/count-022 :group :collections :origin :curated :source "(count [0 1])" :expect {:value 2 :type :integer}}
-  {:id :collections/count-023 :group :collections :origin :curated :source "(count [0 1 2])" :expect {:value 3 :type :integer}}
   {:id :collections/nth-000 :group :collections :origin :curated :source "(nth [0 42 1] 1)" :expect {:value 42 :type :integer}}
   {:id :collections/nth-001 :group :collections :origin :curated :source "(nth [1 42 2] 1)" :expect {:value 42 :type :integer}}
   {:id :collections/nth-002 :group :collections :origin :curated :source "(nth [2 42 3] 1)" :expect {:value 42 :type :integer}}

@@ -38,7 +38,8 @@ for i, n in enumerate(range(1, 17)):
     add_value(f"loops/recur-{i:03d}", "loops", f"(loop [x 0 acc 0] (if (< x {n}) (recur (+ x 1) (+ acc x)) acc))", n * (n - 1) // 2)
 for i, n in enumerate(range(1, 17)):
     add_value(f"loops/nested-{i:03d}", "loops", f"(loop [x 0 acc 0] (if (< x {n}) (recur (+ x 1) (+ acc {n})) acc))", n * n)
-for i, n in enumerate(range(1, 25)):
+add_value("collections/sequential-equality-000", "collections", "(if (= [1 2] '(1 2)) 1 0)", 1)
+for i, n in enumerate(range(1, 24)):
     add_value(f"collections/count-{i:03d}", "collections", f"(count [{ ' '.join(str(j) for j in range(n % 7)) }])", n % 7)
 for i, n in enumerate(range(0, 20)):
     add_value(f"collections/nth-{i:03d}", "collections", f"(nth [{n} 42 {n + 1}] 1)", 42)

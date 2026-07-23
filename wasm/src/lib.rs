@@ -857,14 +857,17 @@ mod tests {
     }
 
     #[test]
-    fn fn_star_and_eval_forms_execute_while_hash_eval_is_rejected() {
+    fn fn_star_and_eval_forms_execute_while_hash_dispatch_extensions_are_rejected() {
         let mut runtime = Runtime::new();
         assert_eq!(runtime.eval_text("((fn* [x] (+ x 1)) 4)").unwrap(), "5");
         assert!(runtime
             .eval_text("#=(+ 2 3)")
             .unwrap_err()
             .contains("No dispatch macro for: ="));
-        assert_eq!(runtime.eval_text("#[(def x 4) (+ x 2)]").unwrap(), "6");
+        assert!(runtime
+            .eval_text("#[(def x 4) (+ x 2)]")
+            .unwrap_err()
+            .contains("No dispatch macro for: ["));
         assert!(runtime
             .eval_text("(eval)")
             .unwrap_err()
@@ -966,6 +969,43 @@ mod tests {
         );
         assert_eq!(map_a.stable_hash(), map_b.stable_hash());
         assert_eq!(set_a.stable_hash(), set_b.stable_hash());
+    }
+
+    #[test]
+    fn sequential_representations_share_java_equality_and_hash_semantics() {
+        let values = vec![core::Value::Number(1), core::Value::Number(2)];
+        let list = core::Value::List(values.clone().into());
+        let tuple = core::Value::Tuple(Box::new(
+            crate::lang::data::Tuple::from_values(values.clone()).unwrap(),
+        ));
+        let vector = core::Value::Vector(values.into());
+
+        assert_eq!(list, tuple);
+        assert_eq!(tuple, vector);
+        assert_eq!(list.stable_hash(), tuple.stable_hash());
+        assert_eq!(tuple.stable_hash(), vector.stable_hash());
+
+        let mut runtime = Runtime::new();
+        assert_eq!(runtime.eval_text("(= [1 2] '(1 2))").unwrap(), "true");
+        assert_eq!(runtime.eval_text("(= [1 2] (list 1 2))").unwrap(), "true");
+        assert_eq!(runtime.eval_text("(conj (list 2) 1)").unwrap(), "(1 2)");
+        assert_eq!(runtime.eval_text("(pair 1 2)").unwrap(), "[1 2]");
+        assert_eq!(runtime.eval_text("(key (pair 1 2))").unwrap(), "1");
+        assert_eq!(runtime.eval_text("(val (pair 1 2))").unwrap(), "2");
+        assert_eq!(runtime.eval_text("(tup 1 2 3 4 5)").unwrap(), "[1 2 3 4 5]");
+        assert!(runtime
+            .eval_text("(tup 1 2 3 4 5 6)")
+            .unwrap_err()
+            .contains("at most 5"));
+        assert_eq!(runtime.eval_text("(= [1 2] [1 2 3])").unwrap(), "false");
+        assert_eq!(
+            runtime.eval_text("(get {[1 2] :found} '(1 2))").unwrap(),
+            ":found"
+        );
+        assert_eq!(
+            runtime.eval_text("(get #{[1 2]} '(1 2) :missing)").unwrap(),
+            "[1 2]"
+        );
     }
 
     #[test]
