@@ -1217,7 +1217,7 @@ public final class HaraContext {
       if (values.length < 1) throw new HaraException("just expects a value");
       return HaraMatcher.just(values[0], matcherOption(values, "in-any-order"), matcherOption(values, "gaps-ok"));
     }));
-    tests.define("just-in", new UnaryBuiltin("code.test/just-in", HaraMatcher::just));
+    tests.define("just-in", new UnaryBuiltin("code.test/just-in", HaraMatcher::justIn));
     tests.define("exactly", new VariadicBuiltin("code.test/exactly", values -> {
       if (values.length < 1 || values.length > 2) throw new HaraException("exactly expects a value and optional projection");
       return HaraMatcher.exactly(values[0]);

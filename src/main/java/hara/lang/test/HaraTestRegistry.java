@@ -62,6 +62,7 @@ public final class HaraTestRegistry {
   public synchronized void clearNamespace(String namespace) {
     tests.removeIf(test -> namespace.equals(test.namespace()));
     fixtures.removeIf(fixture -> namespace.equals(fixture.namespace()));
+    factFlags.remove(namespace);
   }
 
   public synchronized HaraTestCase find(String namespace, String name) {
@@ -72,6 +73,10 @@ public final class HaraTestRegistry {
   }
 
   public synchronized boolean remove(String namespace, String name) {
+    factFlags.computeIfPresent(namespace, (ignored, values) -> {
+      values.remove(name);
+      return values;
+    });
     return tests.removeIf(test -> namespace.equals(test.namespace()) && name.equals(test.name()));
   }
 

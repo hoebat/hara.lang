@@ -56,6 +56,10 @@ public class HaraTestIntegrationTest {
       assertTrue(context.eval(HaraLanguage.ID, "(code.test/assert! 2 (code.test/is-not 3))").asBoolean());
       assertTrue(context.eval(HaraLanguage.ID, "(code.test/succeeded? (code.test/verify (code.test/exactly 2) 2))").asBoolean());
       assertTrue(context.eval(HaraLanguage.ID, "(code.test/checker? (code.test/just [1]))").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID,
+          "(code.test/assert! {:a {:b 2}} (code.test/just-in {:a {:b 2}}))").asBoolean());
+      assertTrue(!context.eval(HaraLanguage.ID,
+          "(get (code.test/verify (code.test/just-in {:a {:b 2}}) {:a {:b 2 :c 3}}) :data)").asBoolean());
     }
   }
 
@@ -116,6 +120,21 @@ public class HaraTestIntegrationTest {
       assertEquals(42, context.eval(HaraLanguage.ID, "(code.test/get-global :answer)").asInt());
       assertTrue(context.eval(HaraLanguage.ID, "(code.test/remove-fact \"registry-entry\")").asBoolean());
       assertTrue(context.eval(HaraLanguage.ID, "(code.test/get-fact \"registry-entry\")").isNull());
+    }
+  }
+
+  @Test
+  public void supportsFactScopedSetupFlags() {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(require 'code.test)");
+      context.eval(HaraLanguage.ID, "(fact \"flagged\" 1 => 1)");
+      assertTrue(!context.eval(HaraLanguage.ID, "(code.test/get-flag \"flagged\" :setup)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(code.test/set-flag \"flagged\" :setup true)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(code.test/get-flag \"flagged\" :setup)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID,
+          "(code.test/set-flag \"user\" \"flagged\" :setup false)").asBoolean());
+      assertTrue(!context.eval(HaraLanguage.ID,
+          "(code.test/get-flag \"user\" \"flagged\" :setup)").asBoolean());
     }
   }
 
