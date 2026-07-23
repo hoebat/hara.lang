@@ -333,6 +333,7 @@ impl<K: Clone + Ord, V: Clone + PartialEq> IIndexedKV<K, V> for Standard<K, V> {
     }
 }
 impl<K: Clone + Ord, V: Clone> IEmpty for Standard<K, V> {
+    type Output = Self;
     fn empty(&self) -> Self {
         Self::new().with_meta(self.metadata.clone())
     }

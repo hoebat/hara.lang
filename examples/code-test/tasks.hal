@@ -1,9 +1,9 @@
-; std.task is Java-backed and remains callable from Hara.
-(require 'std.task)
+; std.lib.task is Java-backed and remains callable from Hara.
+(require 'std.lib.task)
 
 (deftask double-task
   {:template :default
    :doc "Doubles each input"
    :main {:fn (fn [value] (* 2 value))}})
 
-(std.task/invoke double-task [1 2 3])
+(std.lib.task/invoke double-task [1 2 3])

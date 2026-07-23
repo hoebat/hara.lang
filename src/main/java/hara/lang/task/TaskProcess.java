@@ -10,7 +10,7 @@ import java.util.regex.Pattern;
 import hara.lang.data.types.ILinearType;
 import hara.truffle.HaraFunction;
 
-/** Execution helpers corresponding to std.task.process. */
+/** Internal execution helpers used by the std.lib.task static facade. */
 public final class TaskProcess {
   private TaskProcess() {}
 

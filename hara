@@ -10,7 +10,7 @@ fi
 # Resolve the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
-# Run the hara.kernel.Main class using Maven
+# Run the canonical Hara Truffle launcher using Maven
 # -f points to the pom.xml in the script's directory
 # -q suppresses Maven output
-mvn -q -f "$SCRIPT_DIR/pom.xml" compile exec:java -Dexec.mainClass="hara.kernel.Main" -Dexec.args="$*"
+mvn -q -f "$SCRIPT_DIR/pom.xml" compile exec:java -Dexec.mainClass="hara.truffle.Main" -Dexec.args="$*"

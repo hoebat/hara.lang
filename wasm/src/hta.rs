@@ -223,26 +223,38 @@ mod tests {
     use super::*;
     #[test]
     fn canonical_round_trip() {
-        let value = Value::Map(vec![
-            (Value::Keyword("b".into()), Value::Number(2)),
-            (
-                Value::Keyword("a".into()),
-                Value::Vector(PVector::from(vec![Value::Bool(true), Value::Nil])),
-            ),
-        ].into_iter().collect());
+        let value = Value::Map(
+            vec![
+                (Value::Keyword("b".into()), Value::Number(2)),
+                (
+                    Value::Keyword("a".into()),
+                    Value::Vector(PVector::from(vec![Value::Bool(true), Value::Nil])),
+                ),
+            ]
+            .into_iter()
+            .collect(),
+        );
         let encoded = encode(&value).unwrap();
         assert_eq!(encode(&decode(&encoded).unwrap()).unwrap(), encoded);
     }
     #[test]
     fn canonical_maps_ignore_insertion_order() {
-        let a = Value::Map(vec![
-            (Value::String("b".into()), Value::Number(2)),
-            (Value::String("a".into()), Value::Number(1)),
-        ].into_iter().collect());
-        let b = Value::Map(vec![
-            (Value::String("a".into()), Value::Number(1)),
-            (Value::String("b".into()), Value::Number(2)),
-        ].into_iter().collect());
+        let a = Value::Map(
+            vec![
+                (Value::String("b".into()), Value::Number(2)),
+                (Value::String("a".into()), Value::Number(1)),
+            ]
+            .into_iter()
+            .collect(),
+        );
+        let b = Value::Map(
+            vec![
+                (Value::String("a".into()), Value::Number(1)),
+                (Value::String("b".into()), Value::Number(2)),
+            ]
+            .into_iter()
+            .collect(),
+        );
         assert_eq!(encode(&a).unwrap(), encode(&b).unwrap());
     }
     #[test]

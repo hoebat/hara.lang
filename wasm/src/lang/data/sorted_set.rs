@@ -90,6 +90,7 @@ impl<E: Clone + Ord> INth<E> for Standard<E> {
     }
 }
 impl<E: Clone + Ord> IEmpty for Standard<E> {
+    type Output = Self;
     fn empty(&self) -> Self {
         Self {
             lookup: self.lookup.empty(),

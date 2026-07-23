@@ -1,5 +1,5 @@
 ; A small code.test example.
-; Facts register test bodies; code.test/run! executes them and returns results.
+; Facts register test bodies; code.test/run executes them and returns results.
 (require 'code.test)
 
 (fact "adds numbers"
@@ -11,4 +11,4 @@
 (fact "checks map lookup"
   (get {:status :ready} :status) => :ready)
 
-(code.test/run!)
+(code.test/run)

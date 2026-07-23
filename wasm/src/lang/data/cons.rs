@@ -1,4 +1,4 @@
-use crate::lang::data::List;
+use crate::lang::data::{List, Tuple};
 use crate::lang::protocol::{
     ICons, ICount, IEmpty, IMetadata, INth, IPersistent, IPopFirst, IPushFirst,
 };
@@ -69,8 +69,9 @@ impl<E: Clone> IPopFirst for Cons<E> {
     }
 }
 impl<E: Clone> IEmpty for Cons<E> {
-    fn empty(&self) -> Self {
-        panic!("Cons empty is Tuple.Tup0 in the Java contract")
+    type Output = Tuple<E>;
+    fn empty(&self) -> Self::Output {
+        Tuple::Tup0
     }
 }
 impl<E: Clone> IMetadata for Cons<E> {

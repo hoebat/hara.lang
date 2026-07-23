@@ -20,11 +20,9 @@ final class HaraLibraryLoader {
   }
 
   void ensure(HaraContext context, String namespace) {
-    for (Map.Entry<String, HaraLibraryProvider> entry : providers.entrySet()) {
-      String provided = entry.getKey();
-      if (namespace.equals(provided) || namespace.startsWith(provided + ".")) {
-        if (installed.putIfAbsent(provided, Boolean.TRUE) == null) entry.getValue().install(context);
-      }
+    HaraLibraryProvider provider = providers.get(namespace);
+    if (provider != null && installed.putIfAbsent(namespace, Boolean.TRUE) == null) {
+      provider.install(context);
     }
   }
 }

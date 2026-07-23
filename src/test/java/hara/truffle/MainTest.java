@@ -71,7 +71,7 @@ public class MainTest {
     ByteArrayOutputStream error = new ByteArrayOutputStream();
     int status =
         Main.run(
-            new String[] {},
+            new String[] {"--port=0"},
             new ByteArrayInputStream(new byte[0]),
             new PrintStream(output, true, StandardCharsets.UTF_8),
             new PrintStream(error, true, StandardCharsets.UTF_8));
@@ -85,7 +85,7 @@ public class MainTest {
     ByteArrayOutputStream error = new ByteArrayOutputStream();
     int status =
         Main.run(
-            new String[] {"repl"},
+            new String[] {"--offline", "repl"},
             new ByteArrayInputStream(
                 "(inc 1)\n(map inc [1 2 3])\n".getBytes(StandardCharsets.UTF_8)),
             new PrintStream(output, true, StandardCharsets.UTF_8),
@@ -139,7 +139,7 @@ public class MainTest {
 
     int status =
         Main.run(
-            new String[] {"repl"},
+            new String[] {"--offline", "repl"},
             new ByteArrayInputStream(input),
             new PrintStream(output, true, StandardCharsets.UTF_8),
             new PrintStream(error, true, StandardCharsets.UTF_8));
@@ -158,7 +158,7 @@ public class MainTest {
 
     int status =
         Main.run(
-            new String[] {"repl"},
+            new String[] {"--offline", "repl"},
             new ByteArrayInputStream(input),
             new PrintStream(output, true, StandardCharsets.UTF_8),
             new PrintStream(error, true, StandardCharsets.UTF_8));
@@ -176,7 +176,7 @@ public class MainTest {
 
     int status =
         Main.run(
-            new String[] {"repl"},
+            new String[] {"--offline", "repl"},
             new ByteArrayInputStream(input),
             new PrintStream(output, true, StandardCharsets.UTF_8),
             new PrintStream(error, true, StandardCharsets.UTF_8));
@@ -187,4 +187,44 @@ public class MainTest {
     assertTrue(history.contains("2: missing"));
     assertEquals("Unbound symbol: missing\n", error.toString(StandardCharsets.UTF_8));
   }
+
+  @Test
+  public void helpUsesTheCanonicalHaraCommandName() {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    ByteArrayOutputStream error = new ByteArrayOutputStream();
+
+    int status =
+        Main.run(
+            new String[] {"help"},
+            new PrintStream(output, true, StandardCharsets.UTF_8),
+            new PrintStream(error, true, StandardCharsets.UTF_8));
+
+    assertEquals(0, status);
+    assertTrue(output.toString(StandardCharsets.UTF_8).contains("hara [OPTIONS]"));
+    assertTrue(!output.toString(StandardCharsets.UTF_8).contains("hara-truffle"));
+  }
+
+  @Test
+  public void parsesSeparateOptionValuesAndRejectsInvalidPorts() {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    ByteArrayOutputStream error = new ByteArrayOutputStream();
+    int valid =
+        Main.run(
+            new String[] {"--offline", "--host", "127.0.0.1", "--port", "0"},
+            new ByteArrayInputStream(new byte[0]),
+            new PrintStream(output, true, StandardCharsets.UTF_8),
+            new PrintStream(error, true, StandardCharsets.UTF_8));
+    assertEquals(error.toString(StandardCharsets.UTF_8), 0, valid);
+
+    error.reset();
+    int invalid =
+        Main.run(
+            new String[] {"--port", "70000"},
+            new ByteArrayInputStream(new byte[0]),
+            new PrintStream(output, true, StandardCharsets.UTF_8),
+            new PrintStream(error, true, StandardCharsets.UTF_8));
+    assertEquals(2, invalid);
+    assertTrue(error.toString(StandardCharsets.UTF_8).contains("between 0 and 65535"));
+  }
+
 }

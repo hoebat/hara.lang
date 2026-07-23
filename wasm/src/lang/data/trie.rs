@@ -173,6 +173,7 @@ impl<V: Clone + Default> IConj<String> for Standard<V> {
     }
 }
 impl<V: Clone> IEmpty for Standard<V> {
+    type Output = Self;
     fn empty(&self) -> Self {
         Self::new().with_meta(self.metadata.clone())
     }

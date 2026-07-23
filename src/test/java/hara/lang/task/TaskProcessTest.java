@@ -15,7 +15,7 @@ public class TaskProcessTest {
         "names",
         args -> args[0],
         null,
-        Map.of("item", Map.of("list", (TaskFunction) args -> List.of("code.test", "std.task"))));
+        Map.of("item", Map.of("list", (TaskFunction) args -> List.of("code.test", "std.lib.task"))));
     assertEquals(List.of("code.test"), TaskProcess.selectInputs(task, Map.of(), Map.of(), "code"));
   }
 
@@ -45,8 +45,8 @@ public class TaskProcessTest {
   @Test
   public void parsesNamespaceArgumentsFromTokenArray() {
     Map<String, Object> parsed = TaskProcess.processNamespaceArgs(
-        ":only", "std.task", ":bulk", ":limit", "3", ":dry-run");
-    assertEquals("std.task", ((hara.lang.data.Symbol) parsed.get("ns")).display());
+        ":only", "std.lib.task", ":bulk", ":limit", "3", ":dry-run");
+    assertEquals("std.lib.task", ((hara.lang.data.Symbol) parsed.get("ns")).display());
     assertEquals(Boolean.TRUE, parsed.get("bulk"));
     assertEquals(3L, parsed.get("limit"));
     assertEquals(Boolean.TRUE, parsed.get("dry-run"));

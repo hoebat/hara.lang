@@ -37,7 +37,7 @@ public final class HaraTestRunner extends Runner {
       for (String resource : resources) {
         context.eval(HaraLanguage.ID, "(require \"" + escape(resource) + "\")");
       }
-      Value results = context.eval(HaraLanguage.ID, "(code.test/run!)");
+      Value results = context.eval(HaraLanguage.ID, "(code.test/run)");
       List<TestEntry> discovered = discover();
       for (int i = 0; i < discovered.size(); i++) {
         TestEntry entry = discovered.get(i);

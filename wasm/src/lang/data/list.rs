@@ -225,6 +225,7 @@ impl<E: Clone> IConj<E> for Standard<E> {
     }
 }
 impl<E: Clone> IEmpty for Standard<E> {
+    type Output = Self;
     fn empty(&self) -> Self {
         Self::new().with_meta(self.metadata.clone())
     }

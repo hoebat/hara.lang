@@ -34,13 +34,13 @@ Requirements: JDK 21 and Maven.
 
 ```shell
 mvn -Ptruffle package
-java -jar target/hara-truffle.jar eval '(+ 19 23)'
-java -jar target/hara-truffle.jar
+./hara eval '(+ 19 23)'
+./hara
 ```
 
-The default Truffle command starts the RESP server on `127.0.0.1:1311`. Use
-`standalone` for a local single-kernel REPL, `headless` for a server without terminal UI, and
-`remote HOST:PORT` for a client connection. The CLI also supports `run <file>`, `stdin`, and `help`. For a native-image build, see the
+The `hara` command starts the JLine REPL in the shared `ROOT` session and exposes that same
+session through RESP on `127.0.0.1:1311`. Use `--offline` to start without the listener,
+`headless` for a listener without terminal UI, and `remote HOST:PORT` for a client connection. The CLI also supports `run <file>`, `stdin`, and `help`. For a native-image build, see the
 [developer guide](docs/development.md); native mode intentionally removes dynamic JVM services.
 
 ## Current runtime boundary

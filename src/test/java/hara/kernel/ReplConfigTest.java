@@ -13,12 +13,13 @@ public class ReplConfigTest {
     ReplConfig config = new ReplConfig(Path.of("history"), ReplConfig.DEFAULT_SPLASH, false);
 
     String banner = config.banner("JVM interpreter", "dev");
-    assertTrue(banner.contains("__  __"));
+    assertTrue(banner.contains(".-==========-."));
     assertTrue(banner.contains("JVM interpreter"));
     assertTrue(banner.contains("session dev"));
     assertTrue(banner.contains("/help"));
     assertFalse(banner.contains("\u001b["));
-    assertEquals("hara[user] › ", config.prompt("user"));
+    assertEquals("hara[user] ", config.prompt("user"));
+    assertEquals("[user] ", config.sessionPrompt("user"));
     assertEquals("       … ", config.continuationPrompt());
   }
 

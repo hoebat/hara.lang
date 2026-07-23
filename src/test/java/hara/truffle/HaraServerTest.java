@@ -21,7 +21,7 @@ public class HaraServerTest {
 
   @After
   public void tearDown() {
-    if (server != null) server.stop();
+    if (server != null) server.close();
   }
 
   @Test

@@ -9,5 +9,7 @@ public final class CodeTestLibraryProvider implements HaraLibraryProvider {
   public int order() { return 10; }
 
   @Override
-  public void install(HaraContext context) { context.installTestLibrary(); }
+  public void install(HaraContext context) {
+    HaraStaticLibrary.install(context, namespace(), CodeTest.class);
+  }
 }

@@ -7,11 +7,35 @@ import java.util.Objects;
 /** Visual and persistence settings shared by Hara's interactive REPLs. */
 public final class ReplConfig {
   public static final String DEFAULT_SPLASH =
-      "    __  __\n"
-          + "   / / / /___ __________ _\n"
-          + "  / /_/ / __ `/ ___/ __ `/\n"
-          + " / __  / /_/ / /  / /_/ /\n"
-          + "/_/ /_/\\__,_/_/   \\__,_/\n";
+      """
+                                      .-==========-.
+                                _.-'       __       '-._
+                           _.-'         .-'  '-.        '-._
+                       _.-'____________/  ◉  ◉  \\____________'-._
+                      /________________\\   /\\   /________________\\
+                      '-----------------\\  --  /-----------------'
+                                         '----'
+                                           ||
+                                        \\  ||  /
+                                         \\ || /
+                                      .   \\||/   .
+                                  .       /||\\       .
+                              .          / || \\          .
+                          .             /  ||  \\             .
+                      .                / ░░░░░░ \\                .
+                  .                   /░░▒▒▒▒▒▒░░\\                   .
+              .______________________/▒▒▓▓▓▓▓▓▓▓▒▒\\______________________.
+
+                 ██╗  ██╗ █████╗ ██████╗  █████╗
+                 ██║  ██║██╔══██╗██╔══██╗██╔══██╗
+                 ███████║███████║██████╔╝███████║
+                 ██╔══██║██╔══██║██╔══██╗██╔══██║
+                 ██║  ██║██║  ██║██║  ██║██║  ██║
+                 ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝▓
+                    ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
+                       ░░░░░░░░░░░░░░░░░░░░░░░░░
+      """;
+
 
   private final Path historyFile;
   private final String splash;
@@ -39,8 +63,58 @@ public final class ReplConfig {
     return splash;
   }
 
+  public String renderedSplash() {
+    String value = splash.stripTrailing();
+    if (!color || value.isBlank()) return value;
+    String[] lines = value.split("\\R", -1);
+    StringBuilder rendered = new StringBuilder();
+    int gradientStart = Math.min(6, lines.length - 1);
+    int gradientLength = Math.max(1, lines.length - gradientStart - 1);
+    for (int index = 0; index < lines.length; index++) {
+      if (index > 0) rendered.append('\n');
+      if (index < gradientStart) {
+        rendered.append(lines[index]);
+        continue;
+      }
+      double position = (index - gradientStart) / (double) gradientLength;
+      int red;
+      int green;
+      int blue;
+      if (position < 0.4) {
+        double phase = position / 0.4;
+        red = blend(190, 20, phase);
+        green = blend(235, 105, phase);
+        blue = 255;
+      } else {
+        double phase = (position - 0.4) / 0.6;
+        red = blend(20, 0, phase);
+        green = blend(105, 0, phase);
+        blue = blend(255, 0, phase);
+      }
+      rendered
+          .append("\u001b[38;2;")
+          .append(red)
+          .append(';')
+          .append(green)
+          .append(';')
+          .append(blue)
+          .append('m')
+          .append(lines[index])
+          .append("\u001b[0m");
+    }
+    return rendered.toString();
+  }
+
+  private static int blend(int from, int to, double position) {
+    return (int) Math.round(from + (to - from) * position);
+  }
+
   public boolean color() {
     return color;
+  }
+
+  public ReplConfig withHistoryFile(Path value) {
+    return new ReplConfig(value, splash, color);
   }
 
   public ReplConfig withSplash(String value) {
@@ -54,7 +128,7 @@ public final class ReplConfig {
   public String banner(String runtime, String session) {
     StringBuilder out = new StringBuilder();
     if (!splash.isBlank()) {
-      out.append(paint("36;1", splash.stripTrailing())).append('\n');
+      out.append(renderedSplash()).append('\n');
     }
     out.append(paint("35;1", "Hara"))
         .append(" · ")
@@ -67,7 +141,11 @@ public final class ReplConfig {
   }
 
   public String prompt(String namespace) {
-    return paint("36;1", "hara") + paint("2", "[" + namespace + "]") + paint("35;1", " › ");
+    return paint("36;1", "hara") + paint("2", "[" + namespace + "] ");
+  }
+
+  public String sessionPrompt(String namespace) {
+    return paint("2", "[") + paint("36;1", namespace) + paint("2", "] ");
   }
 
   public String continuationPrompt() {

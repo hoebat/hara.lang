@@ -9,19 +9,15 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
-import org.graalvm.polyglot.Context;
-import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
 
-/** RESP server and session broker for the Truffle runtime. */
+/** RESP listener for a shared Hara session broker. */
 public final class HaraServer implements AutoCloseable {
   public static final String DEFAULT_HOST = "127.0.0.1";
   public static final int DEFAULT_PORT = 1311;
@@ -46,9 +42,10 @@ public final class HaraServer implements AutoCloseable {
   private final String host;
   private final int requestedPort;
   private final boolean logRequests;
-  private final boolean allowNetwork;
-  private final Map<String, KernelSession> sessions = new ConcurrentHashMap<>();
-  private final ExecutorService clients = Executors.newVirtualThreadPerTaskExecutor();
+  private final HaraSessionBroker broker;
+  private final boolean ownsBroker;
+  private ExecutorService clients;
+
   private final AtomicBoolean running = new AtomicBoolean();
   private ServerSocket socket;
   private Thread acceptor;
@@ -62,17 +59,28 @@ public final class HaraServer implements AutoCloseable {
   }
 
   public HaraServer(String host, int port, boolean logRequests, boolean allowNetwork) {
+    this(new HaraSessionBroker(false, allowNetwork), host, port, logRequests, true);
+  }
+
+  HaraServer(HaraSessionBroker broker, String host, int port, boolean logRequests) {
+    this(broker, host, port, logRequests, false);
+  }
+
+  private HaraServer(
+      HaraSessionBroker broker, String host, int port, boolean logRequests, boolean ownsBroker) {
+    this.broker = broker;
     this.host = host;
     this.requestedPort = port;
     this.logRequests = logRequests;
-    this.allowNetwork = allowNetwork;
+    this.ownsBroker = ownsBroker;
   }
+
 
   public synchronized HaraServer start() throws IOException {
     if (running.get()) return this;
     socket = new ServerSocket();
     socket.bind(new InetSocketAddress(host, requestedPort));
-    sessions.put("ROOT", new KernelSession("ROOT", allowNetwork));
+    clients = Executors.newVirtualThreadPerTaskExecutor();
     running.set(true);
     acceptor = new Thread(this::acceptLoop, "hara-resp-acceptor");
     acceptor.setDaemon(false);
@@ -90,7 +98,7 @@ public final class HaraServer implements AutoCloseable {
   }
 
   public Set<String> sessionNames() {
-    return Collections.unmodifiableSet(sessions.keySet());
+    return broker.sessionNames();
   }
 
   public synchronized void stop() {
@@ -99,15 +107,14 @@ public final class HaraServer implements AutoCloseable {
       if (socket != null) socket.close();
     } catch (IOException ignored) {
     }
-    clients.shutdownNow();
-    for (KernelSession session : sessions.values()) session.close();
-    sessions.clear();
+    if (clients != null) clients.shutdownNow();
     if (acceptor != null) acceptor.interrupt();
   }
 
   @Override
   public void close() {
     stop();
+    if (ownsBroker) broker.close();
   }
 
   private void acceptLoop() {
@@ -202,7 +209,7 @@ public final class HaraServer implements AutoCloseable {
         "SESSION",
         attached,
         "SESSIONS",
-        (long) sessions.size());
+        (long) broker.size());
   }
 
   private String sessionCommand(
@@ -212,19 +219,18 @@ public final class HaraServer implements AutoCloseable {
     switch (sub) {
       case "NEW":
         require(request, 3);
-        String created = normalizeName(request.get(2));
-        if (sessions.putIfAbsent(created, new KernelSession(created, allowNetwork)) != null)
-          throw new IllegalArgumentException("SESSION_EXISTS " + created);
+        String created = HaraSessionBroker.normalizeName(request.get(2));
+        broker.create(created);
         respond(conn, negotiated, request, created);
         return attached;
       case "LIST":
-        List<String> names = new ArrayList<>(sessions.keySet());
+        List<String> names = new ArrayList<>(broker.sessionNames());
         Collections.sort(names);
         respond(conn, negotiated, request, names);
         return attached;
       case "ATTACH":
         require(request, 3);
-        String target = normalizeName(request.get(2));
+        String target = HaraSessionBroker.normalizeName(request.get(2));
         requireSession(target);
         respond(conn, negotiated, request, target);
         return target;
@@ -232,18 +238,15 @@ public final class HaraServer implements AutoCloseable {
         respond(conn, negotiated, request, "DETACHED");
         return null;
       case "INFO":
-        String targetInfo = request.size() > 2 ? normalizeName(request.get(2)) : attached;
-        KernelSession sessionInfo = requireSession(targetInfo);
+        String targetInfo = request.size() > 2 ? HaraSessionBroker.normalizeName(request.get(2)) : attached;
+        HaraSessionBroker.HaraSession sessionInfo = requireSession(targetInfo);
         respond(conn, negotiated, request, sessionInfo.info());
         return attached;
       case "CLOSE":
       case "KILL":
         require(request, 3);
-        String targetClose = normalizeName(request.get(2));
-        if ("ROOT".equals(targetClose)) throw new IllegalArgumentException("ROOT_CANNOT_CLOSE");
-        KernelSession removed = sessions.remove(targetClose);
-        if (removed == null) throw new IllegalArgumentException("NO_SESSION " + targetClose);
-        removed.close();
+        String targetClose = HaraSessionBroker.normalizeName(request.get(2));
+        broker.closeSession(targetClose);
         respond(conn, negotiated, request, true);
         return targetClose.equals(attached) ? null : attached;
       default:
@@ -261,10 +264,10 @@ public final class HaraServer implements AutoCloseable {
       sessionName = requireSessionName(attached);
       source = requireValue(request, 2);
     } else {
-      sessionName = normalizeName(requireValue(request, 1));
+      sessionName = HaraSessionBroker.normalizeName(requireValue(request, 1));
       source = requireValue(request, 2);
     }
-    KernelSession session = requireSession(sessionName);
+    HaraSessionBroker.HaraSession session = requireSession(sessionName);
     Object result = session.eval(source);
     if (negotiated) {
       conn.write(Arrays.asList("RESULT", requestId, display(result)));
@@ -361,21 +364,13 @@ public final class HaraServer implements AutoCloseable {
     return String.valueOf(value);
   }
 
-  private KernelSession requireSession(String name) {
-    KernelSession session = sessions.get(name);
-    if (session == null) throw new IllegalArgumentException("NO_SESSION " + name);
-    return session;
+  private HaraSessionBroker.HaraSession requireSession(String name) {
+    return broker.require(name);
   }
 
   private static String requireSessionName(String name) {
     if (name == null) throw new IllegalArgumentException("NO_SESSION_ATTACHED");
     return name;
-  }
-
-  private static String normalizeName(String value) {
-    if (value == null || value.isEmpty() || !value.matches("[A-Za-z0-9_.-]+"))
-      throw new IllegalArgumentException("INVALID_SESSION_NAME");
-    return value;
   }
 
   private static void validateSymbol(String symbol) {
@@ -402,37 +397,4 @@ public final class HaraServer implements AutoCloseable {
     return result;
   }
 
-  private static final class KernelSession implements AutoCloseable {
-    private final String name;
-    private final Context context;
-
-    private KernelSession(String name, boolean allowNetwork) {
-      this.name = name;
-      this.context =
-          Context.newBuilder(HaraLanguage.ID)
-              .allowIO(
-                  org.graalvm.polyglot.io.IOAccess.newBuilder()
-                      .allowHostSocketAccess(allowNetwork)
-                      .build())
-              .build();
-      context.eval(HaraLanguage.ID, "(load-resource \"hara/l0-core.hal\")");
-    }
-
-    private synchronized Object eval(String source) {
-      try {
-        return context.eval(HaraLanguage.ID, source);
-      } catch (PolyglotException error) {
-        throw new IllegalArgumentException(error.getMessage(), error);
-      }
-    }
-
-    private List<Object> info() {
-      return Arrays.asList("NAME", name, "STATE", "RUNNING");
-    }
-
-    @Override
-    public void close() {
-      context.close(true);
-    }
-  }
 }

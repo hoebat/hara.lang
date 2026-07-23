@@ -1,9 +1,11 @@
 package hara.truffle;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
 import org.junit.Test;
 
@@ -21,7 +23,7 @@ public class HaraTestIntegrationTest {
   public void registersAndRunsAJavaBackedFactMacro() {
     try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
       context.eval(HaraLanguage.ID, "(fact \"addition\" (+ 1 2) => 3)");
-      Value results = context.eval(HaraLanguage.ID, "(code.test/run!)");
+      Value results = context.eval(HaraLanguage.ID, "(code.test/run)");
       assertTrue(results.hasArrayElements());
       assertEquals(1, results.getArraySize());
       Value result = results.getArrayElement(0);
@@ -38,7 +40,7 @@ public class HaraTestIntegrationTest {
       context.eval(HaraLanguage.ID, "(fact \"map subset\" {:a 1 :b 2} => (contains {:a 1}))");
       context.eval(HaraLanguage.ID, "(fact \"any value\" (+ 1 1) => anything)");
       context.eval(HaraLanguage.ID, "(fact \"throws\" (/ 1 0) => (throws))");
-      Value results = context.eval(HaraLanguage.ID, "(code.test/run! {:filter \"user/throws\"})");
+      Value results = context.eval(HaraLanguage.ID, "(code.test/run {:filter \"user/throws\"})");
       assertEquals(1, results.getArraySize());
       assertEquals("PASS", results.getArrayElement(0).getHashValue("status").asString());
     }
@@ -78,19 +80,34 @@ public class HaraTestIntegrationTest {
     try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
       context.eval(HaraLanguage.ID, "(require 'code.test {:refer [fact]})");
       context.eval(HaraLanguage.ID, "(fact \"referred-fact\" 3 => 3)");
-      assertEquals(1, context.eval(HaraLanguage.ID, "(code.test/run! {:name \"referred-fact\"})").getArraySize());
+      assertEquals(1, context.eval(HaraLanguage.ID, "(code.test/run {:name \"referred-fact\"})").getArraySize());
     }
   }
 
   @Test
-  public void exposesSourceCodeTestSubnamespaces() {
+  public void exposesOnlyTheCanonicalStaticLibraryNamespaces() {
     try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
-      context.eval(HaraLanguage.ID, "(require 'code.test.checker.common)");
-      context.eval(HaraLanguage.ID, "(require 'code.test.checker.collection)");
-      assertTrue(context.eval(HaraLanguage.ID,
-          "(code.test/assert! 2 (code.test.checker.common/exactly 2))").asBoolean());
-      assertTrue(context.eval(HaraLanguage.ID,
-          "(code.test/assert! [1 2] (code.test.checker.collection/just [1 2]))").asBoolean());
+      context.eval(HaraLanguage.ID, "(require 'code.test)");
+      assertEquals(
+          "Runs registered facts.",
+          context.eval(HaraLanguage.ID, "(get (meta (var code.test/run)) :doc)").asString());
+      assertThrows(
+          PolyglotException.class,
+          () -> context.eval(HaraLanguage.ID, "(require 'code.test.checker.common)"));
+      assertThrows(
+          PolyglotException.class,
+          () -> context.eval(HaraLanguage.ID, "(require 'code.test.base.runtime)"));
+      assertThrows(
+          PolyglotException.class,
+          () -> context.eval(HaraLanguage.ID, "(var code.test/run!)"));
+
+      context.eval(HaraLanguage.ID, "(require 'std.lib.task)");
+      assertThrows(
+          PolyglotException.class,
+          () -> context.eval(HaraLanguage.ID, "(require 'std.task)"));
+      assertThrows(
+          PolyglotException.class,
+          () -> context.eval(HaraLanguage.ID, "(require 'std.lib.task.bulk)"));
     }
   }
 
@@ -101,7 +118,7 @@ public class HaraTestIntegrationTest {
       context.eval(HaraLanguage.ID, "^{:tag \"fast\"} (fact \"tagged\" 1 => 1)");
       context.eval(HaraLanguage.ID, "(fact \"other\" 1 => 1)");
       Value results = context.eval(HaraLanguage.ID,
-          "(code.test/run! {:metadata {:tag \"fast\"}})");
+          "(code.test/run {:metadata {:tag \"fast\"}})");
       assertEquals(1, results.getArraySize());
       assertEquals("tagged", results.getArrayElement(0).getHashValue("name").asString());
     }
@@ -141,22 +158,22 @@ public class HaraTestIntegrationTest {
   @Test
   public void createsAndInvokesAStdTask() {
     try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
-      context.eval(HaraLanguage.ID, "(require 'std.task)");
-      context.eval(HaraLanguage.ID, "(def add-task (std.task/task :default \"add\" (fn [a b] (+ a b))))");
-      assertTrue(context.eval(HaraLanguage.ID, "(std.task/task? add-task)").asBoolean());
-      assertEquals(5, context.eval(HaraLanguage.ID, "(std.task/invoke add-task 2 3)").asInt());
+      context.eval(HaraLanguage.ID, "(require 'std.lib.task)");
+      context.eval(HaraLanguage.ID, "(def add-task (std.lib.task/task :default \"add\" (fn [a b] (+ a b))))");
+      assertTrue(context.eval(HaraLanguage.ID, "(std.lib.task/task? add-task)").asBoolean());
+      assertEquals(5, context.eval(HaraLanguage.ID, "(std.lib.task/invoke add-task 2 3)").asInt());
     }
   }
 
   @Test
   public void definesTasksWithDeftaskAndRunsBulkInputs() {
     try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
-      context.eval(HaraLanguage.ID, "(require 'std.task)");
+      context.eval(HaraLanguage.ID, "(require 'std.lib.task)");
       context.eval(HaraLanguage.ID,
           "(deftask double-task {:template :default :doc \"doubles\" :main {:fn (fn [x] (* 2 x))}})");
-      assertTrue(context.eval(HaraLanguage.ID, "(std.task/task? double-task)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(std.lib.task/task? double-task)").asBoolean());
       assertEquals("doubles", context.eval(HaraLanguage.ID, "(get (meta (var double-task)) :doc)").asString());
-      Value values = context.eval(HaraLanguage.ID, "(std.task/invoke double-task [1 2 3])");
+      Value values = context.eval(HaraLanguage.ID, "(std.lib.task/invoke double-task [1 2 3])");
       assertEquals(3, values.getArraySize());
       assertEquals(4, values.getArrayElement(1).asInt());
     }
@@ -165,23 +182,23 @@ public class HaraTestIntegrationTest {
   @Test
   public void exposesTaskProcessAndBulkApis() {
     try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
-      context.eval(HaraLanguage.ID, "(require 'std.task)");
-      context.eval(HaraLanguage.ID, "(def bulk-task (std.task/task :default \"double\" (fn [x] (* 2 x))))");
-      Value items = context.eval(HaraLanguage.ID, "(std.task.bulk/bulk-items bulk-task [1 2 3])");
+      context.eval(HaraLanguage.ID, "(require 'std.lib.task)");
+      context.eval(HaraLanguage.ID, "(def bulk-task (std.lib.task/task :default \"double\" (fn [x] (* 2 x))))");
+      Value items = context.eval(HaraLanguage.ID, "(std.lib.task/bulk-items bulk-task [1 2 3])");
       assertEquals(3, items.getArraySize());
-      Value summary = context.eval(HaraLanguage.ID, "(std.task.bulk/bulk-summary (std.task.bulk/bulk-items bulk-task [1 2 3]))");
+      Value summary = context.eval(HaraLanguage.ID, "(std.lib.task/bulk-summary (std.lib.task/bulk-items bulk-task [1 2 3]))");
       assertEquals(3, summary.getHashValue("results").asInt());
-      assertTrue(context.eval(HaraLanguage.ID, "(std.task.process/select-filter \"code\" \"code.test\")").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(std.lib.task/select-filter \"code\" \"code.test\")").asBoolean());
     }
   }
 
   @Test
   public void processesStructuredTasksAndVectorInputs() {
     try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
-      context.eval(HaraLanguage.ID, "(require 'std.task)");
+      context.eval(HaraLanguage.ID, "(require 'std.lib.task)");
       context.eval(HaraLanguage.ID,
-          "(def process-task (std.task/task :default \"process\" {:main {:fn (fn [input params lookup env] (* 2 input))}}))");
-      Value result = context.eval(HaraLanguage.ID, "(std.task.process/invoke process-task [2 3])");
+          "(def process-task (std.lib.task/task :default \"process\" {:main {:fn (fn [input params lookup env] (* 2 input))}}))");
+      Value result = context.eval(HaraLanguage.ID, "(std.lib.task/invoke process-task [2 3])");
       assertEquals(2, result.getArraySize());
       assertEquals(6, result.getArrayElement(1).asInt());
     }
@@ -190,9 +207,9 @@ public class HaraTestIntegrationTest {
   @Test
   public void exposesSourceStyleBulkFunctionSignatures() {
     try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
-      context.eval(HaraLanguage.ID, "(require 'std.task)");
+      context.eval(HaraLanguage.ID, "(require 'std.lib.task)");
       Value items = context.eval(HaraLanguage.ID,
-          "(std.task.bulk/bulk-items (fn [input params lookup env] (* 2 input)) "
+          "(std.lib.task/bulk-items (fn [input params lookup env] (* 2 input)) "
               + "[1 2] {} {} {})");
       assertEquals(2, items.getArraySize());
       assertTrue(items.getArrayElement(0).hasArrayElements());
@@ -203,9 +220,9 @@ public class HaraTestIntegrationTest {
   @Test
   public void processesSourceStyleBulkItemsWithExtraArgumentsAndStatusHelpers() {
     try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
-      context.eval(HaraLanguage.ID, "(require 'std.task)");
+      context.eval(HaraLanguage.ID, "(require 'std.lib.task)");
       context.eval(HaraLanguage.ID,
-          "(def bulk-item (std.task.bulk/bulk-process-item "
+          "(def bulk-item (std.lib.task/bulk-process-item "
               + "(fn [input params lookup env extra] [input {:status :return :data (+ input extra)}]) "
               + "{:idx 0 :total 1 :input 2} {} {} {} 5))");
       Value item = context.eval(HaraLanguage.ID, "bulk-item");
@@ -215,7 +232,7 @@ public class HaraTestIntegrationTest {
       assertTrue(context.eval(HaraLanguage.ID, "(get (nth bulk-item 1) :time)").fitsInLong());
 
       Value errors = context.eval(HaraLanguage.ID,
-          "(std.task.bulk/bulk-errors {} [[1 {:status :error}] [2 {:status :return}]])");
+          "(std.lib.task/bulk-errors {} [[1 {:status :error}] [2 {:status :return}]])");
       assertEquals(1, errors.getArraySize());
       assertEquals(1, errors.getArrayElement(0).getArrayElement(0).asInt());
     }
@@ -224,10 +241,10 @@ public class HaraTestIntegrationTest {
   @Test
   public void packagesBulkResultsInReferenceShape() {
     try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
-      context.eval(HaraLanguage.ID, "(require 'std.task)");
-      context.eval(HaraLanguage.ID, "(def bulk-task (std.task/task :default \"bulk\" (fn [x] x)))");
+      context.eval(HaraLanguage.ID, "(require 'std.lib.task)");
+      context.eval(HaraLanguage.ID, "(def bulk-task (std.lib.task/task :default \"bulk\" (fn [x] x)))");
       Value packaged = context.eval(HaraLanguage.ID,
-          "(std.task.bulk/bulk-package "
+          "(std.lib.task/bulk-package "
               + "{:items [[1 {:status :return :data 1}]] "
               + ":results [{:key 1 :data 1}] :warnings [] :errors [] :summary {}} "
               + ":all :map)");
@@ -236,12 +253,12 @@ public class HaraTestIntegrationTest {
       assertEquals(1, packaged.getHashValue("results").getHashValue(1L).asInt());
 
       Value sourcePackaged = context.eval(HaraLanguage.ID,
-          "(std.task.bulk/bulk-package (std.task/task :default \"bulk\" (fn [x] x)) "
+          "(std.lib.task/bulk-package (std.lib.task/task :default \"bulk\" (fn [x] x)) "
               + "{:items [[1 {:status :return :data 1}]] "
               + ":results [{:key 1 :data 1}] :warnings [] :errors [] :summary {}} :all :map)");
       assertTrue(sourcePackaged.hasHashEntry("summary"));
       Value summary = context.eval(HaraLanguage.ID,
-          "(std.task.bulk/bulk-summary (std.task/task :default \"bulk\" (fn [x] x)) {} "
+          "(std.lib.task/bulk-summary (std.lib.task/task :default \"bulk\" (fn [x] x)) {} "
               + "[[1 {:status :return :time 2 :data 1}]] "
               + "[{:key 1 :data 1}] [] [] 10)");
       assertEquals(1, summary.getHashValue("items").asInt());

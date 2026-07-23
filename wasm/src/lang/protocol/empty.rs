@@ -1,3 +1,4 @@
-pub trait IEmpty: Sized {
-    fn empty(&self) -> Self;
+pub trait IEmpty {
+    type Output;
+    fn empty(&self) -> Self::Output;
 }

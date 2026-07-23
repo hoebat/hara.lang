@@ -467,6 +467,7 @@ impl<K: Clone + Eq + Hash, V: Clone> ILookup<K, V> for Standard<K, V> {
     }
 }
 impl<K: Clone + Eq + Hash, V: Clone> IEmpty for Standard<K, V> {
+    type Output = Self;
     fn empty(&self) -> Self {
         Self::new().with_meta(self.metadata.clone())
     }

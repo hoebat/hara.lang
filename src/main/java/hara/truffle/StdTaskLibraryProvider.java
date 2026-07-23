@@ -1,10 +1,10 @@
 package hara.truffle;
 
-/** Optional Java implementation of std.task and its process/bulk namespaces. */
+/** Optional Java implementation of std.lib.task. */
 public final class StdTaskLibraryProvider implements HaraLibraryProvider {
   @Override
   public String namespace() {
-    return "std.task";
+    return "std.lib.task";
   }
 
   @Override
@@ -14,6 +14,6 @@ public final class StdTaskLibraryProvider implements HaraLibraryProvider {
 
   @Override
   public void install(HaraContext context) {
-    context.installTaskLibrary();
+    HaraStaticLibrary.install(context, namespace(), StdLibTask.class);
   }
 }

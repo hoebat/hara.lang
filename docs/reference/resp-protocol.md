@@ -5,7 +5,8 @@ protocol; HTA is the internal Truffle/WASM ABI.
 
 ## Sessions
 
-The server owns sessions. Each session contains one isolated Hara kernel. Clients attach to a
+The Hara process owns sessions. Each session contains one isolated Hara kernel, while the RESP
+listener is only one way to reach them. The local JLine REPL and RESP clients share `ROOT`. Clients attach to a
 session independently, and multiple clients may attach to the same session. Requests within one
 session are serialized.
 
@@ -18,8 +19,8 @@ session are serialized.
 ["SESSION", "CLOSE", "APP"]
 ```
 
-`ROOT` is created automatically and sessions remain alive until explicitly closed or the server
-exits.
+`ROOT` is created automatically and remains alive when the listener is stopped or restarted. Other
+sessions remain alive until explicitly closed or the Hara process exits.
 
 ## Evaluation
 
@@ -44,8 +45,10 @@ Errors use `ERROR`, followed by the request ID, error code, and message. Clients
 ## Runtime modes
 
 ```text
-truffle-hara                  # server on 127.0.0.1:1311
-truffle-hara standalone       # one local kernel, no listener
-truffle-hara headless         # server without terminal UI
-truffle-hara remote HOST:PORT # remote client mode
+hara                         # ROOT JLine REPL + RESP on 127.0.0.1:1311
+hara --offline               # ROOT JLine REPL, listener initially disabled
+hara headless                # ROOT RESP listener without terminal UI
+hara server                  # compatibility alias for headless
+hara standalone              # compatibility alias for --offline
+hara remote HOST:PORT        # remote client mode
 ```

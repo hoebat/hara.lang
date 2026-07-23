@@ -25,7 +25,12 @@ evaluate -> print value
   +----> EOF -> exit
 ```
 
-The default banner uses Hara ASCII art and identifies the runtime and session. Embedders may replace
+The default banner uses large Hara ASCII art: an alien craft beams a clear-to-blue-to-black
+gradient onto dimensional `HARA` lettering. It includes the tagline `Journey Within` and a spaced
+top menu.
+It identifies runtime `TRUFFLE` and session `ROOT`.
+The left prompt is namespace-only, for example `[user] `, while the right prompt reports the
+live RESP endpoint or `offline`. Embedders may replace
 the splash or suppress it through `ReplConfig`; `hara.repl.splash` and `hara.repl.no-color` provide
 process-level configuration. Banner customization must not change evaluation semantics.
 
@@ -51,19 +56,19 @@ typed prefix
      |
      +--> visible Hara symbols ----+
      |                              |
-     +--> Java packages/classes ----+--> candidates
+     +--> slash commands ----------+--> candidates
 ```
 
-Completion understands Lisp delimiters: `(`, `)`, `[`, `]`, `{`, `}`, and whitespace. Symbol
-completion comes from the runtime-visible namespace; class completion comes from the asynchronously
-scanned package tree. A slow classpath scan must not prevent ordinary symbol completion.
+Completion appears as a cursor-level ghost suggestion while typing, including immediately after `/`.
+Tab accepts and cycles matching slash commands or symbols. Completion understands Lisp delimiters: `(`, `)`, `[`, `]`, `{`, `}`, and whitespace. Symbol
+completion comes from the runtime-visible namespace. Host Java classes are not ambient language
+completion candidates.
 
 Examples:
 
 ```text
 (con<TAB>       -> concat
-(hara.lib.<TAB> -> available library symbols
-java.lang.Str<TAB> -> java.lang.String
+/re<TAB>        -> /resp
 ```
 
 ## Documentation widget
@@ -88,10 +93,13 @@ input line
    |
    +--> starts with / ? -- yes --> REPL command dispatcher
    |                                  |
-   |                                  +--> /help /history /clear /splash /ns /quit
+   |                                  +--> /help /history /clear /splash /status /resp /ns /quit
    |
    +--> no ------------------------> Hara reader/evaluator
 ```
+
+`/resp` reports listener status; `/resp start [PORT|HOST:PORT]`, `/resp stop`, and
+`/resp restart [PORT|HOST:PORT]` control the listener without replacing `ROOT`.
 
 The command vocabulary is an extension point. Unknown commands should produce a concise REPL
 error and leave the session running. A slash command must not shadow a valid Hara form because the

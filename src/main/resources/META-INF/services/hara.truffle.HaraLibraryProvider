@@ -1,2 +1,4 @@
 hara.truffle.CodeTestLibraryProvider
+hara.truffle.StdBlockLibraryProvider
+hara.truffle.StdZipLibraryProvider
 hara.truffle.StdTaskLibraryProvider

@@ -25,6 +25,7 @@ import org.jline.reader.Candidate;
 import org.jline.reader.Completer;
 import org.jline.reader.EndOfFileException;
 import org.jline.reader.History;
+import org.jline.reader.Highlighter;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.ParsedLine;
@@ -33,6 +34,8 @@ import org.jline.reader.impl.DefaultParser;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 import org.jline.utils.InfoCmp;
+import org.jline.utils.AttributedString;
+import org.jline.widget.AutosuggestionWidgets;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
@@ -54,15 +57,24 @@ public final class Main {
   }
 
   static int run(String[] args, InputStream input, PrintStream output, PrintStream error) {
-    Capabilities capabilities = parseCapabilities(args);
+    Capabilities capabilities;
+    try {
+      capabilities = parseCapabilities(args);
+    } catch (IllegalArgumentException exception) {
+      error.println(exception.getMessage());
+      return 2;
+    }
     args = capabilities.arguments;
     if (args.length == 0) {
-      if (input == System.in) {
-        return runServer(output, error, capabilities);
-      }
       return runRepl(
-          input, output, error, input == System.in && System.console() != null, capabilities);
+          input,
+          output,
+          error,
+          input == System.in && System.console() != null,
+          capabilities,
+          !capabilities.offline);
     }
+
     if ("help".equals(args[0]) || "--help".equals(args[0])) {
       printUsage(output);
       return 0;
@@ -70,12 +82,24 @@ public final class Main {
 
     if ("repl".equals(args[0])) {
       return runRepl(
-          input, output, error, input == System.in && System.console() != null, capabilities);
+          input,
+          output,
+          error,
+          input == System.in && System.console() != null,
+          capabilities,
+          !capabilities.offline);
     }
+
     if ("standalone".equalsIgnoreCase(args[0])) {
       return runRepl(
-          input, output, error, input == System.in && System.console() != null, capabilities);
+          input,
+          output,
+          error,
+          input == System.in && System.console() != null,
+          capabilities,
+          false);
     }
+
     if ("server".equalsIgnoreCase(args[0]) || "headless".equalsIgnoreCase(args[0])) {
       return runServer(output, error, capabilities);
     }
@@ -132,11 +156,17 @@ public final class Main {
   }
 
   private static int runServer(PrintStream output, PrintStream error, Capabilities capabilities) {
-    try (HaraServer server =
-        new HaraServer(
-            capabilities.host, capabilities.port, capabilities.logRequests, capabilities.network)) {
+    if (capabilities.offline) {
+      error.println("--offline cannot be used with headless");
+      return 2;
+    }
+    try (HaraSessionBroker broker =
+            new HaraSessionBroker(capabilities.file, capabilities.network);
+        HaraServer server =
+            new HaraServer(
+                broker, capabilities.host, capabilities.port, capabilities.logRequests)) {
       server.start();
-      output.println("HARA SERVER " + capabilities.host + ":" + server.port());
+      output.println("HARA RESP " + capabilities.host + ":" + server.port() + " · session ROOT");
       output.flush();
       while (server.isRunning()) {
         try {
@@ -301,61 +331,60 @@ public final class Main {
       PrintStream output,
       PrintStream error,
       boolean interactive,
-      Capabilities capabilities) {
-    try (Context context = context(capabilities)) {
-      context.eval(HaraLanguage.ID, "(load-resource \"hara/l0-core.hal\")");
-      if (interactive) return runJLineRepl(context, output, error);
-      try (BufferedReader reader =
-          new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8))) {
-        StringBuilder source = new StringBuilder();
-        List<String> history = new ArrayList<>();
-        String line;
-        boolean continuation = false;
-        while (true) {
-          if (interactive) {
-            output.print(continuation ? "..> " : "hara> ");
-            output.flush();
-          }
-          line = reader.readLine();
-          if (line == null) {
-            if (source.length() != 0) {
-              error.println("Incomplete source");
-              return 1;
-            }
-            return 0;
-          }
-          if (source.length() == 0 && ":quit".equals(line.trim())) {
-            return 0;
-          }
-          if (source.length() == 0 && ":help".equals(line.trim())) {
-            output.println(":quit          exit the REPL");
-            output.println(":help          show this help");
-            output.println(":history       show evaluated forms");
-            continue;
-          }
-          if (source.length() == 0 && ":history".equals(line.trim())) {
-            for (int i = 0; i < history.size(); i++) {
-              output.println((i + 1) + ": " + history.get(i));
-            }
-            continue;
-          }
-
-          source.append(line).append('\n');
-          continuation = !isComplete(source);
-          if (continuation) {
-            continue;
-          }
-
-          history.add(source.toString().stripTrailing());
-          try {
-            Value result = context.eval(HaraLanguage.ID, source.toString());
-            output.println(display(result));
-          } catch (PolyglotException exception) {
-            error.println(exception.getMessage());
-          }
-          source.setLength(0);
-          continuation = false;
+      Capabilities capabilities,
+      boolean enableResp) {
+    try (HaraSessionBroker broker =
+        new HaraSessionBroker(capabilities.file, capabilities.network)) {
+      RespController resp =
+          new RespController(
+              broker, capabilities.host, capabilities.port, capabilities.logRequests);
+      if (enableResp) {
+        try {
+          resp.start();
+        } catch (IOException exception) {
+          error.println("Unable to start RESP listener: " + exception.getMessage());
+          return 1;
         }
+      }
+      try {
+        if (interactive)
+          return runJLineRepl(broker.root(), resp, output, error, capabilities);
+        try (BufferedReader reader =
+            new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8))) {
+          StringBuilder source = new StringBuilder();
+          List<String> history = new ArrayList<>();
+          String line;
+          while ((line = reader.readLine()) != null) {
+            if (source.length() == 0 && ":quit".equals(line.trim())) return 0;
+            if (source.length() == 0 && ":help".equals(line.trim())) {
+              output.println(":quit          exit the REPL");
+              output.println(":help          show this help");
+              output.println(":history       show evaluated forms");
+              continue;
+            }
+            if (source.length() == 0 && ":history".equals(line.trim())) {
+              for (int i = 0; i < history.size(); i++)
+                output.println((i + 1) + ": " + history.get(i));
+              continue;
+            }
+            source.append(line).append('\n');
+            if (!isComplete(source)) continue;
+            history.add(source.toString().stripTrailing());
+            try {
+              output.println(display(broker.root().eval(source.toString())));
+            } catch (RuntimeException exception) {
+              error.println(exception.getMessage());
+            }
+            source.setLength(0);
+          }
+          if (source.length() != 0) {
+            error.println("Incomplete source");
+            return 1;
+          }
+          return 0;
+        }
+      } finally {
+        resp.close();
       }
     } catch (IOException exception) {
       error.println(exception.getMessage());
@@ -376,69 +405,156 @@ public final class Main {
     ArrayList<String> positional = new ArrayList<>();
     boolean file = false;
     boolean network = false;
+    boolean offline = false;
+    boolean logRequests = false;
+    boolean noHistory = false;
+    boolean noSplash = false;
+    boolean noColor = false;
+    Path historyFile = null;
     String host = HaraServer.DEFAULT_HOST;
     int port = HaraServer.DEFAULT_PORT;
-    boolean logRequests = false;
-    for (String argument : arguments) {
-      if ("--allow-file".equals(argument)) file = true;
-      else if ("--allow-net".equals(argument)) network = true;
-      else if (argument.startsWith("--host=")) host = argument.substring("--host=".length());
-      else if (argument.startsWith("--port="))
-        port = Integer.parseInt(argument.substring("--port=".length()));
-      else if ("--log-requests".equals(argument)) logRequests = true;
+    boolean options = true;
+    for (int index = 0; index < arguments.length; index++) {
+      String argument = arguments[index];
+      if (options && "--".equals(argument)) {
+        options = false;
+      } else if (options && "--allow-file".equals(argument)) file = true;
+      else if (options && "--allow-net".equals(argument)) network = true;
+      else if (options && "--offline".equals(argument)) offline = true;
+      else if (options && "--log-requests".equals(argument)) logRequests = true;
+      else if (options && "--no-history".equals(argument)) noHistory = true;
+      else if (options && "--no-splash".equals(argument)) noSplash = true;
+      else if (options && "--no-color".equals(argument)) noColor = true;
+      else if (options && argument.startsWith("--host="))
+        host = requiredOption("--host", argument.substring("--host=".length()));
+      else if (options && "--host".equals(argument))
+        host = requiredOption("--host", nextOption(arguments, ++index, "--host"));
+      else if (options && argument.startsWith("--port="))
+        port = parsePort(argument.substring("--port=".length()));
+      else if (options && "--port".equals(argument))
+        port = parsePort(nextOption(arguments, ++index, "--port"));
+      else if (options && argument.startsWith("--history="))
+        historyFile = Path.of(requiredOption("--history", argument.substring("--history=".length())));
+      else if (options && "--history".equals(argument))
+        historyFile = Path.of(nextOption(arguments, ++index, "--history"));
+      else if (options && argument.startsWith("--"))
+        throw new IllegalArgumentException("Unknown option: " + argument);
       else positional.add(argument);
     }
     return new Capabilities(
-        file, network, host, port, logRequests, positional.toArray(new String[0]));
+        file,
+        network,
+        offline,
+        host,
+        port,
+        logRequests,
+        noHistory,
+        noSplash,
+        noColor,
+        historyFile,
+        positional.toArray(new String[0]));
+  }
+
+  private static String nextOption(String[] arguments, int index, String option) {
+    if (index >= arguments.length) throw new IllegalArgumentException(option + " requires a value");
+    return requiredOption(option, arguments[index]);
+  }
+
+  private static String requiredOption(String option, String value) {
+    if (value == null || value.isBlank())
+      throw new IllegalArgumentException(option + " requires a value");
+    return value;
+  }
+
+  private static int parsePort(String value) {
+    try {
+      int port = Integer.parseInt(requiredOption("--port", value));
+      if (port < 0 || port > 65535) throw new NumberFormatException();
+      return port;
+    } catch (NumberFormatException exception) {
+      throw new IllegalArgumentException("--port must be between 0 and 65535");
+    }
   }
 
   private static final class Capabilities {
     private final boolean file;
     private final boolean network;
+    private final boolean offline;
     private final String host;
     private final int port;
     private final boolean logRequests;
+    private final boolean noHistory;
+    private final boolean noSplash;
+    private final boolean noColor;
+    private final Path historyFile;
     private final String[] arguments;
 
     private Capabilities(
         boolean file,
         boolean network,
+        boolean offline,
         String host,
         int port,
         boolean logRequests,
+        boolean noHistory,
+        boolean noSplash,
+        boolean noColor,
+        Path historyFile,
         String[] arguments) {
       this.file = file;
       this.network = network;
+      this.offline = offline;
       this.host = host;
       this.port = port;
       this.logRequests = logRequests;
+      this.noHistory = noHistory;
+      this.noSplash = noSplash;
+      this.noColor = noColor;
+      this.historyFile = historyFile;
       this.arguments = arguments;
     }
   }
 
-  private static int runJLineRepl(Context context, PrintStream output, PrintStream error)
+  private static int runJLineRepl(
+      HaraSessionBroker.HaraSession session,
+      RespController resp,
+      PrintStream output,
+      PrintStream error,
+      Capabilities capabilities)
       throws IOException {
     try (Terminal terminal = TerminalBuilder.builder().system(true).build()) {
-      ReplConfig baseConfig = ReplConfig.defaults(".hara_truffle_history");
+      ReplConfig baseConfig = ReplConfig.defaults(".hara_history");
+      if (capabilities.historyFile != null)
+        baseConfig = baseConfig.withHistoryFile(capabilities.historyFile);
+      if (capabilities.noSplash) baseConfig = baseConfig.withSplash("");
       ReplConfig config =
-          baseConfig.withColor(baseConfig.color() && !"dumb".equalsIgnoreCase(terminal.getType()));
-      LineReader reader =
+          baseConfig.withColor(
+              baseConfig.color()
+                  && !capabilities.noColor
+                  && !"dumb".equalsIgnoreCase(terminal.getType()));
+      LineReaderBuilder builder =
           LineReaderBuilder.builder()
               .terminal(terminal)
               .parser(new LispLineParser())
-              .completer(new HaraCompleter(context))
-              .variable(LineReader.HISTORY_FILE, config.historyFile())
-              .option(LineReader.Option.HISTORY_INCREMENTAL, true)
-              .build();
+              .highlighter(new SlashCommandHighlighter())
+              .completer(new HaraCompleter(session));
+      if (!capabilities.noHistory) {
+        builder
+            .variable(LineReader.HISTORY_FILE, config.historyFile())
+            .option(LineReader.Option.HISTORY_INCREMENTAL, true);
+      }
+      LineReader reader = builder.build();
+      AutosuggestionWidgets autosuggestions = new AutosuggestionWidgets(reader);
+      autosuggestions.enable();
+      reader.setAutosuggestion(LineReader.SuggestionType.TAIL_TIP);
       clearTerminal(terminal);
-      terminal.writer().println(config.banner("Truffle", "polyglot"));
-      printInteractiveHelp(terminal);
+      printHeader(terminal, config, resp, true);
       reader
           .getWidgets()
           .put(
               "show-doc",
               () -> {
-                showDocumentation(context, reader, terminal);
+                showDocumentation(session, reader, terminal);
                 return true;
               });
       reader
@@ -451,11 +567,14 @@ public final class Main {
           .bind(new org.jline.reader.Reference("show-doc"), "\033q");
       StringBuilder source = new StringBuilder();
       long lastElapsedNanos = -1L;
+      String namespace = session.currentNamespace();
       while (true) {
         try {
-          String line =
-              reader.readLine(
-                  source.length() == 0 ? config.prompt("user") : config.continuationPrompt());
+          String prompt =
+              source.length() == 0
+                  ? config.sessionPrompt(namespace)
+                  : config.continuationPrompt();
+          String line = reader.readLine(prompt, resp.rightPrompt(), (Character) null, null);
           if (source.length() == 0) {
             String command = line.strip();
             if ("/quit".equals(command) || "/exit".equals(command) || ":quit".equals(command))
@@ -467,19 +586,19 @@ public final class Main {
             if (command.startsWith("/history") || command.startsWith(":history")) {
               String query = command.replaceFirst("^[/:]history\\s*", "").strip();
               for (History.Entry entry : reader.getHistory()) {
-                if (query.isEmpty() || fuzzyScore(query, entry.line()) < Integer.MAX_VALUE) {
+                if (query.isEmpty() || fuzzyScore(query, entry.line()) < Integer.MAX_VALUE)
                   terminal.writer().println((entry.index() + 1) + ": " + entry.line());
-                }
               }
+              terminal.writer().println();
               terminal.writer().flush();
               continue;
             }
             if (command.startsWith("/doc ")) {
-              showDocumentation(context, command.substring(5).strip(), terminal);
+              showDocumentation(session, command.substring(5).strip(), terminal);
               continue;
             }
             if (command.startsWith("/apropos ")) {
-              printApropos(context, command.substring(9).strip(), terminal);
+              printApropos(session, command.substring(9).strip(), terminal);
               continue;
             }
             if ("/time".equals(command)) {
@@ -489,41 +608,60 @@ public final class Main {
                       lastElapsedNanos < 0
                           ? "No evaluation yet."
                           : formatElapsed(lastElapsedNanos));
+              terminal.writer().println();
               terminal.writer().flush();
+              continue;
+            }
+            if ("/status".equals(command)) {
+              printHeader(terminal, config, resp, false);
               continue;
             }
             if ("/clear".equals(command)) {
               clearTerminal(terminal);
+              printHeader(terminal, config, resp, true);
               continue;
             }
             if ("/splash".equals(command)) {
-              terminal.writer().println(config.banner("Truffle", "polyglot"));
-              terminal.writer().flush();
+              printHeader(terminal, config, resp, true);
               continue;
             }
             if ("/ns".equals(command)) {
-              terminal.writer().println("user");
+              terminal.writer().println(namespace);
+              terminal.writer().println();
+              terminal.writer().flush();
+              continue;
+            }
+            if (command.equals("/resp") || command.startsWith("/resp ")) {
+              terminal.writer().println(resp.command(command));
+              terminal.writer().println();
               terminal.writer().flush();
               continue;
             }
             if (line.startsWith("/")) {
               terminal.writer().println("Unknown command: " + command + ". Try /help.");
+              terminal.writer().println();
               terminal.writer().flush();
               continue;
             }
           }
           source.append(line).append('\n');
           if (!isComplete(source)) continue;
+          long started = System.nanoTime();
           try {
-            Value result = context.eval(HaraLanguage.ID, source.toString());
-            output.println(display(result));
-          } catch (PolyglotException exception) {
+            output.println(display(session.eval(source.toString())));
+            output.println();
+            namespace = session.currentNamespace();
+          } catch (RuntimeException exception) {
             error.println(exception.getMessage());
+            error.println();
+          } finally {
+            lastElapsedNanos = System.nanoTime() - started;
           }
           source.setLength(0);
         } catch (UserInterruptException exception) {
           source.setLength(0);
           output.println("^C");
+          output.println();
         } catch (EndOfFileException exception) {
           return 0;
         }
@@ -531,11 +669,35 @@ public final class Main {
     }
   }
 
+  private static void printHeader(
+      Terminal terminal, ReplConfig config, RespController resp, boolean includeSplash) {
+    if (includeSplash && !config.splash().isBlank()) {
+      terminal.writer().println(config.renderedSplash());
+      terminal.writer().println();
+    }
+    terminal.writer().println("HARA · TRUFFLE                                      SESSION ROOT");
+    terminal.writer().println("Journey Within");
+    terminal.writer().println("────────────────────────────────────────────────────────────────");
+    terminal.writer().println();
+    terminal
+        .writer()
+        .println("  /help  Help       /history  History      /status  Status");
+    terminal
+        .writer()
+        .println("  /resp  Listener   /clear    Clear        /quit    Exit");
+    terminal.writer().println();
+    terminal.writer().println("RESP  " + resp.status());
+    terminal.writer().println();
+    terminal.writer().flush();
+  }
+
   private static final String[][] REPL_COMMANDS = {
     {"/help", "show REPL commands"},
     {"/history", "show persistent input history"},
-    {"/clear", "clear the terminal"},
-    {"/splash", "show the Hara banner"},
+    {"/clear", "clear the terminal and redraw the header"},
+    {"/splash", "show the Hara splash and header"},
+    {"/status", "show ROOT and RESP status"},
+    {"/resp", "show or control the RESP listener"},
     {"/ns", "show the current namespace"},
     {"/doc", "show documentation for a symbol"},
     {"/apropos", "search documented symbols"},
@@ -543,6 +705,7 @@ public final class Main {
     {"/quit", "exit the REPL"},
     {"/exit", "exit the REPL"}
   };
+
 
   private static int fuzzyScore(String query, String value) {
     if (query == null || query.isEmpty()) return 0;
@@ -572,55 +735,82 @@ public final class Main {
     terminal.flush();
   }
 
-  private static void showDocumentation(Context context, LineReader reader, Terminal terminal) {
+  private static void showDocumentation(
+      HaraSessionBroker.HaraSession session, LineReader reader, Terminal terminal) {
     String symbol =
         HaraCompleter.extractWord(reader.getBuffer().toString(), reader.getBuffer().cursor());
-    showDocumentation(context, symbol, terminal);
+    showDocumentation(session, symbol, terminal);
   }
 
-  private static void showDocumentation(Context context, String symbol, Terminal terminal) {
+  private static void showDocumentation(
+      HaraSessionBroker.HaraSession session, String symbol, Terminal terminal) {
     if (symbol == null || symbol.isEmpty() || symbol.startsWith("/")) return;
     try {
-      Value meta = context.eval(HaraLanguage.ID, "(meta #'" + symbol + ")");
-      Value doc = context.eval(HaraLanguage.ID, "(get (meta #'" + symbol + ") :doc)");
-      Value arglists = context.eval(HaraLanguage.ID, "(get (meta #'" + symbol + ") :arglists)");
+      Value doc = session.eval("(get (meta #'" + symbol + ") :doc)");
+      Value arglists = session.eval("(get (meta #'" + symbol + ") :arglists)");
       terminal.writer().println();
       terminal.writer().println("Documentation: " + symbol);
       if (arglists != null && !arglists.isNull())
         terminal.writer().println("  Arglists: " + arglists);
       if (doc != null && !doc.isNull()) terminal.writer().println("  " + doc.asString());
+      terminal.writer().println();
       terminal.writer().flush();
     } catch (RuntimeException ignored) {
       terminal.writer().println("No documentation for " + symbol);
+      terminal.writer().println();
       terminal.writer().flush();
     }
   }
 
-  private static void printApropos(Context context, String query, Terminal terminal) {
+  private static void printApropos(
+      HaraSessionBroker.HaraSession session, String query, Terminal terminal) {
     try {
-      Value symbols = context.eval(HaraLanguage.ID, "(current-symbols)");
-      for (long i = 0; i < symbols.getArraySize(); i++) {
-        String name = symbols.getArrayElement(i).asString();
+      for (String name : session.currentSymbols()) {
         if (fuzzyScore(query, name) == Integer.MAX_VALUE) continue;
-        Value doc = context.eval(HaraLanguage.ID, "(get (meta #'" + name + ") :doc)");
+        Value doc = session.eval("(get (meta #'" + name + ") :doc)");
         if (doc != null && !doc.isNull()) terminal.writer().println(name + " — " + doc.asString());
       }
+      terminal.writer().println();
       terminal.writer().flush();
     } catch (RuntimeException ignored) {
       terminal.writer().println("Unable to search documentation.");
+      terminal.writer().println();
       terminal.writer().flush();
     }
   }
 
   private static void printInteractiveHelp(Terminal terminal) {
-    terminal.writer().println("Commands:");
-    for (String[] command : REPL_COMMANDS) {
-      terminal.writer().printf("  %-12s %s%n", command[0], command[1]);
-    }
-    terminal
-        .writer()
-        .println("Tab completes commands and symbols; candidates show docs and arglists.");
+    terminal.writer().println();
+    terminal.writer().println("REPL");
+    printHelpEntry(terminal, "/help", "show this command guide");
+    printHelpEntry(terminal, "/history [QUERY]", "search persistent input history");
+    printHelpEntry(terminal, "/clear", "clear the terminal and redraw the menu");
+    printHelpEntry(terminal, "/splash", "redraw the splash and menu");
+    printHelpEntry(terminal, "/time", "show the last evaluation time");
+    terminal.writer().println();
+    terminal.writer().println("SESSION · ROOT");
+    printHelpEntry(terminal, "/status", "show session and listener status");
+    printHelpEntry(terminal, "/ns", "show the current namespace");
+    printHelpEntry(terminal, "/doc SYMBOL", "show symbol documentation");
+    printHelpEntry(terminal, "/apropos QUERY", "search documented symbols");
+    terminal.writer().println();
+    terminal.writer().println("RESP LISTENER");
+    printHelpEntry(terminal, "/resp", "show listener status");
+    printHelpEntry(terminal, "/resp start [PORT|HOST:PORT]", "start the listener");
+    printHelpEntry(terminal, "/resp stop", "stop the listener; keep ROOT");
+    printHelpEntry(terminal, "/resp restart [PORT|HOST:PORT]", "restart the listener; keep ROOT");
+    terminal.writer().println();
+    terminal.writer().println("EXIT");
+    printHelpEntry(terminal, "/quit", "leave Hara");
+    printHelpEntry(terminal, "/exit", "leave Hara");
+    terminal.writer().println();
+    terminal.writer().println("Tab completes commands and visible Hara symbols.");
+    terminal.writer().println();
     terminal.writer().flush();
+  }
+
+  private static void printHelpEntry(Terminal terminal, String command, String description) {
+    terminal.writer().printf("  %-36s %s%n", command, description);
   }
 
   private static String display(Value result) {
@@ -669,17 +859,152 @@ public final class Main {
   }
 
   private static void printUsage(PrintStream output) {
-    output.println(
-        "hara-truffle [--host=HOST] [--port=PORT] [--log-requests] [--allow-file] [--allow-net] server");
-    output.println("hara-truffle [--host=HOST] [--port=PORT] headless");
-    output.println("hara-truffle standalone");
-    output.println("hara-truffle remote HOST:PORT");
-    output.println("hara-truffle [--allow-file] [--allow-net] eval <expression>");
-    output.println("hara-truffle [--allow-file] [--allow-net] run <file>");
-    output.println("hara-truffle [--allow-file] [--allow-net] stdin");
-    output.println("hara-truffle [--allow-file] [--allow-net] repl");
-    output.println("hara-truffle conformance");
-    output.println("hara-truffle help");
+    output.println("hara [OPTIONS]                         JLine REPL + ROOT RESP listener");
+    output.println("hara --offline                        JLine REPL without a listener");
+    output.println("hara headless [OPTIONS]               ROOT RESP listener only");
+    output.println("hara server [OPTIONS]                 compatibility alias for headless");
+    output.println("hara standalone [OPTIONS]             compatibility alias for --offline");
+    output.println("hara remote HOST:PORT");
+    output.println("hara [--allow-file] [--allow-net] eval <expression>");
+    output.println("hara [--allow-file] [--allow-net] run <file>");
+    output.println("hara [--allow-file] [--allow-net] stdin");
+    output.println("hara conformance");
+    output.println();
+    output.println("Options:");
+    output.println("  --host HOST, --host=HOST");
+    output.println("  --port PORT, --port=PORT");
+    output.println("  --offline  --log-requests  --allow-file  --allow-net");
+    output.println("  --history PATH  --no-history  --no-splash  --no-color");
+  }
+
+
+  static final class RespController implements AutoCloseable {
+    private final HaraSessionBroker broker;
+    private final boolean logRequests;
+    private String host;
+    private int port;
+    private HaraServer server;
+
+    RespController(HaraSessionBroker broker, String host, int port, boolean logRequests) {
+      this.broker = broker;
+      this.host = host;
+      this.port = port;
+      this.logRequests = logRequests;
+    }
+
+    synchronized void start() throws IOException {
+      if (isRunning()) return;
+      HaraServer candidate = new HaraServer(broker, host, port, logRequests);
+      try {
+        candidate.start();
+        server = candidate;
+        port = candidate.port();
+      } catch (IOException exception) {
+        candidate.close();
+        throw exception;
+      }
+    }
+
+    synchronized void stop() {
+      if (server != null) server.close();
+      server = null;
+    }
+
+    synchronized boolean isRunning() {
+      return server != null && server.isRunning();
+    }
+
+    synchronized String endpoint() {
+      return host + ":" + (isRunning() ? server.port() : port);
+    }
+
+    synchronized String status() {
+      return isRunning() ? "● " + endpoint() : "○ offline";
+    }
+
+    synchronized String rightPrompt() {
+      return "RESP " + status();
+    }
+
+    synchronized String command(String line) {
+      String[] parts = line.strip().split("\\s+");
+      if (parts.length == 1) return "RESP " + status();
+      String action = parts[1].toLowerCase(java.util.Locale.ROOT);
+      try {
+        if ("stop".equals(action)) {
+          stop();
+          return "RESP ○ offline";
+        }
+        if ("start".equals(action) || "restart".equals(action)) {
+          if (parts.length > 3)
+            return "Usage: /resp " + action + " [PORT|HOST:PORT]";
+          String nextHost = host;
+          int nextPort = port;
+          if (parts.length == 3) {
+            Endpoint endpoint = Endpoint.parse(parts[2], host);
+            nextHost = endpoint.host;
+            nextPort = endpoint.port;
+          }
+          if ("start".equals(action) && isRunning())
+            return "RESP already running at " + endpoint();
+          stop();
+          host = nextHost;
+          port = nextPort;
+          start();
+          return "RESP ● " + endpoint();
+        }
+        return "Usage: /resp [start [PORT|HOST:PORT]|stop|restart [PORT|HOST:PORT]]";
+      } catch (IOException | IllegalArgumentException exception) {
+        return "RESP error: " + exception.getMessage();
+      }
+    }
+
+    @Override
+    public synchronized void close() {
+      stop();
+    }
+  }
+
+  static final class Endpoint {
+    private final String host;
+    private final int port;
+
+    private Endpoint(String host, int port) {
+      this.host = host;
+      this.port = port;
+    }
+
+    static Endpoint parse(String value, String defaultHost) {
+      int separator = value.lastIndexOf(':');
+      if (separator < 0) return new Endpoint(defaultHost, parsePort(value));
+      String host = requiredOption("host", value.substring(0, separator));
+      return new Endpoint(host, parsePort(value.substring(separator + 1)));
+    }
+  }
+
+  private static final class SlashCommandHighlighter implements Highlighter {
+    @Override
+    public AttributedString highlight(LineReader reader, String buffer) {
+      String suggestion = "";
+      if (reader.getBuffer().cursor() == buffer.length()
+          && buffer.startsWith("/")
+          && buffer.indexOf(' ') < 0) {
+        for (String[] command : REPL_COMMANDS) {
+          if (command[0].startsWith(buffer) && command[0].length() > buffer.length()) {
+            suggestion = command[0].substring(buffer.length());
+            break;
+          }
+        }
+      }
+      reader.setTailTip(suggestion);
+      return new AttributedString(buffer);
+    }
+
+    @Override
+    public void setErrorPattern(java.util.regex.Pattern pattern) {}
+
+    @Override
+    public void setErrorIndex(int index) {}
   }
 
   private static final class LispLineParser extends DefaultParser {
@@ -699,10 +1024,10 @@ public final class Main {
   }
 
   private static final class HaraCompleter implements Completer {
-    private final Context context;
+    private final HaraSessionBroker.HaraSession session;
 
-    private HaraCompleter(Context context) {
-      this.context = context;
+    private HaraCompleter(HaraSessionBroker.HaraSession session) {
+      this.session = session;
     }
 
     @Override
@@ -715,47 +1040,40 @@ public final class Main {
         addCommandCandidates(prefix, candidates);
         return;
       }
-
       try {
-        Value symbols = context.eval(HaraLanguage.ID, "(current-symbols)");
         List<ScoredCandidate> matches = new ArrayList<>();
-        for (long i = 0; i < symbols.getArraySize(); i++) {
-          String name = symbols.getArrayElement(i).asString();
+        for (String name : session.currentSymbols()) {
           int score = fuzzyScore(prefix, name);
-          if (score < Integer.MAX_VALUE) {
+          if (score < Integer.MAX_VALUE)
             matches.add(new ScoredCandidate(name, score, describe(name)));
-          }
         }
         matches.sort(
             (left, right) -> {
               int result = Integer.compare(left.score, right.score);
               return result == 0 ? left.name.compareTo(right.name) : result;
             });
-        for (ScoredCandidate match : matches) {
+        for (ScoredCandidate match : matches)
           candidates.add(
               new Candidate(
                   match.name, match.name, "Hara symbols", match.description, null, null, true));
-        }
       } catch (RuntimeException ignored) {
-        // Completion must never disrupt the REPL when the context is unavailable.
+        // Completion must never disrupt the REPL when the session is unavailable.
       }
     }
 
     private void addCommandCandidates(String prefix, List<Candidate> candidates) {
       for (String[] command : REPL_COMMANDS) {
-        if (fuzzyScore(prefix, command[0]) != Integer.MAX_VALUE) {
+        if (fuzzyScore(prefix, command[0]) != Integer.MAX_VALUE)
           candidates.add(
               new Candidate(command[0], command[0], "REPL commands", command[1], null, null, true));
-        }
       }
     }
 
     private String describe(String name) {
       try {
         String escaped = name.replace("\\", "\\\\").replace("\"", "\\\"");
-        Value meta = context.eval(HaraLanguage.ID, "(meta #'" + escaped + ")");
-        Value doc = context.eval(HaraLanguage.ID, "(get (meta #'" + escaped + ") :doc)");
-        Value arglists = context.eval(HaraLanguage.ID, "(get (meta #'" + escaped + ") :arglists)");
+        Value doc = session.eval("(get (meta #'" + escaped + ") :doc)");
+        Value arglists = session.eval("(get (meta #'" + escaped + ") :arglists)");
         StringBuilder result = new StringBuilder();
         if (arglists != null && !arglists.isNull()) result.append(arglists);
         if (doc != null && !doc.isNull()) {
@@ -766,25 +1084,6 @@ public final class Main {
       } catch (RuntimeException ignored) {
         return "";
       }
-    }
-
-    private static int fuzzyScore(String query, String value) {
-      if (query == null || query.isEmpty()) return 0;
-      if (value.equals(query)) return 0;
-      if (value.startsWith(query)) return 10 + value.length() - query.length();
-      String lowerQuery = query.toLowerCase(java.util.Locale.ROOT);
-      String lowerValue = value.toLowerCase(java.util.Locale.ROOT);
-      if (lowerValue.contains(lowerQuery)) return 100 + lowerValue.indexOf(lowerQuery);
-      int queryIndex = 0;
-      int gaps = 0;
-      for (int i = 0; i < lowerValue.length() && queryIndex < lowerQuery.length(); i++) {
-        if (lowerValue.charAt(i) == lowerQuery.charAt(queryIndex)) {
-          queryIndex++;
-        } else if (queryIndex > 0) {
-          gaps++;
-        }
-      }
-      return queryIndex == lowerQuery.length() ? 200 + gaps : Integer.MAX_VALUE;
     }
 
     public static String extractWord(String buffer, int cursor) {
@@ -807,9 +1106,8 @@ public final class Main {
             || c == '}'
             || Character.isWhitespace(c)
             || c == '"'
-            || c == '\'') {
+            || c == '\'')
           return start + 1;
-        }
         start--;
       }
       return 0;
@@ -825,18 +1123,7 @@ public final class Main {
         this.score = score;
         this.description = description;
       }
-
-      private String name() {
-        return name;
-      }
-
-      private int score() {
-        return score;
-      }
-
-      private String description() {
-        return description;
-      }
     }
   }
+
 }

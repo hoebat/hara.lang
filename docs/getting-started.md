@@ -20,7 +20,7 @@ This produces `target/hara-truffle.jar`.
 ## 3. Evaluate a form
 
 ```shell
-java -jar target/hara-truffle.jar eval '(let [x 19] (+ x 23))'
+./hara eval '(let [x 19] (+ x 23))'
 ```
 
 Expected result:
@@ -32,20 +32,23 @@ Expected result:
 ## 4. Start the REPL
 
 ```shell
-java -jar target/hara-truffle.jar
+./hara
 
-# Local single-kernel REPL
-java -jar target/hara-truffle.jar standalone
+# ROOT REPL without a RESP listener
+./hara --offline
 ```
 
-The REPL supports multiline forms, persistent history, symbol and Java completion, and inline
-documentation. See [`User guide`](user-guide.md) and [`REPL specification`](reference/repl.md).
+The REPL opens with large alien-abduction Hara art, a clear-to-blue-to-black gradient, the
+`Journey Within` tagline, and a spaced command menu.
+It supports multiline forms, persistent history, cursor-level slash and symbol completion, inline documentation,
+and RESP listener control through `/resp`. The left prompt shows only the current namespace; the
+header identifies session `ROOT`, and the right prompt shows live listener status. See [`User guide`](user-guide.md) and [`REPL specification`](reference/repl.md).
 
 ## 5. Run a file or stdin
 
 ```shell
-java -jar target/hara-truffle.jar run examples/hello.hal
-cat examples/hello.hal | java -jar target/hara-truffle.jar stdin
+./hara run examples/hello.hal
+cat examples/hello.hal | ./hara stdin
 ```
 
 ## 6. Run tests
