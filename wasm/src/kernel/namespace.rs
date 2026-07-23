@@ -29,9 +29,13 @@ impl<V> Namespace<V> {
     }
     pub fn intern(&self, name: impl AsRef<str>, value: V) -> Var<V>
     where
-        V: Clone,
+        V: Clone + 'static,
     {
         let local = Symbol::parse(name.as_ref());
+        if let Some(existing) = self.mappings.borrow().get(&local).cloned() {
+            existing.reset_value(value);
+            return existing;
+        }
         let path = format!("{}/{}", self.name.as_str(), local.get_name());
         let var = Var::new(path, value);
         self.mappings.borrow_mut().insert(local, var.clone());
@@ -87,6 +91,23 @@ impl<V> Namespace<V> {
         V: Clone,
     {
         self.mappings
+            .borrow()
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
+    }
+    pub fn aliases(&self) -> Vec<(Symbol, Namespace<V>)>
+    where
+        V: Clone,
+    {
+        self.aliases
+            .borrow()
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
+    }
+    pub fn imports(&self) -> Vec<(Symbol, String)> {
+        self.imports
             .borrow()
             .iter()
             .map(|(k, v)| (k.clone(), v.clone()))
@@ -217,15 +238,19 @@ mod tests {
     fn resolves_local_and_aliased_vars() {
         let source = Namespace::new("source");
         source.intern("answer", 42);
+        let original = source.resolve(&Symbol::parse("answer")).unwrap();
+        let reinterned = source.intern("answer", 43);
+        assert!(original.same_identity(&reinterned));
+        assert_eq!(original.deref(), 43);
         let target = Namespace::new("target");
         target.alias("s", source.clone());
         assert_eq!(
             source.resolve(&Symbol::parse("answer")).unwrap().deref(),
-            42
+            43
         );
         assert_eq!(
             target.resolve(&Symbol::parse("s/answer")).unwrap().deref(),
-            42
+            43
         );
     }
     #[test]
