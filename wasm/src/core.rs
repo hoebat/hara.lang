@@ -1048,6 +1048,10 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 if !settled { return Err("promise is already settled".into()); }
                 Ok(Value::Promise(promise))
             }
+            Form::Symbol(n) if n == "promise/cancel" => {
+                if fs.len()!=2 { return Err("promise/cancel expects a promise".into()); }
+                let promise=promise_value(&eval(&fs[1], env)?, n)?; if !promise.reject("cancelled") { return Err("promise is already settled".into()); } Ok(Value::Promise(promise))
+            }
             Form::Symbol(n) if n == "promise/adopt" => {
                 if fs.len() != 3 { return Err("promise/adopt expects two promises".into()); }
                 let promise = promise_value(&eval(&fs[1], env)?, n)?; let other = promise_value(&eval(&fs[2], env)?, n)?;
