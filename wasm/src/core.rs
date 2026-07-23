@@ -1000,6 +1000,29 @@ fn function_parts(form: &Form) -> Result<(Vec<String>, Option<String>), String> 
     Ok((params, variadic))
 }
 
+fn deref_value(value: Value) -> Value {
+    match value {
+        Value::Var(cell) => cell.borrow().clone(),
+        value => value,
+    }
+}
+
+fn binding_value(env: &HashMap<String, Value>, name: &str) -> Option<Value> {
+    env.get(name).cloned().map(deref_value)
+}
+
+fn binding_var(env: &mut HashMap<String, Value>, name: &str) -> Option<Rc<RefCell<Value>>> {
+    match env.get(name) {
+        Some(Value::Var(cell)) => Some(cell.clone()),
+        Some(value) => {
+            let cell = Rc::new(RefCell::new(value.clone()));
+            env.insert(name.to_string(), Value::Var(cell.clone()));
+            Some(cell)
+        }
+        None => None,
+    }
+}
+
 fn call_function(function: &Function, arguments: Vec<Value>) -> Result<Value, String> {
     if function.variadic.is_none() && function.params.len() != arguments.len() { return Err(format!("function expects {} arguments", function.params.len())); }
     if arguments.len() < function.params.len() { return Err(format!("function expects at least {} arguments", function.params.len())); }
@@ -1022,9 +1045,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
         Form::Symbol(n) if n == "nil" => Ok(Value::Nil),
         Form::Symbol(n) if n == "true" => Ok(Value::Bool(true)),
         Form::Symbol(n) if n == "false" => Ok(Value::Bool(false)),
-        Form::Symbol(n) => env
-            .get(n)
-            .cloned()
+        Form::Symbol(n) => binding_value(env, n)
             .ok_or_else(|| format!("unbound symbol: {n}")),
         Form::List(fs) if fs.is_empty() => Ok(Value::Nil),
         Form::List(fs) => match &fs[0] {
@@ -1035,11 +1056,35 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
             }
             Form::Symbol(n) if n == "var" => {
                 if fs.len()!=2 { return Err("var expects a symbol".into()); }
-                let name=match &fs[1] { Form::Symbol(name)=>name, _=>return Err("var expects a symbol".into()) }; let value=env.get(name).cloned().ok_or_else(|| format!("unbound symbol: {name}"))?; Ok(Value::Var(Rc::new(RefCell::new(value))))
+                let name=match &fs[1] { Form::Symbol(name)=>name, _=>return Err("var expects a symbol".into()) };
+                let cell=binding_var(env, name).ok_or_else(|| format!("unbound symbol: {name}"))?;
+                Ok(Value::Var(cell))
             }
             Form::Symbol(n) if n == "deref" => {
                 if fs.len()!=2 { return Err("deref expects a var".into()); }
-                match eval(&fs[1], env)? { Value::Var(value)=>Ok(value.borrow().clone()), _=>Err("deref expects a var".into()) }
+                let target=match &fs[1] {
+                    Form::Symbol(name) => match env.get(name) { Some(Value::Var(cell))=>Value::Var(cell.clone()), _=>eval(&fs[1], env)? },
+                    _=>eval(&fs[1], env)?,
+                };
+                match target { Value::Var(value)=>Ok(value.borrow().clone()), _=>Err("deref expects a var".into()) }
+            }
+            Form::Symbol(n) if n == "set!" || n == "var/set" => {
+                if fs.len()!=3 { return Err(format!("{n} expects a symbol and value")); }
+                let name=match &fs[1] { Form::Symbol(name)=>name, _=>return Err(format!("{n} expects a symbol")) };
+                let value=eval(&fs[2], env)?;
+                let cell=binding_var(env, name).ok_or_else(|| format!("unbound var: {name}"))?;
+                *cell.borrow_mut()=value.clone();
+                Ok(value)
+            }
+            Form::Symbol(n) if n == "alter-var-root" => {
+                if fs.len()<3 { return Err("alter-var-root expects a var and function".into()); }
+                let target=match eval(&fs[1], env)? { Value::Var(cell)=>cell, _=>return Err("alter-var-root expects a var".into()) };
+                let function=match eval(&fs[2], env)? { Value::Function(function)=>function, _=>return Err("alter-var-root expects a function".into()) };
+                let mut arguments=vec![target.borrow().clone()];
+                arguments.extend(fs[3..].iter().map(|form| eval(form, env)).collect::<Result<Vec<_>,_>>()?);
+                let value=call_function(&function, arguments)?;
+                *target.borrow_mut()=value.clone();
+                Ok(value)
             }
             Form::Symbol(n) if n == "throw" => {
                 if fs.len()!=2 { return Err("throw expects one value".into()); }
@@ -1056,16 +1101,22 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
             }
             Form::Symbol(n) if n == "def" => {
                 if fs.len()!=3 { return Err("def expects a name and value".into()); }
-                let name=match &fs[1] { Form::Symbol(name)=>name.clone(), _=>return Err("def name must be a symbol".into()) }; let value=eval(&fs[2], env)?; env.insert(name, value.clone()); Ok(value)
+                let name=match &fs[1] { Form::Symbol(name)=>name.clone(), _=>return Err("def name must be a symbol".into()) };
+                let value=eval(&fs[2], env)?;
+                if let Some(Value::Var(cell))=env.get(&name) { *cell.borrow_mut()=value.clone(); }
+                else { env.insert(name, Value::Var(Rc::new(RefCell::new(value.clone())))); }
+                Ok(value)
             }
             Form::Symbol(n) if n == "defn" => {
                 if fs.len() < 4 { return Err("defn expects a name, parameters, and a body".into()); }
                 let name = match &fs[1] { Form::Symbol(name) => name.clone(), _ => return Err("defn name must be a symbol".into()) };
                 let (params, variadic) = function_parts(&fs[2])?;
+                let cell=match env.get(&name) { Some(Value::Var(cell))=>cell.clone(), _=>Rc::new(RefCell::new(Value::Nil)) };
+                env.insert(name.clone(), Value::Var(cell.clone()));
                 let function_ref = Rc::new(Function { params, variadic, body: fs[3..].to_vec(), captured: Rc::new(RefCell::new(env.clone())) });
                 let function = Value::Function(function_ref.clone());
-                function_ref.captured.borrow_mut().insert(name.clone(), function.clone());
-                env.insert(name, function.clone()); Ok(function)
+                *cell.borrow_mut()=function.clone();
+                Ok(function)
             }
             Form::Symbol(n) if n == "do" => {
                 let mut result = Value::Nil;

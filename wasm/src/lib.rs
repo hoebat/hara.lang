@@ -573,6 +573,16 @@ mod tests {
     }
 
     #[test]
+    fn vars_preserve_identity_and_support_root_mutation() {
+        let mut runtime = Runtime::new();
+        assert_eq!(runtime.eval_text("(do (def answer 1) (= (var answer) (var answer)))").unwrap(), "true");
+        assert_eq!(runtime.eval_text("(do (def answer 1) (set! answer 42) (deref (var answer)))").unwrap(), "42");
+        assert_eq!(runtime.eval_text("(do (def answer 1) (let (v (var answer)) (do (set! answer 7) (deref v))))").unwrap(), "7");
+        assert_eq!(runtime.eval_text("(do (def answer 1) (defn add [x y] (+ x y)) (alter-var-root (var answer) add 40) answer)").unwrap(), "41");
+        assert_eq!(runtime.eval_text("(set! missing 1)").unwrap_err(), "unbound var: missing");
+    }
+
+    #[test]
     fn functions_capture_lexical_values_and_support_defn() {
         let mut runtime = Runtime::new();
         assert_eq!(runtime.eval_text("((fn [x] (+ x 1)) 41)").unwrap(), "42");
