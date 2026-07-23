@@ -730,36 +730,50 @@ public interface Iter {
   }
 
   public static <E> Iterator<E> cycle(Supplier<Iterator<E>> f) {
-    return new Iterator<E>() {
+    return new CloseableIterator<E>() {
       Iterator<E> _it;
+      boolean _closed;
 
       private void initialize() {
-        if (_it == null) {
+        if (_it == null && !_closed) {
           _it = f.get();
         }
       }
 
-      @Override
+
       public boolean hasNext() {
         initialize();
-        return true;
+        return !_closed;
       }
 
-      @Override
+
       public E next() {
         initialize();
+        if (_closed) {
+          throw new Ex.NoSuchElement();
+        }
         if (_it.hasNext()) {
           return _it.next();
-        } else {
-          _it = f.get();
         }
+        Iter.close(_it);
+        _it = f.get();
         if (!_it.hasNext()) {
+          Iter.close(_it);
           _it = f.get();
           if (!_it.hasNext()) {
+            close();
             throw new Ex.NoSuchElement();
           }
         }
         return _it.next();
+      }
+
+
+      public void close() {
+        if (_closed) return;
+        _closed = true;
+        Iter.close(_it);
+        _it = null;
       }
     };
   }
@@ -784,29 +798,44 @@ public interface Iter {
 
   @SuppressWarnings({"rawtypes"})
   public static Iterator<Object[]> zip(Iterator<Iterator<Object>> input) {
-    return new Iterator<Object[]>() {
+    return new CloseableIterator<Object[]>() {
       private Iterator[] its;
       private boolean initialized;
+      private boolean closed;
 
       private void initialize() {
-        if (!initialized) {
+        if (!initialized && !closed) {
           its = Iter.toArray(input, Iterator.class);
           initialized = true;
         }
       }
 
-      @Override
+
       public boolean hasNext() {
         initialize();
-        return Array.every((it) -> it.hasNext(), its);
+        if (closed) return false;
+        boolean available = Array.every((it) -> it.hasNext(), its);
+        if (!available) close();
+        return available;
       }
 
-      @Override
+
       public Object[] next() {
         if (!hasNext()) {
           throw new Ex.NoSuchElement();
         }
         return Array.map((it) -> it.next(), Object.class, its);
+      }
+
+
+      public void close() {
+        if (closed) return;
+        closed = true;
+        if (its != null) {
+          for (Iterator iterator : its) Iter.close(iterator);
+          its = null;
+        }
+        Iter.close(input);
       }
     };
   }

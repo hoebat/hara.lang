@@ -2031,6 +2031,18 @@ mod tests {
         );
         assert_eq!(
             runtime
+                .eval_text("(let (it (iter-cycle [1 2])) (do (iter-next it) (iter-close it) (iter-has? it)))")
+                .unwrap(),
+            "false"
+        );
+        assert_eq!(
+            runtime
+                .eval_text("(let (it (iter-zip [1 2] [3 4])) (do (iter-close it) (iter-has? it)))")
+                .unwrap(),
+            "false"
+        );
+        assert_eq!(
+            runtime
                 .eval_text("(iter-next (iter-map (fn [x] (* x 2)) [1 2]))")
                 .unwrap(),
             "2"
