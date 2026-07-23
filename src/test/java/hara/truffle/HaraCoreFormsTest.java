@@ -145,10 +145,10 @@ public class HaraCoreFormsTest {
   public void runtimeErrorsPreserveSourceNameAndLeadingWhitespaceLocation() throws Exception {
     try (Context context = context()) {
       Source source =
-          Source.newBuilder(HaraLanguage.ID, "  \n  (+ 1 :bad)", "diagnostic.hara").build();
+          Source.newBuilder(HaraLanguage.ID, "  \n  (+ 1 :bad)", "diagnostic.hal").build();
       PolyglotException error = assertThrows(PolyglotException.class, () -> context.eval(source));
       assertTrue(error.getSourceLocation() != null);
-      assertEquals("diagnostic.hara", error.getSourceLocation().getSource().getName());
+      assertEquals("diagnostic.hal", error.getSourceLocation().getSource().getName());
       assertEquals(2, error.getSourceLocation().getStartLine());
     }
   }
@@ -156,9 +156,9 @@ public class HaraCoreFormsTest {
   @Test
   public void malformedReaderErrorsPreserveSourceNameAndReaderPosition() throws Exception {
     try (Context context = context()) {
-      Source source = Source.newBuilder(HaraLanguage.ID, "(+ 1 2", "broken.hara").build();
+      Source source = Source.newBuilder(HaraLanguage.ID, "(+ 1 2", "broken.hal").build();
       PolyglotException error = assertThrows(PolyglotException.class, () -> context.eval(source));
-      assertTrue(error.getMessage().contains("Unable to read Hara source broken.hara"));
+      assertTrue(error.getMessage().contains("Unable to read Hara source broken.hal"));
       assertTrue(error.getMessage().contains("line 1"));
       assertTrue(error.getMessage().contains("column"));
     }
@@ -167,11 +167,11 @@ public class HaraCoreFormsTest {
   @Test
   public void compileErrorsExposeTheOffendingFormSourceLocation() throws Exception {
     try (Context context = context()) {
-      Source source = Source.newBuilder(HaraLanguage.ID, "  \n  (if true)", "compile.hara").build();
+      Source source = Source.newBuilder(HaraLanguage.ID, "  \n  (if true)", "compile.hal").build();
       PolyglotException error = assertThrows(PolyglotException.class, () -> context.eval(source));
       assertTrue(error.getMessage().contains("if expects two or three arguments"));
       assertTrue(error.getSourceLocation() != null);
-      assertEquals("compile.hara", error.getSourceLocation().getSource().getName());
+      assertEquals("compile.hal", error.getSourceLocation().getSource().getName());
       assertEquals(2, error.getSourceLocation().getStartLine());
     }
   }

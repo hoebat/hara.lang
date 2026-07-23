@@ -2,6 +2,12 @@ package hara.kernel.base;
 
 import hara.kernel.NativeMode;
 import hara.kernel.builtin.BuiltinInterop;
+import hara.kernel.flavor.NativeCapability;
+import hara.kernel.flavor.NativeFlavorAccess;
+import hara.kernel.flavor.NativeFlavorProvider;
+import hara.kernel.flavor.NativeFlavorRegistry;
+import hara.kernel.jvm.JvmFlavorProvider;
+import hara.kernel.jvm.JvmSetFunction;
 import hara.kernel.protocol.IEnv;
 import hara.kernel.protocol.IRuntime;
 import hara.lang.base.Ex;
@@ -14,6 +20,7 @@ import hara.lang.protocol.*;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map.Entry;
@@ -197,6 +204,11 @@ public interface RT {
 
     @Override
     public Entry<Symbol, Object> find(Symbol sym) {
+      if (!(_rt instanceof Instance)
+          || ((Instance) _rt).getCurrentNs() == null
+          || ((Instance) _rt).getCurrentNs().nativeFlavor == null) {
+        return null;
+      }
       if (sym.getNamespace() == null) {
         var s = sym.getName();
         Class c = null;
@@ -207,10 +219,6 @@ public interface RT {
 
         if (c == null) {
           c = _alias.getOrDefault(s, null);
-        }
-
-        if (c == null) {
-          c = _rt.classFor(s);
         }
         return (c != null) ? BuiltinStruct.pair(sym, c) : null;
       } else {
@@ -225,11 +233,6 @@ public interface RT {
         if (c == null) {
           c = _alias.getOrDefault(s, null);
         }
-
-        if (c == null) {
-          c = _rt.classFor(s);
-        }
-
         if (c != null) {
 
           try {
@@ -410,16 +413,29 @@ public interface RT {
     public final Loader _loader;
     public final RootEnv<AST> _rootEnv;
     public final UserEnv<AST> _userEnv;
+    public final NativeFlavorRegistry _nativeFlavors;
+    public final NativeFlavorAccess _nativeAccess;
     public final ThreadLocal<List<IEnv<Symbol, Var>>> _stack;
     public final java.io.PrintStream out;
 
     public Instance(IContext root, String key) {
+      this(root, key, EnumSet.of(NativeCapability.REFLECTION));
+    }
+
+    public Instance(IContext root, String key, java.util.Set<NativeCapability> nativeCapabilities) {
       _root = root;
       _key = key;
       this.out = new PrefixStream(System.out, "[" + key + "] ");
       _loader = new Loader();
+      _nativeFlavors = new NativeFlavorRegistry().register(JvmFlavorProvider.INSTANCE);
+      _nativeAccess = NativeFlavorAccess.of(_loader, nativeCapabilities);
       _rootEnv = new RootEnv<>(null, this);
       _userEnv = new UserEnv<>(_rootEnv, this);
+      Namespace jvmNamespace = addNamespace(Symbol.create("hara.native.jvm"));
+      jvmNamespace.mappings.put(Symbol.create("set!"), new Var("set!", new JvmSetFunction(this)));
+      addNamespace(Symbol.create("hara.native.jvm.reflect"));
+      addNamespace(Symbol.create("hara.native.jvm.classpath"));
+      addNamespace(Symbol.create("hara.native.jvm.compiler"));
       _stack =
           new ThreadLocal() {
             @Override
@@ -461,6 +477,17 @@ public interface RT {
     @Override
     public IContext getRoot() {
       return _root;
+    }
+
+    public NativeFlavorProvider nativeProvider() {
+      Namespace namespace = getCurrentNs();
+      return namespace == null || namespace.nativeFlavor == null
+          ? null
+          : _nativeFlavors.require(namespace.nativeFlavor);
+    }
+
+    public NativeFlavorAccess nativeAccess() {
+      return _nativeAccess;
     }
 
     @Override

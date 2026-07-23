@@ -684,8 +684,10 @@ public final class HaraNodes {
 
     @Override
     public Object execute(VirtualFrame frame) {
-      HaraVar var = HaraLanguage.currentContext().resolve(symbol);
+      HaraContext context = HaraLanguage.currentContext();
+      HaraVar var = context.resolve(symbol);
       if (var == null) {
+        if (context.hasNativeSymbol(symbol)) return context.resolveNativeSymbol(symbol);
         throw unboundError("symbol");
       }
       return var.deref();
@@ -985,17 +987,18 @@ public final class HaraNodes {
     @Child private HaraExpressionNode finallyBody;
 
     public static final class CatchClause extends HaraExpressionNode {
-      private final String typeName;
+      private final Symbol type;
       private final int catchSlot;
       @Child private HaraExpressionNode body;
 
-      public CatchClause(String typeName, int catchSlot, HaraExpressionNode body) {
-        this.typeName = typeName;
+      public CatchClause(Symbol type, int catchSlot, HaraExpressionNode body) {
+        this.type = type;
         this.catchSlot = catchSlot;
         this.body = body;
       }
 
       private boolean matches(Object value) {
+        String typeName = type.getName();
         if ("Object".equals(typeName)
             || "Exception".equals(typeName)
             || "Throwable".equals(typeName)) {
@@ -1012,6 +1015,9 @@ public final class HaraNodes {
         if ("Double".equals(typeName)) return value instanceof Double;
         if ("BigInteger".equals(typeName)) return value instanceof java.math.BigInteger;
         if ("BigDecimal".equals(typeName)) return value instanceof java.math.BigDecimal;
+        if (value instanceof Throwable) {
+          return HaraLanguage.currentContext().matchesNativeThrowable(type, (Throwable) value);
+        }
         return false;
       }
 
@@ -1043,6 +1049,14 @@ public final class HaraNodes {
           }
         }
         throw thrown;
+      } catch (hara.kernel.flavor.NativeFlavorException failure) {
+        Throwable cause = failure.getCause() == null ? failure : failure.getCause();
+        for (CatchClause clause : catches) {
+          if (clause.matches(cause)) {
+            return clause.executeCatch(frame, cause);
+          }
+        }
+        throw failure;
       } finally {
         if (finallyBody != null) {
           finallyBody.execute(frame);
@@ -1392,6 +1406,54 @@ public final class HaraNodes {
     @TruffleBoundary
     private HaraException hostCallError() {
       return new HaraException("Unable to call host member " + member, this);
+    }
+  }
+
+  public static final class NativeConstruct extends HaraExpressionNode {
+    @Child private HaraExpressionNode type;
+    @Children private final HaraExpressionNode[] arguments;
+
+    public NativeConstruct(HaraExpressionNode type, HaraExpressionNode[] arguments) {
+      this.type = type;
+      this.arguments = arguments;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      Object[] values = new Object[arguments.length];
+      for (int i = 0; i < arguments.length; i++) values[i] = arguments[i].execute(frame);
+      return HaraLanguage.currentContext().constructNative(type.execute(frame), values);
+    }
+  }
+
+  public static final class NativeReadMember extends HaraExpressionNode {
+    @Child private HaraExpressionNode receiver;
+    private final String member;
+
+    public NativeReadMember(HaraExpressionNode receiver, String member) {
+      this.receiver = receiver;
+      this.member = member;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      return HaraLanguage.currentContext().readNativeMember(receiver.execute(frame), member);
+    }
+  }
+
+  public static final class NativeIndex extends HaraExpressionNode {
+    @Child private HaraExpressionNode receiver;
+    @Child private HaraExpressionNode index;
+
+    public NativeIndex(HaraExpressionNode receiver, HaraExpressionNode index) {
+      this.receiver = receiver;
+      this.index = index;
+    }
+
+    @Override
+    public Object execute(VirtualFrame frame) {
+      return HaraLanguage.currentContext()
+          .indexNative(receiver.execute(frame), index.execute(frame));
     }
   }
 

@@ -1,7 +1,7 @@
 # Hara runtime libraries
 
 Hara keeps its automatically referred core small. The runtime generates the library namespaces;
-they are not backed by `.hara` source files and do not expose their JVM implementation.
+they are not backed by `.hal` source files and do not expose their JVM implementation.
 
 Every namespace receives these aliases by default:
 
@@ -60,5 +60,7 @@ Bytes expose unsigned values from `0` through `255` through `bytes/get`; `bytes/
 File and socket namespaces are always present and aliased. Availability does not grant authority.
 Unsupported or denied operations fail when invoked. JVM embeddings grant authority with Graal
 `IOAccess`; the CLI grants it explicitly with `--allow-file` and `--allow-net`. File reads and
-writes use bytes and return promises. Socket v1 consists of promise-returning `connect`, `send`,
-and `close`; receive/framing and HTTP are outside this slice.
+writes use bytes and return promises. Socket v1 follows the xtalk callback contract:
+`connect` accepts host, port, options, and an `(fn [error connection] ...)` callback; `send`
+accepts bytes and returns the byte count; `close` is direct. Receive/framing and HTTP are outside
+this slice.

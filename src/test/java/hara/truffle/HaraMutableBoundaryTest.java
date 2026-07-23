@@ -24,14 +24,15 @@ public class HaraMutableBoundaryTest {
                       + "(protocol-call IHash hash (bytes 1 2 -3)))")
               .asBoolean());
       assertEquals(
-          2, context.eval(HaraLanguage.ID, "(x:get (byte-slice (bytes 1 2 -3) 1 3) 0)").asLong());
+          2,
+          context.eval(HaraLanguage.ID, "(bytes/get (bytes/slice (bytes 1 2 -3) 1 3) 0)").asLong());
       assertEquals(
           1,
           context
               .eval(
                   HaraLanguage.ID,
                   "(let [source (bytes 1 2)] "
-                      + "(let [copy (byte-copy source)] (x:set copy 0 9) (x:get source 0)))")
+                      + "(let [copy (bytes/copy source)] (bytes/set copy 0 9) (bytes/get source 0)))")
               .asLong());
     }
   }
@@ -39,12 +40,12 @@ public class HaraMutableBoundaryTest {
   @Test
   public void byteValuesConvertBetweenSignedAndUnsignedRepresentations() {
     try (Context context = context()) {
-      assertEquals(255, context.eval(HaraLanguage.ID, "(byte-u8 -1)").asLong());
-      assertEquals(-1, context.eval(HaraLanguage.ID, "(byte-s8 255)").asLong());
-      assertEquals(127, context.eval(HaraLanguage.ID, "(byte-s8 127)").asLong());
+      assertEquals(255, context.eval(HaraLanguage.ID, "(bytes/u8 -1)").asLong());
+      assertEquals(-1, context.eval(HaraLanguage.ID, "(bytes/s8 255)").asLong());
+      assertEquals(127, context.eval(HaraLanguage.ID, "(bytes/s8 127)").asLong());
       assertTrue(
           assertThrows(
-                  PolyglotException.class, () -> context.eval(HaraLanguage.ID, "(byte-u8 256)"))
+                  PolyglotException.class, () -> context.eval(HaraLanguage.ID, "(bytes/u8 256)"))
               .getMessage()
               .contains("range -128..255"));
     }
@@ -53,26 +54,26 @@ public class HaraMutableBoundaryTest {
   @Test
   public void ordinaryByteOperationsHaveExplicitBoundsAndMutationSemantics() {
     try (Context context = context()) {
-      assertEquals(3, context.eval(HaraLanguage.ID, "(byte-count (bytes 1 2 -3))").asLong());
-      assertEquals(2, context.eval(HaraLanguage.ID, "(byte-get (bytes 1 2 -3) 1)").asLong());
+      assertEquals(3, context.eval(HaraLanguage.ID, "(bytes/count (bytes 1 2 -3))").asLong());
+      assertEquals(2, context.eval(HaraLanguage.ID, "(bytes/get (bytes 1 2 -3) 1)").asLong());
       assertEquals(
           9,
           context
-              .eval(HaraLanguage.ID, "(let [b (bytes 1 2)] (byte-set b 0 9) (byte-get b 0))")
+              .eval(HaraLanguage.ID, "(let [b (bytes 1 2)] (bytes/set b 0 9) (bytes/get b 0))")
               .asLong());
-      assertEquals(7, context.eval(HaraLanguage.ID, "(byte-get (bytes 1) 4 7)").asLong());
+      assertEquals(7, context.eval(HaraLanguage.ID, "(bytes/get (bytes 1) 4 7)").asLong());
       assertTrue(
           assertThrows(
                   PolyglotException.class,
-                  () -> context.eval(HaraLanguage.ID, "(byte-get (bytes 1) 4)"))
+                  () -> context.eval(HaraLanguage.ID, "(bytes/get (bytes 1) 4)"))
               .getMessage()
-              .contains("byte-get index out of bounds"));
+              .contains("bytes/get index out of bounds"));
       assertTrue(
           assertThrows(
                   PolyglotException.class,
-                  () -> context.eval(HaraLanguage.ID, "(byte-set (bytes 1) 0 256)"))
+                  () -> context.eval(HaraLanguage.ID, "(bytes/set (bytes 1) 0 256)"))
               .getMessage()
-              .contains("byte-set expects a value in the byte range"));
+              .contains("bytes/set expects a value in the range -128..255"));
     }
   }
 
@@ -84,15 +85,16 @@ public class HaraMutableBoundaryTest {
           context
               .eval(
                   HaraLanguage.ID,
-                  "(let [object (x:object)] " + "(x:set object :answer 42) (x:get object :answer))")
+                  "(let [object (object)] "
+                      + "(. object (set \"answer\" 42)) (. object (get \"answer\")))")
               .asLong());
-      assertEquals(7, context.eval(HaraLanguage.ID, "(x:get (x:array 1) 9 7)").asLong());
+      assertEquals(7, context.eval(HaraLanguage.ID, "(. (object) (get \"missing\" 7))").asLong());
 
       PolyglotException invalidIndex =
           assertThrows(
               PolyglotException.class,
-              () -> context.eval(HaraLanguage.ID, "(x:get (x:array 1) :bad 7)"));
-      assertTrue(invalidIndex.getMessage().contains("index must be numeric"));
+              () -> context.eval(HaraLanguage.ID, "(. (array 1) (get :bad))"));
+      assertTrue(invalidIndex.getMessage().contains("expects a numeric index"));
     }
   }
 
@@ -101,13 +103,14 @@ public class HaraMutableBoundaryTest {
     try (Context context = context()) {
       assertTrue(
           assertThrows(
-                  PolyglotException.class, () -> context.eval(HaraLanguage.ID, "(byte-copy [1 2])"))
+                  PolyglotException.class,
+                  () -> context.eval(HaraLanguage.ID, "(bytes/copy [1 2])"))
               .getMessage()
-              .contains("byte-copy expects bytes"));
+              .contains("bytes/copy expects bytes"));
       assertTrue(
           assertThrows(
                   PolyglotException.class,
-                  () -> context.eval(HaraLanguage.ID, "(byte-slice (bytes 1 2) 0 3)"))
+                  () -> context.eval(HaraLanguage.ID, "(bytes/slice (bytes 1 2) 0 3)"))
               .getMessage()
               .contains("range is out of bounds"));
     }
@@ -119,21 +122,15 @@ public class HaraMutableBoundaryTest {
       assertTrue(
           assertThrows(
                   PolyglotException.class,
-                  () -> context.eval(HaraLanguage.ID, "(x:set (x:array 1) 4 9)"))
+                  () -> context.eval(HaraLanguage.ID, "(. (array 1) (set 4 9))"))
               .getMessage()
-              .contains("x:set index out of bounds"));
+              .contains("set index out of bounds"));
       assertTrue(
           assertThrows(
                   PolyglotException.class,
-                  () -> context.eval(HaraLanguage.ID, "(x:delete (x:array 1) 4)"))
+                  () -> context.eval(HaraLanguage.ID, "(. (array 1) (remove 4))"))
               .getMessage()
-              .contains("x:delete index out of bounds"));
-      assertTrue(
-          assertThrows(
-                  PolyglotException.class,
-                  () -> context.eval(HaraLanguage.ID, "(x:remove (x:array 1) 4)"))
-              .getMessage()
-              .contains("x:remove index out of bounds"));
+              .contains("remove index out of bounds"));
     }
   }
 
@@ -166,7 +163,7 @@ public class HaraMutableBoundaryTest {
           context
               .eval(
                   HaraLanguage.ID,
-                  "(let [ia (iter (x:array 1 2)) ib (iter (bytes 3 4))] "
+                  "(let [ia (iter (array 1 2)) ib (iter (bytes 3 4))] "
                       + "(+ (iter-next ia) (iter-next ib)))")
               .asLong());
     }
@@ -216,8 +213,7 @@ public class HaraMutableBoundaryTest {
                   "(let [it (iter-drop 1 (iter-take 3 [1 2 3 4]))] (iter-next it))")
               .asLong());
       assertEquals(
-          3,
-          context.eval(HaraLanguage.ID, "(x:get (iter-next (iter-zip [1 2] [3 4])) 1)").asLong());
+          3, context.eval(HaraLanguage.ID, "(nth (iter-next (iter-zip [1 2] [3 4])) 1)").asLong());
       assertTrue(
           !context
               .eval(
@@ -246,7 +242,7 @@ public class HaraMutableBoundaryTest {
       assertEquals(
           2,
           context
-              .eval(HaraLanguage.ID, "(x:get (iter-next (iter-partition-pair [1 2 3 4])) 1)")
+              .eval(HaraLanguage.ID, "(nth (iter-next (iter-partition-pair [1 2 3 4])) 1)")
               .asLong());
     }
   }

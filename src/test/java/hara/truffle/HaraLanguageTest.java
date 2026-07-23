@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.HostAccess;
+import org.graalvm.polyglot.io.IOAccess;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
 import org.junit.Test;
@@ -51,7 +52,7 @@ public class HaraLanguageTest {
       assertEquals(
           42,
           context
-              .eval(HaraLanguage.ID, "(load-resource \"hara/l0-core.hara\") ((comp2 inc inc) 40)")
+              .eval(HaraLanguage.ID, "(load-resource \"hara/l0-core.hal\") ((comp2 inc inc) 40)")
               .asLong());
       assertEquals(42, context.eval(HaraLanguage.ID, "((comp3 inc inc inc) 39)").asLong());
       assertTrue(context.eval(HaraLanguage.ID, "((complement (fn [x] (= x 1))) 2)").asBoolean());
@@ -104,11 +105,9 @@ public class HaraLanguageTest {
               .asLong());
       assertEquals(
           2,
-          context
-              .eval(HaraLanguage.ID, "(x:get (iter-next (partition-all 2 [1 2 3])) 1)")
-              .asLong());
+          context.eval(HaraLanguage.ID, "(nth (iter-next (partition-all 2 [1 2 3])) 1)").asLong());
       assertEquals(
-          2, context.eval(HaraLanguage.ID, "(x:get (iter-next (partition 2 [1 2 3])) 1)").asLong());
+          2, context.eval(HaraLanguage.ID, "(nth (iter-next (partition 2 [1 2 3])) 1)").asLong());
       assertEquals(1, context.eval(HaraLanguage.ID, "(iter-next (interpose 0 [1 2]))").asLong());
       assertTrue(
           context
@@ -141,11 +140,9 @@ public class HaraLanguageTest {
               .eval(HaraLanguage.ID, "(iter-next (keep (fn [x] (if (= x 2) x nil)) [1 2]))")
               .asLong());
       assertEquals(1, context.eval(HaraLanguage.ID, "(iter-next (cycle [1 2]))").asLong());
+      assertEquals(2, context.eval(HaraLanguage.ID, "(nth (iter-next (zip [1] [2])) 1)").asLong());
       assertEquals(
-          2, context.eval(HaraLanguage.ID, "(x:get (iter-next (zip [1] [2])) 1)").asLong());
-      assertEquals(
-          2,
-          context.eval(HaraLanguage.ID, "(x:get (iter-next (partition-pair [1 2])) 1)").asLong());
+          2, context.eval(HaraLanguage.ID, "(nth (iter-next (partition-pair [1 2])) 1)").asLong());
       assertTrue(context.eval(HaraLanguage.ID, "(every? (fn [x] (> x 0)) [1 2])").asBoolean());
       assertTrue(context.eval(HaraLanguage.ID, "(any? (fn [x] (= x 2)) [1 2])").asBoolean());
       assertEquals(2, context.eval(HaraLanguage.ID, "(some (fn [x] (= x 2)) [1 2])").asLong());
@@ -160,16 +157,16 @@ public class HaraLanguageTest {
       assertEquals(
           42,
           context
-              .eval(HaraLanguage.ID, "(require \"hara/l0-core.hara\") ((comp2 inc inc) 40)")
+              .eval(HaraLanguage.ID, "(require \"hara/l0-core.hal\") ((comp2 inc inc) 40)")
               .asLong());
       assertEquals(42, context.eval(HaraLanguage.ID, "((comp3 inc inc inc) 39)").asLong());
       assertEquals(
-          1, context.eval(HaraLanguage.ID, "(module-revision \"hara/l0-core.hara\")").asLong());
-      context.eval(HaraLanguage.ID, "(require \"hara/l0-core.hara\" {:reload true})");
+          1, context.eval(HaraLanguage.ID, "(module-revision \"hara/l0-core.hal\")").asLong());
+      context.eval(HaraLanguage.ID, "(require \"hara/l0-core.hal\" {:reload true})");
       assertEquals(
           2,
           context
-              .eval(HaraLanguage.ID, "(module-revision \"classpath:hara/l0-core.hara\")")
+              .eval(HaraLanguage.ID, "(module-revision \"classpath:hara/l0-core.hal\")")
               .asLong());
     }
   }
@@ -402,41 +399,42 @@ public class HaraLanguageTest {
   }
 
   @Test
-  public void constructsAndMutatesExplicitXtalkTargetValues() {
+  public void constructsAndMutatesExplicitMarkerValues() {
     try (Context context = context()) {
-      Value array = context.eval(HaraLanguage.ID, "(x:array 1 2)");
+      Value array = context.eval(HaraLanguage.ID, "(array 1 2)");
       assertTrue(array.hasArrayElements());
       array.setArrayElement(1, 7);
       assertEquals(7, array.getArrayElement(1).asLong());
 
-      Value object = context.eval(HaraLanguage.ID, "(x:object :answer 41)");
+      Value object = context.eval(HaraLanguage.ID, "(object \"answer\" 41)");
       assertTrue(object.hasHashEntries());
-      object.putHashEntry(":answer", 42);
-      assertEquals(42, object.getHashValue(":answer").asLong());
-      assertEquals(2, context.eval(HaraLanguage.ID, "(x:len (x:array 1 2))").asLong());
+      object.putHashEntry("answer", 42);
+      assertEquals(42, object.getHashValue("answer").asLong());
+      assertEquals(2, context.eval(HaraLanguage.ID, "(count (array 1 2))").asLong());
       assertEquals(
           7,
           context
-              .eval(HaraLanguage.ID, "(let [a (x:array 1 2)] (x:set a 1 7) (x:get a 1))")
+              .eval(HaraLanguage.ID, "(let [a (array 1 2)] (. a (set 1 7)) (. a (get 1)))")
               .asLong());
       assertEquals(
           1,
           context
-              .eval(HaraLanguage.ID, "(let [a (x:array 1 2)] (x:delete a 0) (x:len a))")
+              .eval(HaraLanguage.ID, "(let [a (array 1 2)] (. a (remove 0)) (count a))")
               .asLong());
       assertEquals(
           3,
           context
-              .eval(HaraLanguage.ID, "(let [a (x:array 1 2)] (x:append a 3) (x:len a))")
+              .eval(HaraLanguage.ID, "(let [a (array 1 2)] (. a (push-last 3)) (count a))")
               .asLong());
       assertEquals(
           7,
           context
-              .eval(HaraLanguage.ID, "(let [a (x:array 1 2)] (x:insert a 1 7) (x:get a 1))")
+              .eval(HaraLanguage.ID, "(let [a (array 1 2)] (. a (insert 1 7)) (. a (get 1)))")
               .asLong());
       assertEquals(
-          2, context.eval(HaraLanguage.ID, "(x:len (x:slice (x:array 1 2 3) 1 3))").asLong());
-      assertEquals(2, context.eval(HaraLanguage.ID, "(x:get (x:clone (x:array 1 2)) 1)").asLong());
+          2, context.eval(HaraLanguage.ID, "(count (. (array 1 2 3) (slice 1 3)))").asLong());
+      assertEquals(
+          2, context.eval(HaraLanguage.ID, "(. (. (array 1 2) (clone)) (get 1))").asLong());
     }
   }
 
@@ -560,7 +558,7 @@ public class HaraLanguageTest {
           42,
           context.eval(HaraLanguage.ID, "(load-string \"(def loaded 41)\") (+ loaded 1)").asLong());
 
-      Path file = Files.createTempFile("hara-l0-", ".hara");
+      Path file = Files.createTempFile("hara-l0-", ".hal");
       try {
         Files.writeString(file, "(def from-file 42)");
         String path = file.toString().replace("\\", "\\\\").replace("\"", "\\\"");
@@ -576,12 +574,12 @@ public class HaraLanguageTest {
   public void loadsPackagedHaraResourcesTransactionally() {
     try (Context context = context()) {
       assertEquals(
-          42, context.eval(HaraLanguage.ID, "(load-resource \"hara/l0-resource.hara\")").asLong());
+          42, context.eval(HaraLanguage.ID, "(load-resource \"hara/l0-resource.hal\")").asLong());
       assertEquals(42, context.eval(HaraLanguage.ID, "l0-resource-answer").asLong());
       assertTrue(
           assertThrows(
                   PolyglotException.class,
-                  () -> context.eval(HaraLanguage.ID, "(load-resource \"hara/missing.hara\")"))
+                  () -> context.eval(HaraLanguage.ID, "(load-resource \"hara/missing.hal\")"))
               .getMessage()
               .contains("Unable to find Hara resource"));
     }
@@ -605,7 +603,7 @@ public class HaraLanguageTest {
               .getMessage()
               .contains("Unbound symbol"));
 
-      Path file = Files.createTempFile("hara-l0-failing-", ".hara");
+      Path file = Files.createTempFile("hara-l0-failing-", ".hal");
       try {
         Files.writeString(file, "(def file-leaked 10) (throw :failed-file)");
         String path = file.toString().replace("\\", "\\\\").replace("\"", "\\\"");
@@ -626,7 +624,7 @@ public class HaraLanguageTest {
   @Test
   public void requireCachesCanonicalModulesAndLoadFileIncrementsRevision() throws Exception {
     try (Context context = context()) {
-      Path file = Files.createTempFile("hara-l0-module-", ".hara");
+      Path file = Files.createTempFile("hara-l0-module-", ".hal");
       try {
         Files.writeString(file, "(def module-answer 41)");
         String path = file.toString().replace("\\", "\\\\").replace("\"", "\\\"");
@@ -659,7 +657,7 @@ public class HaraLanguageTest {
   @Test
   public void requirePreservesCallerNamespaceAndSupportsAliases() throws Exception {
     try (Context context = context()) {
-      Path file = Files.createTempFile("hara-l0-alias-", ".hara");
+      Path file = Files.createTempFile("hara-l0-alias-", ".hal");
       try {
         Files.writeString(file, "(ns library) (def answer 42)");
         String path = file.toString().replace("\\", "\\\\").replace("\"", "\\\"");
@@ -681,7 +679,7 @@ public class HaraLanguageTest {
   @Test
   public void requireSupportsSelectiveLiveReferences() throws Exception {
     try (Context context = context()) {
-      Path file = Files.createTempFile("hara-l0-refer-", ".hara");
+      Path file = Files.createTempFile("hara-l0-refer-", ".hal");
       try {
         Files.writeString(file, "(ns library) (def answer 41) (def other 7)");
         String path = file.toString().replace("\\", "\\\\").replace("\"", "\\\"");
@@ -697,7 +695,7 @@ public class HaraLanguageTest {
   @Test
   public void requireSupportsSelectiveMacroReferences() throws Exception {
     try (Context context = context()) {
-      Path file = Files.createTempFile("hara-l0-macro-refer-", ".hara");
+      Path file = Files.createTempFile("hara-l0-macro-refer-", ".hal");
       try {
         Files.writeString(
             file, "(ns library-macros) (defmacro unless [test body] `(if ~test nil ~body))");
@@ -713,7 +711,7 @@ public class HaraLanguageTest {
   @Test
   public void reloadingARequiredMacroModuleRefreshesNewCompilations() throws Exception {
     try (Context context = context()) {
-      Path file = Files.createTempFile("hara-l0-macro-reload-", ".hara");
+      Path file = Files.createTempFile("hara-l0-macro-reload-", ".hal");
       try {
         Files.writeString(file, "(ns reload-macros) (defmacro answer [] 41)");
         String path = file.toString().replace("\\", "\\\\").replace("\"", "\\\"");
@@ -735,8 +733,8 @@ public class HaraLanguageTest {
   public void requireRejectsCyclesAndRollsBackPartialModules() throws Exception {
     try (Context context = context()) {
       Path directory = Files.createTempDirectory("hara-l0-cycle-");
-      Path first = directory.resolve("first.hara");
-      Path second = directory.resolve("second.hara");
+      Path first = directory.resolve("first.hal");
+      Path second = directory.resolve("second.hal");
       try {
         String firstPath = first.toString().replace("\\", "\\\\").replace("\"", "\\\"");
         String secondPath = second.toString().replace("\\", "\\\\").replace("\"", "\\\"");
@@ -769,8 +767,8 @@ public class HaraLanguageTest {
   public void requireRecordsDeterministicModuleDependencies() throws Exception {
     try (Context context = context()) {
       Path directory = Files.createTempDirectory("hara-l0-deps-");
-      Path child = directory.resolve("child.hara");
-      Path parent = directory.resolve("parent.hara");
+      Path child = directory.resolve("child.hal");
+      Path parent = directory.resolve("parent.hal");
       try {
         String childPath = child.toString().replace("\\", "\\\\").replace("\"", "\\\"");
         String parentPath = parent.toString().replace("\\", "\\\\").replace("\"", "\\\"");
@@ -780,7 +778,7 @@ public class HaraLanguageTest {
         assertEquals(
             child.toAbsolutePath().normalize().toString(),
             context
-                .eval(HaraLanguage.ID, "(x:get (module-dependencies \"" + parentPath + "\") 0)")
+                .eval(HaraLanguage.ID, "(nth (module-dependencies \"" + parentPath + "\") 0)")
                 .asString());
       } finally {
         Files.deleteIfExists(parent);
@@ -1170,25 +1168,18 @@ public class HaraLanguageTest {
   }
 
   @Test
-  public void gatesExplicitHostInterop() {
+  public void doesNotExposeJvmHostInteropForms() {
     try (Context context = context()) {
-      PolyglotException error =
-          assertThrows(
-              PolyglotException.class,
-              () -> context.eval(HaraLanguage.ID, "(host-symbol \"java.lang.String\")"));
-      assertTrue(error.getMessage().contains("Host interop is disabled"));
-    }
-
-    try (Context context =
-        Context.newBuilder(HaraLanguage.ID)
-            .allowHostAccess(HostAccess.ALL)
-            .allowHostClassLookup(name -> true)
-            .build()) {
-      assertTrue(
-          context
-              .eval(HaraLanguage.ID, "(host-symbol \"java.lang.String\")")
-              .toString()
-              .contains("java.lang.String"));
+      for (String form :
+          new String[] {
+            "(host-symbol \"java.lang.String\")",
+            "(host-get nil \"value\")",
+            "(host-call nil \"run\")"
+          }) {
+        PolyglotException error =
+            assertThrows(PolyglotException.class, () -> context.eval(HaraLanguage.ID, form));
+        assertTrue(error.getMessage().contains("Unbound symbol"));
+      }
     }
   }
 
@@ -1261,7 +1252,54 @@ public class HaraLanguageTest {
     }
   }
 
+  @Test
+  public void supportsExplicitJvmFlavorImportsConstructionAndDotChains() {
+    try (Context context =
+        Context.newBuilder(HaraLanguage.ID)
+            .allowHostAccess(HostAccess.ALL)
+            .allowHostClassLookup(name -> true)
+            .build()) {
+      context.eval(
+          HaraLanguage.ID,
+          "(ns jvm-test (:flavor :jvm) (:import [java.lang String RuntimeException] [java.awt Point]))");
+      assertEquals(
+          "HELLO",
+          context.eval(HaraLanguage.ID, "(. (new String \"hello\") (toUpperCase))").asString());
+      assertEquals("42", context.eval(HaraLanguage.ID, "(String/valueOf 42)").asString());
+      assertEquals(
+          9,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(let [p (new Point 3 4)] (hara.native.jvm/set! p \"x\" 9) (. p x))")
+              .asLong());
+      assertEquals(
+          "boom",
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(try (throw (new RuntimeException \"boom\")) (catch RuntimeException e (. e (getMessage))))")
+              .asString());
+      assertEquals(
+          "3", context.eval(HaraLanguage.ID, "(. (new Point 3 4) x (toString))").asString());
+    }
+  }
+
+  @Test
+  public void selectingJvmFlavorDoesNotGrantReflectionAuthority() {
+    try (Context context = context()) {
+      PolyglotException error =
+          assertThrows(
+              PolyglotException.class,
+              () ->
+                  context.eval(
+                      HaraLanguage.ID,
+                      "(ns denied (:flavor :jvm) (:import [java.lang String RuntimeException]))"));
+      assertTrue(error.getMessage().contains("reflection capability is not granted"));
+    }
+  }
+
   private static Context context() {
-    return Context.newBuilder(HaraLanguage.ID).build();
+    return Context.newBuilder(HaraLanguage.ID).allowIO(IOAccess.ALL).build();
   }
 }

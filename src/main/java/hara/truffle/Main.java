@@ -92,7 +92,7 @@ public final class Main {
       }
 
       try (Context context = context(capabilities)) {
-        context.eval(HaraLanguage.ID, "(load-resource \"hara/l0-core.hara\")");
+        context.eval(HaraLanguage.ID, "(load-resource \"hara/l0-core.hal\")");
         Value result = context.eval(HaraLanguage.ID, source);
         output.println(display(result));
       }
@@ -191,7 +191,7 @@ public final class Main {
       boolean interactive,
       Capabilities capabilities) {
     try (Context context = context(capabilities)) {
-      context.eval(HaraLanguage.ID, "(load-resource \"hara/l0-core.hara\")");
+      context.eval(HaraLanguage.ID, "(load-resource \"hara/l0-core.hal\")");
       if (interactive) return runJLineRepl(context, output, error);
       try (BufferedReader reader =
           new BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8))) {
