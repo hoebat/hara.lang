@@ -2,7 +2,10 @@
   "resources": {
     "includes": [
       {
-        "pattern": "(?:hara|std)/.*\\.hal"
+        "pattern": "hara/.*\\.hal"
+      },
+      {
+        "pattern": "std/.*\\.hal"
       },
       {
         "pattern": "spec/hara/.*\\.edn"

@@ -33,6 +33,7 @@ jobs:
         cargo build --manifest-path wasm/Cargo.toml --release --target wasm32-wasip1 --lib
     - name: Record Rust runtime artifact sizes
       run: |
+        mkdir -p target
         {
           stat -c "browser_wasm_bytes=%s" wasm/target/wasm32-unknown-unknown/release/hara_wasm.wasm
           stat -c "wasi_wasm_bytes=%s" wasm/target/wasm32-wasip1/release/hara_wasm.wasm
