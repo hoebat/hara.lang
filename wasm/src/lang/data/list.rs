@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use crate::lang::protocol::{
-    IAssoc, IConj, ICons, ICount, IEmpty, IMutable, INth, IPersistent, IPopFirst, IPopLast,
-    IPushFirst, IPushLast, IToMutable, IToPersistent,
+    IAssoc, IConj, ICons, ICount, IEmpty, IMetadata, IMutable, INth, IPersistent, IPopFirst,
+    IPopLast, IPushFirst, IPushLast, IToMutable, IToPersistent,
 };
 
 const CHUNK_SIZE: usize = 32;
@@ -15,6 +15,7 @@ struct Chunk<E> {
 
 #[derive(Debug, Clone)]
 pub struct Standard<E> {
+    metadata: Option<Rc<str>>,
     head: Option<Rc<Chunk<E>>>,
     size: usize,
 }
@@ -22,6 +23,7 @@ pub struct Standard<E> {
 impl<E> Default for Standard<E> {
     fn default() -> Self {
         Self {
+            metadata: None,
             head: None,
             size: 0,
         }
@@ -46,6 +48,7 @@ impl<E: Clone> Standard<E> {
                 values.push(value);
                 values.extend(head.values.iter().cloned());
                 Self {
+                    metadata: self.metadata.clone(),
                     head: Some(Rc::new(Chunk {
                         values: Rc::new(values),
                         next: head.next.clone(),
@@ -54,6 +57,7 @@ impl<E: Clone> Standard<E> {
                 }
             }
             _ => Self {
+                metadata: self.metadata.clone(),
                 head: Some(Rc::new(Chunk {
                     values: Rc::new(vec![value]),
                     next: self.head.clone(),
@@ -64,7 +68,11 @@ impl<E: Clone> Standard<E> {
     }
 
     pub fn push_last(&self, value: E) -> Self {
-        self.iter().cloned().chain(std::iter::once(value)).collect()
+        self.iter()
+            .cloned()
+            .chain(std::iter::once(value))
+            .collect::<Self>()
+            .with_meta(self.metadata.clone())
     }
     pub fn pop_first_value(&self) -> Self {
         let Some(head) = &self.head else {
@@ -72,11 +80,13 @@ impl<E: Clone> Standard<E> {
         };
         if head.values.len() == 1 {
             Self {
+                metadata: self.metadata.clone(),
                 head: head.next.clone(),
                 size: self.size - 1,
             }
         } else {
             Self {
+                metadata: self.metadata.clone(),
                 head: Some(Rc::new(Chunk {
                     values: Rc::new(head.values[1..].to_vec()),
                     next: head.next.clone(),
@@ -89,7 +99,8 @@ impl<E: Clone> Standard<E> {
         self.iter()
             .take(self.size.saturating_sub(1))
             .cloned()
-            .collect()
+            .collect::<Self>()
+            .with_meta(self.metadata.clone())
     }
     pub fn get(&self, index: usize) -> Option<&E> {
         if index >= self.size {
@@ -214,7 +225,7 @@ impl<E: Clone> IConj<E> for Standard<E> {
 }
 impl<E: Clone> IEmpty for Standard<E> {
     fn empty(&self) -> Self {
-        Self::new()
+        Self::new().with_meta(self.metadata.clone())
     }
 }
 impl<E: Clone> IAssoc<usize, E> for Standard<E> {
@@ -223,7 +234,20 @@ impl<E: Clone> IAssoc<usize, E> for Standard<E> {
             .cloned()
             .enumerate()
             .map(|(i, v)| if i == index { value.clone() } else { v })
-            .collect()
+            .collect::<Self>()
+            .with_meta(self.metadata.clone())
+    }
+}
+impl<E: Clone> IMetadata for Standard<E> {
+    type Metadata = Rc<str>;
+    fn meta(&self) -> Option<&Self::Metadata> {
+        self.metadata.as_ref()
+    }
+    fn with_meta(&self, metadata: Option<Self::Metadata>) -> Self {
+        Self {
+            metadata,
+            ..self.clone()
+        }
     }
 }
 impl<E: Clone> IPersistent for Standard<E> {}
@@ -306,6 +330,24 @@ mod tests {
         assert_eq!(prefixed[0], -1);
         assert_eq!(appended[65], 65);
     }
+    #[test]
+    fn persistent_operations_preserve_metadata() {
+        use crate::lang::protocol::{IAssoc, IEmpty, IMetadata};
+        use std::rc::Rc;
+        let list = Standard::from(vec![1, 2, 3]).with_meta(Some(Rc::from("doc")));
+        let values = [
+            list.push_first(0),
+            list.push_last(4),
+            list.pop_first_value(),
+            list.pop_last_value(),
+            list.assoc(1, 20),
+            list.empty(),
+        ];
+        assert!(values
+            .iter()
+            .all(|value| value.meta().map(|m| m.as_ref()) == Some("doc")));
+    }
+
     #[test]
     fn mutable_round_trip_preserves_original_and_updates_edges() {
         use crate::lang::protocol::{IToMutable, IToPersistent};

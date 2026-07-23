@@ -1,13 +1,15 @@
 use crate::lang::data::{List, Vector};
 use crate::lang::protocol::{
-    IConj, ICount, IEmpty, IMutable, INth, IPersistent, IPopFirst, IPopLast, IPushLast, IToMutable,
-    IToPersistent,
+    IConj, ICount, IEmpty, IMetadata, IMutable, INth, IPersistent, IPopFirst, IPopLast, IPushLast,
+    IToMutable, IToPersistent,
 };
+use std::rc::Rc;
 
 pub const MAX_LENGTH: usize = 1024;
 
 #[derive(Debug, Clone)]
 pub struct Standard<E> {
+    metadata: Option<Rc<str>>,
     size: usize,
     offset: usize,
     head: Vector<E>,
@@ -18,6 +20,7 @@ pub struct Standard<E> {
 impl<E: Clone> Default for Standard<E> {
     fn default() -> Self {
         Self {
+            metadata: None,
             size: 0,
             offset: 0,
             head: Vector::new(),
@@ -112,6 +115,7 @@ impl<E: Clone> Standard<E> {
         }
         if self.buffer.is_empty() {
             Self {
+                metadata: self.metadata.clone(),
                 size: self.size - 1,
                 offset: 0,
                 head: self.tail.clone(),
@@ -199,7 +203,19 @@ impl<E: Clone> IPopLast for Standard<E> {
 }
 impl<E: Clone> IEmpty for Standard<E> {
     fn empty(&self) -> Self {
-        Self::new()
+        Self::new().with_meta(self.metadata.clone())
+    }
+}
+impl<E: Clone> IMetadata for Standard<E> {
+    type Metadata = Rc<str>;
+    fn meta(&self) -> Option<&Self::Metadata> {
+        self.metadata.as_ref()
+    }
+    fn with_meta(&self, metadata: Option<Self::Metadata>) -> Self {
+        Self {
+            metadata,
+            ..self.clone()
+        }
     }
 }
 impl<E: Clone> IPersistent for Standard<E> {}
@@ -292,6 +308,22 @@ mod tests {
         assert_eq!(q.peek_last(), Some(&1029));
         assert_eq!(p.peek_last(), Some(&1028));
     }
+    #[test]
+    fn persistent_operations_preserve_metadata() {
+        use crate::lang::protocol::{IEmpty, IMetadata};
+        use std::rc::Rc;
+        let queue = Standard::from_iter(0..(MAX_LENGTH + 2)).with_meta(Some(Rc::from("doc")));
+        let values = [
+            queue.push_last(9999),
+            queue.pop_first_value(),
+            queue.pop_last_value(),
+            queue.empty(),
+        ];
+        assert!(values
+            .iter()
+            .all(|value| value.meta().map(|m| m.as_ref()) == Some("doc")));
+    }
+
     #[test]
     fn mutable_round_trip_crosses_chunk_boundaries() {
         use crate::lang::protocol::{IToMutable, IToPersistent};
