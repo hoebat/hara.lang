@@ -1,0 +1,9 @@
+{:namespace "hara.runtime.wasm"
+ :version "0.1.0"
+ :provider :wasm
+ :module "hara.wasm"
+ :abi :hta-v1
+ :exports
+ {"eval" {:args [:value] :returns :value :async true}}
+ :host-calls {"crypto.hash.sha256" ["digest"]}
+ :capabilities []}

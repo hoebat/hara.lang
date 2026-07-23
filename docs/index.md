@@ -23,7 +23,7 @@ Hara is a small, runtime-neutral language for live systems.
   <a class="hara-home-card" href="reference/extensions-contract/">
     <span class="hara-card-index">02 / EXTENSIONS</span>
     <strong>One require.<br><em>Any world.</em></strong>
-    <span>Connect pods and WASM providers without changing the Hara call site.</span>
+    <span>Load portable WASM extensions without changing the Hara call site.</span>
   </a>
   <a class="hara-home-card" href="javadocs/">
     <span class="hara-card-index">03 / RUNTIME</span>

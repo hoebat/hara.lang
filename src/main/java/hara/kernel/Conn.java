@@ -80,7 +80,11 @@ public class Conn implements Closeable {
       out.write(CRLF);
 
       for (Object o : list) {
-        if (o instanceof byte[]) {
+        if (o == null) {
+          out.write('$');
+          out.write("-1".getBytes(java.nio.charset.StandardCharsets.US_ASCII));
+          out.write(CRLF);
+        } else if (o instanceof byte[]) {
           write((byte[]) o);
         } else if (o instanceof String) {
           write(((String) o).getBytes());
@@ -88,6 +92,8 @@ public class Conn implements Closeable {
           write((Long) o);
         } else if (o instanceof Integer) {
           write(((Integer) o).longValue());
+        } else if (o instanceof Boolean) {
+          writeString(Boolean.toString((Boolean) o));
         } else if (o instanceof Throwable) {
           write((Throwable) o);
         } else if (o instanceof List) {

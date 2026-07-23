@@ -5,7 +5,8 @@
   "scripts": {
     "build:noir": "vite build --config vite.noir.config.js",
     "test:noir": "npm run build:noir && cp node_modules/@noir-lang/noir_wasm/dist/web/main.mjs dist/noir-wasm.mjs && node --test noir-loader.test.js",
-    "test:hta": "node --test hta.test.js"
+    "test:hta": "node --test hta.test.js",
+    "test:browser": "playwright test"
   },
   "dependencies": {
     "@aztec/bb.js": "5.1.0",
@@ -13,6 +14,7 @@
     "@noir-lang/noir_wasm": "1.0.0-beta.25"
   },
   "devDependencies": {
+    "@playwright/test": "^1.54.1",
     "fake-indexeddb": "6.2.4",
     "vite": "8.1.5"
   }

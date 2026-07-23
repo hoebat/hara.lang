@@ -74,7 +74,7 @@ Before using the extension, you need to start the Hara server. From the main `ha
 mvn exec:java -Dexec.mainClass="hara.kernel.Main"
 ```
 
-The server will start on port `4164` by default.
+The server will start on `127.0.0.1:1311` by default.
 
 ## Usage
 
@@ -122,7 +122,7 @@ You can customize the extension settings in VS Code:
 | Setting | Description | Default |
 |---------|-------------|---------|
 | `hara.server.host` | Hostname of the Hara server | `127.0.0.1` |
-| `hara.server.port` | Port of the Hara server | `4164` |
+| `hara.server.port` | Port of the Hara server | `1311` |
 | `hara.session` | Session to use for evaluation | `ROOT` |
 
 **Example settings.json:**
@@ -130,7 +130,7 @@ You can customize the extension settings in VS Code:
 ```json
 {
   "hara.server.host": "127.0.0.1",
-  "hara.server.port": 4164,
+  "hara.server.port": 1311,
   "hara.session": "ROOT"
 }
 ```
@@ -257,11 +257,11 @@ For faster workflow, you can add custom keybindings:
 
 ### Connection Failed
 
-**Problem:** "Connection failed: connect ECONNREFUSED 127.0.0.1:4164"
+**Problem:** "Connection failed: connect ECONNREFUSED 127.0.0.1:1311"
 
 **Solution:**
 - Ensure the Hara server is running: `mvn exec:java -Dexec.mainClass="hara.kernel.Main"`
-- Check that the server is listening on the correct port (default: 4164)
+- Check that the server is listening on the correct port (default: 1311)
 - Verify your `hara.server.host` and `hara.server.port` settings
 
 ### No Text Selected

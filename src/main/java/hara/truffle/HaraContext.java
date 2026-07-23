@@ -1040,6 +1040,19 @@ public final class HaraContext {
         new UnaryBuiltin("promise/native?", value -> HaraBox.unwrap(value) instanceof HaraPromise));
     promise.define("delay", new VariadicBuiltin("promise/delay", this::promiseDelay));
 
+    HaraNamespace handle = namespace("hara.lib.handle");
+    handle.define(
+        "release",
+        new UnaryBuiltin(
+            "handle/release",
+            value -> {
+              Object input = HaraBox.unwrap(value);
+              if (!(input instanceof HtaHandle))
+                throw new HaraException("handle/release expects an HTA handle");
+              ((HtaHandle) input).close();
+              return HaraNull.SINGLETON;
+            }));
+
     HaraNamespace file = namespace("hara.lib.file");
     file.define("resolve", new VariadicBuiltin("file/resolve", this::fileResolve));
     file.define("read", new UnaryBuiltin("file/read", this::fileRead));

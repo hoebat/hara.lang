@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
+import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -36,6 +37,7 @@ import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.io.IOAccess;
+import hara.kernel.Conn;
 
 public final class Main {
   private Main() {}
@@ -55,6 +57,9 @@ public final class Main {
     Capabilities capabilities = parseCapabilities(args);
     args = capabilities.arguments;
     if (args.length == 0) {
+      if (input == System.in) {
+        return runServer(output, error, capabilities);
+      }
       return runRepl(
           input, output, error, input == System.in && System.console() != null, capabilities);
     }
@@ -66,6 +71,20 @@ public final class Main {
     if ("repl".equals(args[0])) {
       return runRepl(
           input, output, error, input == System.in && System.console() != null, capabilities);
+    }
+    if ("standalone".equalsIgnoreCase(args[0])) {
+      return runRepl(
+          input, output, error, input == System.in && System.console() != null, capabilities);
+    }
+    if ("server".equalsIgnoreCase(args[0]) || "headless".equalsIgnoreCase(args[0])) {
+      return runServer(output, error, capabilities);
+    }
+    if ("remote".equalsIgnoreCase(args[0])) {
+      if (args.length < 2) {
+        error.println("remote requires HOST:PORT");
+        return 2;
+      }
+      return runRemote(args[1], input, output, error);
     }
     if ("conformance".equals(args[0])) {
       return runConformance(output, error);
@@ -110,6 +129,93 @@ public final class Main {
       error.println(exception.getMessage());
       return 1;
     }
+  }
+
+  private static int runServer(PrintStream output, PrintStream error, Capabilities capabilities) {
+    try (HaraServer server =
+        new HaraServer(
+            capabilities.host, capabilities.port, capabilities.logRequests, capabilities.network)) {
+      server.start();
+      output.println("HARA SERVER " + capabilities.host + ":" + server.port());
+      output.flush();
+      while (server.isRunning()) {
+        try {
+          Thread.sleep(1000L);
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          return 0;
+        }
+      }
+      return 0;
+    } catch (IOException exception) {
+      error.println(exception.getMessage());
+      return 1;
+    }
+  }
+
+  private static int runRemote(
+      String endpoint, InputStream input, PrintStream output, PrintStream error) {
+    int separator = endpoint.lastIndexOf(':');
+    if (separator <= 0 || separator == endpoint.length() - 1) {
+      error.println("remote expects HOST:PORT");
+      return 2;
+    }
+    String host = endpoint.substring(0, separator);
+    try (Socket socket = new Socket(host, Integer.parseInt(endpoint.substring(separator + 1)))) {
+      Conn conn = new Conn(socket);
+      conn.write("HELLO", "3", "CLIENT", "HARA-REMOTE");
+      output.println(remoteText(conn.read()));
+      java.io.BufferedReader reader =
+          new java.io.BufferedReader(new InputStreamReader(input, StandardCharsets.UTF_8));
+      String line;
+      long request = 0;
+      while ((line = reader.readLine()) != null) {
+        String command = line.strip();
+        if (command.isEmpty()) continue;
+        if ("/quit".equals(command) || ":quit".equals(command)) {
+          conn.write("QUIT");
+          output.println(remoteText(conn.read()));
+          return 0;
+        }
+        if (command.startsWith("/session use ")) {
+          conn.write("SESSION", "ATTACH", command.substring(13).strip());
+          output.println(remoteText(conn.read()));
+          continue;
+        }
+        if (command.startsWith("/session ")) {
+          String[] parts = command.substring(9).strip().split("\\s+");
+          List<Object> requestArgs = new ArrayList<>();
+          requestArgs.add("SESSION");
+          for (String part : parts) requestArgs.add(part);
+          conn.write(requestArgs);
+          output.println(remoteText(conn.read()));
+          continue;
+        }
+        String id = "REMOTE-" + (++request);
+        conn.write("EVAL", id, command);
+        output.println(remoteText(conn.read()));
+        output.println(remoteText(conn.read()));
+      }
+      return 0;
+    } catch (Exception exception) {
+      error.println(exception.getMessage());
+      return 1;
+    }
+  }
+
+  private static String remoteText(Object value) {
+    if (value instanceof byte[]) return new String((byte[]) value, StandardCharsets.UTF_8);
+    if (value instanceof List<?>) {
+      StringBuilder result = new StringBuilder("[");
+      boolean first = true;
+      for (Object item : (List<?>) value) {
+        if (!first) result.append(' ');
+        first = false;
+        result.append(remoteText(item));
+      }
+      return result.append(']').toString();
+    }
+    return String.valueOf(value);
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})
@@ -270,22 +376,42 @@ public final class Main {
     ArrayList<String> positional = new ArrayList<>();
     boolean file = false;
     boolean network = false;
+    String host = HaraServer.DEFAULT_HOST;
+    int port = HaraServer.DEFAULT_PORT;
+    boolean logRequests = false;
     for (String argument : arguments) {
       if ("--allow-file".equals(argument)) file = true;
       else if ("--allow-net".equals(argument)) network = true;
+      else if (argument.startsWith("--host=")) host = argument.substring("--host=".length());
+      else if (argument.startsWith("--port="))
+        port = Integer.parseInt(argument.substring("--port=".length()));
+      else if ("--log-requests".equals(argument)) logRequests = true;
       else positional.add(argument);
     }
-    return new Capabilities(file, network, positional.toArray(new String[0]));
+    return new Capabilities(
+        file, network, host, port, logRequests, positional.toArray(new String[0]));
   }
 
   private static final class Capabilities {
     private final boolean file;
     private final boolean network;
+    private final String host;
+    private final int port;
+    private final boolean logRequests;
     private final String[] arguments;
 
-    private Capabilities(boolean file, boolean network, String[] arguments) {
+    private Capabilities(
+        boolean file,
+        boolean network,
+        String host,
+        int port,
+        boolean logRequests,
+        String[] arguments) {
       this.file = file;
       this.network = network;
+      this.host = host;
+      this.port = port;
+      this.logRequests = logRequests;
       this.arguments = arguments;
     }
   }
@@ -543,6 +669,11 @@ public final class Main {
   }
 
   private static void printUsage(PrintStream output) {
+    output.println(
+        "hara-truffle [--host=HOST] [--port=PORT] [--log-requests] [--allow-file] [--allow-net] server");
+    output.println("hara-truffle [--host=HOST] [--port=PORT] headless");
+    output.println("hara-truffle standalone");
+    output.println("hara-truffle remote HOST:PORT");
     output.println("hara-truffle [--allow-file] [--allow-net] eval <expression>");
     output.println("hara-truffle [--allow-file] [--allow-net] run <file>");
     output.println("hara-truffle [--allow-file] [--allow-net] stdin");

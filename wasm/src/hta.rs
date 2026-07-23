@@ -15,6 +15,7 @@ const LIST: u8 = 8;
 const VECTOR: u8 = 9;
 const SET: u8 = 10;
 const MAP: u8 = 11;
+const HANDLE: u8 = 12;
 
 pub fn encode(value: &Value) -> Result<Vec<u8>, String> {
     let mut output = MAGIC.to_vec();
@@ -55,6 +56,12 @@ fn encode_bare(value: &Value, output: &mut Vec<u8>) -> Result<(), String> {
             output.push(MAP); encode_len(encoded.len(), output)?;
             for (key, value) in encoded { output.extend_from_slice(&key); output.extend_from_slice(&value); }
         }
+        Value::Extension(value) => {
+            output.push(HANDLE);
+            encode_bytes(value.provider.as_bytes(), output)?;
+            encode_bytes(value.type_name.as_bytes(), output)?;
+            output.extend_from_slice(&value.handle.to_be_bytes());
+        }
         _ => return Err(format!("hta/value-unsupported: {}", value.display())),
     }
     Ok(())
@@ -85,6 +92,7 @@ impl Reader<'_> {
             LIST=>Ok(Value::List(self.sequence()?.into())), VECTOR=>Ok(Value::Vector(self.sequence()?.into())),
             SET=>Ok(Value::Set(self.sequence()?)),
             MAP=>{ let size=self.len()?; let mut values=Vec::with_capacity(size); for _ in 0..size { values.push((self.value()?,self.value()?)); } Ok(Value::Map(values)) },
+            HANDLE=>{let provider=String::from_utf8(self.data()?.to_vec()).map_err(|_|"hta/value-malformed: invalid handle owner")?;let type_name=String::from_utf8(self.data()?.to_vec()).map_err(|_|"hta/value-malformed: invalid handle type")?;let bytes=self.take(8)?;Ok(Value::Extension(crate::core::ExtensionValue{provider,type_name,handle:u64::from_be_bytes(bytes.try_into().unwrap())}))},
             _=>Err("hta/value-malformed: unknown value tag".into()),
         }
     }
@@ -109,5 +117,10 @@ mod tests {
         let a=Value::Map(vec![(Value::String("b".into()),Value::Number(2)),(Value::String("a".into()),Value::Number(1))]);
         let b=Value::Map(vec![(Value::String("a".into()),Value::Number(1)),(Value::String("b".into()),Value::Number(2))]);
         assert_eq!(encode(&a).unwrap(),encode(&b).unwrap());
+    }
+    #[test]
+    fn opaque_handles_round_trip() {
+        let value=Value::Extension(crate::core::ExtensionValue{provider:"runtime".into(),type_name:"cursor".into(),handle:42});
+        assert_eq!(decode(&encode(&value).unwrap()).unwrap(),value);
     }
 }

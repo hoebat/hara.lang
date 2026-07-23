@@ -70,10 +70,6 @@ provider invoke(request-id, function, args)
    +----> error(kind, message) -> promise rejection
 ```
 
-Pods are long-lived subprocesses using a versioned, length-delimited protocol with request IDs,
-limits, separate stderr, and explicit shutdown. Protobuf is the initial pod wire profile. A pod
-must not require callers to construct protocol messages manually.
-
 WASM providers use a host engine. Compilation, instantiation, export calls, and memory access
 remain behind the provider boundary. `:core-v1` is the direct scalar ABI. `:hta-v1` is the Hara
 Transport Adaptor for stateful, promise-returning modules.
@@ -96,16 +92,16 @@ Hara call -> hta_start -> task
 ```
 
 The required exports are `hta_abi_version`, `hta_alloc`, `hta_dealloc`, `hta_start`,
-`hta_next_event`, `hta_deliver`, `hta_poll`, `hta_cancel`, and `hta_drop_task`. Frames use the
+`hta_next_event`, `hta_deliver`, `hta_poll`, `hta_cancel`, `hta_drop_task`, and `hta_release`. Frames use the
 canonical binary `HTA1` value encoding. Its portable value intersection is nil, booleans, signed
-64-bit integers, UTF-8 strings, bytes, keywords, symbols, lists, vectors, sets, and maps. Map and
+64-bit integers, UTF-8 strings, bytes, keywords, symbols, lists, vectors, sets, maps, and opaque `{owner, type, id}` handles. Map and
 set elements are ordered by their encoded bytes so Rust, Java, and JavaScript produce identical
 frames.
 
 Each Truffle extension instance has one Java virtual-thread actor which exclusively owns its
 nested GraalWasm context. Browser instances use one Web Worker per context. Both actors block on a
 mailbox while idle; neither polls in a spin loop. Package completions enqueue a delivery back to
-the owner before any WASM export is called.
+the owner before any WASM export is called. Pending `deref` suspends an explicit evaluator fiber; settlement resumes its retained continuation without replaying completed forms.
 
 Host calls are explicit Hara operations such as:
 

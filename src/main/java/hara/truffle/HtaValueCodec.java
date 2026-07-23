@@ -32,6 +32,7 @@ final class HtaValueCodec {
   private static final int VECTOR = 9;
   private static final int SET = 10;
   private static final int MAP = 11;
+  private static final int HANDLE = 12;
 
   private HtaValueCodec() {}
 
@@ -78,6 +79,13 @@ final class HtaValueCodec {
       Symbol symbol = (Symbol) value;
       output.write(SYMBOL);
       writeText(output, qualified(symbol.getNamespace(), symbol.getName()));
+    } else if (value instanceof HtaHandle) {
+      HtaHandle handle = (HtaHandle) value;
+      if (handle.released()) throw new HaraException("hta/handle-released: " + handle);
+      output.write(HANDLE);
+      writeText(output, handle.owner());
+      writeText(output, handle.type());
+      writeLong(output, handle.id());
     } else if (value instanceof IMapType<?, ?>) {
       writeMap(output, ((IMapType<?, ?>) value).iterator());
     } else if (value instanceof Map<?, ?>) {
@@ -211,6 +219,11 @@ final class HtaValueCodec {
           return set();
         case MAP:
           return map();
+        case HANDLE:
+          String owner = text();
+          String type = text();
+          require(8);
+          return new HtaHandle(owner, type, input.getLong());
         default:
           throw malformed("unknown value tag");
       }

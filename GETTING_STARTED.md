@@ -32,7 +32,10 @@ Expected result:
 ## 4. Start the REPL
 
 ```shell
-java -jar target/hara-truffle.jar repl
+java -jar target/hara-truffle.jar
+
+# Local single-kernel REPL
+java -jar target/hara-truffle.jar standalone
 ```
 
 The REPL supports multiline forms, persistent history, symbol and Java completion, and inline

@@ -1,10 +1,11 @@
 const MAGIC = new Uint8Array([0x48, 0x54, 0x41, 0x31]);
-const TAG = { nil: 0, false: 1, true: 2, i64: 3, string: 4, bytes: 5, keyword: 6, symbol: 7, list: 8, vector: 9, set: 10, map: 11 };
+const TAG = { nil: 0, false: 1, true: 2, i64: 3, string: 4, bytes: 5, keyword: 6, symbol: 7, list: 8, vector: 9, set: 10, map: 11, handle: 12 };
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
 
 export class HtaKeyword { constructor(name) { this.name = name; } }
 export class HtaSymbol { constructor(name) { this.name = name; } }
+export class HtaHandle { constructor(owner,type,id,context=null){this.owner=owner;this.type=type;this.id=BigInt(id);this.context=context;this.released=false;} release(){if(this.released)return;this.released=true;if(this.context)this.context.releaseHandle(this);} }
 
 export function encodeHta(value) {
   const output = [...MAGIC];
@@ -33,6 +34,7 @@ function writeValue(output, value) {
   else if (value instanceof Uint8Array) { output.push(TAG.bytes); writeBytes(output, value); }
   else if (value instanceof HtaKeyword) { output.push(TAG.keyword); writeBytes(output, encoder.encode(value.name)); }
   else if (value instanceof HtaSymbol) { output.push(TAG.symbol); writeBytes(output, encoder.encode(value.name)); }
+  else if (value instanceof HtaHandle) { if(value.released)throw new Error("hta/handle-released");output.push(TAG.handle);writeBytes(output,encoder.encode(value.owner));writeBytes(output,encoder.encode(value.type));writeI64(output,value.id); }
   else if (Array.isArray(value)) { output.push(TAG.vector); writeSequence(output, value); }
   else if (value instanceof Set) { output.push(TAG.set); writeCanonical(output, [...value]); }
   else if (value instanceof Map) {
@@ -64,6 +66,7 @@ class Reader {
     if(tag===TAG.keyword)return new HtaKeyword(decoder.decode(this.data()));if(tag===TAG.symbol)return new HtaSymbol(decoder.decode(this.data()));
     if(tag===TAG.list||tag===TAG.vector)return this.sequence();if(tag===TAG.set)return new Set(this.sequence());
     if(tag===TAG.map){const size=this.u32(),result=new Map();for(let i=0;i<size;i++)result.set(this.value(),this.value());return result;}
+    if(tag===TAG.handle){const owner=decoder.decode(this.data()),type=decoder.decode(this.data()),bytes=this.take(8);let id=0n;for(const byte of bytes)id=(id<<8n)|BigInt(byte);return new HtaHandle(owner,type,id);}
     throw new Error("hta/value-malformed: unknown value tag");
   }
 }
@@ -77,17 +80,20 @@ export class HtaContext {
     worker.postMessage({type:"init",moduleUrl,moduleBytes});
   }
   call(target, args=[]) { let id=null,cancelled=false;
-    const promise=new Promise((resolve,reject)=>{this.ready.then(()=>{id=this.next++;this.pending.set(id,{resolve,reject});this.worker.postMessage({type:"call",id,frame:encodeHta([target,args])});if(cancelled)this.worker.postMessage({type:"cancel",id});},reject);});
+    const promise=new Promise((resolve,reject)=>{this.ready.then(()=>{validateHandles(args,this);id=this.next++;this.pending.set(id,{resolve,reject});this.worker.postMessage({type:"call",id,frame:encodeHta([target,args])});if(cancelled)this.worker.postMessage({type:"cancel",id});}).catch(reject);});
     promise.cancel=()=>{cancelled=true;if(id!==null)this.worker.postMessage({type:"cancel",id});};return promise;
   }
+  releaseHandle(handle){if(handle.context!==this)throw new Error("hta/handle-owner-mismatch");const wireHandle=new HtaHandle(handle.owner,handle.type,handle.id);this.worker.postMessage({type:"release",frame:encodeHta(wireHandle)});}
   async message(message) {
     if(message.type==="ready"){this.readyResolve();return;}if(message.type==="fatal"){this.fail(new Error(message.error?.message??"HTA worker failed"));return;}
-    if(message.type==="result"){const pending=this.pending.get(message.id);if(!pending)return;this.pending.delete(message.id);message.ok?pending.resolve(decodeHta(message.frame)):pending.reject(errorFrom(decodeHta(message.frame)));return;}
+    if(message.type==="result"){const pending=this.pending.get(message.id);if(!pending)return;this.pending.delete(message.id);const value=bindHandles(decodeHta(message.frame),this);message.ok?pending.resolve(value):pending.reject(errorFrom(value));return;}
     if(message.type==="host-call"){const key=`${message.service}/${message.method}`,handler=this.hostCalls[key];try{if(!handler)throw new Error(`hta/host-call-denied: ${key}`);const value=await handler(...decodeHta(message.frame));this.worker.postMessage({type:"delivery",call:message.call,ok:true,frame:encodeHta(value)});}catch(error){this.worker.postMessage({type:"delivery",call:message.call,ok:false,frame:encodeHta(errorValue(error))});}}
   }
   fail(error){this.readyReject(error);for(const pending of this.pending.values())pending.reject(error);this.pending.clear();}
   close(){this.worker.postMessage({type:"close"});this.worker.terminate();}
 }
 
+function bindHandles(value,context){if(value instanceof HtaHandle){value.context=context;return value;}if(Array.isArray(value)){value.forEach(item=>bindHandles(item,context));}else if(value instanceof Set){for(const item of value)bindHandles(item,context);}else if(value instanceof Map){for(const [key,item]of value){bindHandles(key,context);bindHandles(item,context);}}return value;}
+function validateHandles(value,context){if(value instanceof HtaHandle){if(value.released)throw new Error("hta/handle-released");if(value.context!==context)throw new Error("hta/handle-owner-mismatch");return;}if(Array.isArray(value)){value.forEach(item=>validateHandles(item,context));}else if(value instanceof Set){for(const item of value)validateHandles(item,context);}else if(value instanceof Map){for(const [key,item]of value){validateHandles(key,context);validateHandles(item,context);}}}
 function errorValue(error){return new Map([[new HtaKeyword("code"),new HtaKeyword("host/error")],[new HtaKeyword("message"),String(error?.message??error)],[new HtaKeyword("origin"),new HtaKeyword("browser")],[new HtaKeyword("retryable"),false]]);}
 function errorFrom(value){if(value instanceof Error)return value;if(value instanceof Map){for(const[key,item]of value)if(key instanceof HtaKeyword&&key.name==="message")return new Error(String(item));}return new Error(String(value));}

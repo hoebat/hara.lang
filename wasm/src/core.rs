@@ -3,6 +3,10 @@ use std::collections::{HashMap, HashSet};
 use im_rc::Vector as PVector;
 use std::rc::Rc;
 
+#[path = "fiber.rs"]
+mod fiber;
+pub use fiber::{EvalFiber, EvalFiberState};
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Form {
     Number(i64),

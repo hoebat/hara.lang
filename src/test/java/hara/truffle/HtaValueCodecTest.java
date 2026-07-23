@@ -42,4 +42,15 @@ public class HtaValueCodecTest {
     assertThrows(
         HaraException.class, () -> HtaValueCodec.decode(Arrays.copyOf(valid, valid.length + 1)));
   }
+
+  @Test
+  public void opaqueHandlesRoundTripAndCannotBeReencodedAfterRelease() {
+    HtaHandle handle = new HtaHandle("runtime", "cursor", 42L);
+    HtaHandle decoded = (HtaHandle) HtaValueCodec.decode(HtaValueCodec.encode(handle));
+    assertEquals("runtime", decoded.owner());
+    assertEquals("cursor", decoded.type());
+    assertEquals(42L, decoded.id());
+    decoded.close();
+    assertThrows(HaraException.class, () -> HtaValueCodec.encode(decoded));
+  }
 }

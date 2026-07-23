@@ -26,16 +26,13 @@ The runtime discovers manifests from configured extension roots, validates the p
 and generates the requested namespace during `:require`. Extension namespaces are runtime
 generated and are not `.hal` source files.
 
-Pods and WASM providers implement the same lifecycle:
+WASM providers implement the extension lifecycle:
 
 ```text
 discover -> describe -> invoke -> result or error -> cancel -> shutdown
 ```
 
 Arguments and results use Hara values and explicit opaque handles. Remote calls return promises.
-Pods are long-lived subprocesses using a versioned, length-delimited protocol with request IDs,
-limits, separate stderr, and explicit shutdown. Protobuf is the initial pod wire profile.
-
 WASM providers use a host WASM engine. Compilation, instantiation, export calls, and memory
 access remain behind the provider boundary. `:core-v1` invokes low-level scalar exports directly.
 `:hta-v1` uses an import-free, host-driven mailbox and returns Hara promises. On the JVM one virtual

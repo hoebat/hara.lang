@@ -5,6 +5,8 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
@@ -29,8 +31,10 @@ final class HaraWasmExtension implements AutoCloseable {
   private final Value htaDeliver;
   private final Value htaCancel;
   private final Value htaDropTask;
+  private final Value htaRelease;
   private final BlockingQueue<Command> mailbox;
   private final Map<Long, CompletableFuture<Object>> tasks = new LinkedHashMap<>();
+  private final Set<HtaHandle> handles = new LinkedHashSet<>();
   private final Thread owner;
 
   HaraWasmExtension(HaraExtensionPackage extensionPackage) {
@@ -87,6 +91,7 @@ final class HaraWasmExtension implements AutoCloseable {
       htaDeliver = isHta ? requireExport(members, "hta_deliver", manifest.module()) : null;
       htaCancel = isHta ? requireExport(members, "hta_cancel", manifest.module()) : null;
       htaDropTask = isHta ? requireExport(members, "hta_drop_task", manifest.module()) : null;
+      htaRelease = isHta ? requireExport(members, "hta_release", manifest.module()) : null;
       if (isHta) {
         Value version = requireExport(members, "hta_abi_version", manifest.module());
         if (version.execute().asInt() != 1) {
@@ -236,6 +241,7 @@ final class HaraWasmExtension implements AutoCloseable {
         if (command instanceof Start) start((Start) command);
         else if (command instanceof Delivery) deliver((Delivery) command);
         else if (command instanceof Cancel) cancel((Cancel) command);
+        else if (command instanceof Release) releaseNow((Release) command);
         else running = false;
         if (running) drainEvents();
       }
@@ -363,7 +369,38 @@ final class HaraWasmExtension implements AutoCloseable {
     byte[] bytes = new byte[(int) size];
     for (int i = 0; i < bytes.length; i++) bytes[i] = memory.readBufferByte(pointer + i);
     deallocator.execute((int) pointer, bytes.length);
-    return HtaValueCodec.decode(bytes);
+    return bindHandles(HtaValueCodec.decode(bytes));
+  }
+
+  private Object bindHandles(Object value) {
+    if (value instanceof HtaHandle) {
+      HtaHandle handle = ((HtaHandle) value).bind(this);
+      handles.add(handle);
+      return handle;
+    }
+    if (value instanceof List<?>) ((List<?>) value).forEach(this::bindHandles);
+    else if (value instanceof Set<?>) ((Set<?>) value).forEach(this::bindHandles);
+    else if (value instanceof Map<?, ?>)
+      ((Map<?, ?>) value)
+          .forEach(
+              (key, item) -> {
+                bindHandles(key);
+                bindHandles(item);
+              });
+    return value;
+  }
+
+  void release(HtaHandle handle) {
+    mailbox.add(new Release(handle));
+  }
+
+  private void releaseNow(Release command) {
+    command.handle.requireOwner(this);
+    HtaHandle wireHandle =
+        new HtaHandle(command.handle.owner(), command.handle.type(), command.handle.id());
+    int status = executeFrame(htaRelease, wireHandle).asInt();
+    if (status != 0) throw new HaraException("hta/handle-release-failed: " + status);
+    handles.remove(command.handle);
   }
 
   private static long number(List<Object> values, int index, String field) {
@@ -448,6 +485,14 @@ final class HaraWasmExtension implements AutoCloseable {
     }
   }
 
+  private static final class Release implements Command {
+    private final HtaHandle handle;
+
+    private Release(HtaHandle handle) {
+      this.handle = handle;
+    }
+  }
+
   private static final class Frame {
     private final int pointer;
     private final int length;
@@ -466,6 +511,7 @@ final class HaraWasmExtension implements AutoCloseable {
       context.close(true);
       return;
     }
+    for (HtaHandle handle : List.copyOf(handles)) handle.close();
     mailbox.add(new Stop());
     try {
       owner.join();

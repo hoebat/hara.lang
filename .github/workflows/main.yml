@@ -20,6 +20,24 @@ jobs:
       run: ./scripts/generate-wasm-truffle-parity && git diff --exit-code -- spec/hara/wasm-truffle-parity.edn
     - name: Build raw Rust WASM extension artifact
       run: ./scripts/build-hara-wasm-raw
+    - name: Build SHA-256 HTA extension artifact
+      run: ./scripts/build-crypto-hash-sha256-wasm
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: npm
+        cache-dependency-path: wasm/web/package-lock.json
+    - name: Install browser test dependencies
+      working-directory: wasm/web
+      run: |
+        npm ci
+        npx playwright install --with-deps chromium
+    - name: Run HTA Node and real-browser conformance
+      working-directory: wasm/web
+      run: |
+        npm run test:hta
+        npm run test:browser
     - name: Set up JDK 21
       uses: actions/setup-java@v4
       with:
@@ -96,8 +114,14 @@ jobs:
           target/native-extensions/blockchain/proof/noir/noir.wasm
         cp examples/extensions/blockchain/proof/noir/hara.extension.edn \
           target/native-extensions/blockchain/proof/noir/hara.extension.edn
+        mkdir -p target/native-extensions/hara/runtime/wasm
+        cp wasm/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm \
+          target/native-extensions/hara/runtime/wasm/hara.wasm
+        cp examples/extensions/hara/runtime/wasm/hara.extension.edn \
+          target/native-extensions/hara/runtime/wasm/hara.extension.edn
         test "$(target/hara-truffle conformance)" = "L0 conformance passed: 64 cases"
         test "$(HARA_EXTENSION_PATH="$PWD/target/native-extensions" target/hara-truffle eval '(ns app (:require [blockchain.proof.noir :as noir])) (noir/add 20 22)')" = "42"
+        test "$(HARA_EXTENSION_PATH="$PWD/target/native-extensions" target/hara-truffle eval '(ns app (:require [hara.runtime.wasm :as runtime])) (deref (runtime/eval "(+ 10 (count (deref (host/call \"crypto.hash.sha256\" \"digest\" (bytes 97 98 99)))))"))')" = "42"
         test "$(target/hara-truffle eval '(+ 19 23)')" = "42"
         test "$(target/hara-truffle eval '(bytes/u8 -1)')" = "255"
         test "$(target/hara-truffle eval '(protocol-call ICount count (bytes 1 2 3))')" = "3"

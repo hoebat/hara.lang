@@ -13,7 +13,6 @@ Truffle language and the specifications are authoritative.
 | `hara.kernel.Repl` | JVM interactive REPL and JLine integration |
 | `hara.kernel.flavor.NativeFlavorProvider` | Runtime-neutral host capability provider contract |
 | `hara.kernel.flavor.NativeFlavorAccess` | Capability-gated host access contract |
-| `hara.truffle.HaraPodClient` | Pod lifecycle boundary |
 
 ## Generate API docs
 

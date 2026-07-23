@@ -47,6 +47,36 @@ public class HaraHtaExtensionTest {
         });
   }
 
+  @Test
+  public void pendingDerefResumesInsideNestedEvaluation() throws Exception {
+    withExtension(
+        ":host-calls {\"crypto.hash.sha256\" [\"digest\"]}",
+        context ->
+            assertEquals(
+                42,
+                context
+                    .eval(
+                        HaraLanguage.ID,
+                        "(ns app (:require [hara.runtime.wasm :as runtime])) "
+                            + "(deref (runtime/eval \"(+ 10 (count (deref (host/call \\\"crypto.hash.sha256\\\" \\\"digest\\\" (bytes 97 98 99)))))\"))")
+                    .asLong()));
+  }
+
+  @Test
+  public void rejectedPendingDerefFlowsThroughCatch() throws Exception {
+    withExtension(
+        "",
+        context ->
+            assertEquals(
+                42,
+                context
+                    .eval(
+                        HaraLanguage.ID,
+                        "(ns app (:require [hara.runtime.wasm :as runtime])) "
+                            + "(deref (runtime/eval \"(try (deref (host/call \\\"denied\\\" \\\"call\\\")) (catch error 42))\"))")
+                    .asLong()));
+  }
+
   private static void withExtension(String hostCalls, CheckedConsumer operation) throws Exception {
     assertTrue("build wasm/raw before HTA tests: " + ARTIFACT, Files.isRegularFile(ARTIFACT));
     Path root = Files.createTempDirectory("hara-hta-extension-");
