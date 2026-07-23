@@ -1,3 +1,6 @@
+(ns example.noir-proof
+  (:require [blockchain.proof.noir :as noir]))
+
 (def square-program
   (noir/program
     "proof_demo"

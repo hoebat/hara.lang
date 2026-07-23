@@ -103,3 +103,25 @@ manifest requests capability
 The runtime preserves distinct errors for missing or malformed manifests, unsupported providers,
 denied capabilities, crashes, timeouts, cancellation, and remote failures. The same Hara
 namespace can therefore be backed by a pod or WASM provider without changing the call site.
+
+## Packaged Noir proof provider
+
+The first classpath package is `blockchain.proof.noir`. Its manifest lives at
+`META-INF/hara/extensions/blockchain/proof/noir/hara.extension.edn`, selects the `:wasm` provider,
+and exports the Noir compile/prove/verify boundary without exposing compiler or WASM objects:
+
+```hal
+(ns proof.example
+  (:require [blockchain.proof.noir :as noir]))
+
+(def program
+  (noir/program
+    "square"
+    "fn main(secret: Field, expected: pub Field) { assert(secret * secret == expected); }"))
+```
+
+No `noir/*` alias is installed implicitly. Applications opt into this surface through `:require`;
+`hara.lib.noir` remains an internal runtime namespace used by the provider adapter.
+
+Classpath discovery rejects duplicate namespace packages, malformed manifests, unknown providers,
+unknown modules, and denied capability requests before installing any exported vars.

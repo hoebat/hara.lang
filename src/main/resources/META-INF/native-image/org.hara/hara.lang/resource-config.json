@@ -6,6 +6,9 @@
       },
       {
         "pattern": "spec/hara/.*\\.edn"
+      },
+      {
+        "pattern": "META-INF/hara/extensions/.*\\.edn"
       }
     ]
   }
