@@ -78,6 +78,22 @@ public class HaraMutableBoundaryTest {
   }
 
   @Test
+  public void libraryByteLookupIsUnsignedWhileProtocolNthIsSigned() {
+    try (Context context = context()) {
+      assertEquals(255, context.eval(HaraLanguage.ID, "(bytes/get (bytes -1) 0)").asLong());
+      assertEquals(
+          -1, context.eval(HaraLanguage.ID, "(protocol-call INth nth (bytes -1) 0)").asLong());
+      assertEquals(
+          2,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(let [b (bytes 1 2)] (bytes/set b 0 3) (count (bytes/set b 1 4)))")
+              .asLong());
+    }
+  }
+
+  @Test
   public void mutableObjectsUseKeysWhileSequentialTargetsRequireNumericIndexes() {
     try (Context context = context()) {
       assertEquals(

@@ -170,10 +170,11 @@ semantics and are not specified as thread-safe.
 Bytes are an ordinary value category constructed with `(bytes ...)`. Elements
 use signed-byte storage and accept the checked `-128..255` input domain.
 Operations live in `hara.lib.bytes`: `bytes/count`, `bytes/get`, `bytes/set`,
-`bytes/copy`, `bytes/slice`, `bytes/u8`, and `bytes/s8`. `bytes/get` returns a
-signed element and accepts an optional fallback for an invalid index; without
-a fallback it reports a bounds error. `bytes/set`
-mutates and returns the same byte value after checked conversion. Copy and
+`bytes/copy`, `bytes/slice`, `bytes/u8`, and `bytes/s8`. `bytes/get` returns an
+unsigned element in the range `0..255` and accepts an optional fallback for an
+invalid index; without a fallback it reports a bounds error. Protocol
+`INth/nth` exposes the signed stored element. `bytes/set` mutates and returns
+the same byte array after checked conversion. Copy and
 slice allocate independent storage. Readable bytes print as `(bytes ...)`,
 and equality/hashing use byte content. Raw connector transport preserves
 bytes as bytes.

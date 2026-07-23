@@ -1,6 +1,7 @@
 package hara.kernel.base;
 
 import hara.lang.data.Symbol;
+import hara.lang.data.types.ILinearType;
 import org.junit.Test;
 
 import static org.junit.Assert.*;
@@ -30,6 +31,29 @@ public class RTTest {
     RT.Instance<Object> rt = new RT.Instance<>(null, "test");
     Object result = rt.eval(rt.readString("(+ 1 2)"));
     assertEquals(3L, result);
+  }
+
+  @Test
+  public void testVariadicStr() {
+    RT.Instance<Object> rt = new RT.Instance<>(null, "test");
+
+    assertEquals("", rt.eval(rt.readString("(str)")));
+    assertEquals("1", rt.eval(rt.readString("(str 1)")));
+    assertEquals("123", rt.eval(rt.readString("(str 1 2 3)")));
+  }
+
+  @Test
+  public void testVariadicConj() {
+    RT.Instance<Object> rt = new RT.Instance<>(null, "test");
+
+    ILinearType<?> empty = (ILinearType<?>) rt.eval(rt.readString("(conj)"));
+    ILinearType<?> unary = (ILinearType<?>) rt.eval(rt.readString("(conj 1)"));
+    ILinearType<?> many = (ILinearType<?>) rt.eval(rt.readString("(conj [] 1 2 3)"));
+    assertEquals(0, empty.count());
+    assertEquals(1, unary.count());
+    assertEquals(1L, unary.nth(0));
+    assertEquals(3, many.count());
+    assertEquals(3L, many.nth(2));
   }
 
   @Test
@@ -96,5 +120,28 @@ public class RTTest {
       }
     }
     assertTrue("URL should be in path cache", found);
+  }
+
+  @Test
+  public void testLegacyParityPrimitives() {
+    RT.Instance<Object> rt = new RT.Instance<>(null, "test");
+
+    assertEquals(42L, rt.eval(rt.readString("((fn [x & xs] (+ x (count xs))) 40 1 2)")));
+    assertEquals(6L, rt.eval(rt.readString("(apply (fn [a b c] (+ a b c)) 1 [2 3])")));
+    assertEquals(42L, rt.eval(rt.readString("(do (defn answer [x] (+ x 1)) (answer 41))")));
+    assertEquals(1L, rt.eval(rt.readString("(iter-next (iter [1 2]))")));
+
+    ILinearType<?> array = (ILinearType<?>) rt.eval(rt.readString("(array 1 2)"));
+    assertEquals(2, array.count());
+    assertEquals(2L, array.nth(1));
+  }
+
+  @Test
+  public void testHalResourceLoading() {
+    RT.Instance<Object> rt = new RT.Instance<>(null, "test");
+
+    assertEquals(42L, rt.eval(rt.readString("(load-resource \"hara/l0-resource.hal\")")));
+    assertNull(rt.eval(rt.readString("(require \"hara/l0-resource.hal\")")));
+    assertEquals(42L, rt.eval(rt.readString("l0-resource-answer")));
   }
 }

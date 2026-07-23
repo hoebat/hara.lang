@@ -36,13 +36,6 @@ public class BuiltinBasicTest {
   }
 
   @Test
-  public void testJArr() {
-    Object[] result = BuiltinStruct.jArr(java.util.Arrays.asList(1, 2, 3));
-    assertNotNull(result);
-    assertEquals(3, result.length);
-  }
-
-  @Test
   public void testIdentity() {
     String input = "test";
     Object result = BuiltinLambda.identity(input);

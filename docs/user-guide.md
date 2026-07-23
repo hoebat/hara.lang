@@ -34,8 +34,8 @@ Persistent collections are the default. Use `array` and `object` when mutation i
 
 ```clojure
 (let [a (array 1 2 3)]
-  (array:push-last a 4)
-  (array:get a 3))
+  (. a (push-last 4))
+  (. a (get 3)))
 ```
 
 The marker value makes the mutability boundary visible at construction time.
@@ -65,9 +65,10 @@ errors distinct so applications can respond correctly.
 
 ## REPL workflow
 
-The REPL provides history, completion, multiline input, and metadata docs. Use `Alt-q` or `F1` on a
-symbol to inspect its docstring and arglists. Slash commands are a planned control layer; ordinary
-Hara forms always go through the reader and evaluator.
+The REPL provides history, completion, multiline input, metadata docs, and slash commands. Use
+`Alt-q` or `F1` on a symbol to inspect its docstring and arglists. Commands such as `/help`,
+`/history`, `/clear`, `/splash`, `/ns`, and `/quit` are handled by the REPL and are not sent to the
+Hara evaluator; ordinary Hara forms always go through the reader and evaluator.
 
 ## Learn the exact rules
 

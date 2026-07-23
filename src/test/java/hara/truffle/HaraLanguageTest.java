@@ -36,6 +36,10 @@ public class HaraLanguageTest {
       assertEquals(2, context.eval(HaraLanguage.ID, "(get (assoc {:a 1} :b 2) :b)").asLong());
       assertEquals(4, context.eval(HaraLanguage.ID, "(nth [3 4] 1)").asLong());
       assertEquals(2, context.eval(HaraLanguage.ID, "(count (conj [5] 6))").asLong());
+      assertEquals(0, context.eval(HaraLanguage.ID, "(count (conj))").asLong());
+      assertEquals(1, context.eval(HaraLanguage.ID, "(nth (conj 1) 0)").asLong());
+      assertEquals(3, context.eval(HaraLanguage.ID, "(count (conj [] 1 2 3))").asLong());
+      assertEquals(3, context.eval(HaraLanguage.ID, "(nth (conj [] 1 2 3) 2)").asLong());
       assertEquals(2, context.eval(HaraLanguage.ID, "(count (cons 0 '(1)))").asLong());
       assertEquals(0, context.eval(HaraLanguage.ID, "(count (empty [1 2]))").asLong());
       assertEquals(0, context.eval(HaraLanguage.ID, "(count nil)").asLong());
@@ -43,6 +47,16 @@ public class HaraLanguageTest {
       assertTrue(context.eval(HaraLanguage.ID, "(empty nil)").isNull());
       assertEquals(1, context.eval(HaraLanguage.ID, "(count (conj nil 1))").asLong());
       assertEquals(1, context.eval(HaraLanguage.ID, "(count (cons 1 nil))").asLong());
+    }
+  }
+
+  @Test
+  public void rejectsArgumentsToNullaryCurrentSymbols() {
+    try (Context context = context()) {
+      PolyglotException error =
+          assertThrows(
+              PolyglotException.class, () -> context.eval(HaraLanguage.ID, "(current-symbols 1)"));
+      assertTrue(error.getMessage().contains("expects 0 arguments"));
     }
   }
 
@@ -1020,6 +1034,19 @@ public class HaraLanguageTest {
                   HaraLanguage.ID,
                   "(defn increment \"increments\" {:private true} [x] (+ x 1)) " + "(increment 41)")
               .asLong());
+    }
+  }
+
+  @Test
+  public void userFunctionsExposeDocstringsAndArglists() {
+    try (Context context = context()) {
+      Value result =
+          context.eval(
+              HaraLanguage.ID,
+              "(do (defn add \"adds values\" [left right] (+ left right)) "
+                  + "(let [m (meta #'add)] [(get m :doc) (get m :arglists)]))");
+      assertEquals("adds values", result.getArrayElement(0).asString());
+      assertEquals(2, result.getArrayElement(1).getArrayElement(0).getArraySize());
     }
   }
 

@@ -77,6 +77,21 @@ public class HaraCapabilityTest {
   }
 
   @Test
+  public void fileResolveNormalizesAChildPathWhenFileAccessIsGranted() throws Exception {
+    Path directory = Files.createTempDirectory("hara-resolve-");
+    try (Context context = context(true, false)) {
+      String root = sourceString(directory);
+      String resolved =
+          context
+              .eval(HaraLanguage.ID, "(file/resolve \"" + root + "\" \"child/../data.bin\")")
+              .asString();
+      assertEquals(directory.resolve("data.bin").normalize().toString(), resolved);
+    } finally {
+      Files.deleteIfExists(directory);
+    }
+  }
+
+  @Test
   public void explicitSocketAccessSendsBytesOnLoopback() throws Exception {
     try (ServerSocket server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
       CompletableFuture<byte[]> received =

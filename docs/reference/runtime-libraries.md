@@ -55,12 +55,15 @@ Promises are backed by the runtime's native promise mechanism. On the JVM that i
 `xt.lang.spec-promise` settlement and adoption model.
 
 Bytes expose unsigned values from `0` through `255` through `bytes/get`; `bytes/u8` and
-`bytes/s8` explicitly convert representations. String encoding and decoding are UTF-8.
+`bytes/s8` explicitly convert representations. The ordinary `bytes/get` library operation is
+unsigned, while protocol `INth/nth` preserves the signed byte value. String encoding and decoding
+are UTF-8.
 
 File and socket namespaces are always present and aliased. Availability does not grant authority.
 Unsupported or denied operations fail when invoked. JVM embeddings grant authority with Graal
-`IOAccess`; the CLI grants it explicitly with `--allow-file` and `--allow-net`. File reads and
-writes use bytes and return promises. Socket v1 follows the xtalk callback contract:
-`connect` accepts host, port, options, and an `(fn [error connection] ...)` callback; `send`
-accepts bytes and returns the byte count; `close` is direct. Receive/framing and HTTP are outside
-this slice.
+`IOAccess`; the CLI grants it explicitly with `--allow-file` and `--allow-net`. `file/resolve`
+resolves a child path beneath a supplied root and returns a normalized path string. File reads and
+writes use bytes and return promises. Socket v1 follows the callback contract: `connect` accepts
+host, port, a reserved options value, and an `(fn [error connection] ...)` callback; the current
+implementation does not interpret options. `send` accepts bytes and returns the byte count;
+`close` is direct. Receive/framing and HTTP are outside this slice.

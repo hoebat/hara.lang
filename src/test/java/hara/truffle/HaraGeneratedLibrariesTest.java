@@ -128,6 +128,17 @@ public class HaraGeneratedLibrariesTest {
   }
 
   @Test
+  public void strIsVariadicAndMatchesJvmConcatenation() {
+    try (Context context = context()) {
+      assertEquals("", context.eval(HaraLanguage.ID, "(str)").asString());
+      assertEquals("1", context.eval(HaraLanguage.ID, "(str 1)").asString());
+      assertEquals("123", context.eval(HaraLanguage.ID, "(str 1 2 3)").asString());
+      assertEquals("ab", context.eval(HaraLanguage.ID, "(str \"a\" nil \"b\")").asString());
+      assertEquals(":ok", context.eval(HaraLanguage.ID, "(str :ok)").asString());
+    }
+  }
+
+  @Test
   public void intrinsicsCanExcludeAndRenameGeneratedAliases() {
     try (Context context = context()) {
       assertEquals(
@@ -248,6 +259,9 @@ public class HaraGeneratedLibrariesTest {
   public void bitOperationsUseSignedThirtyTwoBitSemantics() {
     try (Context context = context()) {
       assertEquals(2, context.eval(HaraLanguage.ID, "(bit-and 6 3)").asLong());
+      assertErrorContains(context, "(bit-and 7 3 1)", "expects two integers");
+      assertErrorContains(context, "(bit-or 1 2 4)", "expects two integers");
+      assertErrorContains(context, "(bit-xor 1 2 4)", "expects two integers");
       assertEquals(-1, context.eval(HaraLanguage.ID, "(bit-not 0)").asLong());
       assertEquals(-2, context.eval(HaraLanguage.ID, "(bit-shift-right -4 1)").asLong());
       assertEquals(-2147483648L, context.eval(HaraLanguage.ID, "(bit-shift-left 1 31)").asLong());

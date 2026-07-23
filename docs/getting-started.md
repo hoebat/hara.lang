@@ -41,8 +41,8 @@ documentation. See [`User guide`](user-guide.md) and [`REPL specification`](refe
 ## 5. Run a file or stdin
 
 ```shell
-java -jar target/hara-truffle.jar run examples/hello.hara
-cat examples/hello.hara | java -jar target/hara-truffle.jar stdin
+java -jar target/hara-truffle.jar run examples/hello.hal
+cat examples/hello.hal | java -jar target/hara-truffle.jar stdin
 ```
 
 ## 6. Run tests

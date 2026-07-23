@@ -233,12 +233,22 @@ public class ParserTest {
   }
 
   @Test
-  public void testQueueReader() {
-    Object result = Parser.LispReader.readString("#[1 2]", null);
-    assertTrue(result instanceof Queue);
-    Queue q = (Queue) result;
-    assertEquals(2, q.count());
-    assertEquals(1L, q.peekFirst());
+  public void testVarQuoteReader() {
+    Object result = Parser.LispReader.readString("#'a", null);
+    assertTrue(result instanceof List);
+    List l = (List) result;
+    assertEquals(Symbol.create("var"), l.nth(0));
+    assertEquals(Symbol.create("a"), l.nth(1));
+  }
+
+  @Test
+  public void testQueueDispatchIsRejected() {
+    try {
+      Parser.LispReader.readString("#[1 2]", null);
+      fail("Expected unknown dispatch macro");
+    } catch (Parser.LispReader.ReaderException e) {
+      assertTrue(e.getCause().getMessage().contains("No dispatch macro for: ["));
+    }
   }
 
   @Test
