@@ -10,6 +10,7 @@ on:
       - "mkdocs.yml"
       - "requirements-docs.txt"
       - "pom.xml"
+      - "wasm/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -64,8 +65,7 @@ jobs:
           mkdir -p site-build/wasm
           wasm-bindgen --target web --out-dir site-build/wasm/pkg wasm/target/wasm32-unknown-unknown/release/hara_wasm.wasm
           cp wasm/web/index.html wasm/web/playground.css wasm/web/playground.js site-build/wasm/
-          cp wasm/web/dist/noir-loader.js site-build/wasm/
-          cp wasm/web/node_modules/@noir-lang/noir_wasm/dist/web/main.mjs site-build/wasm/noir-wasm.mjs
+          cp -R wasm/web/dist/. site-build/wasm/
 
       - name: Add Java API documentation
         run: |

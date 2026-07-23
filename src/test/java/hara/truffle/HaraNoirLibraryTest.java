@@ -48,6 +48,11 @@ public class HaraNoirLibraryTest {
                       HaraLanguage.ID,
                       "(deref (noir/compile (noir/program \"first_cut\" \"" + SOURCE + "\")))"));
       assertTrue(error.getMessage().contains("capability-scoped NoirWasmLoader"));
+      PolyglotException proveError =
+          assertThrows(
+              PolyglotException.class,
+              () -> context.eval(HaraLanguage.ID, "(noir/prove nil \"{}\")"));
+      assertTrue(proveError.getMessage().contains("expects a compiled Noir artifact"));
     }
   }
 }

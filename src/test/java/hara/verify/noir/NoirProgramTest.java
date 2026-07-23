@@ -11,10 +11,10 @@ public class NoirProgramTest {
 
   @Test
   public void cacheKeyMatchesTheBrowserLoaderVector() {
-    NoirProgram program = NoirProgram.create("first_cut", SOURCE, "1.0.0-beta.25", "unbound");
+    NoirProgram program = NoirProgram.create("first_cut", SOURCE);
 
     assertEquals(
-        "903bcaf8fa5feb527497bb35d67ca6b7a2427db93a323cb14bfea83653bcb871",
+        "6db358723409593229a47cd5271d5073dd67f38c55bc0a643857afb2206e8c5f",
         program.cacheKey().hex());
   }
 

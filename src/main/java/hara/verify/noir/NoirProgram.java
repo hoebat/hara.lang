@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 /** Immutable Noir source plus the exact toolchain identity that gives it meaning. */
 public final class NoirProgram implements IDisplay {
   public static final String DEFAULT_NOIR_VERSION = "1.0.0-beta.25";
-  public static final String DEFAULT_BACKEND_VERSION = "unbound";
+  public static final String DEFAULT_BACKEND_VERSION = "bb.js/5.1.0";
 
   private static final byte[] DOMAIN = "HARA_NOIR_PROGRAM_V1\0".getBytes(StandardCharsets.US_ASCII);
   private static final Pattern NAME = Pattern.compile("[a-z][a-z0-9_]*");
@@ -36,7 +36,7 @@ public final class NoirProgram implements IDisplay {
       throw new IllegalArgumentException("A pinned Noir compiler version is required.");
     }
     if (backendVersion == null || backendVersion.isBlank()) {
-      throw new IllegalArgumentException("A backend version or 'unbound' is required.");
+      throw new IllegalArgumentException("A pinned proving backend version is required.");
     }
     this.name = name;
     this.source = source;

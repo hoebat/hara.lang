@@ -7,9 +7,12 @@
     "test:noir": "npm run build:noir && cp node_modules/@noir-lang/noir_wasm/dist/web/main.mjs dist/noir-wasm.mjs && node --test noir-loader.test.js"
   },
   "dependencies": {
+    "@aztec/bb.js": "5.1.0",
+    "@noir-lang/noir_js": "1.0.0-beta.25",
     "@noir-lang/noir_wasm": "1.0.0-beta.25"
   },
   "devDependencies": {
+    "fake-indexeddb": "6.2.4",
     "vite": "8.1.5"
   }
 }

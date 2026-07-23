@@ -27,6 +27,7 @@ import hara.lang.protocol.IDerefTimeout;
 import hara.lang.protocol.ICount;
 import hara.lang.protocol.INth;
 import hara.verify.noir.NoirArtifact;
+import hara.verify.noir.NoirProof;
 import hara.verify.noir.NoirProgram;
 import hara.verify.noir.NoirWasmLoader;
 import java.io.IOException;
@@ -985,6 +986,8 @@ public final class HaraContext {
               return noirWasmLoader.available();
             }));
     noir.define("compile", new UnaryBuiltin("noir/compile", this::noirCompile));
+    noir.define("prove", new VariadicBuiltin("noir/prove", this::noirProve));
+    noir.define("verify", new VariadicBuiltin("noir/verify", this::noirVerify));
     noir.define(
         "artifact-key",
         new UnaryBuiltin(
@@ -995,6 +998,20 @@ public final class HaraContext {
         new UnaryBuiltin(
             "noir/artifact-json",
             value -> requireNoirArtifact(value, "noir/artifact-json").circuitJson()));
+    noir.define(
+        "proof-key",
+        new UnaryBuiltin(
+            "noir/proof-key", value -> requireNoirProof(value, "noir/proof-key").programKey()));
+    noir.define(
+        "proof-bytes",
+        new UnaryBuiltin(
+            "noir/proof-bytes",
+            value -> requireNoirProof(value, "noir/proof-bytes").proofBase64()));
+    noir.define(
+        "public-inputs",
+        new UnaryBuiltin(
+            "noir/public-inputs",
+            value -> requireNoirProof(value, "noir/public-inputs").publicInputsJson()));
   }
 
   private Object noirProgram(Object[] values) {
@@ -1020,6 +1037,28 @@ public final class HaraContext {
     return new HaraPromise(future);
   }
 
+  private Object noirProve(Object[] values) {
+    if (values.length != 2) {
+      throw new HaraException("noir/prove expects an artifact and strict JSON inputs");
+    }
+    NoirArtifact artifact = requireNoirArtifact(values[0], "noir/prove");
+    String inputsJson = stringValue(values[1], "noir/prove");
+    CompletableFuture<Object> future =
+        noirWasmLoader.prove(artifact, inputsJson).thenApply(proof -> (Object) proof);
+    return new HaraPromise(future);
+  }
+
+  private Object noirVerify(Object[] values) {
+    if (values.length != 2) {
+      throw new HaraException("noir/verify expects an artifact and proof");
+    }
+    NoirArtifact artifact = requireNoirArtifact(values[0], "noir/verify");
+    NoirProof proof = requireNoirProof(values[1], "noir/verify");
+    CompletableFuture<Object> future =
+        noirWasmLoader.verify(artifact, proof).thenApply(verified -> (Object) verified);
+    return new HaraPromise(future);
+  }
+
   private static NoirProgram requireNoirProgram(Object value, String operation) {
     Object input = HaraBox.unwrap(value);
     if (!(input instanceof NoirProgram))
@@ -1033,6 +1072,14 @@ public final class HaraContext {
       throw new HaraException(operation + " expects a compiled Noir artifact");
     }
     return (NoirArtifact) input;
+  }
+
+  private static NoirProof requireNoirProof(Object value, String operation) {
+    Object input = HaraBox.unwrap(value);
+    if (!(input instanceof NoirProof)) {
+      throw new HaraException(operation + " expects a Noir proof");
+    }
+    return (NoirProof) input;
   }
 
   private static int int32(Object value, String operation) {

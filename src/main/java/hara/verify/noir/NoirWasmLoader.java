@@ -3,13 +3,17 @@ package hara.verify.noir;
 import java.util.ServiceLoader;
 import java.util.concurrent.CompletableFuture;
 
-/** Host capability for compiling Noir through a WASM compiler implementation. */
+/** Host capability for compiling, proving, and verifying Noir through WASM. */
 public interface NoirWasmLoader {
   String id();
 
   boolean available();
 
   CompletableFuture<NoirArtifact> compile(NoirProgram program);
+
+  CompletableFuture<NoirProof> prove(NoirArtifact artifact, String inputsJson);
+
+  CompletableFuture<Boolean> verify(NoirArtifact artifact, NoirProof proof);
 
   static NoirWasmLoader discover() {
     for (NoirWasmLoader loader : ServiceLoader.load(NoirWasmLoader.class)) {
@@ -35,10 +39,24 @@ public interface NoirWasmLoader {
 
     @Override
     public CompletableFuture<NoirArtifact> compile(NoirProgram program) {
-      CompletableFuture<NoirArtifact> result = new CompletableFuture<>();
+      return unavailable("compile");
+    }
+
+    @Override
+    public CompletableFuture<NoirProof> prove(NoirArtifact artifact, String inputsJson) {
+      return unavailable("prove");
+    }
+
+    @Override
+    public CompletableFuture<Boolean> verify(NoirArtifact artifact, NoirProof proof) {
+      return unavailable("verify");
+    }
+
+    private static <T> CompletableFuture<T> unavailable(String operation) {
+      CompletableFuture<T> result = new CompletableFuture<>();
       result.completeExceptionally(
           new IllegalStateException(
-              "noir/compile is unavailable: install a capability-scoped NoirWasmLoader"));
+              "noir/" + operation + " is unavailable: install a capability-scoped NoirWasmLoader"));
       return result;
     }
   }

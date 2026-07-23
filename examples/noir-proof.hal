@@ -1,0 +1,10 @@
+(def square-program
+  (noir/program
+    "proof_demo"
+    "fn main(secret: Field, expected: pub Field) { assert(secret * secret == expected); }"))
+
+(def square-artifact (deref (noir/compile square-program)))
+(def square-proof
+  (deref (noir/prove square-artifact "{\"secret\":\"7\",\"expected\":\"49\"}")))
+
+(deref (noir/verify square-artifact square-proof))

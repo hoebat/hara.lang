@@ -1,7 +1,15 @@
 import { compile_program, createFileManager } from "./noir-wasm.mjs";
+import { Noir } from "@noir-lang/noir_js";
+import {
+  BackendType,
+  Barretenberg,
+  UltraHonkBackend
+} from "@aztec/bb.js";
 
 export const NOIR_VERSION = "1.0.0-beta.25";
-export const LOADER_ID = `noir_wasm/${NOIR_VERSION}`;
+export const BB_VERSION = "5.1.0";
+export const BACKEND_ID = `bb.js/${BB_VERSION}`;
+export const LOADER_ID = `noir_wasm/${NOIR_VERSION}+${BACKEND_ID}`;
 
 const DOMAIN = new TextEncoder().encode("HARA_NOIR_PROGRAM_V1\0");
 const PACKAGE_NAME = /^[a-z][a-z0-9_]*$/;
@@ -9,8 +17,12 @@ const CACHE_DATABASE = "hara-noir-artifacts-v1";
 const CACHE_STORE = "circuits";
 
 export class NoirBrowserLoader {
-  constructor({ cache = new IndexedDbArtifactCache() } = {}) {
+  constructor({
+    cache = new IndexedDbArtifactCache(),
+    backendFactory = defaultBackendFactory
+  } = {}) {
     this.cache = cache;
+    this.backendFactory = backendFactory;
   }
 
   get id() {
@@ -66,6 +78,40 @@ export class NoirBrowserLoader {
     await this.cache.put(programKey, artifact);
     return artifact;
   }
+
+  async prove(artifact, inputs) {
+    validateArtifact(artifact);
+    validateInputs(inputs);
+    const noir = new Noir(artifact.circuit.program);
+    const { witness } = await noir.execute(inputs);
+    const { api, backend } = await this.backendFactory(artifact.circuit.program.bytecode);
+    try {
+      const proof = await backend.generateProof(witness);
+      return Object.freeze({
+        format: "hara.noir.proof/v1",
+        programKey: artifact.programKey,
+        loaderId: LOADER_ID,
+        proof: base64(proof.proof),
+        publicInputs: Object.freeze([...proof.publicInputs])
+      });
+    } finally {
+      await api.destroy();
+    }
+  }
+
+  async verify(artifact, envelope) {
+    validateArtifact(artifact);
+    validateProof(artifact, envelope);
+    const { api, backend } = await this.backendFactory(artifact.circuit.program.bytecode);
+    try {
+      return await backend.verifyProof({
+        proof: unbase64(envelope.proof),
+        publicInputs: [...envelope.publicInputs]
+      });
+    } finally {
+      await api.destroy();
+    }
+  }
 }
 
 export class MemoryArtifactCache {
@@ -116,6 +162,54 @@ function validateProgram(program) {
   }
 }
 
+function validateArtifact(artifact) {
+  if (artifact?.format !== "hara.noir.artifact/v1") {
+    throw new TypeError("noir/artifact-format: expected hara.noir.artifact/v1");
+  }
+  if (artifact.loaderId !== LOADER_ID) {
+    throw new Error(
+      `noir/loader-mismatch: ${LOADER_ID} cannot use artifact from ${artifact.loaderId}`
+    );
+  }
+  if (artifact.backendVersion !== BACKEND_ID) {
+    throw new Error(
+      `noir/backend-mismatch: expected ${BACKEND_ID}, received ${artifact.backendVersion}`
+    );
+  }
+  if (!artifact.circuit?.program?.bytecode) {
+    throw new TypeError("noir/artifact-circuit: compiled program bytecode is required");
+  }
+}
+
+function validateInputs(inputs) {
+  if (!inputs || typeof inputs !== "object" || Array.isArray(inputs)) {
+    throw new TypeError("noir/inputs must be an object");
+  }
+}
+
+function validateProof(artifact, envelope) {
+  if (envelope?.format !== "hara.noir.proof/v1") {
+    throw new TypeError("noir/proof-format: expected hara.noir.proof/v1");
+  }
+  if (envelope.programKey !== artifact.programKey) {
+    throw new Error("noir/proof-program-mismatch: proof belongs to another program");
+  }
+  if (envelope.loaderId !== LOADER_ID) {
+    throw new Error("noir/proof-loader-mismatch: proof belongs to another backend");
+  }
+  if (typeof envelope.proof !== "string" || !Array.isArray(envelope.publicInputs)) {
+    throw new TypeError("noir/proof-data: proof bytes and public inputs are required");
+  }
+}
+
+async function defaultBackendFactory(bytecode) {
+  const api = await Barretenberg.new({
+    backend: BackendType.Wasm,
+    threads: 1
+  });
+  return { api, backend: new UltraHonkBackend(bytecode, api) };
+}
+
 function manifest(name) {
   return `[package]\nname = "${name}"\ntype = "bin"\n`;
 }
@@ -134,6 +228,19 @@ function field(value) {
 
 function hex(value) {
   return Array.from(new Uint8Array(value), byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function base64(value) {
+  if (typeof Buffer !== "undefined") return Buffer.from(value).toString("base64");
+  let binary = "";
+  for (const byte of value) binary += String.fromCharCode(byte);
+  return btoa(binary);
+}
+
+function unbase64(value) {
+  if (typeof Buffer !== "undefined") return new Uint8Array(Buffer.from(value, "base64"));
+  const binary = atob(value);
+  return Uint8Array.from(binary, character => character.charCodeAt(0));
 }
 
 async function request(store, method, ...arguments_) {
