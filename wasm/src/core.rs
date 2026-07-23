@@ -968,6 +968,21 @@ fn collection_assoc(value: &Value, key: &Value, replacement: Value) -> Result<Va
     }
 }
 
+fn collection_dissoc(value: &Value, keys: &[Value]) -> Result<Value, String> {
+    match value {
+        Value::Map(entries) => {
+            let output = entries
+                .iter()
+                .filter(|(candidate, _)| !keys.iter().any(|key| candidate == key))
+                .cloned()
+                .collect();
+            Ok(Value::Map(output))
+        }
+        Value::Nil => Ok(Value::Map(Vec::new())),
+        _ => Err("dissoc expects a map".into()),
+    }
+}
+
 fn collection_get_in(value: Value, keys: &[Value]) -> Result<Value, String> {
     if keys.is_empty() { return Ok(value); }
     let next=collection_get(&value, &keys[0], Value::Nil)?;
@@ -1470,6 +1485,12 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 for pair in fs[2..].chunks(2) { let key=eval(&pair[0], env)?; let replacement=eval(&pair[1], env)?; value=collection_assoc(&value, &key, replacement)?; }
                 Ok(value)
             }
+            Form::Symbol(n) if n == "dissoc" => {
+                if fs.len() < 3 { return Err("dissoc expects a map and at least one key".into()); }
+                let value = eval(&fs[1], env)?;
+                let keys = fs[2..].iter().map(|form| eval(form, env)).collect::<Result<Vec<_>, _>>()?;
+                collection_dissoc(&value, &keys)
+            }
             Form::Symbol(n) if n == "get-in" => {
                 if fs.len()!=3 { return Err("get-in expects a collection and keys".into()); }
                 let value=eval(&fs[1], env)?; let keys=iterator_values(eval(&fs[2], env)?)?; collection_get_in(value, &keys)
@@ -1492,7 +1513,18 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     Value::Vector(mut values) => { values.push(item); Ok(Value::Vector(values)) },
                     Value::List(mut values) => { values.insert(0, item); Ok(Value::List(values)) },
                     Value::Set(mut values) => { if !values.contains(&item) { values.push(item); } Ok(Value::Set(values)) },
-                    Value::Map(_values) => { return Err("conj map entries are not implemented".into()) },
+                    Value::Map(mut values) => {
+                        let entry = match item {
+                            Value::Vector(entry) | Value::List(entry) if entry.len() == 2 => entry,
+                            _ => return Err("conj map expects a two-element entry".into()),
+                        };
+                        if let Some((_, value)) = values.iter_mut().find(|(key, _)| key == &entry[0]) {
+                            *value = entry[1].clone();
+                        } else {
+                            values.push((entry[0].clone(), entry[1].clone()));
+                        }
+                        Ok(Value::Map(values))
+                    },
                     _ => Err("conj expects a vector, list, or set".into())
                 }
             }

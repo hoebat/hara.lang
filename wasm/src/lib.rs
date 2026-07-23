@@ -465,6 +465,10 @@ mod tests {
         assert_eq!(runtime.eval_text("(count [1 2 3])").unwrap(), "3");
         assert_eq!(runtime.eval_text("(get {\"a\" 9} \"a\")").unwrap(), "9");
         assert_eq!(runtime.eval_text("(nth (conj [1] 2) 1)").unwrap(), "2");
+        assert_eq!(runtime.eval_text(r#"(conj {"a" 1} ["b" 2])"#).unwrap(), r#"{"a" 1 "b" 2}"#);
+        assert_eq!(runtime.eval_text(r#"(get (conj {"a" 1} ["a" 9]) "a")"#).unwrap(), "9");
+        assert_eq!(runtime.eval_text(r#"(dissoc {"a" 1 "b" 2} "a")"#).unwrap(), r#"{"b" 2}"#);
+        assert_eq!(runtime.eval_text(r#"(dissoc {"a" 1 "b" 2} "a" "b")"#).unwrap(), "{}");
         assert_eq!(runtime.eval_text("(cons 0 [1 2])").unwrap(), "[0 1 2]");
         assert_eq!(runtime.eval_text("(= :ready :ready)").unwrap(), "true");
     }
