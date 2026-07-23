@@ -1195,6 +1195,43 @@ mod tests {
     }
 
     #[test]
+    fn generated_string_library_covers_the_portable_surface() {
+        let mut runtime = Runtime::new();
+        let cases = [
+            (r#"(str/len "hé")"#, "2"),
+            (r#"(str/comp "a" "b")"#, "-1"),
+            (r#"(str/lt? "a" "b")"#, "true"),
+            (r#"(str/gt? "b" "a")"#, "true"),
+            (r#"(str/pad-left "7" 3 "0")"#, r#""007""#),
+            (r#"(str/pad-right "7" 3 "0")"#, r#""700""#),
+            (r#"(str/starts-with? "hara" "ha")"#, "true"),
+            (r#"(str/ends-with? "hara" "ra")"#, "true"),
+            (r#"(str/char "h😀" 1)"#, r#""😀""#),
+            (r#"(. (str/split "a,b,c" ",") (get 1))"#, r#""b""#),
+            (r#"(str/join "-" ["a" "b"])"#, r#""a-b""#),
+            (r#"(str/index-of "a😀b" "b")"#, "2"),
+            (r#"(str/substring "a😀b" 1 2)"#, r#""😀""#),
+            (r#"(str/to-fixed 1 2)"#, r#""1.00""#),
+            (r#"(str/replace "a-b-a" "a" "x")"#, r#""x-b-x""#),
+            (r#"(str/trim-left "  a  ")"#, r#""a  ""#),
+            (r#"(str/trim-right "  a  ")"#, r#""  a""#),
+            (r#"(str/to-upper "Hara")"#, r#""HARA""#),
+            (r#"(str/to-lower "Hara")"#, r#""hara""#),
+        ];
+        for (source, expected) in cases {
+            assert_eq!(runtime.eval_text(source).unwrap(), expected, "{source}");
+        }
+        assert!(runtime
+            .eval_text(r#"(str/substring "abc" 2 1)"#)
+            .unwrap_err()
+            .contains("out of bounds"));
+        assert!(runtime
+            .eval_text(r#"(str/char "a" 1)"#)
+            .unwrap_err()
+            .contains("out of bounds"));
+    }
+
+    #[test]
     fn byte_buffers_preserve_signed_storage_and_unsigned_reads() {
         let mut runtime = Runtime::new();
         assert_eq!(

@@ -1527,6 +1527,173 @@ fn promise_chain(source: Promise, operation: &str, function: Rc<Function>) -> Pr
     output
 }
 
+fn string_value<'a>(value: &'a Value, operation: &str) -> Result<&'a str, String> {
+    match value {
+        Value::String(value) => Ok(value),
+        _ => Err(format!("{operation} expects a string")),
+    }
+}
+
+fn string_operation(operation: &str, values: Vec<Value>) -> Result<Value, String> {
+    let pair = |values: &[Value]| -> Result<(String, String), String> {
+        if values.len() != 2 {
+            return Err(format!("{operation} expects two strings"));
+        }
+        Ok((
+            string_value(&values[0], operation)?.to_owned(),
+            string_value(&values[1], operation)?.to_owned(),
+        ))
+    };
+    match operation {
+        "str/comp" | "str/lt?" | "str/gt?" => {
+            let (left, right) = pair(&values)?;
+            let ordering = left.cmp(&right);
+            Ok(match operation {
+                "str/comp" => Value::Number(match ordering {
+                    std::cmp::Ordering::Less => -1,
+                    std::cmp::Ordering::Equal => 0,
+                    std::cmp::Ordering::Greater => 1,
+                }),
+                "str/lt?" => Value::Bool(ordering.is_lt()),
+                _ => Value::Bool(ordering.is_gt()),
+            })
+        }
+        "str/starts-with?" | "str/ends-with?" => {
+            let (text, part) = pair(&values)?;
+            Ok(Value::Bool(if operation == "str/starts-with?" {
+                text.starts_with(&part)
+            } else {
+                text.ends_with(&part)
+            }))
+        }
+        "str/pad-left" | "str/pad-right" => {
+            if values.len() != 3 {
+                return Err(format!(
+                    "{operation} expects a string, length, and padding string"
+                ));
+            }
+            let text = string_value(&values[0], operation)?;
+            let length = value_index(&values[1])?;
+            let padding = string_value(&values[2], operation)?;
+            let text_length = text.chars().count();
+            if padding.is_empty() || text_length >= length {
+                return Ok(Value::String(text.into()));
+            }
+            let needed = length - text_length;
+            let fill = padding.chars().cycle().take(needed).collect::<String>();
+            Ok(Value::String(if operation == "str/pad-left" {
+                format!("{fill}{text}")
+            } else {
+                format!("{text}{fill}")
+            }))
+        }
+        "str/char" => {
+            if values.len() != 2 {
+                return Err("str/char expects a string and index".into());
+            }
+            let text = string_value(&values[0], operation)?;
+            let index = value_index(&values[1])?;
+            text.chars()
+                .nth(index)
+                .map(|value| Value::String(value.to_string()))
+                .ok_or_else(|| "str/char index out of bounds".into())
+        }
+        "str/split" => {
+            let (text, separator) = pair(&values)?;
+            let parts = text
+                .split(&separator)
+                .map(|part| Value::String(part.into()))
+                .collect();
+            Ok(Value::Array(Rc::new(RefCell::new(parts))))
+        }
+        "str/join" => {
+            if values.len() != 2 {
+                return Err("str/join expects a separator and collection".into());
+            }
+            let separator = string_value(&values[0], operation)?;
+            let parts = iterator_values(values[1].clone())?
+                .into_iter()
+                .map(|value| match value {
+                    Value::String(value) => Ok(value),
+                    _ => Err("str/join expects a collection of strings".into()),
+                })
+                .collect::<Result<Vec<String>, String>>()?;
+            Ok(Value::String(parts.join(separator)))
+        }
+        "str/index-of" => {
+            if values.len() != 2 && values.len() != 3 {
+                return Err("str/index-of expects a string, substring, and optional offset".into());
+            }
+            let text = string_value(&values[0], operation)?;
+            let part = string_value(&values[1], operation)?;
+            let offset = if values.len() == 3 {
+                value_index(&values[2])?
+            } else {
+                0
+            };
+            let byte_offset = text
+                .char_indices()
+                .nth(offset)
+                .map_or(text.len(), |(index, _)| index);
+            let found = text[byte_offset..]
+                .find(part)
+                .map(|index| text[..byte_offset + index].chars().count() as i64);
+            Ok(Value::Number(found.unwrap_or(-1)))
+        }
+        "str/substring" => {
+            if values.len() != 2 && values.len() != 3 {
+                return Err("str/substring expects a string, start, and optional end".into());
+            }
+            let text = string_value(&values[0], operation)?;
+            let start = value_index(&values[1])?;
+            let chars = text.chars().collect::<Vec<_>>();
+            let end = if values.len() == 3 {
+                value_index(&values[2])?
+            } else {
+                chars.len()
+            };
+            if start > end || end > chars.len() {
+                return Err("str/substring range is out of bounds".into());
+            }
+            Ok(Value::String(chars[start..end].iter().collect()))
+        }
+        "str/to-fixed" => {
+            if values.len() != 2 {
+                return Err("str/to-fixed expects a number and precision".into());
+            }
+            let number = match values[0] {
+                Value::Number(number) => number as f64,
+                _ => return Err("str/to-fixed expects a number and precision".into()),
+            };
+            let precision = value_index(&values[1])?;
+            if precision > 100 {
+                return Err("str/to-fixed precision must be in the range 0..100".into());
+            }
+            Ok(Value::String(format!("{number:.precision$}")))
+        }
+        "str/replace" => {
+            if values.len() != 3 {
+                return Err("str/replace expects a string, match, and replacement".into());
+            }
+            Ok(Value::String(string_value(&values[0], operation)?.replace(
+                string_value(&values[1], operation)?,
+                string_value(&values[2], operation)?,
+            )))
+        }
+        "str/trim-left" | "str/trim-right" => {
+            if values.len() != 1 {
+                return Err(format!("{operation} expects one string"));
+            }
+            let text = string_value(&values[0], operation)?;
+            Ok(Value::String(if operation == "str/trim-left" {
+                text.trim_start().into()
+            } else {
+                text.trim_end().into()
+            }))
+        }
+        _ => Err(format!("unknown string operation: {operation}")),
+    }
+}
 fn marker_key(value: &Value, operation: &str) -> Result<String, String> {
     match value {
         Value::String(key) => Ok(key.clone()),
@@ -3084,6 +3251,33 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                         .collect::<Vec<_>>()
                         .join(""),
                 ))
+            }
+            Form::Symbol(n)
+                if [
+                    "str/comp",
+                    "str/lt?",
+                    "str/gt?",
+                    "str/pad-left",
+                    "str/pad-right",
+                    "str/starts-with?",
+                    "str/ends-with?",
+                    "str/char",
+                    "str/split",
+                    "str/join",
+                    "str/index-of",
+                    "str/substring",
+                    "str/to-fixed",
+                    "str/replace",
+                    "str/trim-left",
+                    "str/trim-right",
+                ]
+                .contains(&n.as_str()) =>
+            {
+                let values = fs[1..]
+                    .iter()
+                    .map(|form| eval(form, env))
+                    .collect::<Result<Vec<_>, _>>()?;
+                string_operation(n, values)
             }
             Form::Symbol(n)
                 if n == "str/count" || n == "str/trim" || n == "str/upper" || n == "str/lower" =>
