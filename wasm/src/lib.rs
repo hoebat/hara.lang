@@ -831,7 +831,7 @@ mod tests {
             "true"
         );
         assert_eq!(runtime.eval_text("(conj #{1} 2)").unwrap(), "#{1 2}");
-        assert_eq!(runtime.eval_text("(set 1 2 1)").unwrap(), "#{1 2}");
+        assert_eq!(runtime.eval_text("(= (set 1 2 1) #{1 2})").unwrap(), "true");
         assert_eq!(runtime.eval_text("(= #{1 2} #{2 1})").unwrap(), "true");
         assert_eq!(runtime.eval_text("(get #{1 2} 2 :missing)").unwrap(), "2");
     }
@@ -1006,6 +1006,64 @@ mod tests {
             runtime.eval_text("(get #{[1 2]} '(1 2) :missing)").unwrap(),
             "[1 2]"
         );
+    }
+
+    #[test]
+    fn java_collection_families_are_first_class_runtime_values() {
+        let mut runtime = Runtime::new();
+        for source in [
+            "(= (hash-map :a 1 :b 2) (ordered-map :b 2 :a 1))",
+            "(= (hash-map :a 1 :b 2) (sorted-map :b 2 :a 1))",
+            "(= (hash-set 1 2) (ordered-set 2 1))",
+            "(= (hash-set 1 2) (sorted-set 2 1))",
+            "(= (queue 1 2) [1 2])",
+        ] {
+            assert_eq!(runtime.eval_text(source).unwrap(), "true", "{source}");
+        }
+        assert_eq!(runtime.eval_text("(get (hash-map :a 1) :a)").unwrap(), "1");
+        assert_eq!(
+            runtime.eval_text("(get (ordered-map :a 1) :a)").unwrap(),
+            "1"
+        );
+        assert_eq!(
+            runtime.eval_text("(get (sorted-map :a 1) :a)").unwrap(),
+            "1"
+        );
+        assert_eq!(
+            runtime
+                .eval_text("(get (trie \"alpha\" 7) \"alpha\")")
+                .unwrap(),
+            "7"
+        );
+        assert_eq!(
+            runtime.eval_text("(keys (sorted-map :b 2 :a 1))").unwrap(),
+            "[:a :b]"
+        );
+        assert_eq!(runtime.eval_text("(nth (queue 4 5 6) 1)").unwrap(), "5");
+        assert_eq!(
+            runtime.eval_text("(last (conj (queue 4 5) 6))").unwrap(),
+            "6"
+        );
+        assert_eq!(
+            runtime
+                .eval_text("(count (dissoc (ordered-set 1 2) 1))")
+                .unwrap(),
+            "1"
+        );
+        assert_eq!(
+            runtime
+                .eval_text("(get (assoc (trie) \"x\" 9) \"x\")")
+                .unwrap(),
+            "9"
+        );
+        assert!(runtime
+            .eval_text("(hash-map :a)")
+            .unwrap_err()
+            .contains("even number"));
+        assert!(runtime
+            .eval_text("(trie :a 1)")
+            .unwrap_err()
+            .contains("string keys"));
     }
 
     #[test]

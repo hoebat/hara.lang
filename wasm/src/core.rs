@@ -6,7 +6,9 @@ pub use crate::kernel::Form;
 use crate::kernel::{NamespaceRegistry, Var as KernelVar};
 use crate::lang::data::List as PList;
 use crate::lang::data::{
-    Keyword, OrderedMap as PMap, OrderedSet as PSet, Symbol, Tuple as PTuple, Vector as PVector,
+    Keyword, Map as PMap, OrderedMap as POrderedMap, OrderedSet as POrderedSet, Queue as PQueue,
+    Set as PSet, SortedMap as PSortedMap, SortedSet as PSortedSet, Symbol, Trie as PTrie,
+    Tuple as PTuple, Vector as PVector,
 };
 use crate::lang::data::{Metadata, MetadataValue};
 use crate::lang::protocol::{IDisplay, IMetadata, INamespaced};
@@ -44,8 +46,14 @@ pub enum Value {
     Promise(Promise),
     Recur(Vec<Value>),
     Map(PMap<Value, Value>),
+    OrderedMap(Box<POrderedMap<Value, Value>>),
+    SortedMap(Box<PSortedMap<Value, Value>>),
+    Trie(Box<PTrie<Value>>),
     Set(PSet<Value>),
+    OrderedSet(Box<POrderedSet<Value>>),
+    SortedSet(Box<PSortedSet<Value>>),
     List(PList<Value>),
+    Queue(Box<PQueue<Value>>),
     Symbol(Symbol),
     Function(Rc<Function>),
     Tuple(Box<PTuple<Value>>),
@@ -390,6 +398,7 @@ fn sequential_equality(left: &Value, right: &Value) -> Option<bool> {
     fn items(value: &Value) -> Option<Vec<&Value>> {
         match value {
             Value::List(values) => Some(values.iter().collect()),
+            Value::Queue(values) => Some(values.iter().collect()),
             Value::Tuple(values) => Some(values.iter().collect()),
             Value::Vector(values) => Some(values.iter().collect()),
             _ => None,
@@ -398,9 +407,128 @@ fn sequential_equality(left: &Value, right: &Value) -> Option<bool> {
     Some(items(left)? == items(right)?)
 }
 
+fn map_entries(value: &Value) -> Option<Vec<(Value, Value)>> {
+    match value {
+        Value::Map(values) => Some(values.iter().map(|(k, v)| (k.clone(), v.clone())).collect()),
+        Value::OrderedMap(values) => {
+            Some(values.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+        }
+        Value::SortedMap(values) => {
+            Some(values.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+        }
+        Value::Trie(values) => Some(
+            values
+                .entries()
+                .into_iter()
+                .map(|(k, v)| (Value::String(k), v.clone()))
+                .collect(),
+        ),
+        _ => None,
+    }
+}
+
+fn map_value<'a>(value: &'a Value, key: &Value) -> Option<&'a Value> {
+    match value {
+        Value::Map(values) => values.get(key),
+        Value::OrderedMap(values) => values.get(key),
+        Value::SortedMap(values) => values.get(key),
+        Value::Trie(values) => match key {
+            Value::String(key) => values.get(key),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn map_equality(left: &Value, right: &Value) -> Option<bool> {
+    let left_entries = map_entries(left)?;
+    let right_entries = map_entries(right)?;
+    Some(
+        left_entries.len() == right_entries.len()
+            && left_entries
+                .iter()
+                .all(|(key, value)| map_value(right, key) == Some(value)),
+    )
+}
+
+fn set_items(value: &Value) -> Option<Vec<&Value>> {
+    match value {
+        Value::Set(values) => Some(values.iter().collect()),
+        Value::OrderedSet(values) => Some(values.iter().collect()),
+        Value::SortedSet(values) => Some(values.iter().collect()),
+        _ => None,
+    }
+}
+
+fn set_equality(left: &Value, right: &Value) -> Option<bool> {
+    let left_items = set_items(left)?;
+    let right_items = set_items(right)?;
+    Some(
+        left_items.len() == right_items.len()
+            && left_items.iter().all(|item| right_items.contains(item)),
+    )
+}
+
+fn map_assoc_value(collection: &Value, key: Value, value: Value) -> Result<Value, String> {
+    Ok(match collection {
+        Value::Map(values) => Value::Map(values.assoc_value(key, value)),
+        Value::OrderedMap(values) => Value::OrderedMap(Box::new(values.assoc_value(key, value))),
+        Value::SortedMap(values) => Value::SortedMap(Box::new(values.assoc_value(key, value))),
+        Value::Trie(values) => match key {
+            Value::String(key) => Value::Trie(Box::new(values.assoc_value(key, value))),
+            _ => return Err("trie expects string keys".into()),
+        },
+        _ => return Err("assoc expects a map".into()),
+    })
+}
+
+fn map_dissoc_value(collection: &Value, key: &Value) -> Result<Value, String> {
+    Ok(match collection {
+        Value::Map(values) => Value::Map(values.dissoc_value(key)),
+        Value::OrderedMap(values) => Value::OrderedMap(Box::new(values.dissoc_value(key))),
+        Value::SortedMap(values) => Value::SortedMap(Box::new(values.dissoc_value(key))),
+        Value::Trie(values) => match key {
+            Value::String(key) => Value::Trie(Box::new(values.dissoc_value(key))),
+            _ => return Err("trie expects string keys".into()),
+        },
+        _ => return Err("dissoc expects a map".into()),
+    })
+}
+
+fn set_find(collection: &Value, key: &Value) -> Option<Value> {
+    set_items(collection)?
+        .into_iter()
+        .find(|value| *value == key)
+        .cloned()
+}
+
+fn set_conj_value(collection: &Value, value: Value) -> Result<Value, String> {
+    Ok(match collection {
+        Value::Set(values) => Value::Set(values.conj_value(value)),
+        Value::OrderedSet(values) => Value::OrderedSet(Box::new(values.conj_value(value))),
+        Value::SortedSet(values) => Value::SortedSet(Box::new(values.conj_value(value))),
+        _ => return Err("conj expects a set".into()),
+    })
+}
+
+fn set_dissoc_value(collection: &Value, value: &Value) -> Result<Value, String> {
+    Ok(match collection {
+        Value::Set(values) => Value::Set(values.dissoc_value(value)),
+        Value::OrderedSet(values) => Value::OrderedSet(Box::new(values.dissoc_value(value))),
+        Value::SortedSet(values) => Value::SortedSet(Box::new(values.dissoc_value(value))),
+        _ => return Err("dissoc expects a set".into()),
+    })
+}
+
 impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         if let Some(equal) = sequential_equality(self, other) {
+            return equal;
+        }
+        if let Some(equal) = map_equality(self, other) {
+            return equal;
+        }
+        if let Some(equal) = set_equality(self, other) {
             return equal;
         }
         match (self, other) {
@@ -438,6 +566,63 @@ impl PartialEq for Value {
 }
 
 impl Eq for Value {}
+impl PartialOrd for Value {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl Ord for Value {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        if self == other {
+            return std::cmp::Ordering::Equal;
+        }
+        match (self, other) {
+            (Value::Number(left), Value::Number(right)) => return left.cmp(right),
+            (Value::Float(left), Value::Float(right)) => return left.total_cmp(right),
+            (Value::Character(left), Value::Character(right)) => return left.cmp(right),
+            (Value::Bool(left), Value::Bool(right)) => return left.cmp(right),
+            (Value::String(left), Value::String(right)) => return left.cmp(right),
+            (Value::Keyword(left), Value::Keyword(right)) => return left.cmp(right),
+            (Value::BigInteger(left), Value::BigInteger(right))
+            | (Value::Decimal(left), Value::Decimal(right)) => return left.cmp(right),
+            _ => {}
+        }
+        fn rank(value: &Value) -> u8 {
+            match value {
+                Value::Nil => 0,
+                Value::Bool(_) => 1,
+                Value::Number(_) => 2,
+                Value::Float(_) => 3,
+                Value::BigInteger(_) => 4,
+                Value::Decimal(_) => 5,
+                Value::Character(_) => 6,
+                Value::String(_) => 7,
+                Value::Keyword(_) => 8,
+                Value::Symbol(_) => 9,
+                Value::List(_) | Value::Queue(_) | Value::Tuple(_) | Value::Vector(_) => 10,
+                Value::Map(_) | Value::OrderedMap(_) | Value::SortedMap(_) | Value::Trie(_) => 11,
+                Value::Set(_) | Value::OrderedSet(_) | Value::SortedSet(_) => 12,
+                Value::Bytes(_) => 13,
+                Value::ByteBuffer(_) => 14,
+                Value::Regex(_) => 15,
+                Value::Tagged(_, _) => 16,
+                Value::Array(_) => 17,
+                Value::Object(_) => 18,
+                Value::Promise(_) => 19,
+                Value::Recur(_) => 20,
+                Value::Function(_) => 21,
+                Value::Iterator(_) => 22,
+                Value::Var(_) => 23,
+                Value::Namespace(_) => 24,
+                Value::Extension(_) => 25,
+            }
+        }
+        rank(self)
+            .cmp(&rank(other))
+            .then_with(|| self.display().cmp(&other.display()))
+            .then_with(|| self.stable_hash().cmp(&other.stable_hash()))
+    }
+}
 impl Hash for Value {
     fn hash<H: Hasher>(&self, state: &mut H) {
         state.write_u64(self.stable_hash());
@@ -515,16 +700,28 @@ impl Value {
                     .collect::<Vec<_>>()
                     .join(" ")
             ),
-            Self::Map(values) => format!(
-                "{{{}}}",
-                values
+            value @ (Self::Map(_) | Self::OrderedMap(_) | Self::SortedMap(_) | Self::Trie(_)) => {
+                format!(
+                    "{{{}}}",
+                    map_entries(value)
+                        .unwrap()
+                        .iter()
+                        .map(|(k, v)| format!("{} {}", k.display(), v.display()))
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                )
+            }
+            value @ (Self::Set(_) | Self::OrderedSet(_) | Self::SortedSet(_)) => format!(
+                "#{{{}}}",
+                set_items(value)
+                    .unwrap()
                     .iter()
-                    .map(|(k, v)| format!("{} {}", k.display(), v.display()))
+                    .map(|item| item.display())
                     .collect::<Vec<_>>()
                     .join(" ")
             ),
-            Self::Set(values) => format!(
-                "#{{{}}}",
+            Self::Queue(values) => format!(
+                "#queue[{}]",
                 values
                     .iter()
                     .map(Value::display)
@@ -588,9 +785,9 @@ impl Value {
                 Value::Object(_) => 7,
                 Value::Promise(_) => 8,
                 Value::Recur(_) => 9,
-                Value::Map(_) => 10,
-                Value::Set(_) => 11,
-                Value::List(_) | Value::Tuple(_) | Value::Vector(_) => 12,
+                Value::Map(_) | Value::OrderedMap(_) | Value::SortedMap(_) | Value::Trie(_) => 10,
+                Value::Set(_) | Value::OrderedSet(_) | Value::SortedSet(_) => 11,
+                Value::List(_) | Value::Queue(_) | Value::Tuple(_) | Value::Vector(_) => 12,
                 Value::Symbol(_) => 13,
                 Value::Function(_) => 14,
                 Value::Iterator(_) => 16,
@@ -628,8 +825,12 @@ impl Value {
                 }),
                 Value::Promise(v) => v.identity_address().hash(state),
                 Value::Recur(v) => v.iter().for_each(|item| hash_value(item, state)),
-                Value::Map(v) => {
-                    let mut entries = v
+                value @ (Value::Map(_)
+                | Value::OrderedMap(_)
+                | Value::SortedMap(_)
+                | Value::Trie(_)) => {
+                    let mut entries = map_entries(value)
+                        .unwrap()
                         .iter()
                         .map(|(key, item)| {
                             let mut h = std::collections::hash_map::DefaultHasher::new();
@@ -641,8 +842,9 @@ impl Value {
                     entries.sort_unstable();
                     entries.hash(state);
                 }
-                Value::Set(v) => {
-                    let mut entries = v
+                value @ (Value::Set(_) | Value::OrderedSet(_) | Value::SortedSet(_)) => {
+                    let mut entries = set_items(value)
+                        .unwrap()
                         .iter()
                         .map(|item| {
                             let mut h = std::collections::hash_map::DefaultHasher::new();
@@ -654,6 +856,7 @@ impl Value {
                     entries.hash(state);
                 }
                 Value::List(v) => v.iter().for_each(|item| hash_value(item, state)),
+                Value::Queue(v) => v.iter().for_each(|item| hash_value(item, state)),
                 Value::Tuple(v) => v.iter().for_each(|item| hash_value(item, state)),
                 Value::Vector(v) => v.iter().for_each(|item| hash_value(item, state)),
                 Value::Function(v) => Rc::as_ptr(v).hash(state),
@@ -1551,10 +1754,11 @@ pub fn receiver_category(value: &Value) -> &'static str {
         Value::Promise(_) => "promise",
         Value::Recur(_) => "recur",
         Value::List(_) => "list",
+        Value::Queue(_) => "queue",
         Value::Tuple(_) => "tuple",
         Value::Vector(_) => "vector",
-        Value::Map(_) => "map",
-        Value::Set(_) => "set",
+        Value::Map(_) | Value::OrderedMap(_) | Value::SortedMap(_) | Value::Trie(_) => "map",
+        Value::Set(_) | Value::OrderedSet(_) | Value::SortedSet(_) => "set",
         Value::Iterator(_) => "iterator",
         Value::Var(_) => "var",
         Value::Namespace(_) => "namespace",
@@ -1708,24 +1912,36 @@ fn value_to_metadata(value: &Value) -> Result<MetadataValue, String> {
                 .map(value_to_metadata)
                 .collect::<Result<_, _>>()?,
         )),
+        Value::Queue(values) => Ok(MetadataValue::List(
+            values
+                .iter()
+                .map(value_to_metadata)
+                .collect::<Result<_, _>>()?,
+        )),
         Value::List(values) => Ok(MetadataValue::List(
             values
                 .iter()
                 .map(value_to_metadata)
                 .collect::<Result<_, _>>()?,
         )),
-        Value::Set(values) => Ok(MetadataValue::Set(
-            values
-                .iter()
-                .map(value_to_metadata)
-                .collect::<Result<_, _>>()?,
-        )),
-        Value::Map(values) => Ok(MetadataValue::Map(
-            values
-                .iter()
-                .map(|(key, value)| Ok((value_to_metadata(key)?, value_to_metadata(value)?)))
-                .collect::<Result<_, String>>()?,
-        )),
+        value @ (Value::Set(_) | Value::OrderedSet(_) | Value::SortedSet(_)) => {
+            Ok(MetadataValue::Set(
+                set_items(value)
+                    .unwrap()
+                    .into_iter()
+                    .map(value_to_metadata)
+                    .collect::<Result<_, _>>()?,
+            ))
+        }
+        value @ (Value::Map(_) | Value::OrderedMap(_) | Value::SortedMap(_) | Value::Trie(_)) => {
+            Ok(MetadataValue::Map(
+                map_entries(value)
+                    .unwrap()
+                    .iter()
+                    .map(|(key, value)| Ok((value_to_metadata(key)?, value_to_metadata(value)?)))
+                    .collect::<Result<_, String>>()?,
+            ))
+        }
         _ => Err("value cannot be stored in runtime-neutral metadata".into()),
     }
 }
@@ -1775,8 +1991,14 @@ fn value_metadata(value: &Value) -> Option<Rc<Metadata>> {
         Value::Tuple(value) => value.meta().cloned(),
         Value::Vector(value) => value.meta().cloned(),
         Value::List(value) => value.meta().cloned(),
+        Value::Queue(value) => value.meta().cloned(),
         Value::Map(value) => value.meta().cloned(),
+        Value::OrderedMap(value) => value.meta().cloned(),
+        Value::SortedMap(value) => value.meta().cloned(),
+        Value::Trie(value) => value.meta().cloned(),
         Value::Set(value) => value.meta().cloned(),
+        Value::OrderedSet(value) => value.meta().cloned(),
+        Value::SortedSet(value) => value.meta().cloned(),
         Value::Var(value) => value.hara_metadata(),
         _ => None,
     }
@@ -1926,12 +2148,14 @@ fn protocol_find(arguments: &[Value]) -> Result<Value, String> {
     let collection = &arguments[0];
     let key = &arguments[1];
     match collection {
-        Value::Map(values) => Ok(values
-            .find_entry(key)
-            .map(|(candidate, value)| {
-                Value::Vector(PVector::from_iter([candidate.clone(), value.clone()]))
-            })
-            .unwrap_or(Value::Nil)),
+        value @ (Value::Map(_) | Value::OrderedMap(_) | Value::SortedMap(_) | Value::Trie(_)) => {
+            Ok(map_entries(value)
+                .unwrap()
+                .into_iter()
+                .find(|(candidate, _)| candidate == key)
+                .map(|(candidate, value)| Value::Vector(PVector::from_iter([candidate, value])))
+                .unwrap_or(Value::Nil))
+        }
         Value::Object(values) => {
             let key = match key {
                 Value::String(value) => value.as_str(),
@@ -1950,10 +2174,13 @@ fn protocol_find(arguments: &[Value]) -> Result<Value, String> {
                 })
                 .unwrap_or(Value::Nil))
         }
-        Value::Set(values) => Ok(values.get(key).cloned().unwrap_or(Value::Nil)),
+        value @ (Value::Set(_) | Value::OrderedSet(_) | Value::SortedSet(_)) => {
+            Ok(set_find(value, key).unwrap_or(Value::Nil))
+        }
         Value::Tuple(values) => indexed_find(values.get(value_index(key)?), value_index(key)?),
         Value::Vector(values) => indexed_find(values.get(value_index(key)?), value_index(key)?),
         Value::List(values) => indexed_find(values.get(value_index(key)?), value_index(key)?),
+        Value::Queue(values) => indexed_find(values.get(value_index(key)?), value_index(key)?),
         _ => Err("IFind/find has no implementation for this value".into()),
     }
 }
@@ -1965,7 +2192,9 @@ fn protocol_has(arguments: &[Value]) -> Result<Value, String> {
     let collection = &arguments[0];
     let key = &arguments[1];
     let found = match collection {
-        Value::Map(values) => values.get(key).is_some(),
+        value @ (Value::Map(_) | Value::OrderedMap(_) | Value::SortedMap(_) | Value::Trie(_)) => {
+            map_value(value, key).is_some()
+        }
         Value::Object(values) => match key {
             Value::String(key) => values
                 .borrow()
@@ -1977,7 +2206,9 @@ fn protocol_has(arguments: &[Value]) -> Result<Value, String> {
                 .any(|(candidate, _)| candidate == key.as_str()),
             _ => false,
         },
-        Value::Set(values) => values.contains(key),
+        value @ (Value::Set(_) | Value::OrderedSet(_) | Value::SortedSet(_)) => {
+            set_find(value, key).is_some()
+        }
         Value::Tuple(values) => value_index(key)
             .map(|index| index < values.len())
             .unwrap_or(false),
@@ -1985,6 +2216,9 @@ fn protocol_has(arguments: &[Value]) -> Result<Value, String> {
             .map(|index| index < values.len())
             .unwrap_or(false),
         Value::List(values) => value_index(key)
+            .map(|index| index < values.len())
+            .unwrap_or(false),
+        Value::Queue(values) => value_index(key)
             .map(|index| index < values.len())
             .unwrap_or(false),
         _ => return Err("IFind/has? has no implementation for this value".into()),
@@ -2020,17 +2254,20 @@ fn protocol_conj(arguments: &[Value]) -> Result<Value, String> {
             let output = values.push_last(item.clone());
             Ok(Value::Vector(output))
         }
+        Value::Queue(values) => Ok(Value::Queue(Box::new(values.push_last(item.clone())))),
         Value::List(values) => {
             let output = std::iter::once(item.clone())
                 .chain(values.iter().cloned())
                 .collect();
             Ok(Value::List(output))
         }
-        Value::Set(values) => Ok(Value::Set(values.conj_value(item.clone()))),
-        Value::Map(values) => {
+        value @ (Value::Set(_) | Value::OrderedSet(_) | Value::SortedSet(_)) => {
+            set_conj_value(value, item.clone())
+        }
+        value @ (Value::Map(_) | Value::OrderedMap(_) | Value::SortedMap(_) | Value::Trie(_)) => {
             let (entry_key, entry_value) = pair_parts(item)
                 .ok_or_else(|| "IConj/conj map expects a two-element entry".to_string())?;
-            Ok(Value::Map(values.assoc_value(entry_key, entry_value)))
+            map_assoc_value(value, entry_key, entry_value)
         }
         _ => Err("IConj/conj expects a collection".into()),
     }
@@ -2716,6 +2953,7 @@ fn iterator_values(value: Value) -> Result<Vec<Value>, String> {
         Value::Tuple(values) => Ok(values.iter().cloned().collect()),
         Value::Vector(values) => Ok(values.iter().cloned().collect()),
         Value::List(values) => Ok(values.iter().cloned().collect()),
+        Value::Queue(values) => Ok(values.iter().cloned().collect()),
         Value::String(text) => Ok(text.chars().map(|c| Value::String(c.to_string())).collect()),
         Value::Bytes(bytes) => Ok(bytes
             .into_iter()
@@ -2737,11 +2975,16 @@ fn iterator_values(value: Value) -> Result<Vec<Value>, String> {
                 ]))
             })
             .collect()),
-        Value::Map(entries) => Ok(entries
-            .into_iter()
-            .map(|(key, value)| Value::Vector(PVector::from_iter([key, value])))
-            .collect()),
-        Value::Set(values) => Ok(values.into_iter().collect()),
+        value @ (Value::Map(_) | Value::OrderedMap(_) | Value::SortedMap(_) | Value::Trie(_)) => {
+            Ok(map_entries(&value)
+                .unwrap()
+                .into_iter()
+                .map(|(key, value)| Value::Vector(PVector::from_iter([key, value])))
+                .collect())
+        }
+        value @ (Value::Set(_) | Value::OrderedSet(_) | Value::SortedSet(_)) => {
+            Ok(set_items(&value).unwrap().into_iter().cloned().collect())
+        }
         Value::Iterator(iterator) => {
             let mut state = iterator.borrow_mut();
             if state.closed {
@@ -2768,8 +3011,14 @@ fn make_iterator(value: Value) -> Result<Value, String> {
         | Value::Array(_)
         | Value::Object(_)
         | Value::Map(_)
+        | Value::OrderedMap(_)
+        | Value::SortedMap(_)
+        | Value::Trie(_)
         | Value::Set(_)
+        | Value::OrderedSet(_)
+        | Value::SortedSet(_)
         | Value::List(_)
+        | Value::Queue(_)
         | Value::Tuple(_)
         | Value::Vector(_) => Ok(Value::Iterator(Rc::new(RefCell::new(IteratorState::new(
             iterator_values(value)?,
@@ -3057,9 +3306,15 @@ fn iterator_close(value: &Value) -> Result<Value, String> {
 
 fn collection_keys(value: &Value) -> Result<Value, String> {
     match value {
-        Value::Map(values) => Ok(Value::Vector(
-            values.iter().map(|(key, _)| key.clone()).collect(),
-        )),
+        value @ (Value::Map(_) | Value::OrderedMap(_) | Value::SortedMap(_) | Value::Trie(_)) => {
+            Ok(Value::Vector(
+                map_entries(value)
+                    .unwrap()
+                    .into_iter()
+                    .map(|(key, _)| key)
+                    .collect(),
+            ))
+        }
         Value::Object(values) => Ok(Value::Vector(
             values
                 .borrow()
@@ -3073,9 +3328,15 @@ fn collection_keys(value: &Value) -> Result<Value, String> {
 
 fn collection_vals(value: &Value) -> Result<Value, String> {
     match value {
-        Value::Map(values) => Ok(Value::Vector(
-            values.iter().map(|(_, value)| value.clone()).collect(),
-        )),
+        value @ (Value::Map(_) | Value::OrderedMap(_) | Value::SortedMap(_) | Value::Trie(_)) => {
+            Ok(Value::Vector(
+                map_entries(value)
+                    .unwrap()
+                    .into_iter()
+                    .map(|(_, value)| value)
+                    .collect(),
+            ))
+        }
         Value::Object(values) => Ok(Value::Vector(
             values
                 .borrow()
@@ -3147,8 +3408,13 @@ fn collection_count(value: &Value) -> Result<Value, String> {
         Value::Tuple(v) => v.len(),
         Value::Vector(v) => v.len(),
         Value::List(v) => v.len(),
-        Value::Map(v) => v.len(),
-        Value::Set(v) => v.len(),
+        Value::Queue(v) => v.len(),
+        value @ (Value::Map(_) | Value::OrderedMap(_) | Value::SortedMap(_) | Value::Trie(_)) => {
+            map_entries(value).unwrap().len()
+        }
+        value @ (Value::Set(_) | Value::OrderedSet(_) | Value::SortedSet(_)) => {
+            set_items(value).unwrap().len()
+        }
         Value::Bytes(v) => v.len(),
         Value::ByteBuffer(v) => v.borrow().len(),
         Value::Array(v) => v.borrow().len(),
@@ -3216,6 +3482,10 @@ fn collection_get(value: &Value, key: &Value, default: Value) -> Result<Value, S
             let index = value_index(key)?;
             Ok(values.get(index).cloned().unwrap_or(default))
         }
+        Value::Queue(values) => {
+            let index = value_index(key)?;
+            Ok(values.get(index).cloned().unwrap_or(default))
+        }
         Value::String(text) => {
             let index = value_index(key)?;
             Ok(text
@@ -3224,8 +3494,12 @@ fn collection_get(value: &Value, key: &Value, default: Value) -> Result<Value, S
                 .map(|c| Value::String(c.to_string()))
                 .unwrap_or(default))
         }
-        Value::Map(entries) => Ok(entries.get(key).cloned().unwrap_or(default)),
-        Value::Set(values) => Ok(values.get(key).cloned().unwrap_or(default)),
+        value @ (Value::Map(_) | Value::OrderedMap(_) | Value::SortedMap(_) | Value::Trie(_)) => {
+            Ok(map_value(value, key).cloned().unwrap_or(default))
+        }
+        value @ (Value::Set(_) | Value::OrderedSet(_) | Value::SortedSet(_)) => {
+            Ok(set_find(value, key).unwrap_or(default))
+        }
         Value::Object(entries) => {
             let name = match key {
                 Value::String(name) => name.as_str(),
@@ -3264,7 +3538,9 @@ fn collection_nth(value: &Value, key: &Value) -> Result<Value, String> {
 
 fn collection_assoc(value: &Value, key: &Value, replacement: Value) -> Result<Value, String> {
     match value {
-        Value::Map(entries) => Ok(Value::Map(entries.assoc_value(key.clone(), replacement))),
+        value @ (Value::Map(_) | Value::OrderedMap(_) | Value::SortedMap(_) | Value::Trie(_)) => {
+            map_assoc_value(value, key.clone(), replacement)
+        }
         Value::Object(entries) => {
             let name = marker_key(key, "object")?;
             let mut output = entries.borrow().clone();
@@ -3284,10 +3560,13 @@ fn collection_assoc(value: &Value, key: &Value, replacement: Value) -> Result<Va
 
 fn collection_dissoc(value: &Value, keys: &[Value]) -> Result<Value, String> {
     match value {
-        Value::Map(entries) => Ok(Value::Map(
+        value @ (Value::Map(_) | Value::OrderedMap(_) | Value::SortedMap(_) | Value::Trie(_)) => {
             keys.iter()
-                .fold(entries.clone(), |map, key| map.dissoc_value(key)),
-        )),
+                .try_fold(value.clone(), |map, key| map_dissoc_value(&map, key))
+        }
+        value @ (Value::Set(_) | Value::OrderedSet(_) | Value::SortedSet(_)) => keys
+            .iter()
+            .try_fold(value.clone(), |set, key| set_dissoc_value(&set, key)),
         Value::Nil => Ok(Value::Map(PMap::new())),
         _ => Err("dissoc expects a map".into()),
     }
@@ -3387,8 +3666,14 @@ fn attach_metadata(value: Value, metadata: Rc<Metadata>) -> Result<Value, String
         Value::Tuple(value) => Value::Tuple(Box::new(value.with_meta(Some(metadata)))),
         Value::Vector(value) => Value::Vector(value.with_meta(Some(metadata))),
         Value::List(value) => Value::List(value.with_meta(Some(metadata))),
+        Value::Queue(value) => Value::Queue(Box::new(value.with_meta(Some(metadata)))),
         Value::Map(value) => Value::Map(value.with_meta(Some(metadata))),
+        Value::OrderedMap(value) => Value::OrderedMap(Box::new(value.with_meta(Some(metadata)))),
+        Value::SortedMap(value) => Value::SortedMap(Box::new(value.with_meta(Some(metadata)))),
+        Value::Trie(value) => Value::Trie(Box::new(value.with_meta(Some(metadata)))),
         Value::Set(value) => Value::Set(value.with_meta(Some(metadata))),
+        Value::OrderedSet(value) => Value::OrderedSet(Box::new(value.with_meta(Some(metadata)))),
+        Value::SortedSet(value) => Value::SortedSet(Box::new(value.with_meta(Some(metadata)))),
         Value::Var(value) => {
             value.set_hara_metadata(Some(metadata));
             Value::Var(value)
@@ -3434,6 +3719,50 @@ fn eval_sequential_constructor(
     })
 }
 
+fn eval_collection_constructor(
+    name: &str,
+    forms: &[Form],
+    env: &mut HashMap<String, Value>,
+) -> Result<Value, String> {
+    let values = forms
+        .iter()
+        .map(|form| eval(form, env))
+        .collect::<Result<Vec<_>, _>>()?;
+    match name {
+        "hash-map" | "ordered-map" | "sorted-map" | "trie" => {
+            if values.len() % 2 != 0 {
+                return Err(format!(
+                    "{name} expects an even number of key/value arguments"
+                ));
+            }
+            let entries = values
+                .chunks_exact(2)
+                .map(|pair| (pair[0].clone(), pair[1].clone()));
+            Ok(match name {
+                "hash-map" => Value::Map(PMap::from_iter(entries)),
+                "ordered-map" => Value::OrderedMap(Box::new(POrderedMap::from_iter(entries))),
+                "sorted-map" => Value::SortedMap(Box::new(PSortedMap::from_iter(entries))),
+                "trie" => {
+                    let mut trie = PTrie::new();
+                    for (key, value) in entries {
+                        let Value::String(key) = key else {
+                            return Err("trie expects string keys".into());
+                        };
+                        trie = trie.assoc_value(key, value);
+                    }
+                    Value::Trie(Box::new(trie))
+                }
+                _ => unreachable!("guarded map constructor"),
+            })
+        }
+        "hash-set" => Ok(Value::Set(values.into_iter().collect())),
+        "ordered-set" => Ok(Value::OrderedSet(Box::new(values.into_iter().collect()))),
+        "sorted-set" => Ok(Value::SortedSet(Box::new(values.into_iter().collect()))),
+        "queue" => Ok(Value::Queue(Box::new(values.into_iter().collect()))),
+        _ => unreachable!("guarded collection constructor"),
+    }
+}
+
 fn vector_literal(values: Vec<Value>) -> Result<Value, String> {
     if values.len() <= 5 {
         Ok(Value::Tuple(Box::new(PTuple::from_values(values)?)))
@@ -3462,18 +3791,20 @@ fn literal_value(form: &Form) -> Result<Value, String> {
         Form::Vector(values) => {
             vector_literal(values.iter().map(literal_value).collect::<Result<_, _>>()?)
         }
-        Form::Set(values) => Ok(Value::Set(
-            unique_values(values.iter().map(literal_value).collect::<Result<_, _>>()?).into(),
-        )),
+        Form::Set(values) => Ok(Value::OrderedSet(Box::new(
+            unique_values(values.iter().map(literal_value).collect::<Result<_, _>>()?)
+                .into_iter()
+                .collect(),
+        ))),
         Form::List(values) => Ok(Value::List(
             values.iter().map(literal_value).collect::<Result<_, _>>()?,
         )),
-        Form::Map(values) => Ok(Value::Map(
+        Form::Map(values) => Ok(Value::OrderedMap(Box::new(
             values
                 .iter()
                 .map(|(k, v)| Ok((literal_value(k)?, literal_value(v)?)))
                 .collect::<Result<_, String>>()?,
-        )),
+        ))),
     }
 }
 
@@ -3559,16 +3890,22 @@ fn call_value(callable: Value, arguments: Vec<Value>) -> Result<Value, String> {
             [target, fallback] => lookup(target, &Value::Keyword(keyword), fallback.clone()),
             _ => Err("keyword invocation expects one or two arguments".into()),
         },
-        Value::Map(values) => match arguments.as_slice() {
-            [key] => Ok(values.get(key).cloned().unwrap_or(Value::Nil)),
-            [key, fallback] => Ok(values.get(key).cloned().unwrap_or_else(|| fallback.clone())),
-            _ => Err("map invocation expects one or two arguments".into()),
-        },
-        Value::Set(values) => match arguments.as_slice() {
-            [key] => Ok(values.get(key).cloned().unwrap_or(Value::Nil)),
-            [key, fallback] => Ok(values.get(key).cloned().unwrap_or_else(|| fallback.clone())),
-            _ => Err("set invocation expects one or two arguments".into()),
-        },
+        value @ (Value::Map(_) | Value::OrderedMap(_) | Value::SortedMap(_) | Value::Trie(_)) => {
+            match arguments.as_slice() {
+                [key] => Ok(map_value(&value, key).cloned().unwrap_or(Value::Nil)),
+                [key, fallback] => Ok(map_value(&value, key)
+                    .cloned()
+                    .unwrap_or_else(|| fallback.clone())),
+                _ => Err("map invocation expects one or two arguments".into()),
+            }
+        }
+        value @ (Value::Set(_) | Value::OrderedSet(_) | Value::SortedSet(_)) => {
+            match arguments.as_slice() {
+                [key] => Ok(set_find(&value, key).unwrap_or(Value::Nil)),
+                [key, fallback] => Ok(set_find(&value, key).unwrap_or_else(|| fallback.clone())),
+                _ => Err("set invocation expects one or two arguments".into()),
+            }
+        }
         _ => Err("value is not callable".into()),
     }
 }
@@ -3697,7 +4034,7 @@ fn syntax_quote_value(form: &Form, env: &mut HashMap<String, Value>) -> Result<V
         }
         Form::List(values) => syntax_quote_collection(values, false, env),
         Form::Vector(values) => syntax_quote_collection(values, true, env),
-        Form::Map(values) => Ok(Value::Map(
+        Form::Map(values) => Ok(Value::OrderedMap(Box::new(
             values
                 .iter()
                 .map(|(key, value)| {
@@ -3709,7 +4046,7 @@ fn syntax_quote_value(form: &Form, env: &mut HashMap<String, Value>) -> Result<V
                 .collect::<Result<Vec<_>, String>>()?
                 .into_iter()
                 .collect(),
-        )),
+        ))),
         _ => literal_value(form),
     }
 }
@@ -3814,21 +4151,22 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
         {
             literal_value(&fs[1])
         }
-        Form::Map(values) => Ok(Value::Map(
+        Form::Map(values) => Ok(Value::OrderedMap(Box::new(
             values
                 .iter()
                 .map(|(key, value)| Ok((eval(key, env)?, eval(value, env)?)))
                 .collect::<Result<_, String>>()?,
-        )),
-        Form::Set(values) => Ok(Value::Set(
+        ))),
+        Form::Set(values) => Ok(Value::OrderedSet(Box::new(
             unique_values(
                 values
                     .iter()
                     .map(|value| eval(value, env))
                     .collect::<Result<_, _>>()?,
             )
-            .into(),
-        )),
+            .into_iter()
+            .collect(),
+        ))),
         Form::Vector(values) => vector_literal(
             values
                 .iter()
@@ -4316,6 +4654,21 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
             }
             Form::Symbol(n) if ["list", "vector", "pair", "tup"].contains(&n.as_str()) => {
                 eval_sequential_constructor(n, &fs[1..], env)
+            }
+            Form::Symbol(n)
+                if [
+                    "hash-map",
+                    "hash-set",
+                    "ordered-map",
+                    "ordered-set",
+                    "queue",
+                    "sorted-map",
+                    "sorted-set",
+                    "trie",
+                ]
+                .contains(&n.as_str()) =>
+            {
+                eval_collection_constructor(n, &fs[1..], env)
             }
             Form::Symbol(n) if n == "set" => Ok(Value::Set(
                 unique_values(
@@ -5385,22 +5738,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 }
                 let collection = eval(&fs[1], env)?;
                 let item = eval(&fs[2], env)?;
-                match collection {
-                    Value::Tuple(values) => tuple_push_last(&values, item),
-                    Value::Vector(values) => Ok(Value::Vector(values.push_last(item))),
-                    Value::List(values) => Ok(Value::List(
-                        std::iter::once(item)
-                            .chain(values.iter().cloned())
-                            .collect(),
-                    )),
-                    Value::Set(values) => Ok(Value::Set(values.conj_value(item))),
-                    Value::Map(values) => {
-                        let (entry_key, entry_value) = pair_parts(&item)
-                            .ok_or_else(|| "conj map expects a two-element entry".to_string())?;
-                        Ok(Value::Map(values.assoc_value(entry_key, entry_value)))
-                    }
-                    _ => Err("conj expects a vector, list, or set".into()),
-                }
+                protocol_conj(&[collection, item])
             }
             Form::Symbol(n) if n == "cons" => {
                 if fs.len() != 3 {
