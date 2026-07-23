@@ -3,7 +3,8 @@ use std::rc::Rc;
 
 use crate::lang::data::Tuple;
 use crate::lang::protocol::{
-    IConj, ICons, ICount, IEmpty, IMetadata, IPeekFirst, IPersistent, IPopFirst, IPushFirst,
+    HashType, IColl, IConj, ICons, ICount, IDisplay, IEmpty, IEquality, IHash, IMetadata, IObjType,
+    IPeekFirst, IPersistent, IPopFirst, IPushFirst, ObjType,
 };
 
 #[derive(Clone)]
@@ -122,6 +123,48 @@ impl<E: Clone + 'static> IMetadata for Seq<E> {
     }
 }
 impl<E: Clone + 'static> IPersistent for Seq<E> {}
+impl<E: Clone + PartialEq + 'static> IEquality for Seq<E> {
+    fn equality(&self, other: &Self) -> bool {
+        self.clone().into_iter().eq(other.clone())
+    }
+}
+impl<E: Clone + std::fmt::Debug + 'static> IDisplay for Seq<E> {
+    fn display(&self) -> String {
+        format!(
+            "({})",
+            self.clone()
+                .into_iter()
+                .map(|v| format!("{v:?}"))
+                .collect::<Vec<_>>()
+                .join(" ")
+        )
+    }
+}
+impl<E: Clone + std::hash::Hash + 'static> IHash for Seq<E> {
+    fn hash_calc(&self, _: HashType) -> u64 {
+        let mut s = std::collections::hash_map::DefaultHasher::new();
+        use std::hash::{Hash, Hasher};
+        "::SEQUENTIAL".hash(&mut s);
+        self.clone().into_iter().for_each(|v| v.hash(&mut s));
+        s.finish()
+    }
+}
+impl<E: Clone + std::fmt::Debug + 'static> IObjType for Seq<E> {
+    fn obj_type(&self) -> ObjType {
+        ObjType::Sequential
+    }
+}
+impl<E> IColl<E> for Seq<E>
+where
+    E: Clone + PartialEq + std::fmt::Debug + std::hash::Hash + 'static,
+{
+    fn start_string(&self) -> &'static str {
+        "("
+    }
+    fn end_string(&self) -> &'static str {
+        ")"
+    }
+}
 
 impl<E: Clone + 'static> IntoIterator for Seq<E> {
     type Item = E;

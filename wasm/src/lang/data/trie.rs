@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use crate::lang::protocol::{
-    IAssoc, IConj, ICount, IDissoc, IEmpty, IFind, ILookup, IMetadata, IMutable, IPersistent,
-    IToMutable, IToPersistent,
+    HashType, IAssoc, IColl, IConj, ICount, IDisplay, IDissoc, IEmpty, IEquality, IFind, IHash,
+    ILookup, IMetadata, IMutable, IObjType, IPersistent, IToMutable, IToPersistent, ObjType,
 };
 
 #[derive(Debug, Clone)]
@@ -194,6 +194,59 @@ impl<V: Clone> IMetadata for Standard<V> {
     }
 }
 impl<V: Clone> IPersistent for Standard<V> {}
+impl<V: Clone> IntoIterator for Standard<V> {
+    type Item = String;
+    type IntoIter = std::vec::IntoIter<String>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter().collect::<Vec<_>>().into_iter()
+    }
+}
+impl<V: Clone + PartialEq> IEquality for Standard<V> {
+    fn equality(&self, other: &Self) -> bool {
+        self.len() == other.len() && self.entries().iter().all(|(k, v)| other.get(k) == Some(*v))
+    }
+}
+impl<V: Clone + std::fmt::Debug> IDisplay for Standard<V> {
+    fn display(&self) -> String {
+        format!(
+            "#{{{}}}",
+            self.entries()
+                .iter()
+                .map(|(k, v)| format!("{k:?} {v:?}"))
+                .collect::<Vec<_>>()
+                .join(" ")
+        )
+    }
+}
+impl<V: Clone + std::hash::Hash> IHash for Standard<V> {
+    fn hash_calc(&self, _: HashType) -> u64 {
+        self.entries()
+            .iter()
+            .map(|(k, v)| {
+                let mut s = std::collections::hash_map::DefaultHasher::new();
+                std::hash::Hash::hash(k, &mut s);
+                std::hash::Hash::hash(v, &mut s);
+                std::hash::Hasher::finish(&s)
+            })
+            .fold(0u64, u64::wrapping_add)
+    }
+}
+impl<V: Clone + std::fmt::Debug> IObjType for Standard<V> {
+    fn obj_type(&self) -> ObjType {
+        ObjType::Map
+    }
+}
+impl<V> IColl<String> for Standard<V>
+where
+    V: Clone + Default + PartialEq + std::hash::Hash + std::fmt::Debug,
+{
+    fn start_string(&self) -> &'static str {
+        "#{"
+    }
+    fn end_string(&self) -> &'static str {
+        "}"
+    }
+}
 impl<V: Clone> IToMutable for Standard<V> {
     type Mutable = Mutable<V>;
     fn to_mutable(&self) -> Self::Mutable {

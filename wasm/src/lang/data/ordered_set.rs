@@ -3,8 +3,8 @@ use std::hash::Hash;
 
 use crate::lang::data::{Map, Vector};
 use crate::lang::protocol::{
-    IConj, ICount, IDissoc, IEmpty, IFind, IMetadata, IMutable, INth, IPersistent, IToMutable,
-    IToPersistent,
+    HashType, IColl, IConj, ICount, IDisplay, IDissoc, IEmpty, IEquality, IFind, IHash, IMetadata,
+    IMutable, INth, IObjType, IPersistent, IToMutable, IToPersistent, ObjType,
 };
 
 const COMPACT_MINIMUM: usize = 32;
@@ -124,6 +124,56 @@ impl<E: Clone + Eq + Hash> IMetadata for Standard<E> {
     }
 }
 impl<E: Clone + Eq + Hash> IPersistent for Standard<E> {}
+impl<E: Clone + Eq + Hash> IntoIterator for Standard<E> {
+    type Item = E;
+    type IntoIter = std::vec::IntoIter<E>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter().cloned().collect::<Vec<_>>().into_iter()
+    }
+}
+impl<E: Clone + Eq + Hash> IEquality for Standard<E> {
+    fn equality(&self, other: &Self) -> bool {
+        self.len() == other.len() && self.iter().all(|v| other.get(v).is_some())
+    }
+}
+impl<E: Clone + Eq + Hash + std::fmt::Debug> IDisplay for Standard<E> {
+    fn display(&self) -> String {
+        format!(
+            "#{{{}}}",
+            self.iter()
+                .map(|v| format!("{v:?}"))
+                .collect::<Vec<_>>()
+                .join(" ")
+        )
+    }
+}
+impl<E: Clone + Eq + Hash> IHash for Standard<E> {
+    fn hash_calc(&self, _: HashType) -> u64 {
+        self.iter()
+            .map(|v| {
+                let mut s = std::collections::hash_map::DefaultHasher::new();
+                std::hash::Hash::hash(v, &mut s);
+                std::hash::Hasher::finish(&s)
+            })
+            .fold(0u64, u64::wrapping_add)
+    }
+}
+impl<E: Clone + Eq + Hash + std::fmt::Debug> IObjType for Standard<E> {
+    fn obj_type(&self) -> ObjType {
+        ObjType::Set
+    }
+}
+impl<E> IColl<E> for Standard<E>
+where
+    E: Clone + Eq + Hash + std::fmt::Debug,
+{
+    fn start_string(&self) -> &'static str {
+        "#{"
+    }
+    fn end_string(&self) -> &'static str {
+        "}"
+    }
+}
 impl<E: Clone + Eq + Hash> IToMutable for Standard<E> {
     type Mutable = Mutable<E>;
     fn to_mutable(&self) -> Self::Mutable {
