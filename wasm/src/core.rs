@@ -39,7 +39,7 @@ pub struct Function {
     params: Vec<String>,
     variadic: Option<String>,
     body: Vec<Form>,
-    captured: HashMap<String, Value>,
+    captured: Rc<RefCell<HashMap<String, Value>>>,
 }
 
 #[derive(Debug, Clone)]
@@ -860,7 +860,7 @@ fn function_parts(form: &Form) -> Result<(Vec<String>, Option<String>), String> 
 fn call_function(function: &Function, arguments: Vec<Value>) -> Result<Value, String> {
     if function.variadic.is_none() && function.params.len() != arguments.len() { return Err(format!("function expects {} arguments", function.params.len())); }
     if arguments.len() < function.params.len() { return Err(format!("function expects at least {} arguments", function.params.len())); }
-    let mut env = function.captured.clone();
+    let mut env = function.captured.borrow().clone();
     for (name, value) in function.params.iter().zip(arguments.iter().take(function.params.len())) { env.insert(name.clone(), value.clone()); }
     if let Some(name) = &function.variadic { env.insert(name.clone(), Value::List(arguments.into_iter().skip(function.params.len()).collect())); }
     let mut result = Value::Nil;
@@ -888,13 +888,15 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
             Form::Symbol(n) if n == "fn" => {
                 if fs.len() < 3 { return Err("fn expects parameters and a body".into()); }
                 let (params, variadic) = function_parts(&fs[1])?;
-                Ok(Value::Function(Rc::new(Function { params, variadic, body: fs[2..].to_vec(), captured: env.clone() })))
+                Ok(Value::Function(Rc::new(Function { params, variadic, body: fs[2..].to_vec(), captured: Rc::new(RefCell::new(env.clone())) })))
             }
             Form::Symbol(n) if n == "defn" => {
                 if fs.len() < 4 { return Err("defn expects a name, parameters, and a body".into()); }
                 let name = match &fs[1] { Form::Symbol(name) => name.clone(), _ => return Err("defn name must be a symbol".into()) };
                 let (params, variadic) = function_parts(&fs[2])?;
-                let function = Value::Function(Rc::new(Function { params, variadic, body: fs[3..].to_vec(), captured: env.clone() }));
+                let function_ref = Rc::new(Function { params, variadic, body: fs[3..].to_vec(), captured: Rc::new(RefCell::new(env.clone())) });
+                let function = Value::Function(function_ref.clone());
+                function_ref.captured.borrow_mut().insert(name.clone(), function.clone());
                 env.insert(name, function.clone()); Ok(function)
             }
             Form::Symbol(n) if n == "do" => {

@@ -546,6 +546,7 @@ mod tests {
         assert_eq!(runtime.eval_text("((fn [x] (+ x 1)) 41)").unwrap(), "42");
         assert_eq!(runtime.eval_text("(let (inc (fn [x] (+ x 1))) (inc 41))").unwrap(), "42");
         assert_eq!(runtime.eval_text("(do (defn add1 [x] (+ x 1)) (add1 41))").unwrap(), "42");
+        assert_eq!(runtime.eval_text("(do (defn factorial [n] (if (<= n 1) 1 (* n (factorial (dec n))))) (factorial 5))").unwrap(), "120");
         assert_eq!(runtime.eval_text("(let (x 40) (let (f (fn [y] (+ x y))) (f 2)))").unwrap(), "42");
     }
 
