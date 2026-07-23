@@ -58,6 +58,35 @@ public class CloseableIteratorTest {
   }
 
   @Test
+  public void mapFilterTakeDropAndPartitionOwnTheirResourceSource() {
+    AtomicInteger closed = new AtomicInteger();
+    Iterator<?>[] derived = {
+      Iter.map(new CountingIterator(1, closed), value -> value),
+      Iter.filter(new CountingIterator(1, closed), value -> true),
+      Iter.take(new CountingIterator(1, closed), 1),
+      Iter.drop(new CountingIterator(1, closed), 0),
+      Iter.partitionPair(new CountingIterator(1, closed))
+    };
+
+    assertEquals(0, closed.get());
+    for (int index = 0; index < derived.length; index++) {
+      Iter.close(derived[index]);
+      Iter.close(derived[index]);
+      assertEquals(index + 1, closed.get());
+      assertFalse(derived[index].hasNext());
+    }
+  }
+
+  @Test
+  public void exhaustionAlsoReleasesTheResourceSource() {
+    AtomicInteger closed = new AtomicInteger();
+    Iterator<Integer> mapped = Iter.map(new CountingIterator(1, closed), value -> value);
+    assertEquals(Integer.valueOf(1), mapped.next());
+    assertFalse(mapped.hasNext());
+    assertEquals(1, closed.get());
+  }
+
+  @Test
   @SuppressWarnings({"unchecked", "rawtypes"})
   public void zipClosesEveryResourceWhenTheShortestSourceEnds() {
     TrackingIterator first = new TrackingIterator(1);
