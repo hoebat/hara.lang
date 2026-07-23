@@ -17,7 +17,10 @@ fn canonical_decimal(value: &str) -> String {
     if mantissa == "-0" || mantissa == "+0" {
         mantissa = "0".into();
     }
-    exponent.map_or(mantissa.clone(), |e| format!("{mantissa}E{e}"))
+    exponent.map_or(mantissa.clone(), |e| {
+        let sign = if e.starts_with(['+', '-']) { "" } else { "+" };
+        format!("{mantissa}E{sign}{e}")
+    })
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -362,6 +365,21 @@ impl<'a> Parser<'a> {
         if numeric {
             let negative = token.starts_with('-');
             let sign = if negative { "-" } else { "" };
+            if let Some((radix_text, digits)) = body.split_once(['r', 'R']) {
+                let radix = radix_text.parse::<u32>().map_err(|_| ParseError {
+                    message: format!("Invalid number: {token}"),
+                    position: self.reader.position(),
+                })?;
+                if !(2..=36).contains(&radix) {
+                    return self.error(format!("Radix out of range: {radix}"));
+                }
+                if let Some(digit) = digits.chars().find(|digit| digit.to_digit(radix).is_none()) {
+                    return self.error(format!("Invalid digit {digit} under radix {radix}"));
+                }
+                if digits.is_empty() {
+                    return self.error(format!("Invalid number: {token}"));
+                }
+            }
             let parsed =
                 if let Some(hex) = body.strip_prefix("0x").or_else(|| body.strip_prefix("0X")) {
                     i64::from_str_radix(hex, 16)

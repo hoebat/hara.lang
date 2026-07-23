@@ -72,6 +72,7 @@ impl std::fmt::Display for Form {
             Self::Float(value) if value.is_nan() => "##NaN".into(),
             Self::Float(value) if *value == f64::INFINITY => "##Inf".into(),
             Self::Float(value) if *value == f64::NEG_INFINITY => "##-Inf".into(),
+            Self::Float(value) if value.fract() == 0.0 => format!("{value:.1}"),
             Self::Float(value) => value.to_string(),
             Self::BigInteger(value) => format!("{value}N"),
             Self::Decimal(value) => format!("{value}M"),
@@ -85,7 +86,7 @@ impl std::fmt::Display for Form {
             Self::Character(value) => format!("\\{value}"),
             Self::Regex(value) => display_regex(value),
             Self::Tagged(tag, value) => format!("#{tag}{value}"),
-            Self::Metadata(metadata, value) => format!("^{metadata} {value}"),
+            Self::Metadata(_, value) => value.to_string(),
             Self::Symbol(value) => value.clone(),
             Self::Keyword(value) => format!(":{value}"),
             Self::String(value) => display_string(value),
@@ -142,7 +143,7 @@ mod tests {
     #[test]
     fn metadata_printing_is_canonical() {
         let metadata = parse("^:private [1]").unwrap();
-        assert_eq!(metadata.to_string(), "^{:private true} [1]");
-        assert_eq!(parse(&metadata.to_string()).unwrap(), metadata);
+        assert_eq!(metadata.to_string(), "[1]");
+        assert_eq!(parse(&metadata.to_string()).unwrap(), parse("[1]").unwrap());
     }
 }

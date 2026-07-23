@@ -30,10 +30,7 @@ fn preserves_recursive_source_locations_without_changing_forms() {
 #[test]
 fn preserves_locations_through_dispatch_and_metadata() {
     let root = read_forms("#tag ^:private [#'x ##Inf]").unwrap().remove(0);
-    assert_eq!(
-        root.form.to_string(),
-        "#tag^{:private true} [(var x) ##Inf]"
-    );
+    assert_eq!(root.form.to_string(), "#tag[(var x) ##Inf]");
     assert_eq!(root.children.len(), 1);
     let metadata = &root.children[0];
     assert_eq!(metadata.children.len(), 2);

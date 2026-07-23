@@ -21,8 +21,7 @@
    :readable "[(quote x) (syntax-quote y) (unquote z) (unquote-splicing items) (deref state) (var root)]"}
   {:id :metadata
    :source "^:private [1]"
-   :readable "[1]"
-   :rust-readable "^{:private true} [1]"}
+   :readable "[1]"}
   {:id :discard :source "[1 #_2 3]" :readable "[1 3]"}
   {:id :regex :source "#\"a\\\\d+\"" :readable "#\"a\\\\d+\""}
   {:id :symbolic-values
@@ -45,19 +44,16 @@
   {:id :radix-integers :source "[2r101010 8r52 16r2a 36r16 -2r101010]" :readable "[42 42 42 42 -42]"}
   {:id :floating-point
    :source "[0.0 1. 1e2 -1.25e-2]"
-   :readable "[0.0 1.0 100.0 -0.0125]"
-   :rust-readable "[0 1 100 -0.0125]"}
+   :readable "[0.0 1.0 100.0 -0.0125]"}
   {:id :big-decimals
    :source "[0M 1.2500M -42M 1e2M]"
-   :readable "[0M 1.25M -42M 1E+2M]"
-   :rust-readable "[0M 1.25M -42M 1E2M]"}
+   :readable "[0M 1.25M -42M 1E+2M]"}
   {:id :character-singletons :source "[\\a \\0 \\λ \\雪]" :readable "[\\a \\0 \\λ \\雪]"}
   {:id :symbol-shapes :source "[+ - * ? ! foo.bar foo-bar foo? foo! a/b a/b/c]" :readable "[+ - * ? ! foo.bar foo-bar foo? foo! a/b a/b/c]"}
   {:id :keyword-shapes :source "[:+ :- :* :? :! :foo.bar :foo-bar :foo? :foo! :a/b]" :readable "[:+ :- :* :? :! :foo.bar :foo-bar :foo? :foo! :a/b]"}
   {:id :metadata-symbol
    :source "^private [2]"
-   :readable "[2]"
-   :rust-readable "^{:tag private} [2]"}
+   :readable "[2]"}
   {:id :nested-discard :source "[0 #_[1 #_2 3] 4]" :readable "[0 4]"}
   {:id :root-discard :source "#_1 2" :readable "2"}
   {:id :var-quote :source "#'ns/root" :readable "(var ns/root)"}
@@ -92,9 +88,9 @@
   {:id :unsupported-queue-dispatch :source "#[1 2]" :error "No dispatch macro for: ["}
   {:id :invalid-symbolic :source "##[1]" :error "Invalid"}
   {:id :invalid-hex :source "0xGG" :error "Invalid number"}
-  {:id :invalid-radix-low :source "1r1" :error "Radix out of range" :rust-error "Invalid number"}
-  {:id :invalid-radix-high :source "37r1" :error "Radix out of range" :rust-error "Invalid number"}
-  {:id :invalid-radix-digit :source "2r2" :error "under radix 2" :rust-error "Invalid number"}
+  {:id :invalid-radix-low :source "1r1" :error "Radix out of range"}
+  {:id :invalid-radix-high :source "37r1" :error "Radix out of range"}
+  {:id :invalid-radix-digit :source "2r2" :error "under radix 2"}
   {:id :invalid-octal :source "078" :error "Invalid number"}
   {:id :invalid-exponent :source "1e" :error "Invalid number"}
   {:id :invalid-bigint :source "1.0N" :error "Invalid number"}
