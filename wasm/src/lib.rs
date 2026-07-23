@@ -2137,6 +2137,33 @@ mod tests {
     }
 
     #[test]
+    fn portable_type_descriptors_cover_named_and_collection_values() {
+        let mut runtime = Runtime::new();
+        for (source, expected) in [
+            ("nil", ":hara.type/nil"),
+            (":key", ":hara.type/keyword"),
+            ("(symbol \"hara/name\")", ":hara.type/symbol"),
+            ("[]", ":hara.type/tuple"),
+            ("(vector)", ":hara.type/vector"),
+            ("{}", ":hara.type/map"),
+            ("(ns:create (quote example))", ":hara.type/namespace"),
+        ] {
+            assert_eq!(
+                runtime.eval_text(&format!("(type {source})")).unwrap(),
+                expected
+            );
+        }
+        assert_eq!(
+            runtime.eval_text("(type (type []))").unwrap(),
+            ":hara.type/keyword"
+        );
+        assert!(runtime
+            .eval_text("(type)")
+            .unwrap_err()
+            .contains("one value"));
+    }
+
+    #[test]
     fn protocol_registry_dispatches_by_protocol_and_method() {
         let mut registry = core::ProtocolRegistry::new();
         registry.register("IIdentity", "identity", protocol_identity);

@@ -455,6 +455,21 @@ mod tests {
     }
 
     #[test]
+    fn portable_type_descriptors_are_available_in_raw_wasm() {
+        for source in [
+            "(if (= (type nil) :hara.type/nil) 42 0)",
+            "(if (= (type :key) :hara.type/keyword) 42 0)",
+            "(if (= (type (symbol \"hara/name\")) :hara.type/symbol) 42 0)",
+            "(if (= (type []) :hara.type/tuple) 42 0)",
+            "(if (= (type (vector)) :hara.type/vector) 42 0)",
+            "(if (= (type {}) :hara.type/map) 42 0)",
+            "(if (= (type (ns:create (quote example))) :hara.type/namespace) 42 0)",
+        ] {
+            assert_eq!(evaluate(source), Ok(42), "{source}");
+        }
+    }
+
+    #[test]
     fn iterator_lifecycle_matches_native_core_in_raw_wasm() {
         for source in [
             "(let (it (iter-cycle [1 2])) (do (iter-next it) (iter-close it) (if (iter-has? it) 0 42)))",

@@ -4233,6 +4233,16 @@ fn eval_basic_object_form(
     env: &mut HashMap<String, Value>,
 ) -> Result<Value, String> {
     match operation {
+        "type" => {
+            if forms.len() != 2 {
+                return Err("type expects one value".into());
+            }
+            let value = eval(&forms[1], env)?;
+            Ok(Value::Keyword(Keyword::create(
+                Some("hara.type"),
+                receiver_category(&value),
+            )?))
+        }
         "compare" => {
             if forms.len() != 3 {
                 return Err("compare expects two values".into());
@@ -4467,7 +4477,9 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     binding_var(env, name).ok_or_else(|| format!("unbound symbol: {name}"))?;
                 Ok(Value::Var(cell))
             }
-            Form::Symbol(n) if ["compare", "hash", "meta", "with-meta"].contains(&n.as_str()) => {
+            Form::Symbol(n)
+                if ["type", "compare", "hash", "meta", "with-meta"].contains(&n.as_str()) =>
+            {
                 eval_basic_object_form(n, fs, env)
             }
             Form::Symbol(n)
