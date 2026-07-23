@@ -1,10 +1,12 @@
 package hara.truffle;
 
+import java.lang.reflect.Method;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
@@ -80,12 +82,135 @@ public class StdLibraryProviderTest {
   }
 
   @Test
+  public void loadsContextThroughTheLibraryProvider() {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(require 'std.lib.context)");
+      assertTrue(
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(std.lib.context/rt-null? "
+                      + "(std.lib.context/registry-scratch :null))")
+              .asBoolean());
+      assertTrue(
+          context
+              .eval(HaraLanguage.ID, "(std.lib.context/space? (std.lib.context/space))")
+              .asBoolean());
+      context.eval(
+          HaraLanguage.ID,
+          "(std.lib.context/space:context-set :null :default {})");
+      assertFalse(
+          context
+              .eval(HaraLanguage.ID, "(std.lib.context/space:rt-started? :null)")
+              .asBoolean());
+      assertTrue(
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(std.lib.context/rt-null? "
+                      + "(std.lib.context/space:rt-start :null))")
+              .asBoolean());
+      assertTrue(
+          context
+              .eval(HaraLanguage.ID, "(std.lib.context/space:rt-started? :null)")
+              .asBoolean());
+      assertEquals(
+          42,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(let [ptr (std.lib.context/pointer {:context :null :value 42})]"
+                      + " (get (std.lib.context/pointer-deref ptr) :value))")
+              .asInt());
+      context.eval(HaraLanguage.ID, "(std.lib.context/space:rt-stop :null)");
+      assertTrue(
+          context
+              .eval(HaraLanguage.ID, "(std.lib.context/space:rt-stopped? :null)")
+              .asBoolean());
+      assertEquals(
+          "Returns the context space for the current or supplied namespace.",
+          context
+              .eval(HaraLanguage.ID, "(get (meta (var std.lib.context/space)) :doc)")
+              .asString());
+      assertTrue(
+          context
+                  .eval(
+                      HaraLanguage.ID,
+                      "(count (get (meta (var std.lib.context/space)) :arglists))")
+                  .asInt()
+              > 0);
+    }
+  }
+
+  @Test
+  public void contextProviderKeepsStateIsolatedAndHidesImplementationNamespaces() {
+    try (Context first = Context.newBuilder(HaraLanguage.ID).build();
+        Context second = Context.newBuilder(HaraLanguage.ID).build()) {
+      first.eval(HaraLanguage.ID, "(require 'std.lib.context)");
+      second.eval(HaraLanguage.ID, "(require 'std.lib.context)");
+      first.eval(
+          HaraLanguage.ID,
+          "(std.lib.context/registry-install :isolated "
+              + "{:scratch (std.lib.context/registry-scratch :null)})");
+      assertTrue(
+          first
+              .eval(
+                  HaraLanguage.ID,
+                  "(iter-any? (fn [x] (= x \"isolated\")) "
+                      + "(std.lib.context/registry-list))")
+              .asBoolean());
+      assertFalse(
+          second
+              .eval(
+                  HaraLanguage.ID,
+                  "(iter-any? (fn [x] (= x \"isolated\")) "
+                      + "(std.lib.context/registry-list))")
+              .asBoolean());
+
+      assertThrows(
+          PolyglotException.class,
+          () -> first.eval(HaraLanguage.ID, "(var std.lib.context/+rt-null+)"));
+      assertThrows(
+          PolyglotException.class,
+          () -> first.eval(HaraLanguage.ID, "(var std.lib.context/protocol-tmpl)"));
+      assertThrows(
+          PolyglotException.class,
+          () -> first.eval(HaraLanguage.ID, "(var std.lib.context/p:registry-list)"));
+      assertThrows(
+          PolyglotException.class,
+          () -> first.eval(HaraLanguage.ID, "(require 'std.lib.context.space)"));
+      assertThrows(
+          PolyglotException.class,
+          () -> first.eval(HaraLanguage.ID, "(require 'std.lib.context.registry)"));
+    }
+  }
+
+  @Test
   public void providersDeclareCanonicalNamespacesAndStableOrder() {
     HaraLibraryProvider block = new StdBlockLibraryProvider();
     HaraLibraryProvider zip = new StdZipLibraryProvider();
+    HaraLibraryProvider context = new StdLibContextLibraryProvider();
+    HaraLibraryProvider task = new StdLibTaskLibraryProvider();
     assertEquals("std.lib.block", block.namespace());
     assertEquals("std.lib.zip", zip.namespace());
+    assertEquals("std.lib.context", context.namespace());
+    assertEquals("std.lib.task", task.namespace());
     assertEquals(20, block.order());
     assertEquals(20, zip.order());
+    assertEquals(20, context.order());
+    assertEquals(20, task.order());
+  }
+
+  @Test
+  public void everyContextExportProvidesDocumentationAndArglists() {
+    int exports = 0;
+    for (Method method : StdLibContext.class.getDeclaredMethods()) {
+      HaraExport export = method.getAnnotation(HaraExport.class);
+      if (export == null) continue;
+      exports++;
+      assertFalse(export.name(), export.doc().isEmpty());
+      assertTrue(export.name(), export.arglists().length > 0);
+    }
+    assertEquals(43, exports);
   }
 }

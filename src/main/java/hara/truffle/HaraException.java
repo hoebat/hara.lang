@@ -1,5 +1,6 @@
 package hara.truffle;
 
+import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.exception.AbstractTruffleException;
 import com.oracle.truffle.api.nodes.Node;
 
@@ -21,10 +22,12 @@ public final class HaraException extends AbstractTruffleException {
   }
 
   /** Enables diagnostic Hara frames without changing normal exception messages. */
+  @TruffleBoundary
   public static boolean tracingEnabled() {
     return Boolean.getBoolean("hara.stacktrace");
   }
 
+  @TruffleBoundary
   public static HaraException withFrame(Throwable error, Node location, String frame) {
     String message =
         error.getMessage() == null ? error.getClass().getSimpleName() : error.getMessage();

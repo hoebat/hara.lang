@@ -8,32 +8,22 @@ import java.util.Objects;
 public final class ReplConfig {
   public static final String DEFAULT_SPLASH =
       """
-                                      .-==========-.
-                                _.-'       __       '-._
-                           _.-'         .-'  '-.        '-._
-                       _.-'____________/  ◉  ◉  \\____________'-._
-                      /________________\\   /\\   /________________\\
-                      '-----------------\\  --  /-----------------'
-                                         '----'
-                                           ||
-                                        \\  ||  /
-                                         \\ || /
-                                      .   \\||/   .
-                                  .       /||\\       .
-                              .          / || \\          .
-                          .             /  ||  \\             .
-                      .                / ░░░░░░ \\                .
-                  .                   /░░▒▒▒▒▒▒░░\\                   .
-              .______________________/▒▒▓▓▓▓▓▓▓▓▒▒\\______________________.
 
-                 ██╗  ██╗ █████╗ ██████╗  █████╗
-                 ██║  ██║██╔══██╗██╔══██╗██╔══██╗
-                 ███████║███████║██████╔╝███████║
-                 ██╔══██║██╔══██║██╔══██╗██╔══██║
-                 ██║  ██║██║  ██║██║  ██║██║  ██║
-                 ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝▓
-                    ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓
-                       ░░░░░░░░░░░░░░░░░░░░░░░░░
+
+                               ░░░▒▒▓▒▒░░░
+                          ░░░░░▒▒▒▒▒▓▒▒▒▒▒░░░░░
+                     ░░░░░▒▒▒▒▒▒▓▓▓▓▓▓▓▓▓▒▒▒▒▒▒░░░░░
+                ░░░░░▒▒▒▒▒▒▒▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓▒▒▒▒▒▒▒░░░░░
+
+          ██╗       ██╗   ███████╗    ███████╗     ███████╗
+          ██║       ██║  ██╔═════██╗  ██╔════██╗   ██╔═════██╗
+          ██║  ●────██║  ██║     ██║  ██║     ██║  ██║     ██║
+          ████████████║  ███████████║  ████████╔╝   ███████████║
+          ██╔═══════██║  ██╔══════██║  ██╔═══██╗    ██╔══════██║
+          ██║ ──●── ██║  ██║  ●───██║  ██║    ██╗   ██║  ●───██║
+          ██║       ██║  ██║      ██║  ██║     ██╗  ██║      ██║
+          ╚═╝       ╚═╝  ╚═╝      ╚═╝  ╚═╝     ╚═╝  ╚═╝      ╚═╝
+                ·───────●───────────────●───────────────·
       """;
 
 
@@ -68,36 +58,48 @@ public final class ReplConfig {
     if (!color || value.isBlank()) return value;
     String[] lines = value.split("\\R", -1);
     StringBuilder rendered = new StringBuilder();
-    int gradientStart = Math.min(6, lines.length - 1);
-    int gradientLength = Math.max(1, lines.length - gradientStart - 1);
+    boolean defaultSplash = DEFAULT_SPLASH.equals(splash);
+    int triangleStart = defaultSplash ? 2 : 0;
+    int wordStart = defaultSplash ? 7 : Math.min(2, lines.length - 1);
+    int wordGradientLength = Math.max(1, lines.length - wordStart - 1);
     for (int index = 0; index < lines.length; index++) {
       if (index > 0) rendered.append('\n');
-      if (index < gradientStart) {
+      if (defaultSplash && (index < triangleStart || index == 6)) {
         rendered.append(lines[index]);
         continue;
       }
-      double position = (index - gradientStart) / (double) gradientLength;
-      int red;
-      int green;
-      int blue;
-      if (position < 0.4) {
-        double phase = position / 0.4;
-        red = blend(190, 20, phase);
-        green = blend(235, 105, phase);
-        blue = 255;
+      double position;
+      int[][] stops;
+      if (defaultSplash && index < wordStart) {
+        position = (index - triangleStart) / 3.0;
+        stops =
+            new int[][] {
+              {255, 246, 150},
+              {235, 246, 185},
+              {170, 226, 230},
+              {85, 170, 255}
+            };
       } else {
-        double phase = (position - 0.4) / 0.6;
-        red = blend(20, 0, phase);
-        green = blend(105, 0, phase);
-        blue = blend(255, 0, phase);
+        position = (index - wordStart) / (double) wordGradientLength;
+        stops =
+            new int[][] {
+              {105, 245, 255},
+              {35, 185, 255},
+              {45, 105, 255},
+              {105, 65, 235},
+              {185, 65, 220},
+              {70, 20, 100},
+              {5, 8, 20}
+            };
       }
+      int[] color = gradient(position, stops);
       rendered
           .append("\u001b[38;2;")
-          .append(red)
+          .append(color[0])
           .append(';')
-          .append(green)
+          .append(color[1])
           .append(';')
-          .append(blue)
+          .append(color[2])
           .append('m')
           .append(lines[index])
           .append("\u001b[0m");
@@ -107,6 +109,17 @@ public final class ReplConfig {
 
   private static int blend(int from, int to, double position) {
     return (int) Math.round(from + (to - from) * position);
+  }
+
+  private static int[] gradient(double position, int[][] stops) {
+    double scaled = Math.max(0, Math.min(1, position)) * (stops.length - 1);
+    int from = Math.min((int) scaled, stops.length - 2);
+    double phase = scaled - from;
+    return new int[] {
+      blend(stops[from][0], stops[from + 1][0], phase),
+      blend(stops[from][1], stops[from + 1][1], phase),
+      blend(stops[from][2], stops[from + 1][2], phase)
+    };
   }
 
   public boolean color() {
@@ -128,7 +141,7 @@ public final class ReplConfig {
   public String banner(String runtime, String session) {
     StringBuilder out = new StringBuilder();
     if (!splash.isBlank()) {
-      out.append(renderedSplash()).append('\n');
+      out.append(renderedSplash()).append("\n\n\n");
     }
     out.append(paint("35;1", "Hara"))
         .append(" · ")

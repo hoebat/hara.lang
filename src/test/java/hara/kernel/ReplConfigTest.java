@@ -13,7 +13,14 @@ public class ReplConfigTest {
     ReplConfig config = new ReplConfig(Path.of("history"), ReplConfig.DEFAULT_SPLASH, false);
 
     String banner = config.banner("JVM interpreter", "dev");
-    assertTrue(banner.contains(".-==========-."));
+    assertTrue(banner.contains("░░░▒▒▓▒▒░░░"));
+    assertTrue(banner.contains("▓▓▓▓"));
+    assertFalse(banner.contains("◉"));
+    String[] splashLines = ReplConfig.DEFAULT_SPLASH.stripTrailing().split("\\R");
+    assertEquals("", splashLines[0]);
+    assertEquals("", splashLines[1]);
+    assertEquals(41, splashLines[5].stripLeading().length());
+    assertEquals(58, splashLines[10].length());
     assertTrue(banner.contains("JVM interpreter"));
     assertTrue(banner.contains("session dev"));
     assertTrue(banner.contains("/help"));

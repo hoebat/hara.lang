@@ -4,15 +4,16 @@ use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
 
-use crate::lang::data::{Atom, Symbol};
+use crate::lang::data::{Atom, Metadata, Symbol};
 use crate::lang::protocol::{IDeref, IDisplay, INamespaced, IReset};
 
 thread_local! {
     static DYNAMIC_BINDINGS: RefCell<HashMap<usize, Vec<Box<dyn Any>>>> = RefCell::new(HashMap::new());
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct VarMetadata {
+    pub hara: Option<Rc<Metadata>>,
     pub control: bool,
     pub dynamic: bool,
     pub macro_form: bool,
@@ -51,11 +52,20 @@ impl<V> Var<V> {
     pub fn metadata(&self) -> VarMetadata {
         self.metadata.borrow().clone()
     }
+    pub fn hara_metadata(&self) -> Option<Rc<Metadata>> {
+        self.metadata.borrow().hara.clone()
+    }
+    pub fn set_hara_metadata(&self, metadata: Option<Rc<Metadata>>) {
+        self.metadata.borrow_mut().hara = metadata;
+    }
     pub fn set_metadata(&self, metadata: VarMetadata) -> VarMetadata {
         std::mem::replace(&mut *self.metadata.borrow_mut(), metadata)
     }
     pub fn update_metadata(&self, update: impl FnOnce(&mut VarMetadata)) {
         update(&mut self.metadata.borrow_mut());
+    }
+    pub fn identity_address(&self) -> usize {
+        self.identity_key()
     }
     pub fn same_identity(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.identity, &other.identity)
@@ -65,12 +75,30 @@ impl<V> Var<V> {
     }
     pub fn is_control(&self) -> bool {
         self.metadata.borrow().control
+            || self
+                .metadata
+                .borrow()
+                .hara
+                .as_ref()
+                .is_some_and(|meta| meta.flag("control"))
     }
     pub fn is_dynamic(&self) -> bool {
         self.metadata.borrow().dynamic
+            || self
+                .metadata
+                .borrow()
+                .hara
+                .as_ref()
+                .is_some_and(|meta| meta.flag("dynamic"))
     }
     pub fn is_macro(&self) -> bool {
         self.metadata.borrow().macro_form
+            || self
+                .metadata
+                .borrow()
+                .hara
+                .as_ref()
+                .is_some_and(|meta| meta.flag("macro"))
     }
 }
 impl<V: Clone + 'static> Var<V> {

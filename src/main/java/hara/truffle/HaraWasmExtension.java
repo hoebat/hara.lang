@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingQueue;
+import org.graalvm.nativeimage.ImageInfo;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
@@ -100,10 +101,7 @@ final class HaraWasmExtension implements AutoCloseable {
       }
       hta = isHta;
       mailbox = isHta ? new LinkedBlockingQueue<>() : null;
-      owner =
-          isHta
-              ? Thread.ofVirtual().name("hara-hta-" + manifest.namespace()).start(this::runMailbox)
-              : null;
+      owner = isHta ? startMailboxOwner() : null;
     } catch (HaraException error) {
       if (opened != null) opened.close(true);
       throw error;
@@ -112,6 +110,16 @@ final class HaraWasmExtension implements AutoCloseable {
       throw new HaraException(
           "extension/module-invalid: " + manifest.namespace() + " (" + error.getMessage() + ")");
     }
+  }
+
+  private Thread startMailboxOwner() {
+    String name = "hara-hta-" + manifest.namespace();
+    if (!ImageInfo.inImageRuntimeCode()) {
+      return Thread.ofVirtual().name(name).start(this::runMailbox);
+    }
+    Thread thread = new Thread(this::runMailbox, name);
+    thread.start();
+    return thread;
   }
 
   private static Value requireExport(Value members, String name, String module) {

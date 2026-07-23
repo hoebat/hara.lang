@@ -15,6 +15,7 @@ import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.graalvm.nativeimage.ImageInfo;
 import org.graalvm.polyglot.Value;
 
 /** RESP listener for a shared Hara session broker. */
@@ -80,7 +81,10 @@ public final class HaraServer implements AutoCloseable {
     if (running.get()) return this;
     socket = new ServerSocket();
     socket.bind(new InetSocketAddress(host, requestedPort));
-    clients = Executors.newVirtualThreadPerTaskExecutor();
+    clients =
+        ImageInfo.inImageRuntimeCode()
+            ? Executors.newCachedThreadPool()
+            : Executors.newVirtualThreadPerTaskExecutor();
     running.set(true);
     acceptor = new Thread(this::acceptLoop, "hara-resp-acceptor");
     acceptor.setDaemon(false);

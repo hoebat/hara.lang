@@ -110,6 +110,7 @@ public final class HaraContext {
   private final Map<String, HaraWasmExtension> loadedExtensions = new ConcurrentHashMap<>();
   private final Map<String, ModuleRecord> modules = new ConcurrentHashMap<>();
   private final Map<String, Set<String>> moduleDependencies = new ConcurrentHashMap<>();
+  private final Map<String, Object> libraryStates = new ConcurrentHashMap<>();
   private final Set<String> loadingModules = ConcurrentHashMap.newKeySet();
   private final Deque<String> loadingStack = new ArrayDeque<>();
   private volatile HaraNamespace currentNamespace;
@@ -188,6 +189,11 @@ public final class HaraContext {
 
   HaraTestRegistry testRegistry() {
     return testRegistry;
+  }
+
+  @SuppressWarnings("unchecked")
+  <T> T libraryState(String name, Supplier<T> factory) {
+    return (T) libraryStates.computeIfAbsent(name, ignored -> factory.get());
   }
 
   @TruffleBoundary

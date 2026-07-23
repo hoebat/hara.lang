@@ -3,10 +3,11 @@ use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 
 pub use crate::kernel::Form;
+use crate::kernel::Var as KernelVar;
 use crate::lang::data::List as PList;
 use crate::lang::data::{Keyword, Map as PMap, Set as PSet, Symbol, Vector as PVector};
 use crate::lang::data::{Metadata, MetadataValue};
-use crate::lang::protocol::IMetadata;
+use crate::lang::protocol::{IDisplay, IMetadata};
 pub use crate::task::{LocalPromiseProvider, Promise, PromiseProvider, PromiseState};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
@@ -41,7 +42,7 @@ pub enum Value {
     Function(Rc<Function>),
     Vector(PVector<Value>),
     Iterator(Rc<RefCell<IteratorState>>),
-    Var(Rc<RefCell<Value>>),
+    Var(KernelVar<Value>),
     Extension(ExtensionValue),
     Nil,
 }
@@ -391,7 +392,7 @@ impl PartialEq for Value {
             (Value::Function(a), Value::Function(b)) => Rc::ptr_eq(a, b),
             (Value::Vector(a), Value::Vector(b)) => a == b,
             (Value::Iterator(a), Value::Iterator(b)) => Rc::ptr_eq(a, b),
-            (Value::Var(a), Value::Var(b)) => Rc::ptr_eq(a, b),
+            (Value::Var(a), Value::Var(b)) => a.same_identity(b),
             (Value::Extension(a), Value::Extension(b)) => a == b,
             (Value::Nil, Value::Nil) => true,
             _ => false,
@@ -499,7 +500,7 @@ impl Value {
                     "<iterator>".into()
                 }
             }
-            Self::Var(_) => "<var>".into(),
+            Self::Var(value) => value.display(),
             Self::Extension(value) => format!("#ht[:handle {}]", value.handle),
             Self::Nil => "nil".into(),
         }
@@ -556,7 +557,7 @@ impl Value {
                 Value::Vector(v) => v.iter().for_each(|item| hash_value(item, state)),
                 Value::Function(v) => Rc::as_ptr(v).hash(state),
                 Value::Iterator(v) => Rc::as_ptr(v).hash(state),
-                Value::Var(v) => Rc::as_ptr(v).hash(state),
+                Value::Var(v) => v.identity_address().hash(state),
                 Value::Extension(v) => {
                     v.provider.hash(state);
                     v.type_name.hash(state);
@@ -1401,6 +1402,7 @@ fn value_metadata(value: &Value) -> Option<Rc<Metadata>> {
         Value::List(value) => value.meta().cloned(),
         Value::Map(value) => value.meta().cloned(),
         Value::Set(value) => value.meta().cloned(),
+        Value::Var(value) => value.hara_metadata(),
         _ => None,
     }
 }
@@ -2951,6 +2953,10 @@ fn attach_metadata(value: Value, metadata: Rc<Metadata>) -> Result<Value, String
         Value::List(value) => Value::List(value.with_meta(Some(metadata))),
         Value::Map(value) => Value::Map(value.with_meta(Some(metadata))),
         Value::Set(value) => Value::Set(value.with_meta(Some(metadata))),
+        Value::Var(value) => {
+            value.set_hara_metadata(Some(metadata));
+            Value::Var(value)
+        }
         Value::Keyword(value) => Value::Keyword(value),
         _ => return Err("metadata can only be applied to object values".into()),
     })
@@ -3042,7 +3048,7 @@ fn function_parts(form: &Form) -> Result<(Vec<String>, Option<String>), String> 
 
 fn deref_value(value: Value) -> Value {
     match value {
-        Value::Var(cell) => cell.borrow().clone(),
+        Value::Var(var) => var.deref_value(),
         value => value,
     }
 }
@@ -3051,13 +3057,13 @@ fn binding_value(env: &HashMap<String, Value>, name: &str) -> Option<Value> {
     env.get(name).cloned().map(deref_value)
 }
 
-fn binding_var(env: &mut HashMap<String, Value>, name: &str) -> Option<Rc<RefCell<Value>>> {
+fn binding_var(env: &mut HashMap<String, Value>, name: &str) -> Option<KernelVar<Value>> {
     match env.get(name) {
-        Some(Value::Var(cell)) => Some(cell.clone()),
+        Some(Value::Var(var)) => Some(var.clone()),
         Some(value) => {
-            let cell = Rc::new(RefCell::new(value.clone()));
-            env.insert(name.to_string(), Value::Var(cell.clone()));
-            Some(cell)
+            let var = KernelVar::new(name, value.clone());
+            env.insert(name.to_string(), Value::Var(var.clone()));
+            Some(var)
         }
         None => None,
     }
@@ -3127,6 +3133,17 @@ fn call_function(function: &Function, arguments: Vec<Value>) -> Result<Value, St
         });
     }
     result
+}
+
+fn binding_symbol(form: &Form, context: &str) -> Result<(String, Option<Rc<Metadata>>), String> {
+    match form {
+        Form::Symbol(name) => Ok((name.clone(), None)),
+        Form::Metadata(metadata, value) => match value.as_ref() {
+            Form::Symbol(name) => Ok((name.clone(), Some(metadata_from_form(metadata)?))),
+            _ => Err(format!("{context} must be a symbol")),
+        },
+        _ => Err(format!("{context} must be a symbol")),
+    }
 }
 
 pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, String> {
@@ -3227,7 +3244,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     _ => eval(&fs[1], env)?,
                 };
                 match target {
-                    Value::Var(value) => Ok(value.borrow().clone()),
+                    Value::Var(value) => Ok(value.deref_value()),
                     Value::Promise(promise) => match promise.state() {
                         PromiseState::Fulfilled(value) => Ok(value),
                         PromiseState::Rejected(error) => Err(error),
@@ -3248,7 +3265,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 };
                 let value = eval(&fs[2], env)?;
                 let cell = binding_var(env, name).ok_or_else(|| format!("unbound var: {name}"))?;
-                *cell.borrow_mut() = value.clone();
+                cell.reset_value(value.clone());
                 Ok(value)
             }
             Form::Symbol(n) if n == "alter-var-root" => {
@@ -3263,7 +3280,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     Value::Function(function) => function,
                     _ => return Err("alter-var-root expects a function".into()),
                 };
-                let mut arguments = vec![target.borrow().clone()];
+                let mut arguments = vec![target.deref_value()];
                 arguments.extend(
                     fs[3..]
                         .iter()
@@ -3271,7 +3288,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                         .collect::<Result<Vec<_>, _>>()?,
                 );
                 let value = call_function(&function, arguments)?;
-                *target.borrow_mut() = value.clone();
+                target.reset_value(value.clone());
                 Ok(value)
             }
             Form::Symbol(n) if n == "throw" => {
@@ -3343,15 +3360,15 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 if fs.len() != 3 {
                     return Err("def expects a name and value".into());
                 }
-                let name = match &fs[1] {
-                    Form::Symbol(name) => name.clone(),
-                    _ => return Err("def name must be a symbol".into()),
-                };
+                let (name, metadata) = binding_symbol(&fs[1], "def name")?;
                 let value = eval(&fs[2], env)?;
                 if let Some(Value::Var(cell)) = env.get(&name) {
-                    *cell.borrow_mut() = value.clone();
+                    cell.reset_value(value.clone());
                 } else {
-                    env.insert(name, Value::Var(Rc::new(RefCell::new(value.clone()))));
+                    env.insert(
+                        name.clone(),
+                        Value::Var(KernelVar::new(name, value.clone())),
+                    );
                 }
                 Ok(value)
             }
@@ -3359,14 +3376,11 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 if fs.len() < 4 {
                     return Err("defn expects a name, parameters, and a body".into());
                 }
-                let name = match &fs[1] {
-                    Form::Symbol(name) => name.clone(),
-                    _ => return Err("defn name must be a symbol".into()),
-                };
+                let (name, metadata) = binding_symbol(&fs[1], "defn name")?;
                 let (params, variadic) = function_parts(&fs[2])?;
                 let cell = match env.get(&name) {
                     Some(Value::Var(cell)) => cell.clone(),
-                    _ => Rc::new(RefCell::new(Value::Nil)),
+                    _ => KernelVar::new(name.clone(), Value::Nil),
                 };
                 env.insert(name.clone(), Value::Var(cell.clone()));
                 let function_ref = Rc::new(Function {
@@ -3378,7 +3392,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     native: None,
                 });
                 let function = Value::Function(function_ref.clone());
-                *cell.borrow_mut() = function.clone();
+                cell.reset_value(function.clone());
                 Ok(function)
             }
             Form::Symbol(n) if n == "do" => {

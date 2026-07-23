@@ -199,7 +199,7 @@ fn list(v: Vec<Form>, env: Rc<RefCell<HashMap<String, Value>>>, k: Cont) -> Step
                 v[1].clone(),
                 env,
                 Box::new(move |r| match r {
-                    Ok(Value::Var(x)) => k(Ok(x.borrow().clone())),
+                    Ok(Value::Var(x)) => k(Ok(x.deref_value())),
                     Ok(Value::Promise(p)) => match p.state() {
                         PromiseState::Fulfilled(x) => k(Ok(x)),
                         PromiseState::Rejected(e) => k(Err(e)),
@@ -409,15 +409,18 @@ fn bind_form(v: Vec<Form>, env: Rc<RefCell<HashMap<String, Value>>>, k: Cont) ->
                 let mut env = e.borrow_mut();
                 if op == "def" {
                     if let Some(Value::Var(c)) = env.get(&name) {
-                        *c.borrow_mut() = x.clone();
+                        c.reset_value(x.clone());
                     } else {
-                        env.insert(name, Value::Var(Rc::new(RefCell::new(x.clone()))));
+                        env.insert(
+                            name.clone(),
+                            Value::Var(crate::kernel::Var::new(name, x.clone())),
+                        );
                     }
                 } else {
                     let Some(c) = binding_var(&mut env, &name) else {
                         return k(Err(format!("unbound var: {name}")));
                     };
-                    *c.borrow_mut() = x.clone();
+                    c.reset_value(x.clone());
                 }
                 drop(env);
                 k(Ok(x))

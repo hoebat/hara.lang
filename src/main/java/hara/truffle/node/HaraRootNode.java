@@ -80,6 +80,7 @@ public final class HaraRootNode extends RootNode {
     }
   }
 
+  @TruffleBoundary
   private String frameLabel() {
     if (sourceSection == null || !sourceSection.isAvailable()) return "<hara>";
     return sourceSection.getSource().getName();
