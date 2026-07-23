@@ -169,9 +169,26 @@ impl<'a> Parser<'a> {
             map @ Form::Map(_) => map,
             _ => return self.error("Metadata must be Symbol, Keyword, String or Map"),
         };
+
+        if matches!(value, Form::Keyword(_)) {
+            return Ok(value);
+        }
+        if let Form::Metadata(existing, inner) = value {
+            let (Form::Map(mut old), Form::Map(new)) = (*existing, normalized) else {
+                unreachable!("reader metadata is normalized to a map")
+            };
+            for (key, value) in new {
+                if let Some((_, prior)) = old.iter_mut().find(|(candidate, _)| *candidate == key) {
+                    *prior = value;
+                } else {
+                    old.push((key, value));
+                }
+            }
+            return Ok(Form::Metadata(Box::new(Form::Map(old)), inner));
+        }
         if !matches!(
             value,
-            Form::List(_) | Form::Vector(_) | Form::Map(_) | Form::Set(_)
+            Form::Symbol(_) | Form::List(_) | Form::Vector(_) | Form::Map(_) | Form::Set(_)
         ) {
             return self.error("Metadata can only be applied to object forms");
         }
@@ -274,7 +291,13 @@ impl<'a> Parser<'a> {
             _ => {}
         }
         if let Some(keyword) = token.strip_prefix(':') {
-            if keyword.is_empty() || keyword == "/" {
+            let slashes = keyword.bytes().filter(|byte| *byte == b'/').count();
+            if keyword.is_empty()
+                || keyword == "/"
+                || slashes > 1
+                || keyword.starts_with('/')
+                || keyword.ends_with('/')
+            {
                 return self.error(format!("Keyword not allowed: {token}"));
             }
             return Ok(Form::Keyword(keyword.into()));
@@ -583,6 +606,33 @@ mod tests {
             .unwrap_err()
             .contains("Metadata can only be applied"));
     }
+    #[test]
+    fn validates_keywords_and_merges_metadata_like_java() {
+        for invalid in [":", ":/", ":/name", ":name/", ":a/b/c"] {
+            assert!(parse_forms(invalid)
+                .unwrap_err()
+                .contains("Keyword not allowed"));
+        }
+        assert_eq!(
+            parse_forms(":ns/name").unwrap(),
+            vec![Form::Keyword("ns/name".into())]
+        );
+        assert_eq!(
+            parse_forms("^:private ^{:tag fast} item").unwrap(),
+            vec![Form::Metadata(
+                Box::new(Form::Map(vec![
+                    (Form::Keyword("tag".into()), Form::Symbol("fast".into())),
+                    (Form::Keyword("private".into()), Form::Bool(true)),
+                ])),
+                Box::new(Form::Symbol("item".into())),
+            )]
+        );
+        assert_eq!(
+            parse_forms("^:ignored :keyword").unwrap(),
+            vec![Form::Keyword("keyword".into())]
+        );
+    }
+
     #[test]
     fn supports_dispatch_and_quote_forms() {
         let forms = parse_forms("#{1 2} 'x @y #tag {:a 1}").unwrap();
