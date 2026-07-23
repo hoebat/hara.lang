@@ -4134,6 +4134,48 @@ fn eval_namespace_operation(
     }
 }
 
+fn eval_basic_object_form(
+    operation: &str,
+    forms: &[Form],
+    env: &mut HashMap<String, Value>,
+) -> Result<Value, String> {
+    match operation {
+        "compare" => {
+            if forms.len() != 3 {
+                return Err("compare expects two values".into());
+            }
+            let left = eval(&forms[1], env)?;
+            let right = eval(&forms[2], env)?;
+            Ok(Value::Number(match left.cmp(&right) {
+                std::cmp::Ordering::Less => -1,
+                std::cmp::Ordering::Equal => 0,
+                std::cmp::Ordering::Greater => 1,
+            }))
+        }
+        "hash" => {
+            if forms.len() != 2 {
+                return Err("hash expects one value".into());
+            }
+            Ok(Value::Number(eval(&forms[1], env)?.stable_hash() as i64))
+        }
+        "meta" => {
+            if forms.len() != 2 {
+                return Err("meta expects one value".into());
+            }
+            protocol_meta(&[eval(&forms[1], env)?])
+        }
+        "with-meta" => {
+            if forms.len() != 3 {
+                return Err("with-meta expects a value and metadata map".into());
+            }
+            let value = eval(&forms[1], env)?;
+            let metadata = eval(&forms[2], env)?;
+            protocol_with_meta(&[value, metadata])
+        }
+        _ => unreachable!("eval_basic_object_form called for an unknown operation"),
+    }
+}
+
 fn eval_atom_form(
     operation: &str,
     forms: &[Form],
@@ -4291,6 +4333,9 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 let cell =
                     binding_var(env, name).ok_or_else(|| format!("unbound symbol: {name}"))?;
                 Ok(Value::Var(cell))
+            }
+            Form::Symbol(n) if ["compare", "hash", "meta", "with-meta"].contains(&n.as_str()) => {
+                eval_basic_object_form(n, fs, env)
             }
             Form::Symbol(n)
                 if ["atom", "atom:basic", "reset!", "compare:set!", "swap!"]

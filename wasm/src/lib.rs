@@ -1222,6 +1222,47 @@ mod tests {
     }
 
     #[test]
+    fn named_values_expose_java_basic_object_operations() {
+        let mut runtime = Runtime::new();
+        assert_eq!(runtime.eval_text("(compare :a :b)").unwrap(), "-1");
+        assert_eq!(
+            runtime
+                .eval_text("(compare (symbol \"a\") (symbol \"a\"))")
+                .unwrap(),
+            "0"
+        );
+        assert_eq!(
+            runtime
+                .eval_text("(= (hash [1 2]) (hash (list 1 2)))")
+                .unwrap(),
+            "true"
+        );
+        assert_eq!(runtime.eval_text("(meta :answer)").unwrap(), "nil");
+        assert_eq!(
+            runtime
+                .eval_text("(with-meta :answer {:doc \"ignored\"})")
+                .unwrap(),
+            ":answer"
+        );
+        assert_eq!(
+            runtime
+                .eval_text("(get (meta (with-meta (symbol \"answer\") {:doc \"named\"})) :doc)")
+                .unwrap(),
+            "\"named\""
+        );
+        assert_eq!(
+            runtime
+                .eval_text("(get (meta (with-meta [1] {:doc \"vector\"})) :doc)")
+                .unwrap(),
+            "\"vector\""
+        );
+        assert_eq!(
+            runtime.eval_text("(hash)").unwrap_err(),
+            "hash expects one value"
+        );
+    }
+
+    #[test]
     fn keyword_symbol_constructors_and_namespaced_protocol_match_java() {
         let mut runtime = Runtime::new();
         assert_eq!(
