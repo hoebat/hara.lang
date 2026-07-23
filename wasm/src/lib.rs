@@ -793,6 +793,27 @@ mod tests {
     }
 
     #[test]
+    fn reader_literals_are_first_class_runtime_values() {
+        let mut runtime = Runtime::new();
+        let cases = [
+            ("1.5", "1.5"),
+            ("123N", "123N"),
+            ("1.20M", "1.2M"),
+            ("\\newline", "\\newline"),
+            ("#\"a+\"", "#\"a+\""),
+            ("#demo {:a 1}", "#demo{:a 1}"),
+            ("##Inf", "##Inf"),
+            ("##-Inf", "##-Inf"),
+            ("##NaN", "##NaN"),
+        ];
+        for (source, expected) in cases {
+            assert_eq!(runtime.eval_text(source).unwrap(), expected, "{source}");
+        }
+        assert_eq!(runtime.eval_text("(= ##NaN ##NaN)").unwrap(), "true");
+        assert_eq!(runtime.eval_text("'#demo [1 2]").unwrap(), "#demo[1 2]");
+    }
+
+    #[test]
     fn strings_and_maps_are_values() {
         let mut runtime = Runtime::new();
         assert_eq!(runtime.eval_text("\"hello\"").unwrap(), "\"hello\"");

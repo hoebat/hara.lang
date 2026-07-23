@@ -26,6 +26,12 @@ pub struct ExtensionValue {
 #[derive(Debug, Clone)]
 pub enum Value {
     Number(i64),
+    Float(f64),
+    BigInteger(String),
+    Decimal(String),
+    Character(char),
+    Regex(String),
+    Tagged(String, Box<Value>),
     Bool(bool),
     String(String),
     Keyword(Keyword),
@@ -376,6 +382,12 @@ impl PartialEq for Value {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Value::Number(a), Value::Number(b)) => a == b,
+            (Value::Float(a), Value::Float(b)) => a.to_bits() == b.to_bits(),
+            (Value::BigInteger(a), Value::BigInteger(b)) => a == b,
+            (Value::Decimal(a), Value::Decimal(b)) => a == b,
+            (Value::Character(a), Value::Character(b)) => a == b,
+            (Value::Regex(a), Value::Regex(b)) => a == b,
+            (Value::Tagged(at, av), Value::Tagged(bt, bv)) => at == bt && av == bv,
             (Value::Bool(a), Value::Bool(b)) => a == b,
             (Value::String(a), Value::String(b)) => a == b,
             (Value::Keyword(a), Value::Keyword(b)) => a == b,
@@ -411,6 +423,22 @@ impl Value {
     pub fn display(&self) -> String {
         match self {
             Self::Number(v) => v.to_string(),
+            Self::Float(v) if v.is_nan() => "##NaN".into(),
+            Self::Float(v) if *v == f64::INFINITY => "##Inf".into(),
+            Self::Float(v) if *v == f64::NEG_INFINITY => "##-Inf".into(),
+            Self::Float(v) => v.to_string(),
+            Self::BigInteger(v) => format!("{v}N"),
+            Self::Decimal(v) => format!("{v}M"),
+            Self::Character('\n') => "\\newline".into(),
+            Self::Character(' ') => "\\space".into(),
+            Self::Character('\t') => "\\tab".into(),
+            Self::Character('\u{0008}') => "\\backspace".into(),
+            Self::Character('\u{000c}') => "\\formfeed".into(),
+            Self::Character('\r') => "\\return".into(),
+            Self::Character(v) if v.is_control() => format!("\\u{:04X}", *v as u32),
+            Self::Character(v) => format!("\\{v}"),
+            Self::Regex(v) => format!("#\"{}\"", v.replace('"', "\\\"")),
+            Self::Tagged(tag, value) => format!("#{tag}{}", value.display()),
             Self::Bool(v) => v.to_string(),
             Self::String(v) => format!("\"{v}\""),
             Self::Keyword(v) => format!(":{}", v.as_str()),
@@ -512,9 +540,44 @@ impl Value {
     /// Stable structural hash used by protocol and collection conformance tests.
     pub fn stable_hash(&self) -> u64 {
         fn hash_value(value: &Value, state: &mut std::collections::hash_map::DefaultHasher) {
-            std::mem::discriminant(value).hash(state);
+            let type_tag: u64 = match value {
+                Value::Number(_) => 0,
+                Value::Bool(_) => 1,
+                Value::String(_) => 2,
+                Value::Keyword(_) => 3,
+                Value::Bytes(_) => 4,
+                Value::ByteBuffer(_) => 5,
+                Value::Array(_) => 6,
+                Value::Object(_) => 7,
+                Value::Promise(_) => 8,
+                Value::Recur(_) => 9,
+                Value::Map(_) => 10,
+                Value::Set(_) => 11,
+                Value::List(_) => 12,
+                Value::Symbol(_) => 13,
+                Value::Function(_) => 14,
+                Value::Vector(_) => 15,
+                Value::Iterator(_) => 16,
+                Value::Var(_) => 17,
+                Value::Extension(_) => 18,
+                Value::Nil => 19,
+                Value::Float(_) => 20,
+                Value::BigInteger(_) => 21,
+                Value::Decimal(_) => 22,
+                Value::Character(_) => 23,
+                Value::Regex(_) => 24,
+                Value::Tagged(_, _) => 25,
+            };
+            type_tag.hash(state);
             match value {
                 Value::Number(v) => v.hash(state),
+                Value::Float(v) => v.to_bits().hash(state),
+                Value::BigInteger(v) | Value::Decimal(v) | Value::Regex(v) => v.hash(state),
+                Value::Character(v) => v.hash(state),
+                Value::Tagged(tag, value) => {
+                    tag.hash(state);
+                    hash_value(value, state);
+                }
                 Value::Bool(v) => v.hash(state),
                 Value::String(v) => v.hash(state),
                 Value::Keyword(v) => v.hash(state),
@@ -1173,7 +1236,10 @@ impl SocketProvider for UnsupportedSocketProvider {
 pub fn receiver_category(value: &Value) -> &'static str {
     match value {
         Value::Nil => "nil",
-        Value::Number(_) => "number",
+        Value::Number(_) | Value::Float(_) | Value::BigInteger(_) | Value::Decimal(_) => "number",
+        Value::Character(_) => "character",
+        Value::Regex(_) => "pattern",
+        Value::Tagged(_, _) => "tagged",
         Value::Bool(_) => "boolean",
         Value::String(_) => "string",
         Value::Keyword(_) => "keyword",
@@ -2966,12 +3032,12 @@ fn literal_value(form: &Form) -> Result<Value, String> {
     match form {
         Form::Nil => Ok(Value::Nil),
         Form::Bool(value) => Ok(Value::Bool(*value)),
-        Form::Character(value) => Ok(Value::String(value.to_string())),
-        Form::Float(_)
-        | Form::BigInteger(_)
-        | Form::Decimal(_)
-        | Form::Regex(_)
-        | Form::Tagged(_, _) => Err("reader literal is not supported by the L0 evaluator".into()),
+        Form::Character(value) => Ok(Value::Character(*value)),
+        Form::Float(value) => Ok(Value::Float(*value)),
+        Form::BigInteger(value) => Ok(Value::BigInteger(value.clone())),
+        Form::Decimal(value) => Ok(Value::Decimal(value.clone())),
+        Form::Regex(value) => Ok(Value::Regex(value.clone())),
+        Form::Tagged(tag, value) => Ok(Value::Tagged(tag.clone(), Box::new(literal_value(value)?))),
         Form::Metadata(metadata, value) => {
             attach_metadata(literal_value(value)?, metadata_from_form(metadata)?)
         }
@@ -3153,12 +3219,12 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
         Form::Keyword(v) => Ok(Value::Keyword(v.clone().into())),
         Form::Nil => Ok(Value::Nil),
         Form::Bool(value) => Ok(Value::Bool(*value)),
-        Form::Character(value) => Ok(Value::String(value.to_string())),
-        Form::Float(_)
-        | Form::BigInteger(_)
-        | Form::Decimal(_)
-        | Form::Regex(_)
-        | Form::Tagged(_, _) => Err("reader literal is not supported by the L0 evaluator".into()),
+        Form::Character(value) => Ok(Value::Character(*value)),
+        Form::Float(value) => Ok(Value::Float(*value)),
+        Form::BigInteger(value) => Ok(Value::BigInteger(value.clone())),
+        Form::Decimal(value) => Ok(Value::Decimal(value.clone())),
+        Form::Regex(value) => Ok(Value::Regex(value.clone())),
+        Form::Tagged(tag, value) => Ok(Value::Tagged(tag.clone(), Box::new(literal_value(value)?))),
         Form::Metadata(_, value) => eval(value, env),
         Form::List(fs)
             if fs.len() == 2 && matches!(&fs[0], Form::Symbol(name) if name == "quote") =>
