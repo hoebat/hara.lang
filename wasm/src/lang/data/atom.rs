@@ -1,7 +1,7 @@
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
-use crate::lang::protocol::{IDeref, IDisplay};
+use crate::lang::protocol::{IDeref, IDisplay, IReset, IValidate, IWatch};
 
 type Validator<V> = Arc<dyn Fn(&V) -> bool + Send + Sync>;
 type Watch<V> = Arc<dyn Fn(&WatchEntry<V>) + Send + Sync>;
@@ -52,7 +52,7 @@ impl<V> Atom<V> {
             .expect("atom watches")
             .retain(|(candidate, _)| candidate != key);
     }
-    fn validate(&self, value: &V) -> bool {
+    fn accepts(&self, value: &V) -> bool {
         self.validator
             .as_ref()
             .is_none_or(|validator| validator(value))
@@ -63,7 +63,7 @@ impl<V: Clone> Atom<V> {
         self.state.lock().expect("atom state").clone()
     }
     pub fn reset(&self, new_value: V) -> Result<V, String> {
-        if !self.validate(&new_value) {
+        if !self.accepts(&new_value) {
             return Err("atom validator rejected value".into());
         }
         let old_value = {
@@ -78,7 +78,7 @@ impl<V: Clone> Atom<V> {
             let mut state = self.state.lock().expect("atom state");
             let old = state.clone();
             let new = f(&old);
-            if !self.validate(&new) {
+            if !self.accepts(&new) {
                 return Err("atom validator rejected value".into());
             }
             *state = new.clone();
@@ -99,7 +99,7 @@ impl<V: Clone> Atom<V> {
 }
 impl<V: Clone + PartialEq> Atom<V> {
     pub fn compare_and_set(&self, old: &V, new: V) -> Result<bool, String> {
-        if !self.validate(&new) {
+        if !self.accepts(&new) {
             return Ok(false);
         }
         let prior = {
@@ -121,6 +121,38 @@ impl<V: Clone> IDeref for Atom<V> {
         self.deref_value()
     }
 }
+impl<V> IValidate<V> for Atom<V> {
+    type Error = String;
+
+    fn validate(&self, value: &V) -> Result<(), Self::Error> {
+        self.accepts(value)
+            .then_some(())
+            .ok_or_else(|| "atom validator rejected value".into())
+    }
+}
+impl<V: Clone> IReset<V> for Atom<V> {
+    type Error = String;
+
+    fn reset(&self, value: V) -> Result<V, Self::Error> {
+        Atom::reset(self, value)
+    }
+}
+impl<V: Clone> IWatch<V> for Atom<V> {
+    type Key = String;
+    type WatchEntry = WatchEntry<V>;
+
+    fn add_watch(&self, key: Self::Key, watch: impl Fn(&Self::WatchEntry) + Send + Sync + 'static) {
+        Atom::add_watch(self, key, watch);
+    }
+
+    fn remove_watch(&self, key: &Self::Key) {
+        Atom::remove_watch(self, key);
+    }
+
+    fn notify_watches(&self, old_value: V, new_value: V) {
+        self.notify(old_value, new_value);
+    }
+}
 impl<V: fmt::Display + Clone> IDisplay for Atom<V> {
     fn display(&self) -> String {
         format!("#atom <{}>", self.deref_value())
@@ -140,6 +172,7 @@ impl<V> fmt::Debug for Atom<V> {
 #[cfg(test)]
 mod tests {
     use super::Atom;
+    use crate::lang::protocol::{IReset, IValidate, IWatch};
     use std::sync::{Arc, Mutex};
     #[test]
     fn validates_swaps_and_notifies() {
@@ -155,5 +188,10 @@ mod tests {
         assert_eq!(atom.swap(|v| v + 2).unwrap(), 3);
         assert!(atom.reset(-1).is_err());
         assert_eq!(&*seen.lock().unwrap(), &[(1, 3)]);
+        assert!(IValidate::validate(&atom, &4).is_ok());
+        assert_eq!(IReset::reset(&atom, 4).unwrap(), 4);
+        IWatch::remove_watch(&atom, &"test".to_string());
+        IWatch::notify_watches(&atom, 4, 5);
+        assert_eq!(seen.lock().unwrap().len(), 2);
     }
 }

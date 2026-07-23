@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 
-use crate::lang::protocol::{IDisplay, IMetadata, INamespaced};
+use crate::lang::protocol::{IDisplay, IMetadata, INamespaced, IObjType, ObjType};
 
 thread_local! {
     static INTERNED: RefCell<HashMap<String, Weak<Data>>> = RefCell::new(HashMap::new());
@@ -89,6 +89,11 @@ impl IDisplay for Symbol {
         self.data.full.clone()
     }
 }
+impl IObjType for Symbol {
+    fn obj_type(&self) -> ObjType {
+        ObjType::Symbol
+    }
+}
 impl PartialEq for Symbol {
     fn eq(&self, other: &Self) -> bool {
         self.data.full == other.data.full
@@ -120,7 +125,7 @@ impl std::fmt::Display for Symbol {
 #[cfg(test)]
 mod tests {
     use super::Symbol;
-    use crate::lang::protocol::{IDisplay, IMetadata, INamespaced};
+    use crate::lang::protocol::{IDisplay, IMetadata, INamespaced, IObjType, ObjType};
     use std::rc::Rc;
 
     #[test]
@@ -131,6 +136,8 @@ mod tests {
         assert_eq!(first.get_namespace(), Some("hara"));
         assert_eq!(first.get_name(), "name");
         assert_eq!(first.display(), "hara/name");
+        assert_eq!(first.obj_type(), ObjType::Symbol);
+        assert_eq!(first.hash_seed(), "::SYMBOL");
         assert_eq!(Symbol::parse("/").get_namespace(), None);
 
         let documented = first.with_meta(Some(Rc::from("doc")));

@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 
-use crate::lang::protocol::{IDisplay, ILookup, IMetadata, INamespaced};
+use crate::lang::protocol::{IDisplay, ILookup, IMetadata, INamespaced, IObjType, ObjType};
 
 thread_local! {
     static INTERNED: RefCell<HashMap<String, Weak<Data>>> = RefCell::new(HashMap::new());
@@ -105,6 +105,11 @@ impl IDisplay for Keyword {
         format!(":{}", self.0.full)
     }
 }
+impl IObjType for Keyword {
+    fn obj_type(&self) -> ObjType {
+        ObjType::Keyword
+    }
+}
 impl PartialEq for Keyword {
     fn eq(&self, other: &Self) -> bool {
         self.0.full == other.0.full
@@ -148,7 +153,7 @@ mod tests {
     use super::Keyword;
     use crate::lang::data::Map;
     use crate::lang::protocol::IAssoc;
-    use crate::lang::protocol::{IDisplay, IMetadata, INamespaced};
+    use crate::lang::protocol::{IDisplay, IMetadata, INamespaced, IObjType, ObjType};
     use std::rc::Rc;
 
     #[test]
@@ -159,6 +164,8 @@ mod tests {
         assert_eq!(first.get_namespace(), Some("hara"));
         assert_eq!(first.get_name(), "name");
         assert_eq!(first.display(), ":hara/name");
+        assert_eq!(first.obj_type(), ObjType::Keyword);
+        assert_eq!(first.hash_seed(), "::KEYWORD");
         for invalid in ["", "/", "/name", "name/", "a/b/c"] {
             assert!(Keyword::parse(invalid).is_err());
         }

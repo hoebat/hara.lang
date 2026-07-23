@@ -1,5 +1,5 @@
 use crate::lang::data::Symbol;
-use crate::lang::protocol::{IDisplay, IMetadata, INamespaced};
+use crate::lang::protocol::{IDisplay, IMetadata, INamespaced, IObjType, ObjType};
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
@@ -36,6 +36,11 @@ impl IMetadata for Pointer {
 impl IDisplay for Pointer {
     fn display(&self) -> String {
         format!("#'{}", self.path())
+    }
+}
+impl IObjType for Pointer {
+    fn obj_type(&self) -> ObjType {
+        ObjType::Pointer
     }
 }
 impl Hash for Pointer {

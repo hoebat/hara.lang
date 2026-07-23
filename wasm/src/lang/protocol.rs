@@ -36,6 +36,8 @@ pub mod mutable;
 pub mod namespaced;
 #[path = "protocol/nth.rs"]
 pub mod nth;
+#[path = "protocol/obj_type.rs"]
+pub mod obj_type;
 #[path = "protocol/pair.rs"]
 pub mod pair;
 #[path = "protocol/peek_first.rs"]
@@ -66,6 +68,8 @@ pub mod to_mutable;
 pub mod to_persistent;
 #[path = "protocol/validate.rs"]
 pub mod validate;
+#[path = "protocol/watch.rs"]
+pub mod watch;
 
 pub use assoc::IAssoc;
 pub use coll::IColl;
@@ -78,7 +82,7 @@ pub use dissoc::IDissoc;
 pub use empty::IEmpty;
 pub use equality::IEquality;
 pub use find::IFind;
-pub use hash::IHash;
+pub use hash::{HashType, IHash, IHashCached};
 pub use indexed::IIndexed;
 pub use indexed_kv::IIndexedKV;
 pub use lookup::ILookup;
@@ -86,6 +90,7 @@ pub use metadata::IMetadata;
 pub use mutable::IMutable;
 pub use namespaced::INamespaced;
 pub use nth::INth;
+pub use obj_type::{IObjType, ObjType};
 pub use pair::IPair;
 pub use peek_first::IPeekFirst;
 pub use peek_last::IPeekLast;
@@ -101,6 +106,7 @@ pub use reset::IReset;
 pub use to_mutable::IToMutable;
 pub use to_persistent::IToPersistent;
 pub use validate::IValidate;
+pub use watch::IWatch;
 
 #[cfg(test)]
 mod tests {
