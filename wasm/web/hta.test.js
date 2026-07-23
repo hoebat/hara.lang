@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { decodeHta, encodeHta, HtaContext, HtaHandle, HtaKeyword, loadHtaExtension, parseHtaManifest } from "./hta.js";
+import { BrowserPromiseProvider, decodeHta, encodeHta, HtaContext, HtaHandle, HtaKeyword, loadHtaExtension, parseHtaManifest } from "./hta.js";
 
 const tensorDescriptor='{:namespace "math.tensor" :version "1" :provider :wasm :module "tensor.wasm" :abi :hta-v1 :exports {"open" {:args [] :returns :value :async true}} :handles {"tensor" {:tag math}} :capabilities []}';
 
@@ -13,6 +13,36 @@ test("descriptor loader resolves wasm and applies handle tags",async()=>{const w
 test("descriptor loader fetches EDN when given its URL",async()=>{const worker=new FakeWorker(),descriptorUrl=`data:text/plain,${encodeURIComponent(tensorDescriptor)}`;const context=await loadHtaExtension({worker,descriptorUrl,moduleBytes:new Uint8Array()});assert.deepEqual(context.manifest.handleTags,{tensor:"math"});assert.ok(worker.sent[0].moduleBytes instanceof Uint8Array);context.close();});
 test("context releases bound handles once and rejects later use",async()=>{const worker=new FakeWorker();const context=new HtaContext({worker,moduleUrl:"runtime.wasm"});worker.emit({type:"ready"});const result=context.call("open",[]);await Promise.resolve();const call=worker.sent.find(message=>message.type==="call");worker.emit({type:"result",id:call.id,ok:true,frame:encodeHta(new HtaHandle("runtime","cursor",42n))});const handle=await result;handle.release();handle.release();const releases=worker.sent.filter(message=>message.type==="release");assert.equal(releases.length,1);const released=decodeHta(releases[0].frame);assert.equal(released.id,42n);await assert.rejects(context.call("use",[handle]),/hta\/handle-released/);context.close();});
 test("context exposes worker results as promises",async()=>{const worker=new FakeWorker();const context=new HtaContext({worker,moduleUrl:"runtime.wasm"});worker.emit({type:"ready"});const result=context.call("eval",["(+ 1 2)"]);await Promise.resolve();const call=worker.sent.find(message=>message.type==="call");worker.emit({type:"result",id:call.id,ok:true,frame:encodeHta(3)});assert.equal(await result,3);context.close();});
-test("context cancellation is forwarded to its worker",async()=>{const worker=new FakeWorker();const context=new HtaContext({worker,moduleUrl:"runtime.wasm"});worker.emit({type:"ready"});const result=context.call("eval",["slow"]);result.cancel();await Promise.resolve();await Promise.resolve();assert.equal(worker.sent.at(-1).type,"cancel");context.close();});
+test("context cancellation is forwarded to its worker",async()=>{const worker=new FakeWorker();const context=new HtaContext({worker,moduleUrl:"runtime.wasm"});worker.emit({type:"ready"});const result=context.call("eval",["slow"]);const rejection=assert.rejects(result,/cancelled/);result.cancel();await Promise.resolve();await Promise.resolve();assert.equal(worker.sent.at(-1).type,"cancel");await rejection;context.close();});
 
 class FakeWorker{constructor(){this.listeners={};this.sent=[];}addEventListener(type,handler){this.listeners[type]=handler;}postMessage(message){this.sent.push(message);}emit(data){this.listeners.message({data});}terminate(){this.terminated=true;}}
+
+test("browser promise provider uses native microtasks and ordered chaining",async()=>{
+  const provider=new BrowserPromiseProvider(),events=[];
+  const source=provider.run(()=>{events.push("run");return 20;});
+  provider.then(source,value=>{events.push("first");return value+1;});
+  const result=provider.then(source,value=>{events.push("second");return provider.run(()=>value*2);});
+  events.push("sync");
+  assert.equal(await result,40);
+  assert.deepEqual(events,["sync","run","first","second"]);
+});
+
+test("browser promise provider adopts, recovers, finalizes, orders all, and settles once",async()=>{
+  const provider=new BrowserPromiseProvider(),events=[];
+  const adopted=provider.run(()=>provider.run(()=>7));
+  const recovered=provider.catch(provider.run(()=>{throw new Error("broken");}),error=>error.message);
+  const finalized=provider.finally(adopted,()=>{events.push("finally");});
+  assert.deepEqual(await provider.all([recovered,finalized,3]),["broken",7,3]);
+  assert.deepEqual(events,["finally"]);
+  let resolveSource,rejectSource;
+  const once=provider.create((resolve,reject)=>{resolveSource=resolve;rejectSource=reject;});
+  assert.equal(resolveSource(1),true);assert.equal(rejectSource(new Error("late")),false);assert.equal(await once,1);
+});
+
+test("browser promise provider cancellation prevents deferred work",async()=>{
+  const scheduled=[];
+  const provider=new BrowserPromiseProvider({schedule:(task)=>{scheduled.push(task);return 0;},cancelSchedule:()=>scheduled.splice(0),enqueue:queueMicrotask});
+  let ran=false;const delayed=provider.delay(10,()=>{ran=true;return 1;});
+  assert.equal(delayed.cancel(),true);assert.equal(delayed.cancel(),false);
+  await assert.rejects(delayed,/cancelled/);assert.equal(ran,false);assert.equal(scheduled.length,0);
+});

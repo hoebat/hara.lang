@@ -7,6 +7,42 @@ export class HtaKeyword { constructor(name) { this.name = name; } }
 export class HtaSymbol { constructor(name) { this.name = name; } }
 export class HtaHandle { constructor(owner,type,id,context=null,displayTag="ht",displayKind="handle"){this.owner=owner;this.type=type;this.id=BigInt(id);this.context=context;this.displayTag=displayTag;this.displayKind=displayKind;this.released=false;} release(){if(this.released)return;this.released=true;if(this.context)this.context.releaseHandle(this);} toString(){return `#${this.displayTag}[:${this.displayKind} ${this.id}]`;} }
 
+/** Browser host adapter for the portable Hara promise-provider contract. */
+export class BrowserPromiseProvider {
+  constructor(options={}) {
+    this.enqueue=options.enqueue ?? (task=>queueMicrotask(task));
+    this.schedule=options.schedule ?? ((task,milliseconds)=>setTimeout(task,milliseconds));
+    this.cancelSchedule=options.cancelSchedule ?? (timer=>clearTimeout(timer));
+  }
+  create(executor) {
+    let settled=false,rejectPromise=()=>{},cancelAction=()=>{};
+    const promise=new Promise((resolve,reject)=>{
+      rejectPromise=reject;
+      const settle=(callback)=>(value)=>{if(settled)return false;settled=true;callback(value);return true;};
+      const onCancel=(action)=>{cancelAction=typeof action==="function"?action:()=>{};};
+      try{executor(settle(resolve),settle(reject),onCancel);}catch(error){settle(reject)(error);}
+    });
+    promise.cancel=()=>{if(settled)return false;cancelAction();settled=true;rejectPromise(new Error("cancelled"));return true;};
+    return promise;
+  }
+  run(task) {
+    return this.create((resolve,reject,onCancel)=>{
+      let cancelled=false;onCancel(()=>{cancelled=true;});
+      this.enqueue(()=>{if(cancelled)return;try{resolve(task());}catch(error){reject(error);}});
+    });
+  }
+  delay(milliseconds,task) {
+    return this.create((resolve,reject,onCancel)=>{
+      const timer=this.schedule(()=>{try{resolve(task());}catch(error){reject(error);}},milliseconds);
+      onCancel(()=>this.cancelSchedule(timer));
+    });
+  }
+  all(values) { return this.create((resolve,reject)=>Promise.all(values).then(resolve,reject)); }
+  then(source,callback) { return this.create((resolve,reject)=>Promise.resolve(source).then(callback).then(resolve,reject)); }
+  catch(source,callback) { return this.create((resolve,reject)=>Promise.resolve(source).catch(callback).then(resolve,reject)); }
+  finally(source,callback) { return this.create((resolve,reject)=>Promise.resolve(source).finally(callback).then(resolve,reject)); }
+}
+
 export function encodeHta(value) {
   const output = [...MAGIC];
   writeValue(output, value);
@@ -125,16 +161,18 @@ class Reader {
 }
 
 export class HtaContext {
-  constructor({ worker, moduleUrl, moduleBytes, hostCalls = {}, handleTags = {} }) {
-    this.worker=worker;this.hostCalls=hostCalls;this.handleTags=handleTags;this.next=1;this.pending=new Map();
+  constructor({ worker, moduleUrl, moduleBytes, hostCalls = {}, handleTags = {}, promiseProvider = new BrowserPromiseProvider() }) {
+    this.worker=worker;this.hostCalls=hostCalls;this.handleTags=handleTags;this.promiseProvider=promiseProvider;this.next=1;this.pending=new Map();
     this.ready=new Promise((resolve,reject)=>{this.readyResolve=resolve;this.readyReject=reject;});
     worker.addEventListener("message", event=>this.message(event.data));
     worker.addEventListener("error", error=>this.fail(error));
     worker.postMessage({type:"init",moduleUrl,moduleBytes});
   }
   call(target, args=[]) { let id=null,cancelled=false;
-    const promise=new Promise((resolve,reject)=>{this.ready.then(()=>{validateHandles(args,this);id=this.next++;this.pending.set(id,{resolve,reject});this.worker.postMessage({type:"call",id,frame:encodeHta([target,args])});if(cancelled)this.worker.postMessage({type:"cancel",id});}).catch(reject);});
-    promise.cancel=()=>{cancelled=true;if(id!==null)this.worker.postMessage({type:"cancel",id});};return promise;
+    return this.promiseProvider.create((resolve,reject,onCancel)=>{
+      onCancel(()=>{cancelled=true;if(id!==null)this.worker.postMessage({type:"cancel",id});});
+      this.ready.then(()=>{validateHandles(args,this);id=this.next++;this.pending.set(id,{resolve,reject});this.worker.postMessage({type:"call",id,frame:encodeHta([target,args])});if(cancelled)this.worker.postMessage({type:"cancel",id});}).catch(reject);
+    });
   }
   releaseHandle(handle){if(handle.context!==this)throw new Error("hta/handle-owner-mismatch");const wireHandle=new HtaHandle(handle.owner,handle.type,handle.id);this.worker.postMessage({type:"release",frame:encodeHta(wireHandle)});}
   async message(message) {
