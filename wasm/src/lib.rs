@@ -544,6 +544,8 @@ mod tests {
     fn def_binds_values_in_the_current_environment() {
         let mut runtime = Runtime::new();
         assert_eq!(runtime.eval_text("(do (def answer 41) (+ answer 1))").unwrap(), "42");
+        assert_eq!(runtime.eval_text("(do (def answer 42) (deref (var answer)))").unwrap(), "42");
+        assert!(runtime.eval_text("(deref 42)").unwrap_err().contains("deref expects a var"));
         assert_eq!(runtime.eval_text("(do (def answer 1) (def answer 42) answer)").unwrap(), "42");
         assert!(runtime.eval_text("(def 1 2)").unwrap_err().contains("def name must be a symbol"));
     }

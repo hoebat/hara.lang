@@ -31,6 +31,7 @@ pub enum Value {
     Function(Rc<Function>),
     Vector(Vec<Value>),
     Iterator(Rc<RefCell<IteratorState>>),
+    Var(Rc<RefCell<Value>>),
     Nil,
 }
 
@@ -103,6 +104,7 @@ impl PartialEq for Value {
             (Value::Function(a), Value::Function(b)) => Rc::ptr_eq(a, b),
             (Value::Vector(a), Value::Vector(b)) => a == b,
             (Value::Iterator(a), Value::Iterator(b)) => Rc::ptr_eq(a, b),
+            (Value::Var(a), Value::Var(b)) => Rc::ptr_eq(a, b),
             (Value::Nil, Value::Nil) => true,
             _ => false,
         }
@@ -128,6 +130,7 @@ impl Value {
             Self::Function(_) => "<fn>".into(),
             Self::Vector(values) => format!("[{}]", values.iter().map(Value::display).collect::<Vec<_>>().join(" ")),
             Self::Iterator(_) => "<iterator>".into(),
+            Self::Var(_) => "<var>".into(),
             Self::Nil => "nil".into(),
         }
     }
@@ -466,6 +469,7 @@ pub fn receiver_category(value: &Value) -> &'static str {
         Value::Vector(_) => "vector",
         Value::Map(_) => "map",
         Value::Iterator(_) => "iterator",
+        Value::Var(_) => "var",
     }
 }
 
@@ -968,6 +972,14 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 if fs.len() < 3 { return Err("fn expects parameters and a body".into()); }
                 let (params, variadic) = function_parts(&fs[1])?;
                 Ok(Value::Function(Rc::new(Function { params, variadic, body: fs[2..].to_vec(), captured: Rc::new(RefCell::new(env.clone())) })))
+            }
+            Form::Symbol(n) if n == "var" => {
+                if fs.len()!=2 { return Err("var expects a symbol".into()); }
+                let name=match &fs[1] { Form::Symbol(name)=>name, _=>return Err("var expects a symbol".into()) }; let value=env.get(name).cloned().ok_or_else(|| format!("unbound symbol: {name}"))?; Ok(Value::Var(Rc::new(RefCell::new(value))))
+            }
+            Form::Symbol(n) if n == "deref" => {
+                if fs.len()!=2 { return Err("deref expects a var".into()); }
+                match eval(&fs[1], env)? { Value::Var(value)=>Ok(value.borrow().clone()), _=>Err("deref expects a var".into()) }
             }
             Form::Symbol(n) if n == "def" => {
                 if fs.len()!=3 { return Err("def expects a name and value".into()); }
