@@ -163,4 +163,48 @@ public class CollectionProtocolConformanceTest {
     assertTrue(sameMutable == mutable);
     assertEquals(2L, lookup.invoke("lookup", mutable, new Object[] {"b"}));
   }
+
+
+  public void emptyPreservesEverySupportedCollectionFamily() {
+    HaraProtocol empty = new HaraProtocol("IEmpty", java.util.Map.of("empty", 1));
+    HaraJavaAdapters.installEmpty(empty);
+    HaraProtocol count = new HaraProtocol("ICount", java.util.Map.of("count", 1));
+    HaraJavaAdapters.installCount(count);
+
+    Object[] persistent = {
+      Map.Standard.from(null, "a", 1),
+      OrderedMap.Standard.from(null, "a", 1),
+      SortedMap.Standard.from(null, "a", 1),
+      Set.Standard.from(null, "a"),
+      OrderedSet.Standard.from(null, "a"),
+      SortedSet.Standard.from(null, "a"),
+      Vector.Standard.from(null, "a"),
+      List.Standard.from(null, "a"),
+      Queue.Standard.from(null, "a"),
+      new Tuple.Tup1.L<>(null, "a")
+    };
+    for (Object receiver : persistent) {
+      Object result = empty.invoke("empty", receiver, new Object[0]);
+      assertEquals(receiver.getClass(), result.getClass());
+      assertEquals(0L, count.invoke("count", result, new Object[0]));
+      assertEquals(1L, count.invoke("count", receiver, new Object[0]));
+    }
+
+    Object[] mutable = {
+      Map.Mutable.from(null, "a", 1),
+      OrderedMap.Mutable.from(null, "a", 1),
+      SortedMap.Mutable.from(null, "a", 1),
+      Set.Mutable.from(null, "a"),
+      OrderedSet.Mutable.from(null, "a"),
+      SortedSet.Mutable.from(null, "a"),
+      Vector.Mutable.from(null, "a"),
+      List.Mutable.from(null, "a"),
+      Queue.Mutable.from(null, "a")
+    };
+    for (Object receiver : mutable) {
+      Object result = empty.invoke("empty", receiver, new Object[0]);
+      assertTrue(result == receiver);
+      assertEquals(0L, count.invoke("count", receiver, new Object[0]));
+    }
+  }
 }
