@@ -1,5 +1,25 @@
 # Rust and WASM runtime mapping
 
+## Native Rust CLI
+
+The shared Rust runtime can also be built as a native command-line executable. It uses the same evaluator, protocols, persistent data structures, and provider traits as the browser/WASM build; only the host adapters differ.
+
+```text
+$ cargo run --manifest-path wasm/Cargo.toml --bin hara -- eval '(+ 19 23)'
+42
+
+$ cargo run --manifest-path wasm/Cargo.toml --bin hara -- --file program.hara
+```
+
+With no `eval` or `--file` argument, the executable reads forms from standard input as a small REPL. Native filesystem and socket capabilities are opt-in:
+
+```text
+$ hara --root ./sandbox --native-sockets
+```
+
+The native binary is intended for CLI and server use. The WASM build remains the browser/runtime-embedding target, while both targets share the Rust core so protocol and evaluator behavior can be tested for parity.
+
+
 This document maps the tested Truffle Hara L0 contract to a Rust implementation. It is a
 portability design, not a second language specification: observable behavior comes from
 `l0-language.md`, `runtime-libraries.md`, and `l0-conformance.edn`.
