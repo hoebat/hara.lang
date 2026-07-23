@@ -603,6 +603,15 @@ mod tests {
     }
 
     #[test]
+    fn function_combinators_capture_values_and_functions() {
+        let mut runtime = Runtime::new();
+        assert_eq!(runtime.eval_text("((constantly 42) 1 2 3)").unwrap(), "42");
+        assert_eq!(runtime.eval_text("((complement (fn [x] (> x 2))) 1)").unwrap(), "true");
+        assert_eq!(runtime.eval_text("((comp2 (fn [x] (+ x 1)) (fn [x] (* x 2))) 20)").unwrap(), "41");
+        assert_eq!(runtime.eval_text("((comp3 (fn [x] (+ x 1)) (fn [x] (+ x 1)) (fn [x] (+ x 1))) 39)").unwrap(), "42");
+    }
+
+    #[test]
     fn nested_associative_helpers_match_l0_shapes() {
         let mut runtime = Runtime::new();
         assert_eq!(runtime.eval_text("(get-in {:a {:b 42}} [:a :b])").unwrap(), "42");

@@ -863,6 +863,11 @@ fn literal_value(form: &Form) -> Result<Value, String> {
     }
 }
 
+fn generated_function(params: Vec<String>, body: Vec<Form>, mut captured: HashMap<String, Value>, bindings: Vec<(&str, Value)>) -> Value {
+    for (name, value) in bindings { captured.insert(name.to_string(), value); }
+    Value::Function(Rc::new(Function { params, variadic: None, body, captured: Rc::new(RefCell::new(captured)) }))
+}
+
 fn function_parts(form: &Form) -> Result<(Vec<String>, Option<String>), String> {
     let list = match form { Form::Vector(values) => values, _ => return Err("function parameters must be a vector".into()) };
     let mut params = Vec::new(); let mut variadic = None; let mut index = 0;
@@ -1145,6 +1150,22 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     if n!="every?" && result.truthy() { found=Some(if n=="some" { result } else { Value::Bool(true) }); break; }
                 }
                 Ok(match n.as_str() { "every?" => Value::Bool(true), "any?" => Value::Bool(found.is_some()), "some" => found.unwrap_or(Value::Nil), _ => Value::Nil })
+            }
+            Form::Symbol(n) if n == "constantly" => {
+                if fs.len()!=2 { return Err("constantly expects one value".into()); }
+                let value=eval(&fs[1], env)?; let mut captured=env.clone(); captured.insert("__constant".into(), value); Ok(Value::Function(Rc::new(Function { params: vec!["ignored".into()], variadic: Some("_rest".into()), body: vec![Form::Symbol("__constant".into())], captured: Rc::new(RefCell::new(captured)) })))
+            }
+            Form::Symbol(n) if n == "complement" => {
+                if fs.len()!=2 { return Err("complement expects one function".into()); }
+                let predicate=eval(&fs[1], env)?; if !matches!(predicate, Value::Function(_)) { return Err("complement expects a function".into()); }
+                Ok(generated_function(vec!["value".into()], vec![Form::List(vec![Form::Symbol("not".into()), Form::List(vec![Form::Symbol("__predicate".into()), Form::Symbol("value".into())])])], env.clone(), vec![("__predicate", predicate)]))
+            }
+            Form::Symbol(n) if n == "comp2" || n == "comp3" => {
+                let expected=if n=="comp2" { 3 } else { 4 }; if fs.len()!=expected { return Err(format!("{n} expects {} functions", expected-1)); }
+                let functions=fs[1..].iter().map(|form| eval(form, env)).collect::<Result<Vec<_>,_>>()?; if functions.iter().any(|value| !matches!(value,Value::Function(_))) { return Err(format!("{n} expects functions")); }
+                let body=if n=="comp2" { Form::List(vec![Form::Symbol("__f".into()), Form::List(vec![Form::Symbol("__g".into()), Form::Symbol("value".into())])]) } else { Form::List(vec![Form::Symbol("__f".into()), Form::List(vec![Form::Symbol("__g".into()), Form::List(vec![Form::Symbol("__h".into()), Form::Symbol("value".into())])])]) };
+                let mut bindings=vec![("__f",functions[0].clone()),("__g",functions[1].clone())]; if n=="comp3" { bindings.push(("__h",functions[2].clone())); }
+                Ok(generated_function(vec!["value".into()], vec![body], env.clone(), bindings))
             }
             Form::Symbol(n) if n == "identity" => { if fs.len()!=2 { return Err("identity expects one value".into()); } eval(&fs[1], env) }
             Form::Symbol(n) if n == "apply" => {
