@@ -9,6 +9,7 @@ pub enum Form {
     Keyword(String),
     String(String),
     Map(Vec<(Form, Form)>),
+    Set(Vec<Form>),
     Vector(Vec<Form>),
     List(Vec<Form>),
 }
@@ -26,6 +27,7 @@ pub enum Value {
     Promise(Promise),
     Recur(Vec<Value>),
     Map(Vec<(Value, Value)>),
+    Set(Vec<Value>),
     List(Vec<Value>),
     Symbol(String),
     Function(Rc<Function>),
@@ -99,6 +101,7 @@ impl PartialEq for Value {
             (Value::Promise(a), Value::Promise(b)) => Rc::ptr_eq(&a.state, &b.state),
             (Value::Recur(a), Value::Recur(b)) => a == b,
             (Value::Map(a), Value::Map(b)) => a == b,
+            (Value::Set(a), Value::Set(b)) => a.len() == b.len() && a.iter().all(|value| b.contains(value)),
             (Value::List(a), Value::List(b)) => a == b,
             (Value::Symbol(a), Value::Symbol(b)) => a == b,
             (Value::Function(a), Value::Function(b)) => Rc::ptr_eq(a, b),
@@ -125,6 +128,7 @@ impl Value {
             Self::Promise(_) => "<promise>".into(),
             Self::Recur(values) => format!("<recur {}>", values.iter().map(Value::display).collect::<Vec<_>>().join(" ")),
             Self::Map(values) => format!("{{{}}}", values.iter().map(|(k, v)| format!("{} {}", k.display(), v.display())).collect::<Vec<_>>().join(" ")),
+            Self::Set(values) => format!("#{{{}}}", values.iter().map(Value::display).collect::<Vec<_>>().join(" ")),
             Self::List(values) => format!("({})", values.iter().map(Value::display).collect::<Vec<_>>().join(" ")),
             Self::Symbol(v) => v.clone(),
             Self::Function(_) => "<fn>".into(),
@@ -498,6 +502,7 @@ pub fn receiver_category(value: &Value) -> &'static str {
         Value::List(_) => "list",
         Value::Vector(_) => "vector",
         Value::Map(_) => "map",
+        Value::Set(_) => "set",
         Value::Iterator(_) => "iterator",
         Value::Var(_) => "var",
     }
@@ -511,6 +516,7 @@ enum Token {
     VectorClose,
     MapOpen,
     MapClose,
+    SetOpen,
     Quote,
     String(String),
     Atom(String),
@@ -523,40 +529,35 @@ fn tokenize(source: &str) -> Vec<Token> {
     let mut quoted = false;
     let mut escaped = false;
     let flush = |tokens: &mut Vec<Token>, atom: &mut String| {
-        if !atom.is_empty() {
-            tokens.push(Token::Atom(std::mem::take(atom)));
-        }
+        if !atom.is_empty() { tokens.push(Token::Atom(std::mem::take(atom))); }
     };
-    for c in source.chars() {
+    let mut chars=source.chars().peekable();
+    while let Some(c)=chars.next() {
         if quoted {
             if escaped {
                 string.push(match c { 'n' => '\n', 'r' => '\r', 't' => '\t', '\\' => '\\', '"' => '"', other => other });
-                escaped = false;
-            } else if c == '\\' {
-                escaped = true;
-            } else if c == '"' {
-                tokens.push(Token::String(std::mem::take(&mut string)));
-                quoted = false;
-            } else {
-                string.push(c);
-            }
+                escaped=false;
+            } else if c=='\\' { escaped=true; }
+            else if c=='"' { tokens.push(Token::String(std::mem::take(&mut string))); quoted=false; }
+            else { string.push(c); }
             continue;
         }
         match c {
-            '\'' => { flush(&mut tokens, &mut atom); tokens.push(Token::Quote); }
-            '"' => { flush(&mut tokens, &mut atom); quoted = true; }
-            '(' => { flush(&mut tokens, &mut atom); tokens.push(Token::Open); }
-            ')' => { flush(&mut tokens, &mut atom); tokens.push(Token::Close); }
-            '[' => { flush(&mut tokens, &mut atom); tokens.push(Token::VectorOpen); }
-            ']' => { flush(&mut tokens, &mut atom); tokens.push(Token::VectorClose); }
-            '{' => { flush(&mut tokens, &mut atom); tokens.push(Token::MapOpen); }
-            '}' => { flush(&mut tokens, &mut atom); tokens.push(Token::MapClose); }
-            c if c.is_whitespace() => flush(&mut tokens, &mut atom),
+            '#' if chars.peek()==Some(&'{') => { chars.next(); flush(&mut tokens,&mut atom); tokens.push(Token::SetOpen); }
+            '\'' => { flush(&mut tokens,&mut atom); tokens.push(Token::Quote); }
+            '"' => { flush(&mut tokens,&mut atom); quoted=true; }
+            '(' => { flush(&mut tokens,&mut atom); tokens.push(Token::Open); }
+            ')' => { flush(&mut tokens,&mut atom); tokens.push(Token::Close); }
+            '[' => { flush(&mut tokens,&mut atom); tokens.push(Token::VectorOpen); }
+            ']' => { flush(&mut tokens,&mut atom); tokens.push(Token::VectorClose); }
+            '{' => { flush(&mut tokens,&mut atom); tokens.push(Token::MapOpen); }
+            '}' => { flush(&mut tokens,&mut atom); tokens.push(Token::MapClose); }
+            c if c.is_whitespace() => flush(&mut tokens,&mut atom),
             _ => atom.push(c),
         }
     }
     if quoted { tokens.push(Token::Atom("unterminated string".into())); }
-    flush(&mut tokens, &mut atom);
+    flush(&mut tokens,&mut atom);
     tokens
 }
 
@@ -578,6 +579,15 @@ fn parse_form(tokens: &[Token], cursor: &mut usize) -> Result<Form, String> {
             *cursor += 1;
             if forms.len() % 2 != 0 { return Err("map literal requires an even number of forms".into()); }
             Ok(Form::Map(forms.chunks(2).map(|pair| (pair[0].clone(), pair[1].clone())).collect()))
+        }
+        Token::SetOpen => {
+            let mut forms = Vec::new();
+            while !matches!(tokens.get(*cursor), Some(Token::MapClose)) {
+                if *cursor >= tokens.len() { return Err("unclosed set".into()); }
+                forms.push(parse_form(tokens, cursor)?);
+            }
+            *cursor += 1;
+            Ok(Form::Set(forms))
         }
         Token::Atom(v) if v.starts_with(':') => Ok(Form::Keyword(v[1..].to_string())),
         Token::Atom(v) => v
@@ -817,6 +827,7 @@ fn iterator_values(value: Value) -> Result<Vec<Value>, String> {
         Value::Array(values) => Ok(values.borrow().clone()),
         Value::Object(values) => Ok(values.borrow().iter().map(|(key, value)| Value::Vector(vec![Value::String(key.clone()), value.clone()])).collect()),
         Value::Map(entries) => Ok(entries.into_iter().map(|(key, value)| Value::Vector(vec![key, value])).collect()),
+        Value::Set(values) => Ok(values),
         Value::Iterator(iterator) => {
             let mut state = iterator.borrow_mut();
             if state.closed { return Ok(Vec::new()); }
@@ -884,6 +895,7 @@ fn iterator_close(value: &Value) -> Result<Value, String> {
 fn collection_contains(value: &Value, entry: &Value) -> Result<Value, String> {
     let result = match value {
         Value::Map(values) => values.iter().any(|(key, _)| key == entry),
+        Value::Set(values) => values.contains(entry),
         Value::Object(values) => match entry { Value::String(key) | Value::Keyword(key) => values.borrow().iter().any(|(candidate, _)| candidate == key), _ => false },
         Value::Vector(values) | Value::List(values) => values.iter().any(|candidate| candidate == entry),
         Value::String(text) => matches!(entry, Value::String(part) if text.contains(part)),
@@ -922,7 +934,7 @@ fn collection_empty(value: Value) -> Result<Value, String> {
 }
 
 fn collection_count(value: &Value) -> Result<Value, String> {
-    let count = match value { Value::Nil => 0, Value::String(v) => v.chars().count(), Value::Vector(v) => v.len(), Value::List(v) => v.len(), Value::Map(v) => v.len(), Value::Bytes(v) => v.len(), Value::ByteBuffer(v) => v.borrow().len(), Value::Array(v) => v.borrow().len(), Value::Object(v) => v.borrow().len(), Value::Iterator(v) => { let state = v.borrow(); if state.generator.is_some() { return Err("count expects a finite collection".into()); } state.values.len().saturating_sub(state.index) }, _ => return Err("count expects a collection".into()) };
+    let count = match value { Value::Nil => 0, Value::String(v) => v.chars().count(), Value::Vector(v) => v.len(), Value::List(v) => v.len(), Value::Map(v) => v.len(), Value::Set(v) => v.len(), Value::Bytes(v) => v.len(), Value::ByteBuffer(v) => v.borrow().len(), Value::Array(v) => v.borrow().len(), Value::Object(v) => v.borrow().len(), Value::Iterator(v) => { let state = v.borrow(); if state.generator.is_some() { return Err("count expects a finite collection".into()); } state.values.len().saturating_sub(state.index) }, _ => return Err("count expects a collection".into()) };
     Ok(Value::Number(count as i64))
 }
 
@@ -934,6 +946,7 @@ fn collection_get(value: &Value, key: &Value, default: Value) -> Result<Value, S
         Value::List(values) => { let index = value_index(key)?; Ok(values.get(index).cloned().unwrap_or(default)) }
         Value::String(text) => { let index = value_index(key)?; Ok(text.chars().nth(index).map(|c| Value::String(c.to_string())).unwrap_or(default)) }
         Value::Map(entries) => Ok(entries.iter().find(|(candidate, _)| candidate == key).map(|(_, value)| value.clone()).unwrap_or(default)),
+        Value::Set(values) => Ok(values.iter().find(|candidate| *candidate == key).cloned().unwrap_or(default)),
         Value::Object(entries) => { let name=match key { Value::String(name) | Value::Keyword(name) => name, _ => return Ok(default) }; Ok(entries.borrow().iter().find(|(candidate, _)| candidate==name).map(|(_, value)| value.clone()).unwrap_or(default)) }
         _ => Err("get expects a collection".into()),
     }
@@ -969,10 +982,17 @@ fn collection_assoc_in(value: Value, keys: &[Value], replacement: Value) -> Resu
     collection_assoc(&current, &keys[0], updated)
 }
 
+fn unique_values(values: Vec<Value>) -> Vec<Value> {
+    let mut unique=Vec::new();
+    for value in values { if !unique.contains(&value) { unique.push(value); } }
+    unique
+}
+
 fn literal_value(form: &Form) -> Result<Value, String> {
     match form {
         Form::Number(v) => Ok(Value::Number(*v)), Form::String(v) => Ok(Value::String(v.clone())), Form::Keyword(v) => Ok(Value::Keyword(v.clone())), Form::Symbol(v) => Ok(Value::Symbol(v.clone())),
         Form::Vector(values) => Ok(Value::Vector(values.iter().map(literal_value).collect::<Result<_, _>>()?)),
+        Form::Set(values) => Ok(Value::Set(unique_values(values.iter().map(literal_value).collect::<Result<_, _>>()?))),
         Form::List(values) => Ok(Value::List(values.iter().map(literal_value).collect::<Result<_, _>>()?)),
         Form::Map(values) => Ok(Value::Map(values.iter().map(|(k, v)| Ok((literal_value(k)?, literal_value(v)?))).collect::<Result<_, String>>()?)),
     }
@@ -1041,6 +1061,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
         Form::Keyword(v) => Ok(Value::Keyword(v.clone())),
         Form::List(fs) if fs.len() == 2 && matches!(&fs[0], Form::Symbol(name) if name == "quote") => literal_value(&fs[1]),
         Form::Map(values) => Ok(Value::Map(values.iter().map(|(key, value)| Ok((eval(key, env)?, eval(value, env)?))).collect::<Result<_, String>>()?)),
+        Form::Set(values) => Ok(Value::Set(unique_values(values.iter().map(|value| eval(value, env)).collect::<Result<_, _>>()?))),
         Form::Vector(values) => Ok(Value::Vector(values.iter().map(|value| eval(value, env)).collect::<Result<_, _>>()?)),
         Form::Symbol(n) if n == "nil" => Ok(Value::Nil),
         Form::Symbol(n) if n == "true" => Ok(Value::Bool(true)),
@@ -1174,6 +1195,9 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 let source=promise_value(&eval(&fs[1], env)?, n)?;
                 let function=match eval(&fs[2], env)? { Value::Function(function)=>function, _=>return Err(format!("{n} expects a function")) };
                 Ok(Value::Promise(promise_chain(source, n, function)))
+            }
+            Form::Symbol(n) if n == "set" => {
+                Ok(Value::Set(unique_values(fs[1..].iter().map(|form| eval(form, env)).collect::<Result<_,_>>()?)))
             }
             Form::Symbol(n) if n == "array" => {
                 let values = fs[1..].iter().map(|form| eval(form, env)).collect::<Result<Vec<_>, _>>()?;
@@ -1464,7 +1488,13 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
             Form::Symbol(n) if n == "conj" => {
                 if fs.len() != 3 { return Err("conj expects two arguments".into()); }
                 let collection = eval(&fs[1], env)?; let item = eval(&fs[2], env)?;
-                match collection { Value::Vector(mut values) => { values.push(item); Ok(Value::Vector(values)) }, Value::List(mut values) => { values.insert(0, item); Ok(Value::List(values)) }, Value::Map(_values) => { return Err("conj map entries are not implemented".into()) }, _ => Err("conj expects a vector".into()) }
+                match collection {
+                    Value::Vector(mut values) => { values.push(item); Ok(Value::Vector(values)) },
+                    Value::List(mut values) => { values.insert(0, item); Ok(Value::List(values)) },
+                    Value::Set(mut values) => { if !values.contains(&item) { values.push(item); } Ok(Value::Set(values)) },
+                    Value::Map(_values) => { return Err("conj map entries are not implemented".into()) },
+                    _ => Err("conj expects a vector, list, or set".into())
+                }
             }
             Form::Symbol(n) if n == "cons" => {
                 if fs.len() != 3 { return Err("cons expects two arguments".into()); }

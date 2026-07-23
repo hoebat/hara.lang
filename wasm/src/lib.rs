@@ -408,6 +408,18 @@ mod tests {
     }
 
     #[test]
+    fn set_literals_are_evaluated_and_deduplicated() {
+        let mut runtime = Runtime::new();
+        assert_eq!(runtime.eval_text("#{1 (+ 1 1) 1}").unwrap(), "#{1 2}");
+        assert_eq!(runtime.eval_text("(count #{1 2 2})").unwrap(), "2");
+        assert_eq!(runtime.eval_text("(contains? #{1 2} 2)").unwrap(), "true");
+        assert_eq!(runtime.eval_text("(conj #{1} 2)").unwrap(), "#{1 2}");
+        assert_eq!(runtime.eval_text("(set 1 2 1)").unwrap(), "#{1 2}");
+        assert_eq!(runtime.eval_text("(= #{1 2} #{2 1})").unwrap(), "true");
+        assert_eq!(runtime.eval_text("(get #{1 2} 2 :missing)").unwrap(), "2");
+    }
+
+    #[test]
     fn strings_and_maps_are_values() {
         let mut runtime = Runtime::new();
         assert_eq!(runtime.eval_text("\"hello\"").unwrap(), "\"hello\"");
