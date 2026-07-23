@@ -825,6 +825,24 @@ mod tests {
     }
 
     #[test]
+    fn runtime_readable_strings_escape_and_round_trip() {
+        let mut runtime = Runtime::new();
+        let sources = [
+            r#""quote: \" slash: \\ newline: \n tab: \t""#,
+            r#"{:text "line\nvalue" :nested ["a\tb" "c\\d"]}"#,
+            r#"["\u0000" "unicode λ"]"#,
+            r#"#"a\"b""#,
+        ];
+        for source in sources {
+            let readable = runtime.eval_text(source).unwrap();
+            assert_eq!(
+                kernel::parse(&readable).unwrap(),
+                kernel::parse(source).unwrap()
+            );
+        }
+    }
+
+    #[test]
     fn reader_literals_are_first_class_runtime_values() {
         let mut runtime = Runtime::new();
         let cases = [

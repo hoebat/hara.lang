@@ -19,7 +19,7 @@ pub enum Form {
     List(Vec<Form>),
 }
 
-fn display_string(value: &str) -> String {
+pub(crate) fn display_string(value: &str) -> String {
     let mut output = String::from("\"");
     for ch in value.chars() {
         match ch {
@@ -38,14 +38,15 @@ fn display_string(value: &str) -> String {
     output
 }
 
-fn display_regex(value: &str) -> String {
+pub(crate) fn display_regex(value: &str) -> String {
     let mut output = String::from("#\"");
+    let mut backslashes = 0usize;
     for ch in value.chars() {
-        if ch == '"' {
-            output.push_str("\\\"");
-        } else {
-            output.push(ch);
+        if ch == '"' && backslashes % 2 == 0 {
+            output.push('\\');
         }
+        output.push(ch);
+        backslashes = if ch == '\\' { backslashes + 1 } else { 0 };
     }
     output.push('"');
     output
@@ -105,6 +106,7 @@ impl std::fmt::Display for Form {
 
 #[cfg(test)]
 mod tests {
+    use super::Form;
     use crate::kernel::parse;
 
     #[test]
@@ -125,6 +127,11 @@ mod tests {
             "#math[:tensor 42]",
             "#\"\\d+\"",
         ];
+        for regex in [Form::Regex(r#"\""#.into()), Form::Regex(r#"\\\""#.into())] {
+            let readable = regex.to_string();
+            assert_eq!(parse(&readable).unwrap(), regex, "{readable}");
+        }
+
         for source in sources {
             let form = parse(source).unwrap();
             let readable = form.to_string();

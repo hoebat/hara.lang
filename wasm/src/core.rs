@@ -444,10 +444,10 @@ impl Value {
             Self::Character('\r') => "\\return".into(),
             Self::Character(v) if v.is_control() => format!("\\u{:04X}", *v as u32),
             Self::Character(v) => format!("\\{v}"),
-            Self::Regex(v) => format!("#\"{}\"", v.replace('"', "\\\"")),
+            Self::Regex(v) => crate::kernel::form::display_regex(v),
             Self::Tagged(tag, value) => format!("#{tag}{}", value.display()),
             Self::Bool(v) => v.to_string(),
-            Self::String(v) => format!("\"{v}\""),
+            Self::String(v) => crate::kernel::form::display_string(v),
             Self::Keyword(v) => format!(":{}", v.as_str()),
             Self::Bytes(values) => format!(
                 "#bytes[{}]",
