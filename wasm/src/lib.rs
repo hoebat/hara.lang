@@ -68,11 +68,34 @@ impl Runtime {
     }
 
     fn eval_text(&mut self, source: &str) -> Result<String, String> {
-        core::eval_text(source, &mut self.env)
+        self.refresh_qualified_bindings();
+        let result=core::eval_text(source, &mut self.env);
+        self.refresh_qualified_bindings();
+        result
+    }
+
+    fn refresh_qualified_bindings(&mut self) {
+        let qualified=self.env.keys().filter(|name| name.contains('/')).cloned().collect::<Vec<_>>();
+        for name in qualified { self.env.remove(&name); }
+        let mut bindings=Vec::new();
+        for (namespace, values) in &self.namespaces {
+            for (name, value) in values { if !name.contains('/') { bindings.push((format!("{namespace}/{name}"), value.clone())); } }
+        }
+        for (name, value) in &self.env {
+            if !name.contains('/') { bindings.push((format!("{}/{}", self.current_namespace, name), value.clone())); }
+        }
+        for (qualified, value) in bindings { self.env.insert(qualified, value); }
+        let aliases=self.namespace_aliases.clone();
+        for (alias, target) in aliases {
+            let prefix=format!("{target}/");
+            let aliased=self.env.iter().filter_map(|(name,value)| name.strip_prefix(&prefix).map(|suffix|(format!("{alias}/{suffix}"),value.clone()))).collect::<Vec<_>>();
+            for (name,value) in aliased { self.env.insert(name,value); }
+        }
     }
 
     fn save_namespace(&mut self) {
-        self.namespaces.insert(self.current_namespace.clone(), self.env.clone());
+        let values=self.env.iter().filter(|(name,_)| !name.contains('/')).map(|(name,value)|(name.clone(),value.clone())).collect();
+        self.namespaces.insert(self.current_namespace.clone(), values);
     }
 
     /// Creates a namespace without selecting it.
@@ -87,6 +110,7 @@ impl Runtime {
         let next = self.namespaces.remove(name).unwrap_or_default();
         self.env = next;
         self.current_namespace = name.into();
+        self.refresh_qualified_bindings();
         true
     }
 
@@ -330,6 +354,20 @@ mod tests {
         runtime.register_resource("helpers", "(defn helper [] 7) (helper)");
         assert_eq!(runtime.require_resource_in_namespace("helpers", "math").unwrap(), "7");
         assert_eq!(runtime.eval_text("(helper)").unwrap(), "7");
+    }
+
+    #[test]
+    fn qualified_namespace_symbols_resolve_shared_vars_and_aliases() {
+        let mut runtime = Runtime::new();
+        assert!(runtime.create_namespace("alpha"));
+        assert_eq!(runtime.eval_in_namespace("alpha", "(def answer 41)").unwrap(), "41");
+        runtime.use_namespace("user");
+        assert_eq!(runtime.eval_text("alpha/answer").unwrap(), "41");
+        assert!(runtime.alias_namespace("a", "alpha"));
+        assert_eq!(runtime.eval_text("a/answer").unwrap(), "41");
+        assert_eq!(runtime.eval_text("(do (set! alpha/answer 42) alpha/answer)").unwrap(), "42");
+        runtime.use_namespace("alpha");
+        assert_eq!(runtime.eval_text("answer").unwrap(), "42");
     }
 
     #[test]
