@@ -1,24 +1,16 @@
+#![allow(clippy::too_many_lines)] // Temporary compatibility facade during Java-port split.
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 
 use std::rc::Rc;
+use crate::lang::data::Vector as PVector;
+pub use crate::kernel::Form;
+pub use crate::task::{Promise, PromiseState};
 use std::hash::{Hash, Hasher};
 
 #[path = "fiber.rs"]
 mod fiber;
 pub use fiber::{EvalFiber, EvalFiberState};
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Form {
-    Number(i64),
-    Symbol(String),
-    Keyword(String),
-    String(String),
-    Map(Vec<(Form, Form)>),
-    Set(Vec<Form>),
-    Vector(Vec<Form>),
-    List(Vec<Form>),
-}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExtensionValue {
@@ -41,10 +33,10 @@ pub enum Value {
     Recur(Vec<Value>),
     Map(Vec<(Value, Value)>),
     Set(Vec<Value>),
-    List(Vec<Value>),
+    List(PVector<Value>),
     Symbol(String),
     Function(Rc<Function>),
-    Vector(Vec<Value>),
+    Vector(PVector<Value>),
     Iterator(Rc<RefCell<IteratorState>>),
     Var(Rc<RefCell<Value>>),
     Extension(ExtensionValue),
@@ -149,7 +141,7 @@ impl PartialEq for Value {
             (Value::ByteBuffer(a), Value::ByteBuffer(b)) => *a.borrow() == *b.borrow(),
             (Value::Array(a), Value::Array(b)) => Rc::ptr_eq(a, b),
             (Value::Object(a), Value::Object(b)) => Rc::ptr_eq(a, b),
-            (Value::Promise(a), Value::Promise(b)) => Rc::ptr_eq(&a.state, &b.state),
+            (Value::Promise(a), Value::Promise(b)) => a.same_identity(b),
             (Value::Recur(a), Value::Recur(b)) => a == b,
             (Value::Map(a), Value::Map(b)) => a == b,
             (Value::Set(a), Value::Set(b)) => a.len() == b.len() && a.iter().all(|value| b.contains(value)),
@@ -207,7 +199,7 @@ impl Value {
                 Value::ByteBuffer(v) => v.borrow().hash(state),
                 Value::Array(v) => v.borrow().iter().for_each(|item| hash_value(item, state)),
                 Value::Object(v) => v.borrow().iter().for_each(|(key, item)| { key.hash(state); hash_value(item, state); }),
-                Value::Promise(v) => Rc::as_ptr(&v.state).hash(state),
+                Value::Promise(v) => v.identity_address().hash(state),
                 Value::Recur(v) => v.iter().for_each(|item| hash_value(item, state)),
                 Value::Map(v) => {
                     let mut entries = v.iter().map(|(key, item)| { let mut h = std::collections::hash_map::DefaultHasher::new(); hash_value(key, &mut h); hash_value(item, &mut h); h.finish() }).collect::<Vec<_>>();
@@ -331,75 +323,6 @@ impl ExtensionRegistry {
 
     pub fn construct(&self, provider: &str, type_name: &str, arguments: &[Value]) -> Result<Value, String> {
         self.providers.get(provider).ok_or_else(|| format!("extension/not-found: {provider}"))?.construct(type_name, arguments)
-    }
-}
-
-#[allow(dead_code)]
-#[derive(Debug, Clone, PartialEq)]
-pub enum PromiseState {
-    Pending,
-    Fulfilled(Value),
-    Rejected(String),
-}
-
-#[derive(Clone)]
-pub struct Promise {
-    state: Rc<RefCell<PromiseState>>,
-    continuations: Rc<RefCell<Vec<Rc<dyn Fn(PromiseState)>>>>,
-}
-
-impl std::fmt::Debug for Promise {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        formatter.debug_struct("Promise").field("state", &self.state()).finish()
-    }
-}
-
-impl Promise {
-    pub fn new() -> Self {
-        Self { state: Rc::new(RefCell::new(PromiseState::Pending)), continuations: Rc::new(RefCell::new(Vec::new())) }
-    }
-
-    pub fn state(&self) -> PromiseState { self.state.borrow().clone() }
-
-    pub fn resolve(&self, value: Value) -> bool { self.settle(PromiseState::Fulfilled(value)) }
-
-    pub fn reject(&self, error: impl Into<String>) -> bool { self.settle(PromiseState::Rejected(error.into())) }
-
-    fn settle(&self, next: PromiseState) -> bool {
-        let continuations = {
-            let mut state = self.state.borrow_mut();
-            if !matches!(*state, PromiseState::Pending) { return false; }
-            *state = next.clone();
-            std::mem::take(&mut *self.continuations.borrow_mut())
-        };
-        for continuation in continuations { continuation(next.clone()); }
-        true
-    }
-
-    pub fn on_settle(&self, continuation: Rc<dyn Fn(PromiseState)>) {
-        let state = self.state();
-        if matches!(state, PromiseState::Pending) {
-            self.continuations.borrow_mut().push(continuation);
-        } else {
-            continuation(state);
-        }
-    }
-
-    pub fn adopt(&self, other: &Promise) -> bool {
-        match other.state() {
-            PromiseState::Pending => {
-                if !matches!(self.state(), PromiseState::Pending) { return false; }
-                let destination = self.clone();
-                other.on_settle(Rc::new(move |state| match state {
-                    PromiseState::Fulfilled(value) => { destination.resolve(value); },
-                    PromiseState::Rejected(error) => { destination.reject(error); },
-                    PromiseState::Pending => {},
-                }));
-                true
-            }
-            PromiseState::Fulfilled(value) => self.resolve(value),
-            PromiseState::Rejected(error) => self.reject(error),
-        }
     }
 }
 
@@ -885,12 +808,12 @@ fn protocol_find(arguments: &[Value]) -> Result<Value, String> {
     let key = &arguments[1];
     match collection {
         Value::Map(values) => Ok(values.iter().find(|(candidate, _)| candidate == key)
-            .map(|(candidate, value)| Value::Vector(Vec::from_iter([candidate.clone(), value.clone()])))
+            .map(|(candidate, value)| Value::Vector(PVector::from_iter([candidate.clone(), value.clone()])))
             .unwrap_or(Value::Nil)),
         Value::Object(values) => {
             let key = match key { Value::String(value) | Value::Keyword(value) => value, _ => return Err("IFind/find object expects a string or keyword key".into()) };
             Ok(values.borrow().iter().find(|(candidate, _)| candidate == key)
-                .map(|(candidate, value)| Value::Vector(Vec::from_iter([Value::String(candidate.clone()), value.clone()])))
+                .map(|(candidate, value)| Value::Vector(PVector::from_iter([Value::String(candidate.clone()), value.clone()])))
                 .unwrap_or(Value::Nil))
         }
         Value::Set(values) => values.iter().find(|candidate| *candidate == key)
@@ -898,7 +821,7 @@ fn protocol_find(arguments: &[Value]) -> Result<Value, String> {
         Value::Vector(values) | Value::List(values) => {
             let index = value_index(key)?;
             Ok(values.get(index)
-                .map(|value| Value::Vector(Vec::from_iter([Value::Number(index as i64), value.clone()])))
+                .map(|value| Value::Vector(PVector::from_iter([Value::Number(index as i64), value.clone()])))
                 .unwrap_or(Value::Nil))
         }
         _ => Err("IFind/find has no implementation for this value".into()),
@@ -932,8 +855,8 @@ fn protocol_conj(arguments: &[Value]) -> Result<Value, String> {
     let collection = &arguments[0];
     let item = &arguments[1];
     match collection {
-        Value::Vector(values) => { let mut output = values.clone(); output.push(item.clone()); Ok(Value::Vector(output)) }
-        Value::List(values) => { let mut output = values.clone(); output.insert(0, item.clone()); Ok(Value::List(output)) }
+        Value::Vector(values) => { let output = values.push_last(item.clone()); Ok(Value::Vector(output)) }
+        Value::List(values) => { let output = std::iter::once(item.clone()).chain(values.iter().cloned()).collect(); Ok(Value::List(output)) }
         Value::Set(values) => { let mut output = values.clone(); output.push(item.clone()); Ok(Value::Set(output)) }
         Value::Map(values) => {
             let entry = match item { Value::Vector(entry) | Value::List(entry) if entry.len() == 2 => entry, _ => return Err("IConj/conj map expects a two-element entry".into()) };
@@ -1023,7 +946,7 @@ fn dot_call(receiver: Value, method: &Form, env: &mut HashMap<String, Value>) ->
             "delete" => { if args.len()!=1 { return Err("object/delete expects a key".into()); } let key=marker_key(&args[0], "object/delete")?; object.borrow_mut().retain(|(candidate, _)| candidate != &key); Ok(Value::Object(object)) }
             "keys" => { if !args.is_empty() { return Err("object/keys expects no arguments".into()); } Ok(Value::Vector(object.borrow().iter().map(|(key, _)| Value::String(key.clone())).collect())) }
             "vals" => { if !args.is_empty() { return Err("object/vals expects no arguments".into()); } Ok(Value::Vector(object.borrow().iter().map(|(_, value)| value.clone()).collect())) }
-            "pairs" => { if !args.is_empty() { return Err("object/pairs expects no arguments".into()); } Ok(Value::Vector(object.borrow().iter().map(|(key, value)| Value::Vector(Vec::from_iter([Value::String(key.clone()), value.clone()]))).collect())) }
+            "pairs" => { if !args.is_empty() { return Err("object/pairs expects no arguments".into()); } Ok(Value::Vector(object.borrow().iter().map(|(key, value)| Value::Vector(PVector::from_iter([Value::String(key.clone()), value.clone()]))).collect())) }
             "assign" => { if args.len()!=1 { return Err("object/assign expects an object".into()); } let other=match &args[0] { Value::Object(other) => other.clone(), _ => return Err("object/assign expects an object".into()) }; let mut values=object.borrow_mut(); for (key,value) in other.borrow().iter() { if let Some((_, existing))=values.iter_mut().find(|(candidate, _)| candidate==key) { *existing=value.clone(); } else { values.push((key.clone(),value.clone())); } } drop(values); Ok(Value::Object(object)) }
             "clone" => Ok(Value::Object(Rc::new(RefCell::new(object.borrow().clone())))),
             _ => Err(format!("unsupported object method: {name}")),
@@ -1081,8 +1004,8 @@ fn iterator_values(value: Value) -> Result<Vec<Value>, String> {
         Value::Bytes(bytes) => Ok(bytes.into_iter().map(|byte| Value::Number(byte as i8 as i64)).collect()),
         Value::ByteBuffer(bytes) => Ok(bytes.borrow().iter().map(|byte| Value::Number(*byte as i8 as i64)).collect()),
         Value::Array(values) => Ok(values.borrow().clone()),
-        Value::Object(values) => Ok(values.borrow().iter().map(|(key, value)| Value::Vector(Vec::from_iter([Value::String(key.clone()), value.clone()]))).collect()),
-        Value::Map(entries) => Ok(entries.into_iter().map(|(key, value)| Value::Vector(Vec::from_iter([key, value]))).collect()),
+        Value::Object(values) => Ok(values.borrow().iter().map(|(key, value)| Value::Vector(PVector::from_iter([Value::String(key.clone()), value.clone()]))).collect()),
+        Value::Map(entries) => Ok(entries.into_iter().map(|(key, value)| Value::Vector(PVector::from_iter([key, value]))).collect()),
         Value::Set(values) => Ok(values),
         Value::Iterator(iterator) => {
             let mut state = iterator.borrow_mut();
@@ -1860,8 +1783,8 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 if fs.len() != 3 { return Err("conj expects two arguments".into()); }
                 let collection = eval(&fs[1], env)?; let item = eval(&fs[2], env)?;
                 match collection {
-                    Value::Vector(mut values) => { values.push(item); Ok(Value::Vector(values)) },
-                    Value::List(mut values) => { values.insert(0, item); Ok(Value::List(values)) },
+                    Value::Vector(values) => { Ok(Value::Vector(values.push_last(item))) },
+                    Value::List(values) => { Ok(Value::List(std::iter::once(item).chain(values.iter().cloned()).collect())) },
                     Value::Set(mut values) => { if !values.contains(&item) { values.push(item); } Ok(Value::Set(values)) },
                     Value::Map(mut values) => {
                         let entry = match item {
@@ -1881,7 +1804,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
             Form::Symbol(n) if n == "cons" => {
                 if fs.len() != 3 { return Err("cons expects two arguments".into()); }
                 let item = eval(&fs[1], env)?; let collection = eval(&fs[2], env)?;
-                match collection { Value::Vector(mut values) => { values.insert(0, item); Ok(Value::Vector(values)) }, Value::List(mut values) => { values.insert(0, item); Ok(Value::List(values)) }, _ => Err("cons expects a vector".into()) }
+                match collection { Value::Vector(values) => { Ok(Value::Vector(std::iter::once(item).chain(values.iter().cloned()).collect())) }, Value::List(values) => { Ok(Value::List(std::iter::once(item).chain(values.iter().cloned()).collect())) }, _ => Err("cons expects a vector".into()) }
             }
             Form::Symbol(n) if n == "recur" => {
                 if fs.len() < 2 { return Err("recur expects values".into()); }

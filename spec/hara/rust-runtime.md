@@ -317,6 +317,19 @@ The Rust core now provides the small bootstrap predicates `inc`, `dec`, `zero?`,
 
 The core collection surface includes `keys` and `vals` for persistent maps, mutable objects, vectors, and lists. Membership is exposed by `IFind/find` and `IFind/has?`: maps and objects test keys, vectors and lists test valid numeric indexes, and sets test values. `has?` remains true for a present key whose value is nil.
 
+## Rust protocol and persistent-vector layer
+
+The WASM crate exposes a runtime-neutral `lang::protocol` module containing
+the collection protocol traits (`IAssoc`, `IConj`, `ICons`, `ICount`, `IFind`,
+`ILookup`, `INth`, and related persistence, metadata, display, equality, and
+hash traits). `IFind::has` is derived from `find`, preserving the distinction
+between an absent entry and an entry whose value is nil.
+
+`lang::data::Vector` is a persistent, structurally shared vector with
+association, append/pop, metadata, subviews, and mutable conversion support.
+The protocol layer is independently testable and does not depend on the
+evaluator or browser host APIs.
+
 ## Application and pair helpers
 
 The bootstrap evaluator supports `identity`, `apply`, `key`, `val`, and `reverse`. `apply` accepts a captured Hara function or built-in arithmetic operator and flattens the final collection argument.

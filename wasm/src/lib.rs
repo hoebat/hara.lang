@@ -1,4 +1,8 @@
+#![allow(clippy::too_many_lines)] // Temporary compatibility facade during Java-port split.
 mod core;
+pub mod lang;
+pub mod kernel;
+pub mod task;
 use std::collections::{HashMap, HashSet};
 use wasm_bindgen::prelude::*;
 
@@ -734,7 +738,7 @@ mod tests {
         assert!(registry.contains("IIdentity", "identity"));
         assert_eq!(registry.invoke("IIdentity", "identity", &[core::Value::Number(7)]).unwrap(), core::Value::Number(7));
         assert!(registry.invoke("IIdentity", "missing", &[]).unwrap_err().contains("missing protocol method"));
-        assert_eq!(core::receiver_category(&core::Value::Vector(Vec::new())), "vector");
+        assert_eq!(core::receiver_category(&core::Value::Vector(Default::default())), "vector");
     }
 
     #[test]
