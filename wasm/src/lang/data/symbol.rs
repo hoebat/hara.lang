@@ -149,6 +149,10 @@ mod tests {
         assert_eq!(first.obj_type(), ObjType::Symbol);
         assert_eq!(first.hash_seed(), "::SYMBOL");
         assert_eq!(Symbol::parse("/").get_namespace(), None);
+        let nested = Symbol::parse("a/b/c");
+        assert_eq!(nested.get_namespace(), Some("a"));
+        assert_eq!(nested.get_name(), "b/c");
+        assert_eq!(nested.as_str(), "a/b/c");
 
         let documented = first.with_meta(Some(crate::lang::data::Metadata::document("doc")));
         assert_eq!(documented.meta().and_then(|value| value.doc()), Some("doc"));

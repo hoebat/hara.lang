@@ -452,9 +452,6 @@ impl<'a> Parser<'a> {
                 position: self.reader.position(),
             });
         }
-        if token.contains('/') && token.chars().filter(|ch| *ch == '/').count() > 1 {
-            return self.error(format!("Invalid token: {token}"));
-        }
         Ok(Form::Symbol(token))
     }
     fn read_one(&mut self) -> Result<Option<SpannedForm>> {

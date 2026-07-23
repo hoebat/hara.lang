@@ -153,6 +153,15 @@ fn matches_extended_canonical_reader_categories() {
         .contains("Metadata can only be applied"));
 }
 #[test]
+fn allows_multi_slash_symbols_but_not_keywords_like_java() {
+    assert_eq!(
+        parse_forms("a/b/c").unwrap(),
+        vec![Form::Symbol("a/b/c".into())]
+    );
+    assert!(parse_forms(":a/b/c").unwrap_err().contains("Keyword"));
+}
+
+#[test]
 fn validates_keywords_and_merges_metadata_like_java() {
     for invalid in [":", ":/", ":/name", ":name/", ":a/b/c"] {
         assert!(parse_forms(invalid)
