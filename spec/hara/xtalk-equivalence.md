@@ -1,7 +1,8 @@
 # Hara and xtalk equivalence
 
 Hara exposes runtime-neutral operations under Hara names. A runtime may implement them natively,
-but Hara programs do not call public `x:*` symbols.
+but Hara L0 programs do not call or resolve public `x:*` symbols. The `x:*` names below are
+equivalence metadata for a future `hara.polyglot` adapter, not part of the Hara namespace.
 
 | Hara surface | Xtalk operation |
 | --- | --- |

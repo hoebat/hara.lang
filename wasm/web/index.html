@@ -1,0 +1,14 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hara WASM playground</title>
+<link rel="stylesheet" href="playground.css">
+<main>
+  <p class="eyebrow">HARA.WASM / BROWSER RUNTIME</p>
+  <h1>Evaluate a live form.</h1>
+  <p class="lede">This page is the browser boundary for the portable Hara runtime.</p>
+  <textarea id="source" spellcheck="false">(let (x 19) (+ x 23))</textarea>
+  <button id="run">Evaluate <span>→</span></button>
+  <pre id="result">loading runtime…</pre>
+</main>
+<script type="module" src="playground.js"></script>

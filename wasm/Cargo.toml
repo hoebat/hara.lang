@@ -1,0 +1,16 @@
+[package]
+name = "hara-wasm"
+version = "0.1.0"
+edition = "2021"
+description = "Portable browser runtime slice for Hara"
+license = "EPL-2.0"
+rust-version = "1.78"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+
+[dev-dependencies]
+
