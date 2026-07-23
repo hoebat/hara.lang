@@ -74,4 +74,12 @@ public class EvalTest {
     assertTrue(vals.hasNext());
     assertEquals(1L, vals.next());
   }
+  @Test
+  public void variadicControlFormsKeepAllArgumentsAfterTheEnvironmentPrefix() {
+    RT.Instance<Object> runtime = new RT.Instance<>(null, "eval-variadic-prefix-test");
+
+    assertEquals(3L, runtime.eval(runtime.readString("(do 1 2 3)")));
+    assertEquals(42L, runtime.eval(runtime.readString("((fn [x] (do 0 (+ x 1))) 41)")));
+  }
+
 }

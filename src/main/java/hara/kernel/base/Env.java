@@ -372,7 +372,11 @@ public interface Env {
     public Function<Object, R> getArgN() {
       return (vargs) -> {
         var it = Iter.iter(vargs);
-        var pargs = Iter.toArrayList(Iter.take(it, _argc));
+        var pargs = new ArrayList<Object>();
+        for (int index = 0; index < _argc; index++) {
+          if (!it.hasNext()) throw new Ex.Arity(index, "Need at least " + _argc);
+          pargs.add(it.next());
+        }
         var args = Iter.toArray(it);
         pargs.add(args);
         return Invoke.invokeMethod(_m, pargs.toArray());

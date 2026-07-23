@@ -1274,7 +1274,9 @@ public class HaraLanguageTest {
 
     try (Context context = context()) {
       for (String expression : expressions) {
-        Number expected = (Number) interpreter.eval(interpreter.readString(expression));
+        Object interpreted = interpreter.eval(interpreter.readString(expression));
+        assertTrue("interpreter returned nil for " + expression, interpreted instanceof Number);
+        Number expected = (Number) interpreted;
         assertEquals(expected.longValue(), context.eval(HaraLanguage.ID, expression).asLong());
       }
     }
