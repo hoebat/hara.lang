@@ -110,7 +110,8 @@ pub use watch::IWatch;
 
 #[cfg(test)]
 mod tests {
-    use super::IFind;
+    use super::{IFind, IObjType, ObjType};
+    use crate::lang::data::{Cons, List, Queue, Seq, Tuple, Vector};
 
     struct Entries(Vec<(u8, Option<u8>)>);
 
@@ -123,6 +124,16 @@ mod tests {
                 .find(|(candidate, _)| candidate == key)
                 .cloned()
         }
+    }
+
+    #[test]
+    fn sequential_family_uses_java_protocol_category() {
+        assert_eq!(List::<i32>::new().obj_type(), ObjType::Sequential);
+        assert_eq!(Vector::<i32>::new().obj_type(), ObjType::Sequential);
+        assert_eq!(Tuple::<i32>::Tup0.obj_type(), ObjType::Sequential);
+        assert_eq!(Queue::<i32>::new().obj_type(), ObjType::Sequential);
+        assert_eq!(Cons::new(1, List::new()).obj_type(), ObjType::Sequential);
+        assert_eq!(Seq::new([1].into_iter()).obj_type(), ObjType::Sequential);
     }
 
     #[test]

@@ -304,7 +304,7 @@ impl<E: Clone + std::hash::Hash> IHash for Standard<E> {
 }
 impl<E: Clone + std::fmt::Debug> IObjType for Standard<E> {
     fn obj_type(&self) -> ObjType {
-        ObjType::List
+        ObjType::Sequential
     }
 }
 impl<E> IColl<E> for Standard<E>

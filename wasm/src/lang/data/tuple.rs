@@ -257,7 +257,7 @@ impl<E: Clone + std::hash::Hash> IHash for Tuple<E> {
 }
 impl<E: Clone + std::fmt::Debug> IObjType for Tuple<E> {
     fn obj_type(&self) -> ObjType {
-        ObjType::Tuple
+        ObjType::Sequential
     }
 }
 impl<E> IColl<E> for Tuple<E>
