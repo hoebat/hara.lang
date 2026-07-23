@@ -1,9 +1,15 @@
 package hara.truffle;
 
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.LinkedBlockingQueue;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
@@ -16,6 +22,16 @@ final class HaraWasmExtension implements AutoCloseable {
   private final Map<String, Value> exports;
   private final Value memory;
   private final Value allocator;
+  private final boolean hta;
+  private final Value deallocator;
+  private final Value htaStart;
+  private final Value htaNextEvent;
+  private final Value htaDeliver;
+  private final Value htaCancel;
+  private final Value htaDropTask;
+  private final BlockingQueue<Command> mailbox;
+  private final Map<Long, CompletableFuture<Object>> tasks = new LinkedHashMap<>();
+  private final Thread owner;
 
   HaraWasmExtension(HaraExtensionPackage extensionPackage) {
     manifest = extensionPackage.manifest();
@@ -26,7 +42,7 @@ final class HaraWasmExtension implements AutoCloseable {
               + " for "
               + manifest.namespace());
     }
-    if (!"core-v1".equals(manifest.abi())) {
+    if (!"core-v1".equals(manifest.abi()) && !"hta-v1".equals(manifest.abi())) {
       throw new HaraException(
           "extension/abi-unsupported: " + manifest.abi() + " for " + manifest.namespace());
     }
@@ -53,19 +69,36 @@ final class HaraWasmExtension implements AutoCloseable {
       Value members = instance.hasMember("exports") ? instance.getMember("exports") : instance;
       Value memoryValue = members.hasMember("memory") ? members.getMember("memory") : null;
       Value allocatorValue = members.hasMember("alloc") ? members.getMember("alloc") : null;
+      boolean isHta = "hta-v1".equals(manifest.abi());
       LinkedHashMap<String, Value> declared = new LinkedHashMap<>();
-      for (String name : manifest.exports().keySet()) {
-        Value function = members.getMember(name);
-        if (function == null || !function.canExecute()) {
-          throw new HaraException(
-              "extension/malformed: module " + manifest.module() + " has no export " + name);
+      if (!isHta) {
+        for (String name : manifest.exports().keySet()) {
+          Value function = requireExport(members, name, manifest.module());
+          declared.put(name, function);
         }
-        declared.put(name, function);
       }
       context = opened;
       exports = Map.copyOf(declared);
       memory = memoryValue;
-      allocator = allocatorValue;
+      allocator = isHta ? requireExport(members, "hta_alloc", manifest.module()) : allocatorValue;
+      deallocator = isHta ? requireExport(members, "hta_dealloc", manifest.module()) : null;
+      htaStart = isHta ? requireExport(members, "hta_start", manifest.module()) : null;
+      htaNextEvent = isHta ? requireExport(members, "hta_next_event", manifest.module()) : null;
+      htaDeliver = isHta ? requireExport(members, "hta_deliver", manifest.module()) : null;
+      htaCancel = isHta ? requireExport(members, "hta_cancel", manifest.module()) : null;
+      htaDropTask = isHta ? requireExport(members, "hta_drop_task", manifest.module()) : null;
+      if (isHta) {
+        Value version = requireExport(members, "hta_abi_version", manifest.module());
+        if (version.execute().asInt() != 1) {
+          throw new HaraException("extension/abi-version-unsupported: " + manifest.namespace());
+        }
+      }
+      hta = isHta;
+      mailbox = isHta ? new LinkedBlockingQueue<>() : null;
+      owner =
+          isHta
+              ? Thread.ofVirtual().name("hara-hta-" + manifest.namespace()).start(this::runMailbox)
+              : null;
     } catch (HaraException error) {
       if (opened != null) opened.close(true);
       throw error;
@@ -76,7 +109,37 @@ final class HaraWasmExtension implements AutoCloseable {
     }
   }
 
+  private static Value requireExport(Value members, String name, String module) {
+    Value function = members.getMember(name);
+    if (function == null || !function.canExecute()) {
+      throw new HaraException("extension/malformed: module " + module + " has no export " + name);
+    }
+    return function;
+  }
+
+  boolean isHta() {
+    return hta;
+  }
+
+  CompletableFuture<Object> invokeAsync(String name, Object[] values) {
+    HaraExtensionManifest.Export spec = manifest.exports().get(name);
+    if (spec == null) throw new HaraException("extension/export-missing: " + name);
+    if (values.length != spec.arguments().size()) {
+      throw new HaraException(
+          manifest.namespace() + "/" + name + " expects " + spec.arguments().size() + " arguments");
+    }
+    CompletableFuture<Object> result = new CompletableFuture<>();
+    TaskFuture task = new TaskFuture(result);
+    mailbox.add(new Start(name, values.clone(), task));
+    result.whenComplete(
+        (value, error) -> {
+          if (result.isCancelled()) mailbox.add(new Cancel(task));
+        });
+    return result;
+  }
+
   synchronized Object invoke(String name, Object[] values) {
+    if (hta) throw new HaraException("hta-v1 exports are asynchronous");
     HaraExtensionManifest.Export spec = manifest.exports().get(name);
     if (spec == null) throw new HaraException("extension/export-missing: " + name);
     if (values.length != spec.arguments().size()) {
@@ -165,8 +228,249 @@ final class HaraWasmExtension implements AutoCloseable {
         "extension/type-error: " + manifest.namespace() + "/" + export + " expects " + expected);
   }
 
+  private void runMailbox() {
+    try {
+      boolean running = true;
+      while (running) {
+        Command command = mailbox.take();
+        if (command instanceof Start) start((Start) command);
+        else if (command instanceof Delivery) deliver((Delivery) command);
+        else if (command instanceof Cancel) cancel((Cancel) command);
+        else running = false;
+        if (running) drainEvents();
+      }
+    } catch (InterruptedException error) {
+      Thread.currentThread().interrupt();
+      rejectAll(new HaraException("hta/mailbox-interrupted"));
+    } catch (RuntimeException error) {
+      rejectAll(new HaraException("hta/mailbox-failed: " + error.getMessage()));
+    } finally {
+      context.close(true);
+    }
+  }
+
+  private void start(Start command) {
+    ArrayList<Object> arguments = new ArrayList<>();
+    for (Object value : command.values) arguments.add(HaraBox.unwrap(value));
+    long task = executeFrame(htaStart, List.of(command.name, arguments)).asLong();
+    if (task <= 0) throw new HaraException("hta/start-failed: " + manifest.namespace());
+    command.result.task = task;
+    tasks.put(task, command.result.future);
+    if (command.result.future.isCancelled()) htaCancel.execute(task);
+  }
+
+  private void deliver(Delivery command) {
+    int status =
+        executeFrame(htaDeliver, List.of(command.call, command.fulfilled ? 0L : 1L, command.value))
+            .asInt();
+    if (status != 0) throw new HaraException("hta/deliver-failed: " + status);
+  }
+
+  @SuppressWarnings("unchecked")
+  private void drainEvents() {
+    while (true) {
+      long packed = htaNextEvent.execute().asLong();
+      if (packed == 0) return;
+      Object decoded = readFrame(packed);
+      if (!(decoded instanceof List<?>)) throw new HaraException("hta/event-malformed");
+      List<Object> event = (List<Object>) decoded;
+      long kind = number(event, 0, "event kind");
+      if (kind == 0 || kind == 1) {
+        long task = number(event, 1, "task id");
+        CompletableFuture<Object> future = tasks.remove(task);
+        if (future == null) continue;
+        htaDropTask.execute(task);
+        if (kind == 0) future.complete(event.get(2));
+        else future.completeExceptionally(rejection(event.get(2)));
+      } else if (kind == 2) {
+        hostCall(event);
+      } else {
+        throw new HaraException("hta/event-unknown: " + kind);
+      }
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private void hostCall(List<Object> event) {
+    if (event.size() != 6) throw new HaraException("hta/host-call-malformed");
+    long call = number(event, 1, "call id");
+    String service = string(event.get(3), "service");
+    String method = string(event.get(4), "method");
+    List<Object> arguments = (List<Object>) event.get(5);
+    if (!manifest.permitsHostCall(service, method)) {
+      mailbox.add(new Delivery(call, false, error("hta/host-call-denied", service + "/" + method)));
+      return;
+    }
+    CompletableFuture.supplyAsync(() -> invokeHost(service, method, arguments))
+        .whenComplete(
+            (value, failure) ->
+                mailbox.add(
+                    failure == null
+                        ? new Delivery(call, true, value)
+                        : new Delivery(
+                            call,
+                            false,
+                            error(
+                                "hta/host-call-failed",
+                                failure.getCause() == null
+                                    ? failure.getMessage()
+                                    : failure.getCause().getMessage()))));
+  }
+
+  private Object invokeHost(String service, String method, List<Object> arguments) {
+    if ("crypto.hash.sha256".equals(service) && "digest".equals(method)) {
+      if (arguments.size() != 1 || !(arguments.get(0) instanceof byte[])) {
+        throw new HaraException("crypto.hash.sha256/digest expects bytes");
+      }
+      try {
+        return MessageDigest.getInstance("SHA-256").digest((byte[]) arguments.get(0));
+      } catch (NoSuchAlgorithmException impossible) {
+        throw new HaraException("SHA-256 is unavailable");
+      }
+    }
+    throw new HaraException("hta/host-call-unknown: " + service + "/" + method);
+  }
+
+  private Frame writeFrame(byte[] bytes) {
+    long pointer = allocator.execute(bytes.length).asLong();
+    if (pointer < 0
+        || pointer > Integer.MAX_VALUE
+        || memory == null
+        || !memory.hasBufferElements()) {
+      throw new HaraException("hta/memory-unavailable: " + manifest.namespace());
+    }
+    for (int i = 0; i < bytes.length; i++) memory.writeBufferByte(pointer + i, bytes[i]);
+    return new Frame((int) pointer, bytes.length);
+  }
+
+  private Value executeFrame(Value function, Object value) {
+    Frame frame = writeFrame(HtaValueCodec.encode(value));
+    try {
+      return function.execute(frame.pointer, frame.length);
+    } finally {
+      deallocator.execute(frame.pointer, frame.length);
+    }
+  }
+
+  private Object readFrame(long packed) {
+    long pointer = packed >>> 32;
+    long size = packed & 0xffff_ffffL;
+    if (pointer > Integer.MAX_VALUE
+        || size > Integer.MAX_VALUE
+        || memory.getBufferSize() < pointer + size) {
+      throw new HaraException("hta/event-memory-invalid");
+    }
+    byte[] bytes = new byte[(int) size];
+    for (int i = 0; i < bytes.length; i++) bytes[i] = memory.readBufferByte(pointer + i);
+    deallocator.execute((int) pointer, bytes.length);
+    return HtaValueCodec.decode(bytes);
+  }
+
+  private static long number(List<Object> values, int index, String field) {
+    if (values.size() <= index || !(values.get(index) instanceof Number)) {
+      throw new HaraException("hta/event-malformed: " + field);
+    }
+    return ((Number) values.get(index)).longValue();
+  }
+
+  private static String string(Object value, String field) {
+    if (!(value instanceof String)) throw new HaraException("hta/event-malformed: " + field);
+    return (String) value;
+  }
+
+  private static Map<Object, Object> error(String code, String message) {
+    LinkedHashMap<Object, Object> error = new LinkedHashMap<>();
+    error.put(hara.lang.data.Keyword.create("code"), hara.lang.data.Keyword.create(code));
+    error.put(
+        hara.lang.data.Keyword.create("message"), message == null ? "unknown error" : message);
+    error.put(hara.lang.data.Keyword.create("origin"), hara.lang.data.Keyword.create("host"));
+    error.put(hara.lang.data.Keyword.create("retryable"), false);
+    return error;
+  }
+
+  private static HaraException rejection(Object value) {
+    if (value instanceof Map<?, ?>) {
+      Object message = ((Map<?, ?>) value).get(hara.lang.data.Keyword.create("message"));
+      if (message != null) return new HaraException(String.valueOf(message));
+    }
+    return new HaraException("HTA task rejected: " + value);
+  }
+
+  private void cancel(Cancel command) {
+    if (command.result.task > 0) htaCancel.execute(command.result.task);
+  }
+
+  private void rejectAll(HaraException error) {
+    tasks.values().forEach(future -> future.completeExceptionally(error));
+    tasks.clear();
+  }
+
+  private interface Command {}
+
+  private static final class TaskFuture {
+    private final CompletableFuture<Object> future;
+    private long task;
+
+    private TaskFuture(CompletableFuture<Object> future) {
+      this.future = future;
+    }
+  }
+
+  private static final class Start implements Command {
+    private final String name;
+    private final Object[] values;
+    private final TaskFuture result;
+
+    private Start(String name, Object[] values, TaskFuture result) {
+      this.name = name;
+      this.values = values;
+      this.result = result;
+    }
+  }
+
+  private static final class Delivery implements Command {
+    private final long call;
+    private final boolean fulfilled;
+    private final Object value;
+
+    private Delivery(long call, boolean fulfilled, Object value) {
+      this.call = call;
+      this.fulfilled = fulfilled;
+      this.value = value;
+    }
+  }
+
+  private static final class Cancel implements Command {
+    private final TaskFuture result;
+
+    private Cancel(TaskFuture result) {
+      this.result = result;
+    }
+  }
+
+  private static final class Frame {
+    private final int pointer;
+    private final int length;
+
+    private Frame(int pointer, int length) {
+      this.pointer = pointer;
+      this.length = length;
+    }
+  }
+
+  private static final class Stop implements Command {}
+
   @Override
   public void close() {
-    context.close(true);
+    if (!hta) {
+      context.close(true);
+      return;
+    }
+    mailbox.add(new Stop());
+    try {
+      owner.join();
+    } catch (InterruptedException error) {
+      Thread.currentThread().interrupt();
+    }
   }
 }

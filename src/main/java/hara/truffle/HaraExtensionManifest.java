@@ -17,6 +17,16 @@ import java.util.regex.Pattern;
 public final class HaraExtensionManifest {
   private static final Pattern NAMESPACE = Pattern.compile("[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+");
   private static final Set<String> FIELDS =
+      Set.of(
+          "namespace",
+          "version",
+          "provider",
+          "module",
+          "abi",
+          "exports",
+          "capabilities",
+          "host-calls");
+  private static final Set<String> REQUIRED_FIELDS =
       Set.of("namespace", "version", "provider", "module", "abi", "exports", "capabilities");
   private static final Set<String> EXPORT_FIELDS = Set.of("args", "returns", "async");
 
@@ -27,6 +37,7 @@ public final class HaraExtensionManifest {
   private final String abi;
   private final Map<String, Export> exports;
   private final java.util.List<String> capabilities;
+  private final Map<String, java.util.List<String>> hostCalls;
 
   private HaraExtensionManifest(
       String namespace,
@@ -35,7 +46,8 @@ public final class HaraExtensionManifest {
       String module,
       String abi,
       Map<String, Export> exports,
-      java.util.List<String> capabilities) {
+      java.util.List<String> capabilities,
+      Map<String, java.util.List<String>> hostCalls) {
     this.namespace = namespace;
     this.version = version;
     this.provider = provider;
@@ -43,6 +55,11 @@ public final class HaraExtensionManifest {
     this.abi = abi;
     this.exports = Collections.unmodifiableMap(new LinkedHashMap<>(exports));
     this.capabilities = Collections.unmodifiableList(new ArrayList<>(capabilities));
+    LinkedHashMap<String, java.util.List<String>> copiedHostCalls = new LinkedHashMap<>();
+    hostCalls.forEach(
+        (service, methods) ->
+            copiedHostCalls.put(service, Collections.unmodifiableList(new ArrayList<>(methods))));
+    this.hostCalls = Collections.unmodifiableMap(copiedHostCalls);
   }
 
   public static HaraExtensionManifest parse(String source, String origin) {
@@ -70,8 +87,10 @@ public final class HaraExtensionManifest {
     Map<String, Export> exports = parseExports(lookup(map, "exports"), origin);
     java.util.List<String> capabilities =
         parseKeywords(lookup(map, "capabilities"), origin, "capabilities");
+    Map<String, java.util.List<String>> hostCalls =
+        parseHostCalls(lookup(map, "host-calls"), origin);
     return new HaraExtensionManifest(
-        namespace, version, provider, module, abi, exports, capabilities);
+        namespace, version, provider, module, abi, exports, capabilities, hostCalls);
   }
 
   public String namespace() {
@@ -100,6 +119,40 @@ public final class HaraExtensionManifest {
 
   public java.util.List<String> capabilities() {
     return capabilities;
+  }
+
+  public Map<String, java.util.List<String>> hostCalls() {
+    return hostCalls;
+  }
+
+  public boolean permitsHostCall(String service, String method) {
+    return hostCalls.getOrDefault(service, java.util.List.of()).contains(method);
+  }
+
+  private static Map<String, java.util.List<String>> parseHostCalls(Object value, String origin) {
+    if (value == null) return Map.of();
+    if (!(value instanceof IMapType<?, ?>)) throw invalid(origin, "host-calls must be a map");
+    LinkedHashMap<String, java.util.List<String>> result = new LinkedHashMap<>();
+    Iterator<?> iterator = ((IMapType<?, ?>) value).iterator();
+    while (iterator.hasNext()) {
+      Map.Entry<?, ?> entry = (Map.Entry<?, ?>) iterator.next();
+      if (!(entry.getKey() instanceof String) || ((String) entry.getKey()).isBlank()) {
+        throw invalid(origin, "host-call services must be non-empty strings");
+      }
+      Object methods = entry.getValue();
+      if (!(methods instanceof ILinearType<?>)) {
+        throw invalid(origin, "host-call methods must be vectors");
+      }
+      ArrayList<String> names = new ArrayList<>();
+      for (Object method : (ILinearType<?>) methods) {
+        if (!(method instanceof String) || ((String) method).isBlank()) {
+          throw invalid(origin, "host-call methods must be non-empty strings");
+        }
+        names.add((String) method);
+      }
+      result.put((String) entry.getKey(), names);
+    }
+    return result;
   }
 
   private static Map<String, Export> parseExports(Object value, String origin) {
@@ -170,8 +223,8 @@ public final class HaraExtensionManifest {
         throw invalid(origin, "unsupported " + subject + " field: " + name);
       seen.add(name);
     }
-    if (subject.equals("manifest") && !seen.equals(allowed)) {
-      LinkedHashSet<String> missing = new LinkedHashSet<>(allowed);
+    if (subject.equals("manifest") && !seen.containsAll(REQUIRED_FIELDS)) {
+      LinkedHashSet<String> missing = new LinkedHashSet<>(REQUIRED_FIELDS);
       missing.removeAll(seen);
       throw invalid(origin, "missing manifest fields: " + missing);
     }

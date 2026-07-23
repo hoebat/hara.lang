@@ -66,6 +66,20 @@ public class MainTest {
   }
 
   @Test
+  public void noArgumentsEnterTheRepl() {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    ByteArrayOutputStream error = new ByteArrayOutputStream();
+    int status =
+        Main.run(
+            new String[] {},
+            new ByteArrayInputStream(new byte[0]),
+            new PrintStream(output, true, StandardCharsets.UTF_8),
+            new PrintStream(error, true, StandardCharsets.UTF_8));
+    assertEquals(0, status);
+    assertEquals("", error.toString(StandardCharsets.UTF_8));
+  }
+
+  @Test
   public void replLoadsCoreAndRendersLazyIterators() {
     ByteArrayOutputStream output = new ByteArrayOutputStream();
     ByteArrayOutputStream error = new ByteArrayOutputStream();

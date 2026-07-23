@@ -96,6 +96,35 @@ public class HaraGeneratedLibrariesTest {
   }
 
   @Test
+  public void promisesExposePortableStateValueAndCancellation() {
+    try (Context context = context()) {
+      assertEquals(
+          ":fulfilled",
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(let [p (promise/new (fn [resolve reject] (resolve 42)))] "
+                      + "(str (promise/state p)))")
+              .asString());
+      assertEquals(
+          42,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(promise/value (promise/new (fn [resolve reject] (resolve 42))))")
+              .asLong());
+      assertEquals(
+          ":cancelled",
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(let [p (promise/delay 10000 (fn [] 1))] "
+                      + "(promise/cancel p) (str (promise/state p)))")
+              .asString());
+    }
+  }
+
+  @Test
   public void stringLibraryMatchesTheXtalkSurface() {
     try (Context context = context()) {
       assertEquals(4, context.eval(HaraLanguage.ID, "(str/len \"hara\")").asLong());

@@ -427,6 +427,7 @@ public final class HaraContext {
       String name,
       HaraExtensionManifest.Export export,
       Object[] values) {
+    if (extension.isHta()) return new HaraPromise(extension.invokeAsync(name, values));
     if (!export.async()) return extension.invoke(name, values);
     return new HaraPromise(CompletableFuture.supplyAsync(() -> extension.invoke(name, values)));
   }
@@ -1024,6 +1025,16 @@ public final class HaraContext {
     promise.define(
         "catch", new VariadicBuiltin("promise/catch", values -> promiseThen(values, true)));
     promise.define("finally", new VariadicBuiltin("promise/finally", this::promiseFinally));
+    promise.define(
+        "state",
+        new UnaryBuiltin("promise/state", value -> requirePromise(value, "promise/state").state()));
+    promise.define(
+        "value",
+        new UnaryBuiltin("promise/value", value -> requirePromise(value, "promise/value").value()));
+    promise.define(
+        "cancel",
+        new UnaryBuiltin(
+            "promise/cancel", value -> requirePromise(value, "promise/cancel").cancel()));
     promise.define(
         "native?",
         new UnaryBuiltin("promise/native?", value -> HaraBox.unwrap(value) instanceof HaraPromise));
@@ -2836,6 +2847,24 @@ public final class HaraContext {
       this.future = future;
     }
 
+    private Object state() {
+      if (future.isCancelled()) return Keyword.create("cancelled");
+      if (!future.isDone()) return Keyword.create("pending");
+      return future.isCompletedExceptionally()
+          ? Keyword.create("rejected")
+          : Keyword.create("fulfilled");
+    }
+
+    private Object value() {
+      if (!future.isDone()) throw new HaraException("promise/value: promise is pending");
+      return deref();
+    }
+
+    private Object cancel() {
+      future.cancel(false);
+      return this;
+    }
+
     @Override
     public Object deref() {
       try {
@@ -2844,6 +2873,8 @@ public final class HaraContext {
         Throwable cause = error.getCause() == null ? error : error.getCause();
         if (cause instanceof HaraException) throw (HaraException) cause;
         throw new HaraException("Promise rejected: " + cause.getMessage());
+      } catch (java.util.concurrent.CancellationException error) {
+        throw new HaraException("Promise cancelled");
       }
     }
 
@@ -2860,6 +2891,8 @@ public final class HaraContext {
         Throwable cause = error.getCause() == null ? error : error.getCause();
         if (cause instanceof HaraException) throw (HaraException) cause;
         throw new HaraException("Promise rejected: " + cause.getMessage());
+      } catch (java.util.concurrent.CancellationException error) {
+        throw new HaraException("Promise cancelled");
       }
     }
 

@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 @SuppressWarnings("rawtypes")
 public class Foundation implements IContext {
 
-  static final int DEFAULT_PORT = 4164;
+  public static final int DEFAULT_PORT = 1311;
 
   public static class Peer {
     public final String name;

@@ -24,6 +24,7 @@ Truffle parser / AST
 - [Java API and Javadocs](docs/javadocs.md) — public entry points and generated API docs.
 - [Language specification](spec/hara/l0-language.md) — normative L0 behavior.
 - [Runtime libraries](spec/hara/runtime-libraries.md) — the portable library contract.
+- [Rust/WASM mapping](spec/hara/rust-runtime.md) — the cross-runtime value, provider, and conformance design.
 - [Extensions](spec/hara/extensions-contract.md) — pods, WASM, manifests, and capabilities.
 - [REPL UX](spec/hara/repl.md) — history, completion, docs, and slash-command design.
 

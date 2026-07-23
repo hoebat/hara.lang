@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "build:noir": "vite build --config vite.noir.config.js",
-    "test:noir": "npm run build:noir && cp node_modules/@noir-lang/noir_wasm/dist/web/main.mjs dist/noir-wasm.mjs && node --test noir-loader.test.js"
+    "test:noir": "npm run build:noir && cp node_modules/@noir-lang/noir_wasm/dist/web/main.mjs dist/noir-wasm.mjs && node --test noir-loader.test.js",
+    "test:hta": "node --test hta.test.js"
   },
   "dependencies": {
     "@aztec/bb.js": "5.1.0",

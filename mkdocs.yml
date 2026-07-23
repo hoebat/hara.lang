@@ -66,3 +66,4 @@ nav:
       - Native flavors: reference/native-flavors.md
       - JVM flavor: reference/jvm-flavor.md
       - Xtalk equivalence: reference/xtalk-equivalence.md
+      - Rust/WASM runtime: reference/rust-runtime.md

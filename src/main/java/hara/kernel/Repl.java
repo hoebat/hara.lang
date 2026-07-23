@@ -34,6 +34,7 @@ public class Repl {
   private final JLineInputReader inputReader;
   private final Reader reader;
   private final ReplConfig config;
+  private long lastElapsedNanos = -1L;
 
   public Repl(RT.Instance rt) throws IOException {
     this(rt, ReplConfig.defaults(".hara_history"));
@@ -93,28 +94,55 @@ public class Repl {
     return rt.getCurrentNs() == null ? "user" : rt.getCurrentNs().name.display();
   }
 
+  private void printHelp() {
+    var writer = terminal.writer();
+    writer.println("Commands:");
+    writer.println("  /help        show REPL commands");
+    writer.println("  /history     show persistent input history");
+    writer.println("  /clear       clear the terminal");
+    writer.println("  /splash      show the Hara banner");
+    writer.println("  /ns          show the current namespace");
+    writer.println("  /quit        exit the REPL");
+    writer.println(
+        "Tab completes slash commands and symbols; candidates include docs and arglists.");
+    writer.flush();
+  }
+
   private JLineInputReader.CommandResult handleCommand(String line) {
     String command = line.strip();
     var writer = terminal.writer();
     if ("/quit".equals(command) || "/exit".equals(command)) {
       return JLineInputReader.CommandResult.EOF;
     } else if ("/help".equals(command)) {
-      writer.println("/help       show REPL commands");
-      writer.println("/history    show persistent input history");
-      writer.println("/clear      clear the terminal");
-      writer.println("/splash     show the Hara banner");
-      writer.println("/ns         show the current namespace");
-      writer.println("/quit       exit the REPL");
-    } else if ("/history".equals(command)) {
+      printHelp();
+    } else if (command.startsWith("/history")) {
+      String query = command.length() > 8 ? command.substring(8).strip() : "";
       for (History.Entry entry : lineReader.getHistory()) {
-        writer.println((entry.index() + 1) + ": " + entry.line());
+        if (query.isEmpty() || entry.line().toLowerCase().contains(query.toLowerCase())) {
+          writer.println((entry.index() + 1) + ": " + entry.line());
+        }
       }
     } else if ("/clear".equals(command)) {
       lineReader.callWidget(LineReader.CLEAR_SCREEN);
     } else if ("/splash".equals(command)) {
       writer.println(config.banner("JVM interpreter", rt._key));
     } else if ("/ns".equals(command)) {
-      writer.println(currentNamespace());
+      writer.println(currentNamespace() + " (" + rt.currentSymbolNames().size() + " symbols)");
+    } else if (command.startsWith("/doc ")) {
+      printDocumentation(command.substring(5).strip());
+    } else if (command.startsWith("/apropos ")) {
+      String query = command.substring(9).strip().toLowerCase();
+      for (Object value : rt.currentSymbolNames()) {
+        String name = String.valueOf(value);
+        if (!name.toLowerCase().contains(query)) continue;
+        Var variable = rt.getObj(Symbol.create(name));
+        if (variable != null && variable.meta() != null) {
+          Object doc = Keyword.create("doc").invoke(variable.meta());
+          if (doc != null) writer.println(name + " — " + doc);
+        }
+      }
+    } else if ("/time".equals(command)) {
+      writer.println(lastElapsedNanos < 0 ? "No evaluation yet." : formatElapsed(lastElapsedNanos));
     } else {
       writer.println("Unknown command: " + command + ". Try /help.");
     }
@@ -122,11 +150,34 @@ public class Repl {
     return JLineInputReader.CommandResult.CONSUMED;
   }
 
+  private String formatElapsed(long nanos) {
+    if (nanos < 1_000_000L) return nanos + " ns";
+    if (nanos < 1_000_000_000L)
+      return String.format(java.util.Locale.ROOT, "%.2f ms", nanos / 1_000_000.0);
+    return String.format(java.util.Locale.ROOT, "%.2f s", nanos / 1_000_000_000.0);
+  }
+
+  private void printDocumentation(String name) {
+    Var variable = rt.getObj(Symbol.create(name));
+    var writer = terminal.writer();
+    if (variable == null || variable.meta() == null) {
+      writer.println("No documentation for " + name);
+      return;
+    }
+    Object arglists = Keyword.create("arglists").invoke(variable.meta());
+    Object doc = Keyword.create("doc").invoke(variable.meta());
+    writer.println("Documentation: " + name);
+    if (arglists != null) writer.println("  Arglists: " + G.display(arglists));
+    if (doc != null) writer.println("  " + doc);
+  }
+
   /**
    * Start the REPL loop. Reads forms, evaluates them, and prints results until EOF is encountered.
    */
   public void run() {
+    lineReader.callWidget(LineReader.CLEAR_SCREEN);
     printBanner();
+    printHelp();
 
     // Use hara.lang.data.Map from BuiltinStruct.hashMap
     hara.lang.data.Map opts = BuiltinStruct.hashMap(new Object[] {});
@@ -139,8 +190,11 @@ public class Repl {
 
         if (form == EOF_SENTINEL) break;
 
+        long started = System.nanoTime();
         Object res = rt.eval(form);
+        lastElapsedNanos = System.nanoTime() - started;
         terminal.writer().println(G.display(res));
+        terminal.writer().println("[" + formatElapsed(lastElapsedNanos) + "]");
         terminal.writer().flush();
       } catch (Throwable t) {
         Throwable cause = t;

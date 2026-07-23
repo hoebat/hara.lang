@@ -200,12 +200,23 @@ impl ProtocolRegistry {
 
 thread_local! {
     static ACTIVE_PROTOCOLS: RefCell<Option<ProtocolRegistry>> = const { RefCell::new(None) };
+    static HOST_CALL_HANDLER: RefCell<Option<Rc<dyn Fn(String, String, Vec<Value>) -> Result<Value, String>>>> = const { RefCell::new(None) };
 }
 
 /// Runs an evaluation with a registry available to protocol dispatch.
 pub fn with_protocols<R>(registry: &ProtocolRegistry, operation: impl FnOnce() -> R) -> R {
     ACTIVE_PROTOCOLS.with(|active| {
         let previous = active.replace(Some(registry.clone()));
+        let result = operation();
+        active.replace(previous);
+        result
+    })
+}
+
+/// Installs the explicit host-call boundary for one evaluation.
+pub fn with_host_calls<R>(handler: Rc<dyn Fn(String, String, Vec<Value>) -> Result<Value, String>>, operation: impl FnOnce() -> R) -> R {
+    HOST_CALL_HANDLER.with(|active| {
+        let previous = active.replace(Some(handler));
         let result = operation();
         active.replace(previous);
         result
@@ -1234,7 +1245,11 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     Form::Symbol(name) => match env.get(name) { Some(Value::Var(cell))=>Value::Var(cell.clone()), _=>eval(&fs[1], env)? },
                     _=>eval(&fs[1], env)?,
                 };
-                match target { Value::Var(value)=>Ok(value.borrow().clone()), _=>Err("deref expects a var".into()) }
+                match target {
+                    Value::Var(value)=>Ok(value.borrow().clone()),
+                    Value::Promise(promise)=>match promise.state(){PromiseState::Fulfilled(value)=>Ok(value),PromiseState::Rejected(error)=>Err(error),PromiseState::Pending=>Err("deref cannot block on a pending promise outside an HTA fiber".into())},
+                    _=>Err("deref expects a var or promise".into())
+                }
             }
             Form::Symbol(n) if n == "set!" || n == "var/set" => {
                 if fs.len()!=3 { return Err(format!("{n} expects a symbol and value")); }
@@ -1311,6 +1326,16 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
             Form::Symbol(n) if n == "promise" => {
                 if fs.len() != 1 { return Err("promise expects no arguments".into()); }
                 Ok(Value::Promise(Promise::new()))
+            }
+            Form::Symbol(n) if n == "host/call" => {
+                if fs.len() < 3 { return Err("host/call expects service, method, and optional arguments".into()); }
+                let service = match eval(&fs[1], env)? { Value::String(value) => value, _ => return Err("host/call service must be a string".into()) };
+                let method = match eval(&fs[2], env)? { Value::String(value) => value, _ => return Err("host/call method must be a string".into()) };
+                let arguments = fs[3..].iter().map(|form| eval(form, env)).collect::<Result<Vec<_>, _>>()?;
+                HOST_CALL_HANDLER.with(|active| {
+                    let handler = active.borrow().as_ref().cloned().ok_or_else(|| "host/call is unavailable".to_string())?;
+                    handler(service, method, arguments)
+                })
             }
             Form::Symbol(n) if n == "promise/state" => {
                 if fs.len() != 2 { return Err("promise/state expects one argument".into()); }
@@ -1716,8 +1741,12 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
 }
 
 pub fn eval_text(source: &str, env: &mut HashMap<String, Value>) -> Result<String, String> {
+    Ok(eval_value_text(source, env)?.display())
+}
+
+pub fn eval_value_text(source: &str, env: &mut HashMap<String, Value>) -> Result<Value, String> {
     let forms = parse_forms(source)?;
     let mut result = Value::Nil;
     for form in forms { result = eval(&form, env)?; if matches!(result, Value::Recur(_)) { return Err("recur must be inside loop".into()); } }
-    Ok(result.display())
+    Ok(result)
 }

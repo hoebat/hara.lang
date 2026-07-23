@@ -16,7 +16,7 @@ import java.util.List;
  */
 public class Conn implements Closeable {
   /** Implements the encoding (writing) side. */
-  static class Encoder {
+  public static class Encoder {
     /** CRLF is used a lot. */
     private static byte[] CRLF = new byte[] {'\r', '\n'};
 
@@ -28,7 +28,7 @@ public class Conn implements Closeable {
      *
      * @param out Will be used to write all encoded data to.
      */
-    Encoder(OutputStream out) {
+    public Encoder(OutputStream out) {
       this.out = out;
     }
 
@@ -39,7 +39,7 @@ public class Conn implements Closeable {
      * @throws IOException Propagated from the output stream.
      * @link https://redis.io/topics/protocol#resp-bulk-strings
      */
-    void write(byte[] value) throws IOException {
+    public void write(byte[] value) throws IOException {
       out.write('$');
       out.write(Long.toString(value.length).getBytes());
       out.write(CRLF);
@@ -54,13 +54,13 @@ public class Conn implements Closeable {
      * @throws IOException Propagated from the output stream.
      * @link https://redis.io/topics/protocol#resp-integers
      */
-    void write(long val) throws IOException {
+    public void write(long val) throws IOException {
       out.write(':');
       out.write(Long.toString(val).getBytes());
       out.write(CRLF);
     }
 
-    void write(Throwable val) throws IOException {
+    public void write(Throwable val) throws IOException {
       out.write('-');
       out.write((val.getMessage() + "").getBytes());
       out.write(CRLF);
@@ -74,7 +74,7 @@ public class Conn implements Closeable {
      * @throws IllegalArgumentException If the list contains unencodable objects.
      * @link https://redis.io/topics/protocol#resp-arrays
      */
-    void write(List<?> list) throws IOException, IllegalArgumentException {
+    public void write(List<?> list) throws IOException, IllegalArgumentException {
       out.write('*');
       out.write(Long.toString(list.size()).getBytes());
       out.write(CRLF);
@@ -98,31 +98,31 @@ public class Conn implements Closeable {
       }
     }
 
-    void writeString(String val) throws IOException {
+    public void writeString(String val) throws IOException {
       out.write('+');
       out.write(val.getBytes());
       out.write(CRLF);
     }
 
-    void flush() throws IOException {
+    public void flush() throws IOException {
       out.flush();
     }
   }
 
   /** Implements the parser (reader) side of protocol. */
-  static class Parser {
+  public static class Parser {
     /** Thrown whenever data could not be parsed. */
     @SuppressWarnings("serial")
-    static class ProtocolException extends IOException {
-      ProtocolException(String msg) {
+    public static class ProtocolException extends IOException {
+      public ProtocolException(String msg) {
         super(msg);
       }
     }
 
     /** Thrown whenever an error string is decoded. */
     @SuppressWarnings("serial")
-    static class ServerError extends IOException {
-      ServerError(String msg) {
+    public static class ServerError extends IOException {
+      public ServerError(String msg) {
         super(msg);
       }
     }
@@ -135,7 +135,7 @@ public class Conn implements Closeable {
      *
      * @param input The stream to read the data from.
      */
-    Parser(InputStream input) {
+    public Parser(InputStream input) {
       this.input = input;
     }
 
@@ -149,7 +149,7 @@ public class Conn implements Closeable {
      * @throws IOException Propagated from the stream
      * @throws ProtocolException In case unexpected bytes are encountered.
      */
-    Object parse() throws IOException, ProtocolException {
+    public Object parse() throws IOException, ProtocolException {
       Object ret;
       int read = this.input.read();
       switch (read) {

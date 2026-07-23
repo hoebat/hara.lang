@@ -31,6 +31,7 @@ import org.jline.reader.UserInterruptException;
 import org.jline.reader.impl.DefaultParser;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
+import org.jline.utils.InfoCmp;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
@@ -53,7 +54,11 @@ public final class Main {
   static int run(String[] args, InputStream input, PrintStream output, PrintStream error) {
     Capabilities capabilities = parseCapabilities(args);
     args = capabilities.arguments;
-    if (args.length == 0 || "help".equals(args[0]) || "--help".equals(args[0])) {
+    if (args.length == 0) {
+      return runRepl(
+          input, output, error, input == System.in && System.console() != null, capabilities);
+    }
+    if ("help".equals(args[0]) || "--help".equals(args[0])) {
       printUsage(output);
       return 0;
     }
@@ -299,9 +304,27 @@ public final class Main {
               .variable(LineReader.HISTORY_FILE, config.historyFile())
               .option(LineReader.Option.HISTORY_INCREMENTAL, true)
               .build();
+      clearTerminal(terminal);
       terminal.writer().println(config.banner("Truffle", "polyglot"));
-      terminal.writer().flush();
+      printInteractiveHelp(terminal);
+      reader
+          .getWidgets()
+          .put(
+              "show-doc",
+              () -> {
+                showDocumentation(context, reader, terminal);
+                return true;
+              });
+      reader
+          .getKeyMaps()
+          .get(LineReader.MAIN)
+          .bind(new org.jline.reader.Reference("show-doc"), "\033OP");
+      reader
+          .getKeyMaps()
+          .get(LineReader.MAIN)
+          .bind(new org.jline.reader.Reference("show-doc"), "\033q");
       StringBuilder source = new StringBuilder();
+      long lastElapsedNanos = -1L;
       while (true) {
         try {
           String line =
@@ -315,15 +338,36 @@ public final class Main {
               printInteractiveHelp(terminal);
               continue;
             }
-            if ("/history".equals(command) || ":history".equals(command)) {
+            if (command.startsWith("/history") || command.startsWith(":history")) {
+              String query = command.replaceFirst("^[/:]history\\s*", "").strip();
               for (History.Entry entry : reader.getHistory()) {
-                terminal.writer().println((entry.index() + 1) + ": " + entry.line());
+                if (query.isEmpty() || fuzzyScore(query, entry.line()) < Integer.MAX_VALUE) {
+                  terminal.writer().println((entry.index() + 1) + ": " + entry.line());
+                }
               }
               terminal.writer().flush();
               continue;
             }
+            if (command.startsWith("/doc ")) {
+              showDocumentation(context, command.substring(5).strip(), terminal);
+              continue;
+            }
+            if (command.startsWith("/apropos ")) {
+              printApropos(context, command.substring(9).strip(), terminal);
+              continue;
+            }
+            if ("/time".equals(command)) {
+              terminal
+                  .writer()
+                  .println(
+                      lastElapsedNanos < 0
+                          ? "No evaluation yet."
+                          : formatElapsed(lastElapsedNanos));
+              terminal.writer().flush();
+              continue;
+            }
             if ("/clear".equals(command)) {
-              reader.callWidget(LineReader.CLEAR_SCREEN);
+              clearTerminal(terminal);
               continue;
             }
             if ("/splash".equals(command)) {
@@ -361,13 +405,95 @@ public final class Main {
     }
   }
 
+  private static final String[][] REPL_COMMANDS = {
+    {"/help", "show REPL commands"},
+    {"/history", "show persistent input history"},
+    {"/clear", "clear the terminal"},
+    {"/splash", "show the Hara banner"},
+    {"/ns", "show the current namespace"},
+    {"/doc", "show documentation for a symbol"},
+    {"/apropos", "search documented symbols"},
+    {"/time", "show the last evaluation time"},
+    {"/quit", "exit the REPL"},
+    {"/exit", "exit the REPL"}
+  };
+
+  private static int fuzzyScore(String query, String value) {
+    if (query == null || query.isEmpty()) return 0;
+    if (value.equals(query)) return 0;
+    String q = query.toLowerCase(java.util.Locale.ROOT);
+    String v = value.toLowerCase(java.util.Locale.ROOT);
+    if (v.startsWith(q)) return 10 + value.length() - query.length();
+    if (v.contains(q)) return 100 + v.indexOf(q);
+    int index = 0;
+    int gaps = 0;
+    for (int i = 0; i < v.length() && index < q.length(); i++) {
+      if (v.charAt(i) == q.charAt(index)) index++;
+      else if (index > 0) gaps++;
+    }
+    return index == q.length() ? 200 + gaps : Integer.MAX_VALUE;
+  }
+
+  private static String formatElapsed(long nanos) {
+    if (nanos < 1_000_000L) return nanos + " ns";
+    if (nanos < 1_000_000_000L)
+      return String.format(java.util.Locale.ROOT, "%.2f ms", nanos / 1_000_000.0);
+    return String.format(java.util.Locale.ROOT, "%.2f s", nanos / 1_000_000_000.0);
+  }
+
+  private static void clearTerminal(Terminal terminal) {
+    terminal.puts(InfoCmp.Capability.clear_screen);
+    terminal.flush();
+  }
+
+  private static void showDocumentation(Context context, LineReader reader, Terminal terminal) {
+    String symbol =
+        HaraCompleter.extractWord(reader.getBuffer().toString(), reader.getBuffer().cursor());
+    showDocumentation(context, symbol, terminal);
+  }
+
+  private static void showDocumentation(Context context, String symbol, Terminal terminal) {
+    if (symbol == null || symbol.isEmpty() || symbol.startsWith("/")) return;
+    try {
+      Value meta = context.eval(HaraLanguage.ID, "(meta #'" + symbol + ")");
+      Value doc = context.eval(HaraLanguage.ID, "(get (meta #'" + symbol + ") :doc)");
+      Value arglists = context.eval(HaraLanguage.ID, "(get (meta #'" + symbol + ") :arglists)");
+      terminal.writer().println();
+      terminal.writer().println("Documentation: " + symbol);
+      if (arglists != null && !arglists.isNull())
+        terminal.writer().println("  Arglists: " + arglists);
+      if (doc != null && !doc.isNull()) terminal.writer().println("  " + doc.asString());
+      terminal.writer().flush();
+    } catch (RuntimeException ignored) {
+      terminal.writer().println("No documentation for " + symbol);
+      terminal.writer().flush();
+    }
+  }
+
+  private static void printApropos(Context context, String query, Terminal terminal) {
+    try {
+      Value symbols = context.eval(HaraLanguage.ID, "(current-symbols)");
+      for (long i = 0; i < symbols.getArraySize(); i++) {
+        String name = symbols.getArrayElement(i).asString();
+        if (fuzzyScore(query, name) == Integer.MAX_VALUE) continue;
+        Value doc = context.eval(HaraLanguage.ID, "(get (meta #'" + name + ") :doc)");
+        if (doc != null && !doc.isNull()) terminal.writer().println(name + " — " + doc.asString());
+      }
+      terminal.writer().flush();
+    } catch (RuntimeException ignored) {
+      terminal.writer().println("Unable to search documentation.");
+      terminal.writer().flush();
+    }
+  }
+
   private static void printInteractiveHelp(Terminal terminal) {
-    terminal.writer().println("/help       show REPL commands");
-    terminal.writer().println("/history    show persistent input history");
-    terminal.writer().println("/clear      clear the terminal");
-    terminal.writer().println("/splash     show the Hara banner");
-    terminal.writer().println("/ns         show the current namespace");
-    terminal.writer().println("/quit       exit the REPL");
+    terminal.writer().println("Commands:");
+    for (String[] command : REPL_COMMANDS) {
+      terminal.writer().printf("  %-12s %s%n", command[0], command[1]);
+    }
+    terminal
+        .writer()
+        .println("Tab completes commands and symbols; candidates show docs and arglists.");
     terminal.writer().flush();
   }
 
@@ -450,24 +576,94 @@ public final class Main {
 
     @Override
     public void complete(LineReader reader, ParsedLine line, List<Candidate> candidates) {
-      String prefix = extractWord(line.line(), line.cursor());
+      String buffer = line.line();
+      int cursor = Math.min(line.cursor(), buffer.length());
+      int start = wordStart(buffer, cursor);
+      String prefix = buffer.substring(start, cursor);
+      if (prefix.startsWith("/")) {
+        addCommandCandidates(prefix, candidates);
+        return;
+      }
+
       try {
         Value symbols = context.eval(HaraLanguage.ID, "(current-symbols)");
-        List<String> names = new ArrayList<>();
+        List<ScoredCandidate> matches = new ArrayList<>();
         for (long i = 0; i < symbols.getArraySize(); i++) {
-          names.add(symbols.getArrayElement(i).asString());
+          String name = symbols.getArrayElement(i).asString();
+          int score = fuzzyScore(prefix, name);
+          if (score < Integer.MAX_VALUE) {
+            matches.add(new ScoredCandidate(name, score, describe(name)));
+          }
         }
-        Collections.sort(names);
-        for (String name : names) {
-          if (name.startsWith(prefix)) candidates.add(new Candidate(name));
+        matches.sort(
+            (left, right) -> {
+              int result = Integer.compare(left.score, right.score);
+              return result == 0 ? left.name.compareTo(right.name) : result;
+            });
+        for (ScoredCandidate match : matches) {
+          candidates.add(
+              new Candidate(
+                  match.name, match.name, "Hara symbols", match.description, null, null, true));
         }
       } catch (RuntimeException ignored) {
         // Completion must never disrupt the REPL when the context is unavailable.
       }
     }
 
-    private static String extractWord(String buffer, int cursor) {
+    private void addCommandCandidates(String prefix, List<Candidate> candidates) {
+      for (String[] command : REPL_COMMANDS) {
+        if (fuzzyScore(prefix, command[0]) != Integer.MAX_VALUE) {
+          candidates.add(
+              new Candidate(command[0], command[0], "REPL commands", command[1], null, null, true));
+        }
+      }
+    }
+
+    private String describe(String name) {
+      try {
+        String escaped = name.replace("\\", "\\\\").replace("\"", "\\\"");
+        Value meta = context.eval(HaraLanguage.ID, "(meta #'" + escaped + ")");
+        Value doc = context.eval(HaraLanguage.ID, "(get (meta #'" + escaped + ") :doc)");
+        Value arglists = context.eval(HaraLanguage.ID, "(get (meta #'" + escaped + ") :arglists)");
+        StringBuilder result = new StringBuilder();
+        if (arglists != null && !arglists.isNull()) result.append(arglists);
+        if (doc != null && !doc.isNull()) {
+          if (result.length() > 0) result.append(" — ");
+          result.append(doc.asString().replace('\n', ' '));
+        }
+        return result.toString();
+      } catch (RuntimeException ignored) {
+        return "";
+      }
+    }
+
+    private static int fuzzyScore(String query, String value) {
+      if (query == null || query.isEmpty()) return 0;
+      if (value.equals(query)) return 0;
+      if (value.startsWith(query)) return 10 + value.length() - query.length();
+      String lowerQuery = query.toLowerCase(java.util.Locale.ROOT);
+      String lowerValue = value.toLowerCase(java.util.Locale.ROOT);
+      if (lowerValue.contains(lowerQuery)) return 100 + lowerValue.indexOf(lowerQuery);
+      int queryIndex = 0;
+      int gaps = 0;
+      for (int i = 0; i < lowerValue.length() && queryIndex < lowerQuery.length(); i++) {
+        if (lowerValue.charAt(i) == lowerQuery.charAt(queryIndex)) {
+          queryIndex++;
+        } else if (queryIndex > 0) {
+          gaps++;
+        }
+      }
+      return queryIndex == lowerQuery.length() ? 200 + gaps : Integer.MAX_VALUE;
+    }
+
+    public static String extractWord(String buffer, int cursor) {
       if (buffer == null || buffer.isEmpty() || cursor <= 0) return "";
+      int start = wordStart(buffer, Math.min(cursor, buffer.length()));
+      return buffer.substring(start, Math.min(cursor, buffer.length()));
+    }
+
+    private static int wordStart(String buffer, int cursor) {
+      if (buffer == null || buffer.isEmpty() || cursor <= 0) return 0;
       cursor = Math.min(cursor, buffer.length());
       int start = Math.max(0, cursor - 1);
       while (start >= 0) {
@@ -481,12 +677,13 @@ public final class Main {
             || Character.isWhitespace(c)
             || c == '"'
             || c == '\'') {
-          start++;
-          break;
+          return start + 1;
         }
         start--;
       }
-      return buffer.substring(Math.max(0, start), cursor);
+      return 0;
     }
+
+    private record ScoredCandidate(String name, int score, String description) {}
   }
 }
