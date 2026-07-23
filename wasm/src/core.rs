@@ -172,31 +172,61 @@ pub enum PromiseState {
     Rejected(String),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Promise {
     state: Rc<RefCell<PromiseState>>,
+    continuations: Rc<RefCell<Vec<Rc<dyn Fn(PromiseState)>>>>,
+}
+
+impl std::fmt::Debug for Promise {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.debug_struct("Promise").field("state", &self.state()).finish()
+    }
 }
 
 impl Promise {
-    pub fn new() -> Self { Self { state: Rc::new(RefCell::new(PromiseState::Pending)) } }
+    pub fn new() -> Self {
+        Self { state: Rc::new(RefCell::new(PromiseState::Pending)), continuations: Rc::new(RefCell::new(Vec::new())) }
+    }
 
     pub fn state(&self) -> PromiseState { self.state.borrow().clone() }
 
-    pub fn resolve(&self, value: Value) -> bool {
-        let mut state = self.state.borrow_mut();
-        if !matches!(*state, PromiseState::Pending) { return false; }
-        *state = PromiseState::Fulfilled(value); true
+    pub fn resolve(&self, value: Value) -> bool { self.settle(PromiseState::Fulfilled(value)) }
+
+    pub fn reject(&self, error: impl Into<String>) -> bool { self.settle(PromiseState::Rejected(error.into())) }
+
+    fn settle(&self, next: PromiseState) -> bool {
+        let continuations = {
+            let mut state = self.state.borrow_mut();
+            if !matches!(*state, PromiseState::Pending) { return false; }
+            *state = next.clone();
+            std::mem::take(&mut *self.continuations.borrow_mut())
+        };
+        for continuation in continuations { continuation(next.clone()); }
+        true
     }
 
-    pub fn reject(&self, error: impl Into<String>) -> bool {
-        let mut state = self.state.borrow_mut();
-        if !matches!(*state, PromiseState::Pending) { return false; }
-        *state = PromiseState::Rejected(error.into()); true
+    pub fn on_settle(&self, continuation: Rc<dyn Fn(PromiseState)>) {
+        let state = self.state();
+        if matches!(state, PromiseState::Pending) {
+            self.continuations.borrow_mut().push(continuation);
+        } else {
+            continuation(state);
+        }
     }
 
     pub fn adopt(&self, other: &Promise) -> bool {
         match other.state() {
-            PromiseState::Pending => false,
+            PromiseState::Pending => {
+                if !matches!(self.state(), PromiseState::Pending) { return false; }
+                let destination = self.clone();
+                other.on_settle(Rc::new(move |state| match state {
+                    PromiseState::Fulfilled(value) => { destination.resolve(value); },
+                    PromiseState::Rejected(error) => { destination.reject(error); },
+                    PromiseState::Pending => {},
+                }));
+                true
+            }
             PromiseState::Fulfilled(value) => self.resolve(value),
             PromiseState::Rejected(error) => self.reject(error),
         }
@@ -668,6 +698,36 @@ fn promise_value_result(promise: &Promise) -> Result<Value, String> {
     match promise.state() { PromiseState::Pending => Err("promise is pending".into()), PromiseState::Fulfilled(value) => Ok(value), PromiseState::Rejected(error) => Err(error) }
 }
 
+fn promise_chain(source: Promise, operation: &str, function: Rc<Function>) -> Promise {
+    let output = Promise::new();
+    let operation = operation.to_string();
+    let destination = output.clone();
+    source.on_settle(Rc::new(move |state| {
+        match state {
+            PromiseState::Fulfilled(value) if operation == "promise/map" => match call_function(&function, vec![value]) {
+                Ok(value) => { destination.resolve(value); },
+                Err(error) => { destination.reject(error); },
+            },
+            PromiseState::Rejected(error) if operation == "promise/recover" => match call_function(&function, vec![Value::String(error)]) {
+                Ok(value) => { destination.resolve(value); },
+                Err(error) => { destination.reject(error); },
+            },
+            PromiseState::Fulfilled(value) if operation == "promise/finally" => match call_function(&function, Vec::new()) {
+                Ok(_) => { destination.resolve(value); },
+                Err(error) => { destination.reject(error); },
+            },
+            PromiseState::Rejected(error) if operation == "promise/finally" => match call_function(&function, Vec::new()) {
+                Ok(_) => { destination.reject(error); },
+                Err(error) => { destination.reject(error); },
+            },
+            PromiseState::Fulfilled(value) => { destination.resolve(value); },
+            PromiseState::Rejected(error) => { destination.reject(error); },
+            PromiseState::Pending => {},
+        }
+    }));
+    output
+}
+
 fn marker_key(value: &Value, operation: &str) -> Result<String, String> {
     match value { Value::String(key) => Ok(key.clone()), Value::Keyword(key) => Ok(key.clone()), _ => Err(format!("{operation} expects a string key")) }
 }
@@ -1060,17 +1120,9 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
             }
             Form::Symbol(n) if ["promise/map", "promise/recover", "promise/finally"].contains(&n.as_str()) => {
                 if fs.len()!=3 { return Err(format!("{n} expects a promise and function")); }
-                let source=promise_value(&eval(&fs[1], env)?, n)?; let function=match eval(&fs[2], env)? { Value::Function(function)=>function, _=>return Err(format!("{n} expects a function")) }; let output=Promise::new();
-                match source.state() {
-                    PromiseState::Fulfilled(value) if n=="promise/map" => match call_function(&function, vec![value]) { Ok(value)=>{ output.resolve(value); }, Err(error)=>{ output.reject(error); } },
-                    PromiseState::Rejected(error) if n=="promise/recover" => match call_function(&function, vec![Value::String(error)]) { Ok(value)=>{ output.resolve(value); }, Err(error)=>{ output.reject(error); } },
-                    PromiseState::Fulfilled(value) if n=="promise/finally" => { let _=call_function(&function,Vec::new()); output.resolve(value); },
-                    PromiseState::Rejected(error) if n=="promise/finally" => { let _=call_function(&function,Vec::new()); output.reject(error); },
-                    PromiseState::Fulfilled(value) => { output.resolve(value); },
-                    PromiseState::Rejected(error) => { output.reject(error); },
-                    PromiseState::Pending => {},
-                }
-                Ok(Value::Promise(output))
+                let source=promise_value(&eval(&fs[1], env)?, n)?;
+                let function=match eval(&fs[2], env)? { Value::Function(function)=>function, _=>return Err(format!("{n} expects a function")) };
+                Ok(Value::Promise(promise_chain(source, n, function)))
             }
             Form::Symbol(n) if n == "array" => {
                 let values = fs[1..].iter().map(|form| eval(form, env)).collect::<Result<Vec<_>, _>>()?;

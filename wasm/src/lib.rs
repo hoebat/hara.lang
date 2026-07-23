@@ -439,6 +439,10 @@ mod tests {
         assert_eq!(runtime.eval_text("(promise/state (promise/map (promise/resolve (promise) 41) (fn [x] (+ x 1))))").unwrap(), ":fulfilled");
         assert_eq!(runtime.eval_text("(promise/value (promise/recover (promise/reject (promise) :bad) (fn [x] (str x :ok))))").unwrap(), "\":bad:ok\"");
         assert_eq!(runtime.eval_text("(promise/value (promise/finally (promise/resolve (promise) 42) (fn [] 0)))").unwrap(), "42");
+        assert_eq!(runtime.eval_text("(let (source (promise) mapped (promise/map source (fn [x] (+ x 1)))) (do (promise/resolve source 41) (promise/value mapped)))").unwrap(), "42");
+        assert_eq!(runtime.eval_text("(let (source (promise) recovered (promise/recover source (fn [x] (str x :ok)))) (do (promise/reject source :bad) (promise/value recovered)))").unwrap(), "\":bad:ok\"");
+        assert_eq!(runtime.eval_text("(let (source (promise) final (promise/finally source (fn [] 0))) (do (promise/resolve source 42) (promise/value final)))").unwrap(), "42");
+        assert_eq!(runtime.eval_text("(let (source (promise) final (promise/finally source (fn [] (throw :cleanup)))) (do (promise/resolve source 42) (promise/value final)))").unwrap_err(), "thrown: :cleanup");
         assert_eq!(runtime.eval_text("(promise/state (promise/cancel (promise)))").unwrap(), ":rejected");
         assert_eq!(runtime.eval_text("(promise/value (promise/cancel (promise)))").unwrap_err(), "cancelled");
     }
@@ -448,10 +452,9 @@ mod tests {
         let pending = core::Promise::new();
         let adopted = core::Promise::new();
         assert_eq!(pending.state(), core::PromiseState::Pending);
-        assert!(!adopted.adopt(&pending));
+        assert!(adopted.adopt(&pending));
         assert!(pending.resolve(core::Value::Number(7)));
         assert!(!pending.reject("late"));
-        assert!(adopted.adopt(&pending));
         assert_eq!(adopted.state(), core::PromiseState::Fulfilled(core::Value::Number(7)));
     }
 
