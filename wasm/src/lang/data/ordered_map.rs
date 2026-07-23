@@ -95,6 +95,14 @@ impl<K: Clone + Eq + Hash, V: Clone> FromIterator<(K, V)> for Standard<K, V> {
             .fold(Self::new(), |map, (key, value)| map.assoc_value(key, value))
     }
 }
+impl<K: Clone + Eq + Hash, V: Clone + PartialEq> PartialEq for Standard<K, V> {
+    fn eq(&self, other: &Self) -> bool {
+        self.len() == other.len()
+            && self
+                .iter()
+                .all(|(key, value)| other.get(key) == Some(value))
+    }
+}
 impl<K: Clone + Eq + Hash, V: Clone> ICount for Standard<K, V> {
     fn count(&self) -> usize {
         self.len()

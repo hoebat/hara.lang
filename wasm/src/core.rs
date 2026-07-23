@@ -5,7 +5,9 @@ use std::collections::{HashMap, HashSet};
 pub use crate::kernel::Form;
 use crate::kernel::Var as KernelVar;
 use crate::lang::data::List as PList;
-use crate::lang::data::{Keyword, Map as PMap, Set as PSet, Symbol, Vector as PVector};
+use crate::lang::data::{
+    Keyword, OrderedMap as PMap, OrderedSet as PSet, Symbol, Vector as PVector,
+};
 use crate::lang::data::{Metadata, MetadataValue};
 use crate::lang::protocol::{IDisplay, IMetadata};
 pub use crate::task::{LocalPromiseProvider, Promise, PromiseProvider, PromiseState};
@@ -498,11 +500,14 @@ impl Value {
                     .collect::<Vec<_>>()
                     .join(" ")
             ),
-            Self::Set(values) => {
-                let mut displayed = values.iter().map(Value::display).collect::<Vec<_>>();
-                displayed.sort();
-                format!("#{{{}}}", displayed.join(" "))
-            }
+            Self::Set(values) => format!(
+                "#{{{}}}",
+                values
+                    .iter()
+                    .map(Value::display)
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ),
             Self::List(values) => format!(
                 "({})",
                 values

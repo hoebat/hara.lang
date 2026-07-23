@@ -934,6 +934,20 @@ mod tests {
     }
 
     #[test]
+    fn reader_maps_and_sets_preserve_java_insertion_order() {
+        let mut runtime = Runtime::new();
+        assert_eq!(runtime.eval_text("{:b 2 :a 1}").unwrap(), "{:b 2 :a 1}");
+        assert_eq!(runtime.eval_text("(keys {:b 2 :a 1})").unwrap(), "[:b :a]");
+        assert_eq!(runtime.eval_text("#{:b :a}").unwrap(), "#{:b :a}");
+        assert_eq!(
+            runtime
+                .eval_text("(conj (dissoc {:a 1 :b 2} :a) [:a 3])")
+                .unwrap(),
+            "{:b 2 :a 3}"
+        );
+    }
+
+    #[test]
     fn collection_operations_are_values() {
         let mut runtime = Runtime::new();
         assert_eq!(runtime.eval_text("(count [1 2 3])").unwrap(), "3");

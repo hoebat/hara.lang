@@ -35,6 +35,9 @@ impl<E: Clone + Eq + Hash> Standard<E> {
     pub fn get(&self, value: &E) -> Option<&E> {
         self.lookup.find_entry(value).map(|(stored, _)| stored)
     }
+    pub fn contains(&self, value: &E) -> bool {
+        self.get(value).is_some()
+    }
     pub fn iter(&self) -> impl Iterator<Item = &E> {
         self.order.iter().filter_map(Option::as_ref)
     }
@@ -75,6 +78,16 @@ impl<E: Clone + Eq + Hash> FromIterator<E> for Standard<E> {
     fn from_iter<T: IntoIterator<Item = E>>(iter: T) -> Self {
         iter.into_iter()
             .fold(Self::new(), |set, value| set.conj_value(value))
+    }
+}
+impl<E: Clone + Eq + Hash> From<Vec<E>> for Standard<E> {
+    fn from(values: Vec<E>) -> Self {
+        values.into_iter().collect()
+    }
+}
+impl<E: Clone + Eq + Hash> PartialEq for Standard<E> {
+    fn eq(&self, other: &Self) -> bool {
+        self.len() == other.len() && self.iter().all(|v| other.contains(v))
     }
 }
 impl<E: Clone + Eq + Hash> ICount for Standard<E> {
