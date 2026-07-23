@@ -664,6 +664,19 @@ public final class HaraContext {
     target.define("load-resource", new UnaryBuiltin("load-resource", this::loadResource));
     target.define("require", new VariadicBuiltin("require", this::requireModule));
     target.define("refer", new UnaryBuiltin("refer", this::referNamespace));
+    target.define(
+        "meta",
+        new UnaryBuiltin(
+            "meta",
+            value -> {
+              Object unwrapped = HaraBox.unwrap(value);
+              if (unwrapped == null || unwrapped == HaraNull.SINGLETON) return null;
+              if (unwrapped instanceof HaraVar) return ((HaraVar) unwrapped).meta();
+              if (unwrapped instanceof hara.lang.protocol.IObjType) {
+                return ((hara.lang.protocol.IObjType) unwrapped).meta();
+              }
+              return null;
+            }));
     target.define("in-ns", new UnaryBuiltin("in-ns", this::inNamespace));
     target.define(
         "current-symbols",
