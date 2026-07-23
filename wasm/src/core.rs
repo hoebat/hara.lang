@@ -3362,13 +3362,15 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 }
                 let (name, metadata) = binding_symbol(&fs[1], "def name")?;
                 let value = eval(&fs[2], env)?;
-                if let Some(Value::Var(cell)) = env.get(&name) {
-                    cell.reset_value(value.clone());
+                if let Some(Value::Var(var)) = env.get(&name) {
+                    var.reset_value(value.clone());
+                    if metadata.is_some() {
+                        var.set_hara_metadata(metadata);
+                    }
                 } else {
-                    env.insert(
-                        name.clone(),
-                        Value::Var(KernelVar::new(name, value.clone())),
-                    );
+                    let var = KernelVar::new(name.clone(), value.clone());
+                    var.set_hara_metadata(metadata);
+                    env.insert(name, Value::Var(var));
                 }
                 Ok(value)
             }
@@ -3382,6 +3384,9 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     Some(Value::Var(cell)) => cell.clone(),
                     _ => KernelVar::new(name.clone(), Value::Nil),
                 };
+                if metadata.is_some() {
+                    cell.set_hara_metadata(metadata);
+                }
                 env.insert(name.clone(), Value::Var(cell.clone()));
                 let function_ref = Rc::new(Function {
                     params,
@@ -4728,6 +4733,53 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                         .map(|form| eval(form, env))
                         .collect::<Result<Vec<_>, _>>()?,
                 ))
+            }
+            Form::Symbol(n) if n == "binding" => {
+                if fs.len() < 3 {
+                    return Err("binding expects bindings and a body".into());
+                }
+                let pairs = match &fs[1] {
+                    Form::List(values) | Form::Vector(values) => values,
+                    _ => return Err("binding expects a binding list or vector".into()),
+                };
+                if pairs.len() % 2 != 0 {
+                    return Err("binding bindings require name/value pairs".into());
+                }
+                let mut pending = Vec::new();
+                for pair in pairs.chunks(2) {
+                    let name = match &pair[0] {
+                        Form::Symbol(name) => name,
+                        _ => return Err("binding name must be a symbol".into()),
+                    };
+                    let var = match env.get(name) {
+                        Some(Value::Var(var)) => var.clone(),
+                        _ => return Err(format!("binding expects a Var: {name}")),
+                    };
+                    if !var.is_dynamic() {
+                        return Err(format!("binding expects a dynamic Var: {name}"));
+                    }
+                    let value = eval(&pair[1], env)?;
+                    pending.push((var, value));
+                }
+                for (var, value) in &pending {
+                    var.bind(value.clone());
+                }
+                let bound = pending.into_iter().map(|(var, _)| var).collect::<Vec<_>>();
+                let mut result = Ok(Value::Nil);
+                for form in &fs[2..] {
+                    result = eval(form, env);
+                    if result.is_err() {
+                        break;
+                    }
+                }
+                for var in bound.into_iter().rev() {
+                    if let Err(error) = var.unbind() {
+                        if result.is_ok() {
+                            result = Err(error);
+                        }
+                    }
+                }
+                result
             }
             Form::Symbol(n) if n == "loop" => {
                 if fs.len() != 3 {

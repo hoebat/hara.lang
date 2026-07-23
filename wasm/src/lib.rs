@@ -2263,4 +2263,20 @@ mod tests {
             "\"quoted\""
         );
     }
+    #[test]
+    fn typed_vars_preserve_definition_metadata_and_dynamic_binding_scope() {
+        let mut runtime = Runtime::new();
+        assert_eq!(runtime.eval_text("(do (def ^:dynamic *answer* 1) (binding [*answer* 42] (binding [*answer* 43] *answer*)))").unwrap(), "43");
+        assert_eq!(runtime.eval_text("*answer*").unwrap(), "1");
+        assert_eq!(runtime.eval_text("(protocol-call ILookup lookup (protocol-call IObjType meta (var *answer*)) :dynamic)").unwrap(), "true");
+        assert_eq!(runtime.eval_text("(do (def ^{:doc \"answer doc\"} answer 42) (protocol-call ILookup lookup (protocol-call IObjType meta (var answer)) :doc))").unwrap(), "\"answer doc\"");
+        assert!(runtime
+            .eval_text("(do (def plain 1) (binding [plain 2] plain))")
+            .unwrap_err()
+            .contains("dynamic Var"));
+        assert!(runtime
+            .eval_text("(do (def ^:dynamic *left* 1) (binding [*left* 2 plain 3] *left*))")
+            .is_err());
+        assert_eq!(runtime.eval_text("*left*").unwrap(), "1");
+    }
 }
