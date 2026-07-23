@@ -57,7 +57,7 @@ jobs:
       - name: Add Java API documentation
         run: |
           mkdir -p site-build/api/java
-          cp -R target/site/apidocs/. site-build/api/java/
+          cp -R target/reports/apidocs/. site-build/api/java/
           cat docs/javadoc-theme.css >> site-build/api/java/stylesheet.css
 
       - name: Configure Pages
