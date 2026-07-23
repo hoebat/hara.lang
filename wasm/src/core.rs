@@ -43,7 +43,7 @@ pub struct Function {
 }
 
 #[derive(Debug, Clone)]
-enum IteratorGenerator { Constant(Value), Repeated(Rc<Function>), Iterate(Rc<Function>, Value), TakeWhile(Rc<Function>, Value), DropWhile(Rc<Function>, Value, bool) }
+enum IteratorGenerator { Constant(Value), Repeated(Rc<Function>), Iterate(Rc<Function>, Value), TakeWhile(Rc<Function>, Value), DropWhile(Rc<Function>, Value, bool), Map(Rc<Function>, Value), Filter(Rc<Function>, Value) }
 
 #[derive(Debug, Clone)]
 pub struct IteratorState {
@@ -67,6 +67,8 @@ impl IteratorState {
                 IteratorGenerator::Iterate(function, current) => { let output=current.clone(); *current=call_function(function, vec![current.clone()])?; Ok(output) },
                 IteratorGenerator::TakeWhile(function, source) => { let value=iterator_next(source)?; if call_function(function, vec![value.clone()])?.truthy() { Ok(value) } else { self.closed=true; Err("iter-next reached the end of the iterator".into()) } },
                 IteratorGenerator::DropWhile(function, source, started) => { loop { let value=iterator_next(source)?; if *started || !call_function(function, vec![value.clone()])?.truthy() { *started=true; break Ok(value); } } },
+                IteratorGenerator::Map(function, source) => { let value=iterator_next(source)?; call_function(function, vec![value]) },
+                IteratorGenerator::Filter(function, source) => { loop { let value=iterator_next(source)?; if call_function(function, vec![value.clone()])?.truthy() { break Ok(value); } } },
             };
         }
         if self.values.is_empty() { return Err("iter-next reached the end of the iterator".into()); }
@@ -770,6 +772,9 @@ fn iterator_take_while(function: Rc<Function>, value: Value) -> Result<Value, St
     if let Value::Iterator(iterator)=&source { if iterator.borrow().generator.is_none() { let values=iterator_values(source)?; let mut output=Vec::new(); for value in values { if !call_function(&function, vec![value.clone()])?.truthy() { break; } output.push(value); } return Ok(iterator_from_values(output)); } }
     Ok(Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::TakeWhile(function, source))))))
 }
+fn iterator_map(function: Rc<Function>, value: Value) -> Result<Value, String> { let source=match value { Value::Iterator(iterator) => Value::Iterator(iterator), value => make_iterator(value)? }; if let Value::Iterator(iterator)=&source { if iterator.borrow().generator.is_none() { let values=iterator_values(source)?; return Ok(iterator_from_values(values.into_iter().map(|value| call_function(&function, vec![value])).collect::<Result<Vec<_>,_>>()?)); } } Ok(Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::Map(function, source)))))) }
+fn iterator_filter(function: Rc<Function>, value: Value) -> Result<Value, String> { let source=match value { Value::Iterator(iterator) => Value::Iterator(iterator), value => make_iterator(value)? }; if let Value::Iterator(iterator)=&source { if iterator.borrow().generator.is_none() { let values=iterator_values(source)?; return Ok(iterator_from_values(values.into_iter().filter_map(|value| match call_function(&function, vec![value.clone()]) { Ok(result) if result.truthy()=>Some(Ok(value)), Ok(_)=>None, Err(error)=>Some(Err(error)) }).collect::<Result<Vec<_>,_>>()?)); } } Ok(Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::Filter(function, source)))))) }
+
 fn iterator_drop_while(function: Rc<Function>, value: Value) -> Result<Value, String> {
     let source=match value { Value::Iterator(iterator) => Value::Iterator(iterator), value => make_iterator(value)? };
     if let Value::Iterator(iterator)=&source { if iterator.borrow().generator.is_none() { let values=iterator_values(source)?; let mut output=Vec::new(); let mut dropping=true; for value in values { if dropping && call_function(&function, vec![value.clone()])?.truthy() { continue; } dropping=false; output.push(value); } return Ok(iterator_from_values(output)); } }
@@ -1091,7 +1096,10 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
             Form::Symbol(n) if ["iter-map", "map", "iter-filter", "filter"].contains(&n.as_str()) => {
                 let is_map = n == "iter-map" || n == "map";
                 if fs.len() < 3 { return Err(format!("{n} expects a function and collection")); }
-                let function = eval(&fs[1], env)?; let collections = fs[2..].iter().map(|form| eval(form, env).and_then(iterator_values)).collect::<Result<Vec<_>,_>>()?; let mut output = Vec::new();
+                let function = eval(&fs[1], env)?;
+                let raw_collection=if fs.len()==3 { Some(eval(&fs[2], env)?) } else { None };
+                if fs.len()==3 { if let Value::Function(function_ref)=&function { if is_map { if let Some(value)=raw_collection.clone() { if let Value::Iterator(iterator)=&value { if iterator.borrow().generator.is_some() { return iterator_map(function_ref.clone(), value); } } } } else if let Some(value)=raw_collection.clone() { if let Value::Iterator(iterator)=&value { if iterator.borrow().generator.is_some() { return iterator_filter(function_ref.clone(), value); } } } } }
+                let collections = if let Some(value)=raw_collection { vec![iterator_values(value)?] } else { fs[2..].iter().map(|form| eval(form, env).and_then(iterator_values)).collect::<Result<Vec<_>,_>>()? }; let mut output = Vec::new();
                 if is_map {
                     let limit=collections.iter().map(Vec::len).min().unwrap_or(0);
                     for index in 0..limit { let args=collections.iter().map(|values| values[index].clone()).collect(); let mapped=match &function { Value::Function(f) => call_function(f,args)?, _ => return Err(format!("{n} expects a function")) }; output.push(mapped); }
