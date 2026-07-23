@@ -729,6 +729,8 @@ impl ProtocolRegistry {
 thread_local! {
     static ACTIVE_PROTOCOLS: RefCell<Option<ProtocolRegistry>> = const { RefCell::new(None) };
     static ACTIVE_PROMISE_PROVIDER: RefCell<Option<Rc<dyn PromiseProvider>>> = const { RefCell::new(None) };
+    static ACTIVE_FILE_PROVIDER: RefCell<Option<Rc<dyn FileProvider>>> = const { RefCell::new(None) };
+    static ACTIVE_SOCKET_PROVIDER: RefCell<Option<Rc<dyn SocketProvider>>> = const { RefCell::new(None) };
     static HOST_CALL_HANDLER: RefCell<Option<Rc<dyn Fn(String, String, Vec<Value>) -> Result<Value, String>>>> = const { RefCell::new(None) };
 }
 
@@ -762,6 +764,182 @@ fn promise_provider() -> Rc<dyn PromiseProvider> {
             .clone()
             .unwrap_or_else(|| Rc::new(LocalPromiseProvider))
     })
+}
+/// Runs an evaluation through the selected runtime capability providers.
+pub fn with_capability_providers<R>(
+    file: Option<Rc<dyn FileProvider>>,
+    socket: Option<Rc<dyn SocketProvider>>,
+    operation: impl FnOnce() -> R,
+) -> R {
+    ACTIVE_FILE_PROVIDER.with(|active_file| {
+        ACTIVE_SOCKET_PROVIDER.with(|active_socket| {
+            let previous_file = active_file.replace(file);
+            let previous_socket = active_socket.replace(socket);
+            let result = operation();
+            active_file.replace(previous_file);
+            active_socket.replace(previous_socket);
+            result
+        })
+    })
+}
+
+fn file_provider(operation: &str) -> Result<Rc<dyn FileProvider>, String> {
+    ACTIVE_FILE_PROVIDER.with(|active| {
+        active
+            .borrow()
+            .clone()
+            .ok_or_else(|| format!("{operation} is unsupported or file access is denied"))
+    })
+}
+
+fn socket_provider(operation: &str) -> Result<Rc<dyn SocketProvider>, String> {
+    ACTIVE_SOCKET_PROVIDER.with(|active| {
+        active
+            .borrow()
+            .clone()
+            .ok_or_else(|| format!("{operation} is unsupported or network access is denied"))
+    })
+}
+
+fn file_error(operation: &str, error: FileError) -> String {
+    format!("{operation} failed: file/{}", error.code())
+}
+
+fn socket_error(operation: &str, error: SocketError) -> String {
+    format!("{operation} failed: socket/{}", error.code())
+}
+
+fn file_operation(
+    operation: &str,
+    forms: &[Form],
+    env: &mut HashMap<String, Value>,
+) -> Result<Value, String> {
+    match operation {
+        "file/resolve" => {
+            if forms.len() != 2 {
+                return Err("file/resolve expects a root and path".into());
+            }
+            let root = match eval(&forms[0], env)? {
+                Value::String(value) => value,
+                _ => return Err("file/resolve expects a root and path".into()),
+            };
+            let path = match eval(&forms[1], env)? {
+                Value::String(value) => value,
+                _ => return Err("file/resolve expects a root and path".into()),
+            };
+            file_provider(operation)?
+                .resolve(&root, &path)
+                .map(Value::String)
+                .map_err(|error| file_error(operation, error))
+        }
+        "file/read" => {
+            if forms.len() != 1 {
+                return Err("file/read expects a path".into());
+            }
+            let path = match eval(&forms[0], env)? {
+                Value::String(value) => value,
+                _ => return Err("file/read expects a path".into()),
+            };
+            file_provider(operation)?
+                .read(&path)
+                .map(Value::Promise)
+                .map_err(|error| file_error(operation, error))
+        }
+        "file/write" => {
+            if forms.len() != 2 {
+                return Err("file/write expects a path and bytes".into());
+            }
+            let path = match eval(&forms[0], env)? {
+                Value::String(value) => value,
+                _ => return Err("file/write expects a path and bytes".into()),
+            };
+            let bytes = match eval(&forms[1], env)? {
+                Value::Bytes(value) => value,
+                Value::ByteBuffer(value) => value.borrow().clone(),
+                _ => return Err("file/write expects a path and bytes".into()),
+            };
+            file_provider(operation)?
+                .write(&path, bytes)
+                .map(Value::Promise)
+                .map_err(|error| file_error(operation, error))
+        }
+        _ => unreachable!(),
+    }
+}
+
+fn socket_operation(
+    operation: &str,
+    forms: &[Form],
+    env: &mut HashMap<String, Value>,
+) -> Result<Value, String> {
+    match operation {
+        "socket/connect" => {
+            if forms.len() != 4 {
+                return Err("socket/connect expects a host, port, options, and callback".into());
+            }
+            let host = match eval(&forms[0], env)? {
+                Value::String(value) => value,
+                _ => {
+                    return Err("socket/connect expects a host, port, options, and callback".into())
+                }
+            };
+            let port = match eval(&forms[1], env)? {
+                Value::Number(value) if value > 0 && value <= u16::MAX as i64 => value as u16,
+                _ => return Err("socket/connect expects a valid port".into()),
+            };
+            let _options = eval(&forms[2], env)?;
+            let callback = match eval(&forms[3], env)? {
+                Value::Function(value) => value,
+                _ => return Err("socket/connect expects a callback".into()),
+            };
+            let callback = Rc::new(move |event| {
+                let arguments = match event {
+                    SocketEvent::Connected(handle) => {
+                        vec![Value::Nil, Value::Number(handle as i64)]
+                    }
+                    SocketEvent::Failed(_, error) => vec![Value::String(error), Value::Nil],
+                    SocketEvent::Data(_, _) | SocketEvent::Closed(_) => return,
+                };
+                let _ = call_function(&callback, arguments);
+            });
+            socket_provider(operation)?
+                .connect(&host, port, callback)
+                .map(|handle| Value::Number(handle as i64))
+                .map_err(|error| socket_error(operation, error))
+        }
+        "socket/send" => {
+            if forms.len() != 2 {
+                return Err("socket/send expects a socket connection and bytes".into());
+            }
+            let socket = match eval(&forms[0], env)? {
+                Value::Number(value) if value >= 0 => value as SocketHandle,
+                _ => return Err("socket/send expects a socket connection and bytes".into()),
+            };
+            let bytes = match eval(&forms[1], env)? {
+                Value::Bytes(value) => value,
+                Value::ByteBuffer(value) => value.borrow().clone(),
+                _ => return Err("socket/send expects a socket connection and bytes".into()),
+            };
+            socket_provider(operation)?
+                .send(socket, &bytes)
+                .map(|count| Value::Number(count as i64))
+                .map_err(|error| socket_error(operation, error))
+        }
+        "socket/close" => {
+            if forms.len() != 1 {
+                return Err("socket/close expects a socket connection".into());
+            }
+            let socket = match eval(&forms[0], env)? {
+                Value::Number(value) if value >= 0 => value as SocketHandle,
+                _ => return Err("socket/close expects a socket connection".into()),
+            };
+            socket_provider(operation)?
+                .close(socket)
+                .map(|()| Value::Nil)
+                .map_err(|error| socket_error(operation, error))
+        }
+        _ => unreachable!(),
+    }
 }
 /// Installs the explicit host-call boundary for one evaluation.
 pub fn with_host_calls<R>(
@@ -877,7 +1055,7 @@ pub trait FileProvider {
 }
 
 pub type SocketHandle = u64;
-pub type SocketCallback = fn(SocketEvent);
+pub type SocketCallback = Rc<dyn Fn(SocketEvent)>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SocketEvent {
@@ -902,16 +1080,16 @@ pub trait SocketProvider {
 use std::io::Write;
 #[cfg(not(target_arch = "wasm32"))]
 use std::net::TcpStream;
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(any(not(target_arch = "wasm32"), target_os = "wasi"))]
 use std::path::{Path, PathBuf};
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(any(not(target_arch = "wasm32"), target_os = "wasi"))]
 #[derive(Debug, Clone)]
 pub struct NativeFileProvider {
     root: PathBuf,
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(any(not(target_arch = "wasm32"), target_os = "wasi"))]
 impl NativeFileProvider {
     pub fn new(root: impl AsRef<Path>) -> Self {
         Self {
@@ -938,7 +1116,7 @@ impl NativeFileProvider {
     }
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(any(not(target_arch = "wasm32"), target_os = "wasi"))]
 impl FileProvider for NativeFileProvider {
     fn resolve(&self, root: &str, path: &str) -> Result<String, FileError> {
         if Path::new(root) != self.root {
@@ -978,7 +1156,7 @@ impl FileProvider for NativeFileProvider {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct NativeSocketProvider {
     next_handle: Cell<SocketHandle>,
     sockets: RefCell<HashMap<SocketHandle, TcpStream>>,
@@ -1001,7 +1179,7 @@ impl SocketProvider for NativeSocketProvider {
         let handle = self.next_handle.get();
         self.next_handle.set(handle + 1);
         self.sockets.borrow_mut().insert(handle, stream);
-        self.callbacks.borrow_mut().insert(handle, callback);
+        self.callbacks.borrow_mut().insert(handle, callback.clone());
         callback(SocketEvent::Connected(handle));
         Ok(handle)
     }
@@ -1015,7 +1193,7 @@ impl SocketProvider for NativeSocketProvider {
             .write_all(bytes)
             .map_err(|error| SocketError::Invalid(error.to_string()))?;
         drop(sockets);
-        if let Some(callback) = self.callbacks.borrow().get(&socket).copied() {
+        if let Some(callback) = self.callbacks.borrow().get(&socket).cloned() {
             callback(SocketEvent::Data(socket, bytes.to_vec()));
         }
         Ok(bytes.len())
@@ -1179,7 +1357,7 @@ impl FileProvider for UnsupportedFileProvider {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct LoopbackSocketProvider {
     next_handle: Rc<Cell<SocketHandle>>,
     callbacks: Rc<RefCell<HashMap<SocketHandle, SocketCallback>>>,
@@ -1206,7 +1384,7 @@ impl SocketProvider for LoopbackSocketProvider {
         }
         let handle = self.next_handle.get();
         self.next_handle.set(handle + 1);
-        self.callbacks.borrow_mut().insert(handle, callback);
+        self.callbacks.borrow_mut().insert(handle, callback.clone());
         callback(SocketEvent::Connected(handle));
         Ok(handle)
     }
@@ -1216,7 +1394,7 @@ impl SocketProvider for LoopbackSocketProvider {
             .callbacks
             .borrow()
             .get(&socket)
-            .copied()
+            .cloned()
             .ok_or_else(|| SocketError::Invalid("unknown socket".into()))?;
         callback(SocketEvent::Data(socket, bytes.to_vec()));
         Ok(bytes.len())
@@ -3900,6 +4078,16 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     .collect::<Result<Vec<_>, _>>()?;
                 Ok(Value::ByteBuffer(Rc::new(RefCell::new(values))))
             }
+            Form::Symbol(n)
+                if ["socket/connect", "socket/send", "socket/close"].contains(&n.as_str()) =>
+            {
+                socket_operation(n, &fs[1..], env)
+            }
+            Form::Symbol(n)
+                if ["file/resolve", "file/read", "file/write"].contains(&n.as_str()) =>
+            {
+                file_operation(n, &fs[1..], env)
+            }
             Form::Symbol(n) if n == "str" => {
                 if fs.len() == 1 {
                     return Ok(Value::String(String::new()));
@@ -5108,6 +5296,11 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
             }
         },
     }
+}
+
+pub fn eval_traced(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, String> {
+    let _guard = TraceGuard::enable();
+    eval(form, env).map_err(append_trace)
 }
 
 pub fn eval_text(source: &str, env: &mut HashMap<String, Value>) -> Result<String, String> {

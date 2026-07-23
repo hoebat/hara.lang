@@ -63,7 +63,10 @@ fn main() {
         runtime.install_native_file_provider(root.to_string_lossy().as_ref());
     }
     if native_sockets {
+        #[cfg(not(target_arch = "wasm32"))]
         runtime.install_native_socket_provider();
+        #[cfg(target_arch = "wasm32")]
+        fail("socket/unsupported".into());
     }
 
     if let Some(path) = file {

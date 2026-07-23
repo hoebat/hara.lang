@@ -5,6 +5,7 @@ pub mod lang;
 pub mod task;
 use crate::kernel::Form;
 use std::collections::{HashMap, HashSet};
+use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 
 fn ignore_socket_event(_event: core::SocketEvent) {}
@@ -87,7 +88,7 @@ impl Runtime {
         }
     }
 
-    fn eval_text(&mut self, source: &str) -> Result<String, String> {
+    fn eval_text_mode(&mut self, source: &str, traced: bool) -> Result<String, String> {
         self.refresh_qualified_bindings();
         let forms = kernel::parse_forms(source)?;
         let mut result = core::Value::Nil;
@@ -111,9 +112,21 @@ impl Runtime {
                 .cloned()
                 .unwrap_or_else(kernel::GeneratedNamespaceConfig::defaults);
             let resolved = config.rewrite(form);
-            result = core::with_promise_provider(self.providers.promise(), || {
-                core::with_protocols(&self.protocols, || core::eval(&resolved, &mut self.env))
-            })?;
+            result = core::with_capability_providers(
+                self.providers.file(),
+                self.providers.socket(),
+                || {
+                    core::with_promise_provider(self.providers.promise(), || {
+                        core::with_protocols(&self.protocols, || {
+                            if traced {
+                                core::eval_traced(&resolved, &mut self.env)
+                            } else {
+                                core::eval(&resolved, &mut self.env)
+                            }
+                        })
+                    })
+                },
+            )?;
             if matches!(result, core::Value::Recur(_)) {
                 return Err("recur must be inside loop".into());
             }
@@ -123,6 +136,10 @@ impl Runtime {
         self.save_namespace();
         self.refresh_qualified_bindings();
         Ok(result.display())
+    }
+
+    fn eval_text(&mut self, source: &str) -> Result<String, String> {
+        self.eval_text_mode(source, false)
     }
 
     fn refresh_qualified_bindings(&mut self) {
@@ -236,7 +253,7 @@ impl Runtime {
             .install_file(core::MemoryFileProvider::new(root));
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(any(not(target_arch = "wasm32"), target_os = "wasi"))]
     pub fn install_native_file_provider(&mut self, root: &str) {
         self.providers
             .install_file(core::NativeFileProvider::new(root));
@@ -341,7 +358,7 @@ impl Runtime {
             .socket()
             .ok_or_else(|| JsValue::from_str("socket/unsupported"))?;
         provider
-            .connect(host, port, ignore_socket_event)
+            .connect(host, port, Rc::new(ignore_socket_event))
             .map_err(|error| JsValue::from_str(&format!("socket/{}", error.code())))
     }
 
@@ -376,19 +393,18 @@ impl Runtime {
     }
 
     pub fn eval_traced(&mut self, source: &str) -> Result<String, JsValue> {
-        self.refresh_qualified_bindings();
-        core::eval_text_traced(source, &mut self.env).map_err(|error| JsValue::from_str(&error))
+        self.eval_text_mode(source, true)
+            .map_err(|error| JsValue::from_str(&error))
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(any(not(target_arch = "wasm32"), target_os = "wasi"))]
     pub fn eval_native(&mut self, source: &str) -> Result<String, String> {
         self.eval_text(source)
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(any(not(target_arch = "wasm32"), target_os = "wasi"))]
     pub fn eval_native_traced(&mut self, source: &str) -> Result<String, String> {
-        self.refresh_qualified_bindings();
-        core::eval_text_traced(source, &mut self.env)
+        self.eval_text_mode(source, true)
     }
 }
 
@@ -437,7 +453,7 @@ mod tests {
         SOCKET_EVENTS.store(0, std::sync::atomic::Ordering::SeqCst);
         let sockets = core::NativeSocketProvider::default();
         let handle = sockets
-            .connect("127.0.0.1", port, count_socket_event)
+            .connect("127.0.0.1", port, Rc::new(count_socket_event))
             .unwrap();
         assert_eq!(sockets.send(handle, &[7, 8, 9]).unwrap(), 3);
         sockets.close(handle).unwrap();
@@ -508,6 +524,70 @@ mod tests {
     }
 
     #[test]
+    fn hara_file_operations_use_capability_providers() {
+        let mut runtime = Runtime::new();
+        assert!(runtime
+            .eval_text("(file/read \"/sandbox/data.bin\")")
+            .unwrap_err()
+            .contains("unsupported or file access is denied"));
+
+        runtime.install_memory_file_provider("/sandbox");
+        assert_eq!(
+            runtime
+                .eval_text("(file/resolve \"/sandbox\" \"data.bin\")")
+                .unwrap(),
+            "\"/sandbox/data.bin\""
+        );
+        assert_eq!(
+            runtime
+                .eval_text("(deref (file/write \"/sandbox/data.bin\" (bytes 0 127 255)))")
+                .unwrap(),
+            "nil"
+        );
+        assert_eq!(
+            runtime
+                .eval_text("(deref (file/read \"/sandbox/data.bin\"))")
+                .unwrap(),
+            "#bytes[0 127 -1]"
+        );
+        assert!(runtime
+            .eval_text("(file/resolve \"/sandbox\" \"../escape\")")
+            .unwrap_err()
+            .contains("file/denied"));
+    }
+
+    #[test]
+    fn hara_socket_operations_use_callback_providers() {
+        let mut runtime = Runtime::new();
+        assert!(runtime
+            .eval_text("(socket/connect \"localhost\" 8080 {} (fn [error socket] socket))")
+            .unwrap_err()
+            .contains("unsupported or network access is denied"));
+
+        runtime.install_loopback_socket_provider();
+        assert_eq!(
+            runtime
+                .eval_text("(def socket-handle (socket/connect \"localhost\" 8080 {} (fn [error socket] socket)))")
+                .unwrap(),
+            "1"
+        );
+        assert_eq!(
+            runtime
+                .eval_text("(socket/send socket-handle (bytes 0 127 255))")
+                .unwrap(),
+            "3"
+        );
+        assert_eq!(
+            runtime.eval_text("(socket/close socket-handle)").unwrap(),
+            "nil"
+        );
+        assert!(runtime
+            .eval_text("(socket/send socket-handle (bytes 1))")
+            .unwrap_err()
+            .contains("socket/invalid"));
+    }
+
+    #[test]
     fn provider_registry_reports_installed_capabilities() {
         let mut registry = core::ProviderRegistry::new();
         assert_eq!(
@@ -545,7 +625,7 @@ mod tests {
         SOCKET_EVENTS.store(0, std::sync::atomic::Ordering::SeqCst);
         let sockets = core::LoopbackSocketProvider::default();
         let handle = sockets
-            .connect("localhost", 8080, count_socket_event)
+            .connect("localhost", 8080, Rc::new(count_socket_event))
             .unwrap();
         assert_eq!(sockets.send(handle, &[1, 2, 3]).unwrap(), 3);
         sockets.close(handle).unwrap();
@@ -596,7 +676,7 @@ mod tests {
         let sockets = core::UnsupportedSocketProvider;
         assert_eq!(
             sockets
-                .connect("localhost", 80, ignore_socket_event)
+                .connect("localhost", 80, Rc::new(ignore_socket_event))
                 .unwrap_err(),
             core::SocketError::Unsupported
         );
