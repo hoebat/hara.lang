@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 #[derive(Debug, Clone)]
 pub struct Cons<E, M = List<E>> {
-    metadata: Option<Rc<str>>,
+    metadata: Option<Rc<crate::lang::data::Metadata>>,
     first: E,
     more: M,
 }
@@ -102,7 +102,7 @@ impl<E: Clone, M: Clone> IEmpty for Cons<E, M> {
     }
 }
 impl<E: Clone, M: Clone> IMetadata for Cons<E, M> {
-    type Metadata = Rc<str>;
+    type Metadata = Rc<crate::lang::data::Metadata>;
     fn meta(&self) -> Option<&Self::Metadata> {
         self.metadata.as_ref()
     }
@@ -122,7 +122,6 @@ mod tests {
     use crate::lang::protocol::{
         IConj, ICons, ICount, IEmpty, IMetadata, INth, IPopFirst, IPushFirst,
     };
-    use std::rc::Rc;
     #[test]
     fn linked_navigation() {
         let c = Cons::new(1, vec![2, 3].into_iter().collect::<List<_>>());
@@ -131,9 +130,9 @@ mod tests {
         assert_eq!(c.pop_first(), List::from(vec![2, 3]));
         assert!(Cons::new(1, List::new()).pop_first().is_empty());
 
-        let documented = c.with_meta(Some(Rc::from("doc")));
+        let documented = c.with_meta(Some(crate::lang::data::Metadata::document("doc")));
         assert_eq!(
-            documented.push_first(0).meta().map(|m| m.as_ref()),
+            documented.push_first(0).meta().map(|m| m.doc().unwrap()),
             Some("doc")
         );
         let pushed = documented.push_first(0);
@@ -141,11 +140,14 @@ mod tests {
         assert_eq!(pushed.pop_first(), documented);
         let conjoined = documented.conj(0);
         assert_eq!(conjoined.pop_first(), documented);
-        assert_eq!(conjoined.meta().map(|m| m.as_ref()), Some("doc"));
+        assert_eq!(conjoined.meta().map(|m| m.doc().unwrap()), Some("doc"));
         let consed = documented.cons(0);
         assert_eq!(consed.meta(), None);
         assert_eq!(consed.pop_first(), documented);
         assert!(documented.empty().is_empty());
-        assert_eq!(documented.empty().meta().map(|m| m.as_ref()), Some("doc"));
+        assert_eq!(
+            documented.empty().meta().map(|m| m.doc().unwrap()),
+            Some("doc")
+        );
     }
 }

@@ -25,7 +25,7 @@ impl<E> Node<E> {
 
 #[derive(Debug, Clone)]
 pub struct Standard<E> {
-    metadata: Option<Rc<str>>,
+    metadata: Option<Rc<crate::lang::data::Metadata>>,
     size: usize,
     shift: usize,
     root: Rc<Node<E>>,
@@ -434,7 +434,7 @@ impl<E: Clone> IEmpty for Standard<E> {
 }
 
 impl<E: Clone> IMetadata for Standard<E> {
-    type Metadata = Rc<str>;
+    type Metadata = Rc<crate::lang::data::Metadata>;
 
     fn meta(&self) -> Option<&Self::Metadata> {
         self.metadata.as_ref()
@@ -483,7 +483,7 @@ impl<E: Clone + std::hash::Hash> IHash for Standard<E> {
 pub struct Mutable<E> {
     editable: Rc<Cell<bool>>,
     values: Vec<E>,
-    metadata: Option<Rc<str>>,
+    metadata: Option<Rc<crate::lang::data::Metadata>>,
 }
 
 impl<E: Clone> Mutable<E> {

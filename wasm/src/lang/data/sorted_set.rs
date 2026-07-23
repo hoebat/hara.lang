@@ -100,7 +100,7 @@ impl<E: Clone + Ord> IEmpty for Standard<E> {
     }
 }
 impl<E: Clone + Ord> IMetadata for Standard<E> {
-    type Metadata = std::rc::Rc<str>;
+    type Metadata = std::rc::Rc<crate::lang::data::Metadata>;
     fn meta(&self) -> Option<&Self::Metadata> {
         self.lookup.meta()
     }
@@ -160,23 +160,22 @@ mod tests {
     #[test]
     fn updates_slices_empty_and_mutable_preserve_metadata() {
         use crate::lang::protocol::{IEmpty, IMetadata, IToMutable, IToPersistent};
-        use std::rc::Rc;
         let set = [1, 2, 3]
             .into_iter()
             .collect::<Standard<_>>()
-            .with_meta(Some(Rc::from("doc")));
+            .with_meta(Some(crate::lang::data::Metadata::document("doc")));
         for value in [
             set.conj_value(4),
             set.dissoc_value(&1),
             set.slice(&1, &2),
             set.empty(),
         ] {
-            assert_eq!(value.meta().map(|m| m.as_ref()), Some("doc"));
+            assert_eq!(value.meta().map(|m| m.doc().unwrap()), Some("doc"));
         }
         let mut mutable = set.to_mutable();
         mutable.conj(4);
         assert_eq!(
-            mutable.to_persistent().meta().map(|m| m.as_ref()),
+            mutable.to_persistent().meta().map(|m| m.doc().unwrap()),
             Some("doc")
         );
     }

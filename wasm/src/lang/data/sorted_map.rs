@@ -168,7 +168,7 @@ fn dissoc<K: Clone + Ord, V: Clone>(root: &Link<K, V>, key: &K) -> Link<K, V> {
 
 #[derive(Debug, Clone)]
 pub struct Standard<K, V> {
-    metadata: Option<Rc<str>>,
+    metadata: Option<Rc<crate::lang::data::Metadata>>,
     root: Link<K, V>,
 }
 impl<K, V> Default for Standard<K, V> {
@@ -341,7 +341,7 @@ impl<K: Clone + Ord, V: Clone> IEmpty for Standard<K, V> {
     }
 }
 impl<K: Clone + Ord, V: Clone> IMetadata for Standard<K, V> {
-    type Metadata = Rc<str>;
+    type Metadata = Rc<crate::lang::data::Metadata>;
     fn meta(&self) -> Option<&Self::Metadata> {
         self.metadata.as_ref()
     }
@@ -427,28 +427,33 @@ mod tests {
     #[test]
     fn tree_updates_slices_maps_empty_and_mutable_preserve_metadata() {
         use crate::lang::protocol::{IEmpty, IMetadata, IToMutable, IToPersistent};
-        use std::rc::Rc;
         let map = [(1, 10), (2, 20), (3, 30)]
             .into_iter()
             .collect::<Standard<_, _>>()
-            .with_meta(Some(Rc::from("doc")));
+            .with_meta(Some(crate::lang::data::Metadata::document("doc")));
         assert_eq!(
-            map.assoc_value(4, 40).meta().map(|m| m.as_ref()),
+            map.assoc_value(4, 40).meta().map(|m| m.doc().unwrap()),
             Some("doc")
         );
-        assert_eq!(map.dissoc_value(&1).meta().map(|m| m.as_ref()), Some("doc"));
-        assert_eq!(map.slice(&1, &2).meta().map(|m| m.as_ref()), Some("doc"));
+        assert_eq!(
+            map.dissoc_value(&1).meta().map(|m| m.doc().unwrap()),
+            Some("doc")
+        );
+        assert_eq!(
+            map.slice(&1, &2).meta().map(|m| m.doc().unwrap()),
+            Some("doc")
+        );
         assert_eq!(
             map.map_values(|_, value| value + 1)
                 .meta()
-                .map(|m| m.as_ref()),
+                .map(|m| m.doc().unwrap()),
             Some("doc")
         );
-        assert_eq!(map.empty().meta().map(|m| m.as_ref()), Some("doc"));
+        assert_eq!(map.empty().meta().map(|m| m.doc().unwrap()), Some("doc"));
         let mut mutable = map.to_mutable();
         mutable.assoc(4, 40);
         assert_eq!(
-            mutable.to_persistent().meta().map(|m| m.as_ref()),
+            mutable.to_persistent().meta().map(|m| m.doc().unwrap()),
             Some("doc")
         );
     }

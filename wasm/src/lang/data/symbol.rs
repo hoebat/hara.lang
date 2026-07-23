@@ -18,7 +18,7 @@ struct Data {
 #[derive(Debug, Clone)]
 pub struct Symbol {
     data: Rc<Data>,
-    metadata: Option<Rc<str>>,
+    metadata: Option<Rc<crate::lang::data::Metadata>>,
 }
 
 impl Symbol {
@@ -71,7 +71,7 @@ impl INamespaced for Symbol {
     }
 }
 impl IMetadata for Symbol {
-    type Metadata = Rc<str>;
+    type Metadata = Rc<crate::lang::data::Metadata>;
 
     fn meta(&self) -> Option<&Self::Metadata> {
         self.metadata.as_ref()
@@ -126,7 +126,6 @@ impl std::fmt::Display for Symbol {
 mod tests {
     use super::Symbol;
     use crate::lang::protocol::{IDisplay, IMetadata, INamespaced, IObjType, ObjType};
-    use std::rc::Rc;
 
     #[test]
     fn matches_java_namespace_and_interning() {
@@ -140,8 +139,8 @@ mod tests {
         assert_eq!(first.hash_seed(), "::SYMBOL");
         assert_eq!(Symbol::parse("/").get_namespace(), None);
 
-        let documented = first.with_meta(Some(Rc::from("doc")));
-        assert_eq!(documented.meta().map(|value| value.as_ref()), Some("doc"));
+        let documented = first.with_meta(Some(crate::lang::data::Metadata::document("doc")));
+        assert_eq!(documented.meta().and_then(|value| value.doc()), Some("doc"));
         assert_eq!(documented, first);
         assert!(documented.same_identity(&first));
     }

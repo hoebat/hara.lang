@@ -8,7 +8,7 @@ use crate::lang::protocol::{
 
 #[derive(Clone)]
 pub struct Seq<E> {
-    metadata: Option<Rc<str>>,
+    metadata: Option<Rc<crate::lang::data::Metadata>>,
     state: Rc<RefCell<State<E>>>,
     offset: usize,
 }
@@ -109,7 +109,7 @@ impl<E: Clone + 'static> IEmpty for Seq<E> {
     }
 }
 impl<E: Clone + 'static> IMetadata for Seq<E> {
-    type Metadata = Rc<str>;
+    type Metadata = Rc<crate::lang::data::Metadata>;
     fn meta(&self) -> Option<&Self::Metadata> {
         self.metadata.as_ref()
     }
@@ -176,19 +176,24 @@ mod tests {
         assert_eq!(calls.get(), 1);
         assert_eq!(seq.pop_first().iter().collect::<Vec<_>>(), vec![1, 2]);
 
-        let documented = seq.with_meta(Some(Rc::from("doc")));
+        let documented = seq.with_meta(Some(crate::lang::data::Metadata::document("doc")));
         assert_eq!(
-            IPopFirst::pop_first(&documented).meta().map(|m| m.as_ref()),
+            IPopFirst::pop_first(&documented)
+                .meta()
+                .map(|m| m.doc().unwrap()),
             Some("doc")
         );
         assert!(documented.empty().is_empty());
-        assert_eq!(documented.empty().meta().map(|m| m.as_ref()), Some("doc"));
+        assert_eq!(
+            documented.empty().meta().map(|m| m.doc().unwrap()),
+            Some("doc")
+        );
 
         let pushed = documented.push_first(-1);
         assert_eq!(pushed.peek_first(), &-1);
         let tail = pushed.pop_first();
         assert_eq!(tail.peek_first(), Some(0));
-        assert_eq!(tail.meta().map(|m| m.as_ref()), Some("doc"));
+        assert_eq!(tail.meta().map(|m| m.doc().unwrap()), Some("doc"));
         let consed = documented.cons(-1);
         assert_eq!(consed.meta(), None);
         assert_eq!(consed.pop_first().peek_first(), Some(0));

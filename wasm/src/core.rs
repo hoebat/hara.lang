@@ -5,6 +5,8 @@ use std::collections::{HashMap, HashSet};
 pub use crate::kernel::Form;
 use crate::lang::data::List as PList;
 use crate::lang::data::{Keyword, Map as PMap, Set as PSet, Symbol, Vector as PVector};
+use crate::lang::data::{Metadata, MetadataValue};
+use crate::lang::protocol::IMetadata;
 pub use crate::task::{LocalPromiseProvider, Promise, PromiseProvider, PromiseState};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
@@ -634,6 +636,8 @@ impl ProtocolRegistry {
         registry.register("IConj", "conj", protocol_conj);
         registry.register("IDissoc", "dissoc", protocol_dissoc);
         registry.register("IIter", "iter", protocol_iter);
+        registry.register("IObjType", "meta", protocol_meta);
+        registry.register("IObjType", "with-meta", protocol_with_meta);
         registry
     }
 }
@@ -1313,6 +1317,112 @@ fn value_index(value: &Value) -> Result<usize, String> {
         Value::Number(index) if *index >= 0 => Ok(*index as usize),
         _ => Err("index must be a non-negative integer".into()),
     }
+}
+
+fn value_to_metadata(value: &Value) -> Result<MetadataValue, String> {
+    match value {
+        Value::Nil => Ok(MetadataValue::Nil),
+        Value::Bool(value) => Ok(MetadataValue::Boolean(*value)),
+        Value::Number(value) => Ok(MetadataValue::Number(*value)),
+        Value::String(value) => Ok(MetadataValue::String(value.clone())),
+        Value::Keyword(value) => Ok(MetadataValue::Keyword(value.clone())),
+        Value::Symbol(value) => Ok(MetadataValue::Symbol(value.clone())),
+        Value::Vector(values) => Ok(MetadataValue::Vector(
+            values
+                .iter()
+                .map(value_to_metadata)
+                .collect::<Result<_, _>>()?,
+        )),
+        Value::List(values) => Ok(MetadataValue::List(
+            values
+                .iter()
+                .map(value_to_metadata)
+                .collect::<Result<_, _>>()?,
+        )),
+        Value::Set(values) => Ok(MetadataValue::Set(
+            values
+                .iter()
+                .map(value_to_metadata)
+                .collect::<Result<_, _>>()?,
+        )),
+        Value::Map(values) => Ok(MetadataValue::Map(
+            values
+                .iter()
+                .map(|(key, value)| Ok((value_to_metadata(key)?, value_to_metadata(value)?)))
+                .collect::<Result<_, String>>()?,
+        )),
+        _ => Err("value cannot be stored in runtime-neutral metadata".into()),
+    }
+}
+
+fn metadata_to_value(value: &MetadataValue) -> Result<Value, String> {
+    match value {
+        MetadataValue::Nil => Ok(Value::Nil),
+        MetadataValue::Boolean(value) => Ok(Value::Bool(*value)),
+        MetadataValue::Number(value) => Ok(Value::Number(*value)),
+        MetadataValue::String(value) => Ok(Value::String(value.clone())),
+        MetadataValue::Keyword(value) => Ok(Value::Keyword(value.clone())),
+        MetadataValue::Symbol(value) => Ok(Value::Symbol(value.clone())),
+        MetadataValue::Vector(values) => Ok(Value::Vector(
+            values
+                .iter()
+                .map(metadata_to_value)
+                .collect::<Result<_, _>>()?,
+        )),
+        MetadataValue::List(values) => Ok(Value::List(
+            values
+                .iter()
+                .map(metadata_to_value)
+                .collect::<Result<_, _>>()?,
+        )),
+        MetadataValue::Set(values) => Ok(Value::Set(
+            values
+                .iter()
+                .map(metadata_to_value)
+                .collect::<Result<Vec<_>, _>>()?
+                .into(),
+        )),
+        MetadataValue::Map(values) => Ok(Value::Map(
+            values
+                .iter()
+                .map(|(key, value)| Ok((metadata_to_value(key)?, metadata_to_value(value)?)))
+                .collect::<Result<Vec<_>, String>>()?
+                .into_iter()
+                .collect(),
+        )),
+        _ => Err("metadata value is not supported by the L0 evaluator".into()),
+    }
+}
+
+fn value_metadata(value: &Value) -> Option<Rc<Metadata>> {
+    match value {
+        Value::Symbol(value) => value.meta().cloned(),
+        Value::Vector(value) => value.meta().cloned(),
+        Value::List(value) => value.meta().cloned(),
+        Value::Map(value) => value.meta().cloned(),
+        Value::Set(value) => value.meta().cloned(),
+        _ => None,
+    }
+}
+
+fn protocol_meta(arguments: &[Value]) -> Result<Value, String> {
+    if arguments.len() != 1 {
+        return Err("IObjType/meta expects one argument".into());
+    }
+    match value_metadata(&arguments[0]) {
+        None => Ok(Value::Nil),
+        Some(metadata) => metadata_to_value(&MetadataValue::Map(metadata.entries().to_vec())),
+    }
+}
+
+fn protocol_with_meta(arguments: &[Value]) -> Result<Value, String> {
+    if arguments.len() != 2 {
+        return Err("IObjType/with-meta expects a value and metadata map".into());
+    }
+    let MetadataValue::Map(entries) = value_to_metadata(&arguments[1])? else {
+        return Err("IObjType/with-meta expects a metadata map".into());
+    };
+    attach_metadata(arguments[0].clone(), Metadata::new(entries))
 }
 
 fn protocol_count(arguments: &[Value]) -> Result<Value, String> {
@@ -2782,6 +2892,70 @@ fn unique_values(values: Vec<Value>) -> Vec<Value> {
     unique
 }
 
+fn metadata_value(form: &Form) -> Result<MetadataValue, String> {
+    match form {
+        Form::Nil => Ok(MetadataValue::Nil),
+        Form::Bool(value) => Ok(MetadataValue::Boolean(*value)),
+        Form::Number(value) => Ok(MetadataValue::Number(*value)),
+        Form::Float(value) => Ok(MetadataValue::Float(*value)),
+        Form::BigInteger(value) => Ok(MetadataValue::BigInteger(value.clone())),
+        Form::Decimal(value) => Ok(MetadataValue::Decimal(value.clone())),
+        Form::Character(value) => Ok(MetadataValue::Character(*value)),
+        Form::Regex(value) => Ok(MetadataValue::Regex(value.clone())),
+        Form::Tagged(tag, value) => Ok(MetadataValue::Tagged(
+            tag.clone(),
+            Box::new(metadata_value(value)?),
+        )),
+        Form::Metadata(_, value) => metadata_value(value),
+        Form::Symbol(value) => Ok(MetadataValue::Symbol(Symbol::from(value.clone()))),
+        Form::Keyword(value) => Ok(MetadataValue::Keyword(Keyword::from(value.clone()))),
+        Form::String(value) => Ok(MetadataValue::String(value.clone())),
+        Form::Vector(values) => Ok(MetadataValue::Vector(
+            values
+                .iter()
+                .map(metadata_value)
+                .collect::<Result<_, _>>()?,
+        )),
+        Form::List(values) => Ok(MetadataValue::List(
+            values
+                .iter()
+                .map(metadata_value)
+                .collect::<Result<_, _>>()?,
+        )),
+        Form::Set(values) => Ok(MetadataValue::Set(
+            values
+                .iter()
+                .map(metadata_value)
+                .collect::<Result<_, _>>()?,
+        )),
+        Form::Map(values) => Ok(MetadataValue::Map(
+            values
+                .iter()
+                .map(|(key, value)| Ok((metadata_value(key)?, metadata_value(value)?)))
+                .collect::<Result<_, String>>()?,
+        )),
+    }
+}
+
+fn metadata_from_form(form: &Form) -> Result<Rc<Metadata>, String> {
+    let MetadataValue::Map(entries) = metadata_value(form)? else {
+        return Err("reader metadata must be a map".into());
+    };
+    Ok(Metadata::new(entries))
+}
+
+fn attach_metadata(value: Value, metadata: Rc<Metadata>) -> Result<Value, String> {
+    Ok(match value {
+        Value::Symbol(value) => Value::Symbol(value.with_meta(Some(metadata))),
+        Value::Vector(value) => Value::Vector(value.with_meta(Some(metadata))),
+        Value::List(value) => Value::List(value.with_meta(Some(metadata))),
+        Value::Map(value) => Value::Map(value.with_meta(Some(metadata))),
+        Value::Set(value) => Value::Set(value.with_meta(Some(metadata))),
+        Value::Keyword(value) => Value::Keyword(value),
+        _ => return Err("metadata can only be applied to object values".into()),
+    })
+}
+
 fn literal_value(form: &Form) -> Result<Value, String> {
     match form {
         Form::Nil => Ok(Value::Nil),
@@ -2792,7 +2966,9 @@ fn literal_value(form: &Form) -> Result<Value, String> {
         | Form::Decimal(_)
         | Form::Regex(_)
         | Form::Tagged(_, _) => Err("reader literal is not supported by the L0 evaluator".into()),
-        Form::Metadata(_, value) => literal_value(value),
+        Form::Metadata(metadata, value) => {
+            attach_metadata(literal_value(value)?, metadata_from_form(metadata)?)
+        }
         Form::Number(v) => Ok(Value::Number(*v)),
         Form::String(v) => Ok(Value::String(v.clone())),
         Form::Keyword(v) => Ok(Value::Keyword(v.clone().into())),

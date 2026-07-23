@@ -62,7 +62,7 @@ fn dissoc_node<V: Clone>(node: &Rc<Node<V>>, chars: &[char]) -> Option<Rc<Node<V
 }
 #[derive(Debug, Clone)]
 pub struct Standard<V> {
-    metadata: Option<Rc<str>>,
+    metadata: Option<Rc<crate::lang::data::Metadata>>,
     root: Rc<Node<V>>,
     size: usize,
 }
@@ -182,7 +182,7 @@ impl<V: Clone> IEmpty for Standard<V> {
     }
 }
 impl<V: Clone> IMetadata for Standard<V> {
-    type Metadata = Rc<str>;
+    type Metadata = Rc<crate::lang::data::Metadata>;
     fn meta(&self) -> Option<&Self::Metadata> {
         self.metadata.as_ref()
     }
@@ -238,23 +238,22 @@ mod tests {
     #[test]
     fn updates_empty_and_mutable_preserve_metadata() {
         use crate::lang::protocol::{IEmpty, IMetadata, IToMutable, IToPersistent};
-        use std::rc::Rc;
         let trie = Standard::new()
             .assoc_value("cat", 1)
-            .with_meta(Some(Rc::from("doc")));
+            .with_meta(Some(crate::lang::data::Metadata::document("doc")));
         assert_eq!(
-            trie.assoc_value("car", 2).meta().map(|m| m.as_ref()),
+            trie.assoc_value("car", 2).meta().map(|m| m.doc().unwrap()),
             Some("doc")
         );
         assert_eq!(
-            trie.dissoc_value("cat").meta().map(|m| m.as_ref()),
+            trie.dissoc_value("cat").meta().map(|m| m.doc().unwrap()),
             Some("doc")
         );
-        assert_eq!(trie.empty().meta().map(|m| m.as_ref()), Some("doc"));
+        assert_eq!(trie.empty().meta().map(|m| m.doc().unwrap()), Some("doc"));
         let mut mutable = trie.to_mutable();
         mutable.assoc("car", 2);
         assert_eq!(
-            mutable.to_persistent().meta().map(|m| m.as_ref()),
+            mutable.to_persistent().meta().map(|m| m.doc().unwrap()),
             Some("doc")
         );
     }

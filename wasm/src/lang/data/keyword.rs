@@ -90,7 +90,7 @@ impl INamespaced for Keyword {
     }
 }
 impl IMetadata for Keyword {
-    type Metadata = Rc<str>;
+    type Metadata = Rc<crate::lang::data::Metadata>;
 
     fn meta(&self) -> Option<&Self::Metadata> {
         None
@@ -154,7 +154,6 @@ mod tests {
     use crate::lang::data::Map;
     use crate::lang::protocol::IAssoc;
     use crate::lang::protocol::{IDisplay, IMetadata, INamespaced, IObjType, ObjType};
-    use std::rc::Rc;
 
     #[test]
     fn matches_java_validation_namespace_and_interning() {
@@ -174,7 +173,7 @@ mod tests {
         assert_eq!(first.lookup(&values), Some(42));
         assert_eq!(Keyword::from("missing").lookup_or(&values, 7), 7);
 
-        let documented = first.with_meta(Some(Rc::from("ignored")));
+        let documented = first.with_meta(Some(crate::lang::data::Metadata::document("ignored")));
         assert!(documented.meta().is_none());
         assert!(documented.same_identity(&first));
     }

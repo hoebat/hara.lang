@@ -146,7 +146,7 @@ impl<K: Clone + Eq + Hash, V: Clone> IEmpty for Standard<K, V> {
     }
 }
 impl<K: Clone + Eq + Hash, V: Clone> IMetadata for Standard<K, V> {
-    type Metadata = std::rc::Rc<str>;
+    type Metadata = std::rc::Rc<crate::lang::data::Metadata>;
     fn meta(&self) -> Option<&Self::Metadata> {
         self.lookup.meta()
     }
@@ -215,14 +215,13 @@ mod tests {
             vec![("a", 3), ("b", 2)]
         );
         use crate::lang::protocol::IMetadata;
-        use std::rc::Rc;
         let original = (0..80)
             .map(|n| (n, n))
             .collect::<Standard<_, _>>()
-            .with_meta(Some(Rc::from("doc")));
+            .with_meta(Some(crate::lang::data::Metadata::document("doc")));
         let reduced = (0..60).fold(original.clone(), |map, key| map.dissoc_value(&key));
         assert_eq!(original.len(), 80);
-        assert_eq!(reduced.meta().map(|m| m.as_ref()), Some("doc"));
+        assert_eq!(reduced.meta().map(|m| m.doc().unwrap()), Some("doc"));
         assert_eq!(
             reduced.iter().map(|(key, _)| *key).collect::<Vec<_>>(),
             (60..80).collect::<Vec<_>>()

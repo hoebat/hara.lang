@@ -1,9 +1,8 @@
-use std::rc::Rc;
-
 use crate::lang::protocol::{
     IAssoc, IConj, ICons, ICount, IEmpty, IMetadata, IMutable, INth, IPeekFirst, IPeekLast,
     IPersistent, IPopFirst, IPopLast, IPushFirst, IPushLast, IToMutable, IToPersistent,
 };
+use std::rc::Rc;
 
 const CHUNK_SIZE: usize = 32;
 
@@ -15,7 +14,7 @@ struct Chunk<E> {
 
 #[derive(Debug, Clone)]
 pub struct Standard<E> {
-    metadata: Option<Rc<str>>,
+    metadata: Option<Rc<crate::lang::data::Metadata>>,
     head: Option<Rc<Chunk<E>>>,
     size: usize,
 }
@@ -260,7 +259,7 @@ impl<E: Clone> IAssoc<usize, E> for Standard<E> {
     }
 }
 impl<E: Clone> IMetadata for Standard<E> {
-    type Metadata = Rc<str>;
+    type Metadata = Rc<crate::lang::data::Metadata>;
     fn meta(&self) -> Option<&Self::Metadata> {
         self.metadata.as_ref()
     }
@@ -354,8 +353,8 @@ mod tests {
     #[test]
     fn persistent_operations_preserve_metadata() {
         use crate::lang::protocol::{IAssoc, IEmpty, IMetadata};
-        use std::rc::Rc;
-        let list = Standard::from(vec![1, 2, 3]).with_meta(Some(Rc::from("doc")));
+        let list = Standard::from(vec![1, 2, 3])
+            .with_meta(Some(crate::lang::data::Metadata::document("doc")));
         let values = [
             list.push_first(0),
             list.push_last(4),
@@ -366,7 +365,7 @@ mod tests {
         ];
         assert!(values
             .iter()
-            .all(|value| value.meta().map(|m| m.as_ref()) == Some("doc")));
+            .all(|value| value.meta().map(|m| m.doc().unwrap()) == Some("doc")));
     }
 
     #[test]

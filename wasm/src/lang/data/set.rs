@@ -103,7 +103,7 @@ impl<E: Clone + Eq + Hash> IEmpty for Standard<E> {
     }
 }
 impl<E: Clone + Eq + Hash> IMetadata for Standard<E> {
-    type Metadata = std::rc::Rc<str>;
+    type Metadata = std::rc::Rc<crate::lang::data::Metadata>;
     fn meta(&self) -> Option<&Self::Metadata> {
         self.lookup.meta()
     }
@@ -159,10 +159,10 @@ mod tests {
     #[test]
     fn persistent_operations_preserve_metadata() {
         use crate::lang::protocol::{IEmpty, IMetadata};
-        use std::rc::Rc;
-        let set = Standard::from(vec![1, 2]).with_meta(Some(Rc::from("doc")));
+        let set = Standard::from(vec![1, 2])
+            .with_meta(Some(crate::lang::data::Metadata::document("doc")));
         for value in [set.conj_value(3), set.dissoc_value(&1), set.empty()] {
-            assert_eq!(value.meta().map(|m| m.as_ref()), Some("doc"));
+            assert_eq!(value.meta().map(|m| m.doc().unwrap()), Some("doc"));
         }
     }
 

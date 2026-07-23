@@ -25,7 +25,7 @@ impl INamespaced for Pointer {
     }
 }
 impl IMetadata for Pointer {
-    type Metadata = Rc<str>;
+    type Metadata = Rc<crate::lang::data::Metadata>;
     fn meta(&self) -> Option<&Self::Metadata> {
         self.0.meta()
     }

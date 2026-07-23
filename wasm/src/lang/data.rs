@@ -10,6 +10,8 @@ pub mod keyword;
 pub mod list;
 #[path = "data/map.rs"]
 pub mod map;
+#[path = "data/metadata.rs"]
+pub mod metadata;
 #[path = "data/ordered_map.rs"]
 pub mod ordered_map;
 #[path = "data/ordered_set.rs"]
@@ -42,6 +44,7 @@ pub use cons::Cons;
 pub use keyword::Keyword;
 pub use list::{Mutable as MutableList, Standard as List};
 pub use map::{Mutable as MutableMap, Standard as Map};
+pub use metadata::{Metadata, MetadataValue};
 pub use ordered_map::{Mutable as MutableOrderedMap, Standard as OrderedMap};
 pub use ordered_set::{Mutable as MutableOrderedSet, Standard as OrderedSet};
 pub use pointer::Pointer;

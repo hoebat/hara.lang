@@ -112,7 +112,7 @@ impl<E: Clone + Eq + Hash> IEmpty for Standard<E> {
     }
 }
 impl<E: Clone + Eq + Hash> IMetadata for Standard<E> {
-    type Metadata = std::rc::Rc<str>;
+    type Metadata = std::rc::Rc<crate::lang::data::Metadata>;
     fn meta(&self) -> Option<&Self::Metadata> {
         self.lookup.meta()
     }
@@ -173,13 +173,15 @@ mod tests {
     #[test]
     fn compaction_and_empty_preserve_metadata() {
         use crate::lang::protocol::{IEmpty, IMetadata};
-        use std::rc::Rc;
         let original = (0..80)
             .collect::<Standard<_>>()
-            .with_meta(Some(Rc::from("doc")));
+            .with_meta(Some(crate::lang::data::Metadata::document("doc")));
         let reduced = (0..60).fold(original, |set, value| set.dissoc_value(&value));
-        assert_eq!(reduced.meta().map(|m| m.as_ref()), Some("doc"));
-        assert_eq!(reduced.empty().meta().map(|m| m.as_ref()), Some("doc"));
+        assert_eq!(reduced.meta().map(|m| m.doc().unwrap()), Some("doc"));
+        assert_eq!(
+            reduced.empty().meta().map(|m| m.doc().unwrap()),
+            Some("doc")
+        );
     }
 
     #[test]

@@ -344,7 +344,7 @@ fn collect<'a, K, V>(node: &'a Node<K, V>, out: &mut Vec<(&'a K, &'a V)>) {
 
 #[derive(Debug, Clone)]
 pub struct Standard<K, V> {
-    metadata: Option<Rc<str>>,
+    metadata: Option<Rc<crate::lang::data::Metadata>>,
     root: Rc<Node<K, V>>,
     size: usize,
 }
@@ -475,7 +475,7 @@ impl<K: Clone + Eq + Hash, V: Clone> IEmpty for Standard<K, V> {
     }
 }
 impl<K: Clone + Eq + Hash, V: Clone> IMetadata for Standard<K, V> {
-    type Metadata = Rc<str>;
+    type Metadata = Rc<crate::lang::data::Metadata>;
     fn meta(&self) -> Option<&Self::Metadata> {
         self.metadata.as_ref()
     }
@@ -540,23 +540,22 @@ mod tests {
     #[test]
     fn persistent_operations_and_mutable_round_trip_preserve_metadata() {
         use crate::lang::protocol::{IEmpty, IMetadata, IToMutable, IToPersistent};
-        use std::rc::Rc;
         let map = Standard::new()
             .assoc_value("a", 1)
-            .with_meta(Some(Rc::from("doc")));
+            .with_meta(Some(crate::lang::data::Metadata::document("doc")));
         assert_eq!(
-            map.assoc_value("b", 2).meta().map(|m| m.as_ref()),
+            map.assoc_value("b", 2).meta().map(|m| m.doc().unwrap()),
             Some("doc")
         );
         assert_eq!(
-            map.dissoc_value(&"a").meta().map(|m| m.as_ref()),
+            map.dissoc_value(&"a").meta().map(|m| m.doc().unwrap()),
             Some("doc")
         );
-        assert_eq!(map.empty().meta().map(|m| m.as_ref()), Some("doc"));
+        assert_eq!(map.empty().meta().map(|m| m.doc().unwrap()), Some("doc"));
         let mut mutable = map.to_mutable();
         mutable.assoc("b", 2);
         assert_eq!(
-            mutable.to_persistent().meta().map(|m| m.as_ref()),
+            mutable.to_persistent().meta().map(|m| m.doc().unwrap()),
             Some("doc")
         );
     }

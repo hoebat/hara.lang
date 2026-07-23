@@ -1,11 +1,10 @@
-use std::rc::Rc;
-
 use crate::lang::protocol::{
     IConj, ICons, ICount, IEmpty, IMetadata, INth, IPeekFirst, IPeekLast, IPersistent, IPopFirst,
     IPopLast, IPushFirst, IPushLast,
 };
+use std::rc::Rc;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone)]
 pub enum Tuple<E> {
     Tup0,
     Tup1([E; 1]),
@@ -16,7 +15,20 @@ pub enum Tuple<E> {
     Tup6([E; 6]),
     Tup7([E; 7]),
     Tup8([E; 8]),
-    WithMeta(Rc<str>, Box<Tuple<E>>),
+    WithMeta(Rc<crate::lang::data::Metadata>, Box<Tuple<E>>),
+}
+
+impl<E: Clone + PartialEq> PartialEq for Tuple<E> {
+    fn eq(&self, other: &Self) -> bool {
+        self.len() == other.len() && self.iter().eq(other.iter())
+    }
+}
+impl<E: Clone + Eq> Eq for Tuple<E> {}
+impl<E: Clone + std::hash::Hash> std::hash::Hash for Tuple<E> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.iter()
+            .for_each(|value| std::hash::Hash::hash(value, state));
+    }
 }
 
 impl<E: Clone> Tuple<E> {
@@ -180,7 +192,7 @@ impl<E: Clone> IConj<E> for Tuple<E> {
 }
 impl<E: Clone> IPersistent for Tuple<E> {}
 impl<E: Clone> IMetadata for Tuple<E> {
-    type Metadata = Rc<str>;
+    type Metadata = Rc<crate::lang::data::Metadata>;
     fn meta(&self) -> Option<&Self::Metadata> {
         match self {
             Self::WithMeta(metadata, _) => Some(metadata),
@@ -214,7 +226,6 @@ impl<E: Clone> Default for Tuple<E> {
 mod tests {
     use super::Tuple;
     use crate::lang::protocol::{IEmpty, IMetadata};
-    use std::rc::Rc;
 
     #[test]
     fn covers_all_java_arities_and_linear_operations() {
@@ -232,7 +243,8 @@ mod tests {
 
     #[test]
     fn preserves_metadata_across_persistent_operations() {
-        let tuple = Tuple::Tup2([1, 2]).with_meta(Some(Rc::from("doc")));
+        let tuple =
+            Tuple::Tup2([1, 2]).with_meta(Some(crate::lang::data::Metadata::document("doc")));
 
         for result in [
             tuple.push_first(0).unwrap(),
@@ -241,7 +253,7 @@ mod tests {
             tuple.pop_last(),
             tuple.empty(),
         ] {
-            assert_eq!(result.meta().map(|m| m.as_ref()), Some("doc"));
+            assert_eq!(result.meta().map(|m| m.doc().unwrap()), Some("doc"));
         }
         assert_eq!(tuple.push_first(0).unwrap().len(), 3);
         assert_eq!(tuple.empty().len(), 0);

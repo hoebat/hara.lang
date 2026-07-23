@@ -2251,4 +2251,16 @@ mod tests {
         assert!(error.contains("at outer"));
         assert_eq!(error.matches("[hara stack]").count(), 1);
     }
+    #[test]
+    fn runtime_metadata_round_trips_through_protocols_and_reader_literals() {
+        let mut runtime = Runtime::new();
+        assert_eq!(
+            runtime.eval_text("(protocol-call ILookup lookup (protocol-call IObjType meta (protocol-call IObjType with-meta [1] {:doc \"vector\"})) :doc)").unwrap(),
+            "\"vector\""
+        );
+        assert_eq!(
+            runtime.eval_text("(protocol-call ILookup lookup (protocol-call IObjType meta (quote ^{:doc \"quoted\"} [1])) :doc)").unwrap(),
+            "\"quoted\""
+        );
+    }
 }

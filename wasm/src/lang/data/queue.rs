@@ -9,7 +9,7 @@ pub const MAX_LENGTH: usize = 1024;
 
 #[derive(Debug, Clone)]
 pub struct Standard<E> {
-    metadata: Option<Rc<str>>,
+    metadata: Option<Rc<crate::lang::data::Metadata>>,
     size: usize,
     offset: usize,
     head: Vector<E>,
@@ -222,7 +222,7 @@ impl<E: Clone> IEmpty for Standard<E> {
     }
 }
 impl<E: Clone> IMetadata for Standard<E> {
-    type Metadata = Rc<str>;
+    type Metadata = Rc<crate::lang::data::Metadata>;
     fn meta(&self) -> Option<&Self::Metadata> {
         self.metadata.as_ref()
     }
@@ -326,8 +326,8 @@ mod tests {
     #[test]
     fn persistent_operations_preserve_metadata() {
         use crate::lang::protocol::{IEmpty, IMetadata};
-        use std::rc::Rc;
-        let queue = Standard::from_iter(0..(MAX_LENGTH + 2)).with_meta(Some(Rc::from("doc")));
+        let queue = Standard::from_iter(0..(MAX_LENGTH + 2))
+            .with_meta(Some(crate::lang::data::Metadata::document("doc")));
         let values = [
             queue.push_last(9999),
             queue.pop_first_value(),
@@ -336,7 +336,7 @@ mod tests {
         ];
         assert!(values
             .iter()
-            .all(|value| value.meta().map(|m| m.as_ref()) == Some("doc")));
+            .all(|value| value.meta().map(|m| m.doc().unwrap()) == Some("doc")));
     }
 
     #[test]
