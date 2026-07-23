@@ -56,6 +56,18 @@ public class HaraInteropTest {
   }
 
   @Test
+  public void interopFailuresUseCanonicalTruffleMessages() throws Exception {
+    InteropLibrary interop = InteropLibrary.getUncached();
+    Object vector = HaraBox.export(Vector.Standard.from(null, "zero"));
+    assertThrows(InvalidArrayIndexException.class, () -> interop.readArrayElement(vector, 1));
+    assertThrows(InvalidArrayIndexException.class, () -> interop.readArrayElement(vector, -1));
+
+    Object map = HaraBox.export(Map.Standard.from(null, "key", "value"));
+    assertThrows(UnknownKeyException.class, () -> interop.readHashValue(map, "missing"));
+    assertThrows(UnsupportedMessageException.class, () -> interop.getIterator(42L));
+  }
+
+  @Test
   public void evaluatesCollectionLiteralContentsBeforeExport() {
     try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
       Value vector = context.eval(HaraLanguage.ID, "[1 (+ 1 1)]");
