@@ -3272,7 +3272,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
         Form::Symbol(n) => binding_value(env, n).ok_or_else(|| format!("unbound symbol: {n}")),
         Form::List(fs) if fs.is_empty() => Ok(Value::Nil),
         Form::List(fs) => match &fs[0] {
-            Form::Symbol(n) if n == "fn" => {
+            Form::Symbol(n) if n == "fn" || n == "fn*" => {
                 if fs.len() < 3 {
                     return Err("fn expects parameters and a body".into());
                 }
@@ -3285,6 +3285,12 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     name: None,
                     native: None,
                 })))
+            }
+            Form::Symbol(n) if n == "eval" => {
+                if fs.len() != 2 {
+                    return Err("eval expects one form".into());
+                }
+                eval(&fs[1], env)
             }
             Form::Symbol(n) if n == "var" => {
                 if fs.len() != 2 {

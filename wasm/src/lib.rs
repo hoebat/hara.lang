@@ -793,6 +793,18 @@ mod tests {
     }
 
     #[test]
+    fn reader_generated_fn_star_and_eval_forms_execute() {
+        let mut runtime = Runtime::new();
+        assert_eq!(runtime.eval_text("((fn* [x] (+ x 1)) 4)").unwrap(), "5");
+        assert_eq!(runtime.eval_text("#=(+ 2 3)").unwrap(), "5");
+        assert_eq!(runtime.eval_text("#[(def x 4) (+ x 2)]").unwrap(), "6");
+        assert!(runtime
+            .eval_text("(eval)")
+            .unwrap_err()
+            .contains("one form"));
+    }
+
+    #[test]
     fn reader_literals_are_first_class_runtime_values() {
         let mut runtime = Runtime::new();
         let cases = [
