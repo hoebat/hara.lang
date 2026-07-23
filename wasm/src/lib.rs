@@ -1281,6 +1281,35 @@ mod tests {
     }
 
     #[test]
+    fn cons_pointer_and_tagged_literals_are_first_class_runtime_values() {
+        let mut runtime = Runtime::new();
+        assert_eq!(runtime.eval_text("(cons 0 [1 2])").unwrap(), "(0 1 2)");
+        assert_eq!(
+            runtime.eval_text("(type (cons 0 [1 2]))").unwrap(),
+            ":hara.type/cons"
+        );
+        assert_eq!(runtime.eval_text("(count (cons 0 [1 2]))").unwrap(), "3");
+        assert_eq!(runtime.eval_text("(get (cons 0 [1 2]) 2)").unwrap(), "2");
+        assert_eq!(
+            runtime
+                .eval_text("(pointer \"hara.core\" \"value\")")
+                .unwrap(),
+            "#\x27hara.core/value"
+        );
+        assert_eq!(
+            runtime
+                .eval_text("(type (pointer \"hara.core/value\"))")
+                .unwrap(),
+            ":hara.type/pointer"
+        );
+        assert_eq!(
+            runtime.eval_text("(type #sample [1 2])").unwrap(),
+            ":hara.type/tagged-literal"
+        );
+        assert_eq!(runtime.eval_text("(protocol-call ILookup lookup (protocol-call IObjType meta (protocol-call IObjType with-meta (cons 0 [1]) {:doc \"cons\"})) :doc)").unwrap(), "\"cons\"");
+    }
+
+    #[test]
     fn keyword_symbol_constructors_and_namespaced_protocol_match_java() {
         let mut runtime = Runtime::new();
         assert_eq!(
@@ -1383,7 +1412,7 @@ mod tests {
                 .unwrap(),
             "{}"
         );
-        assert_eq!(runtime.eval_text("(cons 0 [1 2])").unwrap(), "[0 1 2]");
+        assert_eq!(runtime.eval_text("(cons 0 [1 2])").unwrap(), "(0 1 2)");
         assert_eq!(runtime.eval_text("(= :ready :ready)").unwrap(), "true");
     }
 

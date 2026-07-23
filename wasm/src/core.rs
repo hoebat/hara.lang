@@ -6,8 +6,9 @@ pub use crate::kernel::Form;
 use crate::kernel::{NamespaceRegistry, Var as KernelVar};
 use crate::lang::data::List as PList;
 use crate::lang::data::{
-    Atom as PAtom, Keyword, Map as PMap, OrderedMap as POrderedMap, OrderedSet as POrderedSet,
-    Queue as PQueue, Set as PSet, SortedMap as PSortedMap, SortedSet as PSortedSet, Symbol,
+    Atom as PAtom, Cons as PCons, Keyword, Map as PMap, OrderedMap as POrderedMap,
+    OrderedSet as POrderedSet, Pointer as PPointer, Queue as PQueue, Set as PSet,
+    SortedMap as PSortedMap, SortedSet as PSortedSet, Symbol, TaggedLiteral as PTaggedLiteral,
     Trie as PTrie, Tuple as PTuple, Vector as PVector,
 };
 use crate::lang::data::{Metadata, MetadataValue};
@@ -35,7 +36,7 @@ pub enum Value {
     Decimal(String),
     Character(char),
     Regex(String),
-    Tagged(String, Box<Value>),
+    Tagged(Box<PTaggedLiteral<Value>>),
     Bool(bool),
     String(String),
     Keyword(Keyword),
@@ -54,8 +55,10 @@ pub enum Value {
     OrderedSet(Box<POrderedSet<Value>>),
     SortedSet(Box<PSortedSet<Value>>),
     List(PList<Value>),
+    Cons(Box<PCons<Value>>),
     Queue(Box<PQueue<Value>>),
     Symbol(Symbol),
+    Pointer(PPointer),
     Function(Rc<Function>),
     Tuple(Box<PTuple<Value>>),
     Vector(PVector<Value>),
@@ -489,12 +492,13 @@ impl IteratorState {
 
 #[inline(never)]
 fn sequential_equality(left: &Value, right: &Value) -> Option<bool> {
-    fn items(value: &Value) -> Option<Vec<&Value>> {
+    fn items(value: &Value) -> Option<Vec<Value>> {
         match value {
-            Value::List(values) => Some(values.iter().collect()),
-            Value::Queue(values) => Some(values.iter().collect()),
-            Value::Tuple(values) => Some(values.iter().collect()),
-            Value::Vector(values) => Some(values.iter().collect()),
+            Value::List(values) => Some(values.iter().cloned().collect()),
+            Value::Cons(values) => Some(values.iter().collect()),
+            Value::Queue(values) => Some(values.iter().cloned().collect()),
+            Value::Tuple(values) => Some(values.iter().cloned().collect()),
+            Value::Vector(values) => Some(values.iter().cloned().collect()),
             _ => None,
         }
     }
@@ -632,7 +636,7 @@ impl PartialEq for Value {
             (Value::Decimal(a), Value::Decimal(b)) => a == b,
             (Value::Character(a), Value::Character(b)) => a == b,
             (Value::Regex(a), Value::Regex(b)) => a == b,
-            (Value::Tagged(at, av), Value::Tagged(bt, bv)) => at == bt && av == bv,
+            (Value::Tagged(a), Value::Tagged(b)) => a == b,
             (Value::Bool(a), Value::Bool(b)) => a == b,
             (Value::String(a), Value::String(b)) => a == b,
             (Value::Keyword(a), Value::Keyword(b)) => a == b,
@@ -646,7 +650,9 @@ impl PartialEq for Value {
             (Value::Map(a), Value::Map(b)) => a == b,
             (Value::Set(a), Value::Set(b)) => a == b,
             (Value::List(a), Value::List(b)) => a == b,
+            (Value::Cons(a), Value::Cons(b)) => a == b,
             (Value::Symbol(a), Value::Symbol(b)) => a == b,
+            (Value::Pointer(a), Value::Pointer(b)) => a == b,
             (Value::Function(a), Value::Function(b)) => Rc::ptr_eq(a, b),
             (Value::Tuple(a), Value::Tuple(b)) => a == b,
             (Value::Vector(a), Value::Vector(b)) => a == b,
@@ -694,13 +700,18 @@ impl Ord for Value {
                 Value::String(_) => 7,
                 Value::Keyword(_) => 8,
                 Value::Symbol(_) => 9,
-                Value::List(_) | Value::Queue(_) | Value::Tuple(_) | Value::Vector(_) => 10,
+                Value::Pointer(_) => 9,
+                Value::List(_)
+                | Value::Cons(_)
+                | Value::Queue(_)
+                | Value::Tuple(_)
+                | Value::Vector(_) => 10,
                 Value::Map(_) | Value::OrderedMap(_) | Value::SortedMap(_) | Value::Trie(_) => 11,
                 Value::Set(_) | Value::OrderedSet(_) | Value::SortedSet(_) => 12,
                 Value::Bytes(_) => 13,
                 Value::ByteBuffer(_) => 14,
                 Value::Regex(_) => 15,
-                Value::Tagged(_, _) => 16,
+                Value::Tagged(_) => 16,
                 Value::Array(_) => 17,
                 Value::Object(_) => 18,
                 Value::Promise(_) => 19,
@@ -744,7 +755,7 @@ impl Value {
             Self::Character(v) if v.is_control() => format!("\\u{:04X}", *v as u32),
             Self::Character(v) => format!("\\{v}"),
             Self::Regex(v) => crate::kernel::form::display_regex(v),
-            Self::Tagged(tag, value) => format!("#{tag}{}", value.display()),
+            Self::Tagged(value) => format!("#{}{}", value.tag().as_str(), value.form().display()),
             Self::Bool(v) => v.to_string(),
             Self::String(v) => crate::kernel::form::display_string(v),
             Self::Keyword(v) => format!(":{}", v.as_str()),
@@ -825,6 +836,14 @@ impl Value {
                     .collect::<Vec<_>>()
                     .join(" ")
             ),
+            Self::Cons(values) => format!(
+                "({})",
+                values
+                    .iter()
+                    .map(|value| value.display())
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ),
             Self::List(values) => format!(
                 "({})",
                 values
@@ -834,6 +853,7 @@ impl Value {
                     .join(" ")
             ),
             Self::Symbol(v) => v.as_str().to_owned(),
+            Self::Pointer(v) => v.display(),
             Self::Function(_) => "<fn>".into(),
             Self::Tuple(values) => format!(
                 "[{}]",
@@ -885,8 +905,13 @@ impl Value {
                 Value::Recur(_) => 9,
                 Value::Map(_) | Value::OrderedMap(_) | Value::SortedMap(_) | Value::Trie(_) => 10,
                 Value::Set(_) | Value::OrderedSet(_) | Value::SortedSet(_) => 11,
-                Value::List(_) | Value::Queue(_) | Value::Tuple(_) | Value::Vector(_) => 12,
+                Value::List(_)
+                | Value::Cons(_)
+                | Value::Queue(_)
+                | Value::Tuple(_)
+                | Value::Vector(_) => 12,
                 Value::Symbol(_) => 13,
+                Value::Pointer(_) => 13,
                 Value::Function(_) => 14,
                 Value::Iterator(_) => 16,
                 Value::Var(_) => 17,
@@ -898,7 +923,7 @@ impl Value {
                 Value::Decimal(_) => 22,
                 Value::Character(_) => 23,
                 Value::Regex(_) => 24,
-                Value::Tagged(_, _) => 25,
+                Value::Tagged(_) => 25,
             };
             type_tag.hash(state);
             match value {
@@ -906,14 +931,15 @@ impl Value {
                 Value::Float(v) => v.to_bits().hash(state),
                 Value::BigInteger(v) | Value::Decimal(v) | Value::Regex(v) => v.hash(state),
                 Value::Character(v) => v.hash(state),
-                Value::Tagged(tag, value) => {
-                    tag.hash(state);
-                    hash_value(value, state);
+                Value::Tagged(value) => {
+                    value.tag().hash(state);
+                    hash_value(value.form(), state);
                 }
                 Value::Bool(v) => v.hash(state),
                 Value::String(v) => v.hash(state),
                 Value::Keyword(v) => v.hash(state),
                 Value::Symbol(v) => v.hash(state),
+                Value::Pointer(v) => v.hash(state),
                 Value::Bytes(v) => v.hash(state),
                 Value::ByteBuffer(v) => v.borrow().hash(state),
                 Value::Array(v) => v.borrow().iter().for_each(|item| hash_value(item, state)),
@@ -955,6 +981,7 @@ impl Value {
                     entries.hash(state);
                 }
                 Value::List(v) => v.iter().for_each(|item| hash_value(item, state)),
+                Value::Cons(v) => v.iter().for_each(|item| hash_value(&item, state)),
                 Value::Queue(v) => v.iter().for_each(|item| hash_value(item, state)),
                 Value::Tuple(v) => v.iter().for_each(|item| hash_value(item, state)),
                 Value::Vector(v) => v.iter().for_each(|item| hash_value(item, state)),
@@ -1844,11 +1871,12 @@ fn portable_type_name(value: &Value) -> &str {
         Value::Decimal(_) => "decimal",
         Value::Character(_) => "character",
         Value::Regex(_) => "pattern",
-        Value::Tagged(_, _) => "tagged-literal",
+        Value::Tagged(_) => "tagged-literal",
         Value::Bool(_) => "boolean",
         Value::String(_) => "string",
         Value::Keyword(_) => "keyword",
         Value::Symbol(_) => "symbol",
+        Value::Pointer(_) => "pointer",
         Value::Function(_) => "function",
         Value::Bytes(_) => "bytes",
         Value::ByteBuffer(_) => "byte-buffer",
@@ -1858,6 +1886,7 @@ fn portable_type_name(value: &Value) -> &str {
         Value::Atom(_) => "atom",
         Value::Recur(_) => "recur",
         Value::List(_) => "list",
+        Value::Cons(_) => "cons",
         Value::Queue(_) => "queue",
         Value::Tuple(_) => "tuple",
         Value::Vector(_) => "vector",
@@ -1881,11 +1910,12 @@ pub fn receiver_category(value: &Value) -> &'static str {
         Value::Number(_) | Value::Float(_) | Value::BigInteger(_) | Value::Decimal(_) => "number",
         Value::Character(_) => "character",
         Value::Regex(_) => "pattern",
-        Value::Tagged(_, _) => "tagged",
+        Value::Tagged(_) => "tagged",
         Value::Bool(_) => "boolean",
         Value::String(_) => "string",
         Value::Keyword(_) => "keyword",
         Value::Symbol(_) => "symbol",
+        Value::Pointer(_) => "pointer",
         Value::Function(_) => "function",
         Value::Bytes(_) | Value::ByteBuffer(_) => "bytes",
         Value::Array(_) => "array",
@@ -1894,6 +1924,7 @@ pub fn receiver_category(value: &Value) -> &'static str {
         Value::Atom(_) => "atom",
         Value::Recur(_) => "recur",
         Value::List(_) => "list",
+        Value::Cons(_) => "cons",
         Value::Queue(_) => "queue",
         Value::Tuple(_) => "tuple",
         Value::Vector(_) => "vector",
@@ -2128,9 +2159,11 @@ fn metadata_to_value(value: &MetadataValue) -> Result<Value, String> {
 fn value_metadata(value: &Value) -> Option<Rc<Metadata>> {
     match value {
         Value::Symbol(value) => value.meta().cloned(),
+        Value::Pointer(value) => value.meta().cloned(),
         Value::Tuple(value) => value.meta().cloned(),
         Value::Vector(value) => value.meta().cloned(),
         Value::List(value) => value.meta().cloned(),
+        Value::Cons(value) => value.meta().cloned(),
         Value::Queue(value) => value.meta().cloned(),
         Value::Map(value) => value.meta().cloned(),
         Value::OrderedMap(value) => value.meta().cloned(),
@@ -2320,6 +2353,10 @@ fn protocol_find(arguments: &[Value]) -> Result<Value, String> {
         Value::Tuple(values) => indexed_find(values.get(value_index(key)?), value_index(key)?),
         Value::Vector(values) => indexed_find(values.get(value_index(key)?), value_index(key)?),
         Value::List(values) => indexed_find(values.get(value_index(key)?), value_index(key)?),
+        Value::Cons(values) => {
+            let index = value_index(key)?;
+            indexed_find(values.iter().nth(index).as_ref(), index)
+        }
         Value::Queue(values) => indexed_find(values.get(value_index(key)?), value_index(key)?),
         _ => Err("IFind/find has no implementation for this value".into()),
     }
@@ -2358,6 +2395,9 @@ fn protocol_has(arguments: &[Value]) -> Result<Value, String> {
         Value::List(values) => value_index(key)
             .map(|index| index < values.len())
             .unwrap_or(false),
+        Value::Cons(values) => value_index(key)
+            .map(|index| index < values.iter().count())
+            .unwrap_or(false),
         Value::Queue(values) => value_index(key)
             .map(|index| index < values.len())
             .unwrap_or(false),
@@ -2395,6 +2435,9 @@ fn protocol_conj(arguments: &[Value]) -> Result<Value, String> {
             Ok(Value::Vector(output))
         }
         Value::Queue(values) => Ok(Value::Queue(Box::new(values.push_last(item.clone())))),
+        Value::Cons(values) => Ok(Value::Cons(Box::new(
+            PCons::new(item.clone(), values.iter().collect()).with_meta(values.meta().cloned()),
+        ))),
         Value::List(values) => {
             let output = std::iter::once(item.clone())
                 .chain(values.iter().cloned())
@@ -3093,6 +3136,7 @@ fn iterator_values(value: Value) -> Result<Vec<Value>, String> {
         Value::Tuple(values) => Ok(values.iter().cloned().collect()),
         Value::Vector(values) => Ok(values.iter().cloned().collect()),
         Value::List(values) => Ok(values.iter().cloned().collect()),
+        Value::Cons(values) => Ok(values.iter().collect()),
         Value::Queue(values) => Ok(values.iter().cloned().collect()),
         Value::String(text) => Ok(text.chars().map(|c| Value::String(c.to_string())).collect()),
         Value::Bytes(bytes) => Ok(bytes
@@ -3158,6 +3202,7 @@ fn make_iterator(value: Value) -> Result<Value, String> {
         | Value::OrderedSet(_)
         | Value::SortedSet(_)
         | Value::List(_)
+        | Value::Cons(_)
         | Value::Queue(_)
         | Value::Tuple(_)
         | Value::Vector(_) => Ok(Value::Iterator(Rc::new(RefCell::new(IteratorState::new(
@@ -3548,6 +3593,7 @@ fn collection_count(value: &Value) -> Result<Value, String> {
         Value::Tuple(v) => v.len(),
         Value::Vector(v) => v.len(),
         Value::List(v) => v.len(),
+        Value::Cons(v) => v.iter().count(),
         Value::Queue(v) => v.len(),
         value @ (Value::Map(_) | Value::OrderedMap(_) | Value::SortedMap(_) | Value::Trie(_)) => {
             map_entries(value).unwrap().len()
@@ -3617,6 +3663,10 @@ fn collection_get(value: &Value, key: &Value, default: Value) -> Result<Value, S
         Value::Array(values) => {
             let index = value_index(key)?;
             Ok(values.borrow().get(index).cloned().unwrap_or(default))
+        }
+        Value::Cons(values) => {
+            let index = value_index(key)?;
+            Ok(values.iter().nth(index).unwrap_or(default))
         }
         Value::List(values) => {
             let index = value_index(key)?;
@@ -3802,10 +3852,12 @@ fn metadata_from_form(form: &Form) -> Result<Rc<Metadata>, String> {
 
 fn attach_metadata(value: Value, metadata: Rc<Metadata>) -> Result<Value, String> {
     Ok(match value {
-        Value::Symbol(value) => Value::Symbol(value.with_meta(Some(metadata))),
+        Value::Symbol(value) => Value::Symbol(value.with_meta(Some(metadata.clone()))),
+        Value::Pointer(value) => Value::Pointer(value.with_meta(Some(metadata))),
         Value::Tuple(value) => Value::Tuple(Box::new(value.with_meta(Some(metadata)))),
         Value::Vector(value) => Value::Vector(value.with_meta(Some(metadata))),
-        Value::List(value) => Value::List(value.with_meta(Some(metadata))),
+        Value::List(value) => Value::List(value.with_meta(Some(metadata.clone()))),
+        Value::Cons(value) => Value::Cons(Box::new(value.with_meta(Some(metadata)))),
         Value::Queue(value) => Value::Queue(Box::new(value.with_meta(Some(metadata)))),
         Value::Map(value) => Value::Map(value.with_meta(Some(metadata))),
         Value::OrderedMap(value) => Value::OrderedMap(Box::new(value.with_meta(Some(metadata)))),
@@ -3920,7 +3972,10 @@ fn literal_value(form: &Form) -> Result<Value, String> {
         Form::BigInteger(value) => Ok(Value::BigInteger(value.clone())),
         Form::Decimal(value) => Ok(Value::Decimal(value.clone())),
         Form::Regex(value) => Ok(Value::Regex(value.clone())),
-        Form::Tagged(tag, value) => Ok(Value::Tagged(tag.clone(), Box::new(literal_value(value)?))),
+        Form::Tagged(tag, value) => Ok(Value::Tagged(Box::new(PTaggedLiteral::new(
+            Symbol::parse(tag),
+            literal_value(value)?,
+        )))),
         Form::Metadata(metadata, value) => {
             attach_metadata(literal_value(value)?, metadata_from_form(metadata)?)
         }
@@ -4431,7 +4486,10 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
         Form::BigInteger(value) => Ok(Value::BigInteger(value.clone())),
         Form::Decimal(value) => Ok(Value::Decimal(value.clone())),
         Form::Regex(value) => Ok(Value::Regex(value.clone())),
-        Form::Tagged(tag, value) => Ok(Value::Tagged(tag.clone(), Box::new(literal_value(value)?))),
+        Form::Tagged(tag, value) => Ok(Value::Tagged(Box::new(PTaggedLiteral::new(
+            Symbol::parse(tag),
+            literal_value(value)?,
+        )))),
         Form::Metadata(_, value) => eval(value, env),
         Form::List(fs)
             if fs.len() == 2 && matches!(&fs[0], Form::Symbol(name) if name == "syntax-quote") =>
@@ -4940,7 +4998,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 Ok(Value::Promise(promise_chain(source, n, function)))
             }
             Form::Symbol(n) if n.starts_with("ns:") => eval_namespace_operation(n, fs, env),
-            Form::Symbol(n) if n == "keyword" || n == "symbol" => {
+            Form::Symbol(n) if n == "keyword" || n == "symbol" || n == "pointer" => {
                 if fs.len() != 2 && fs.len() != 3 {
                     return Err(format!("{n} expects a name or namespace and name"));
                 }
@@ -4961,6 +5019,10 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     ("symbol", [name]) => Ok(Value::Symbol(Symbol::parse(name))),
                     ("symbol", [namespace, name]) => {
                         Ok(Value::Symbol(Symbol::create(Some(namespace), name)))
+                    }
+                    ("pointer", [name]) => Ok(Value::Pointer(PPointer::parse(name))),
+                    ("pointer", [namespace, name]) => {
+                        Ok(Value::Pointer(PPointer::create(Some(namespace), name)))
                     }
                     _ => unreachable!(),
                 }
@@ -6060,18 +6122,20 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 let item = eval(&fs[1], env)?;
                 let collection = eval(&fs[2], env)?;
                 match collection {
-                    Value::Tuple(values) => tuple_push_first(&values, item),
-                    Value::Vector(values) => Ok(Value::Vector(
-                        std::iter::once(item)
-                            .chain(values.iter().cloned())
-                            .collect(),
-                    )),
-                    Value::List(values) => Ok(Value::List(
-                        std::iter::once(item)
-                            .chain(values.iter().cloned())
-                            .collect(),
-                    )),
-                    _ => Err("cons expects a vector".into()),
+                    Value::Cons(values) => Ok(Value::Cons(Box::new(
+                        PCons::new(item, values.iter().collect()).with_meta(values.meta().cloned()),
+                    ))),
+                    Value::Tuple(values) => Ok(Value::Cons(Box::new(PCons::new(
+                        item,
+                        values.iter().cloned().collect(),
+                    )))),
+                    Value::Vector(values) => Ok(Value::Cons(Box::new(PCons::new(
+                        item,
+                        values.iter().cloned().collect(),
+                    )))),
+                    Value::List(values) => Ok(Value::Cons(Box::new(PCons::new(item, values)))),
+                    Value::Nil => Ok(Value::Cons(Box::new(PCons::new(item, PList::new())))),
+                    _ => Err("cons expects a sequential collection".into()),
                 }
             }
             Form::Symbol(n) if n == "recur" => {
