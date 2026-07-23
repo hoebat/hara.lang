@@ -15,7 +15,6 @@ import hara.lang.data.types.ILinearType;
 
 import java.util.Iterator;
 import java.util.Map.Entry;
-import java.util.Map.Entry;
 import java.util.function.Function;
 
 import static hara.kernel.base.Module.ReduceInit.*;
@@ -33,7 +32,7 @@ public interface BuiltinLambda {
   public static <R, ITR> R apply(IFn f, ITR vargs) {
     Object[] args = Array.toArray(vargs);
     var lit = Iter.iter(args[args.length - 1]);
-    var it = Iter.concat(Array.toIter(args, 1, args.length - 1), lit);
+    var it = Iter.concat(Array.toIter(args, 0, args.length - 1), lit);
     return (R) f.apply(it);
   }
 

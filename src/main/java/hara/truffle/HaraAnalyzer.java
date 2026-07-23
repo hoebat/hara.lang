@@ -658,10 +658,14 @@ final class HaraAnalyzer {
     }
 
     int parametersIndex = 2;
+    String docstring = null;
     if (form.nth(parametersIndex) instanceof String) {
+      docstring = (String) form.nth(parametersIndex);
       parametersIndex++;
     }
+    IMapType<?, ?> attributes = null;
     if (parametersIndex < form.count() && form.nth(parametersIndex) instanceof IMapType<?, ?>) {
+      attributes = (IMapType<?, ?>) form.nth(parametersIndex);
       parametersIndex++;
     }
     if (parametersIndex >= form.count()) {
@@ -706,11 +710,42 @@ final class HaraAnalyzer {
       }
       function = new HaraNodes.MultiFunction(alternatives);
     }
-    Symbol definitionSymbol = symbol;
+    Object[] signatures;
+    if (isBindingVector(parameterForm)) {
+      signatures = new Object[] {parameterForm};
+    } else {
+      signatures = new Object[(int) form.count() - parametersIndex];
+      for (int i = parametersIndex; i < form.count(); i++) {
+        signatures[i - parametersIndex] = ((List<?>) form.nth(i)).nth(0);
+      }
+    }
+    IMapType<Object, Object> definitionMetadata;
+    if (symbol.meta() instanceof IMapType<?, ?>) {
+      definitionMetadata = (IMapType<Object, Object>) symbol.meta();
+    } else {
+      definitionMetadata = hara.lang.data.Map.Standard.EMPTY;
+    }
+    if (attributes != null) {
+      for (Object entryObject : attributes) {
+        java.util.Map.Entry<?, ?> entry = (java.util.Map.Entry<?, ?>) entryObject;
+        definitionMetadata =
+            (IMapType<Object, Object>) definitionMetadata.assoc(entry.getKey(), entry.getValue());
+      }
+    }
+    if (docstring != null) {
+      definitionMetadata =
+          (IMapType<Object, Object>) definitionMetadata.assoc(Keyword.create("doc"), docstring);
+    }
+    definitionMetadata =
+        (IMapType<Object, Object>)
+            definitionMetadata.assoc(
+                Keyword.create("arglists"), hara.lang.data.Vector.Standard.from(null, signatures));
+    Symbol definitionSymbol = symbol.withMeta(definitionMetadata);
     if (privateDefinition) {
       definitionSymbol =
-          symbol.withMeta(
-              hara.lang.data.Map.Standard.EMPTY.assoc(Keyword.create("private"), Boolean.TRUE));
+          definitionSymbol.withMeta(
+              (IMapType<Object, Object>)
+                  definitionMetadata.assoc(Keyword.create("private"), Boolean.TRUE));
     }
     return new HaraNodes.DefineGlobal(definitionSymbol, function);
   }
@@ -1023,7 +1058,7 @@ final class HaraAnalyzer {
           || !(catchForm.nth(1) instanceof Symbol)
           || ((Symbol) catchForm.nth(1)).getNamespace() != null
           || !(catchForm.nth(2) instanceof Symbol)) {
-        throw error("catch expects an unqualified class, binding, and body");
+        throw error("catch expects an unqualified class, binding, and body", catchForm);
       }
       int catchSlot = frames.addSlot(FrameSlotKind.Object, catchForm.nth(2), null);
       Map<Symbol, Integer> catchLocals = new HashMap<>(locals);
@@ -1525,6 +1560,12 @@ final class HaraAnalyzer {
 
   private HaraException error(String message) {
     return new HaraException(message);
+  }
+
+  private HaraException error(String message, Object form) {
+    HaraExpressionNode location = new HaraNodes.Literal(null);
+    attachSourceSection(location, form);
+    return new HaraException(message, location);
   }
 
   private boolean isBindingVector(Object value) {

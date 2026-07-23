@@ -1901,7 +1901,12 @@ public final class HaraNodes {
 
     @TruffleBoundary
     private Object invokeViaProtocol(Object target, Object[] values) {
-      return HaraLanguage.currentContext().ifnProtocol().invoke("invoke", target, values);
+      try {
+        return HaraLanguage.currentContext().ifnProtocol().invoke("invoke", target, values);
+      } catch (HaraException error) {
+        if (error.haraLocation() != null) throw error;
+        throw new HaraException(error.getMessage(), this);
+      }
     }
 
     private Object[] evaluateArguments(VirtualFrame frame) {

@@ -3,7 +3,6 @@ package hara.kernel.builtin;
 import hara.kernel.base.Module;
 import hara.lang.base.G;
 import hara.lang.base.Iter;
-import hara.lang.base.primitive.Array;
 import hara.lang.data.*;
 import hara.lang.data.Tuple.*;
 import hara.lang.data.types.ILinearType;
@@ -29,16 +28,6 @@ public interface BuiltinStruct {
   @Module.Fn(name = "hash-set", vargs = true, complete = true)
   public static <ITR, E> Set.Standard<E> hashSet(ITR elements) {
     return Set.Standard.into(Iter.iter(elements));
-  }
-
-  @Module.Fn(name = "j:arr", complete = true)
-  public static <ITR, E> E[] jArr(Class<E> type, ITR vargs) {
-    return (E[]) Iter.toArray(Iter.iter(vargs), type);
-  }
-
-  @Module.Fn(name = "j:objs", vargs = true, complete = true)
-  public static <ITR> Object[] jArr(ITR vargs) {
-    return Array.toArray(vargs);
   }
 
   @Module.Fn(name = "j:hash-map", vargs = true, complete = true)
@@ -69,51 +58,6 @@ public interface BuiltinStruct {
   @Module.Fn(name = "list", vargs = true, complete = true)
   public static <ITR, E> List.Standard<E> list(ITR elements) {
     return List.Standard.into(Iter.iter(elements));
-  }
-
-  @Module.Fn(name = "mut:hash-map", vargs = true, complete = true)
-  public static <ITR, K, V> Map.Mutable<K, V> mutHashMap(ITR elements) {
-    return Map.Mutable.into(Iter.partitionPair(Iter.iter(elements)));
-  }
-
-  @Module.Fn(name = "mut:hash-set", vargs = true, complete = true)
-  public static <ITR, E> Set.Mutable<E> mutHashSet(ITR elements) {
-    return Set.Mutable.into(Iter.iter(elements));
-  }
-
-  @Module.Fn(name = "mut:list", vargs = true, complete = true)
-  public static <ITR, E> List.Mutable<E> mutList(ITR elements) {
-    return List.Mutable.into(Iter.iter(elements));
-  }
-
-  @Module.Fn(name = "mut:ordered-map", vargs = true, complete = true)
-  public static <ITR, K, V> OrderedMap.Mutable<K, V> mutOrderedMap(ITR elements) {
-    return OrderedMap.Mutable.into(Iter.partitionPair(Iter.iter(elements)));
-  }
-
-  @Module.Fn(name = "mut:ordered-set", vargs = true, complete = true)
-  public static <ITR, E> OrderedSet.Mutable<E> mutOrderedSet(ITR elements) {
-    return OrderedSet.Mutable.into(Iter.iter(elements));
-  }
-
-  @Module.Fn(name = "mut:queue", vargs = true, complete = true)
-  public static <ITR, E> Queue.Mutable<E> mutQueue(ITR elements) {
-    return Queue.Mutable.into(Iter.iter(elements));
-  }
-
-  @Module.Fn(name = "mut:sorted-map", vargs = true, complete = true)
-  public static <ITR, K, V> SortedMap.Mutable<K, V> mutSortedMap(ITR elements) {
-    return SortedMap.Mutable.into(Iter.partitionPair(Iter.iter(elements)));
-  }
-
-  @Module.Fn(name = "mut:sorted-set", vargs = true, complete = true)
-  public static <ITR, E> SortedSet.Mutable<E> mutSortedSet(ITR elements) {
-    return SortedSet.Mutable.into(Iter.iter(elements));
-  }
-
-  @Module.Fn(name = "mut:vector", vargs = true, complete = true)
-  public static <ITR, E> Vector.Mutable<E> mutVector(ITR elements) {
-    return Vector.Mutable.into(Iter.iter(elements));
   }
 
   @Module.Fn(name = "ordered-map", vargs = true, complete = true)
@@ -208,6 +152,11 @@ public interface BuiltinStruct {
       default:
         throw new Ex.Arity(xs.length, "");
     }
+  }
+
+  @Module.Fn(name = "array", vargs = true, complete = true)
+  public static <ITR, E> Vector.Mutable<E> array(ITR elements) {
+    return Vector.Mutable.into(Iter.iter(elements));
   }
 
   @Module.Fn(name = "vector", vargs = true, complete = true)

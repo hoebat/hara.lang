@@ -4,6 +4,7 @@ import hara.lang.base.Ex;
 import hara.lang.base.G;
 import hara.lang.base.primitive.Array;
 import hara.lang.base.primitive.Num;
+import hara.kernel.builtin.BuiltinStruct;
 import hara.lang.data.*;
 import hara.lang.data.types.ILinearType;
 import hara.lang.data.types.IMapType;
@@ -59,7 +60,7 @@ public interface Parser {
       dispatchMacros['^'] = new MetaReader();
       dispatchMacros['"'] = new RegexReader();
       dispatchMacros['{'] = new SetReader();
-      dispatchMacros['['] = new QueueReader();
+      dispatchMacros[39] = new VarReader();
       dispatchMacros['<'] = new UnreadableReader();
       dispatchMacros['_'] = new DiscardReader();
     }
@@ -415,6 +416,18 @@ public interface Parser {
       }
     }
 
+    /** Reader shorthand for a Var reference: #'foo -> (var foo). */
+    public static class VarReader implements BiFunction<Reader, Map, Object> {
+      @Override
+      public Object apply(Reader r, Map opts) {
+        Object o = read(r, true, null, true, opts);
+        if (!(o instanceof Symbol)) {
+          throw new Ex.Runtime("Var quote expects a symbol");
+        }
+        return List.Standard.from(null, Symbol.create("var"), o);
+      }
+    }
+
     public static class SyntaxQuoteReader implements BiFunction<Reader, Map, Object> {
       @Override
       public Object apply(Reader r, Map opts) {
@@ -673,7 +686,7 @@ public interface Parser {
           keys.add(key);
         }
 
-        return orderedMap(list);
+        return BuiltinStruct.orderedMap(list);
       }
     }
 
@@ -690,15 +703,7 @@ public interface Parser {
           items.add(item);
         }
 
-        return orderedSet(list);
-      }
-    }
-
-    public static class QueueReader implements BiFunction<Reader, Map, Queue> {
-      @Override
-      public Queue apply(Reader r, Map opts) {
-        ArrayList list = readDelimitedList(']', r, true, opts);
-        return queue(list);
+        return BuiltinStruct.orderedSet(list);
       }
     }
   }

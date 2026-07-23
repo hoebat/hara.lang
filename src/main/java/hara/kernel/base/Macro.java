@@ -20,19 +20,16 @@ import hara.lang.protocol.ILookup;
 import hara.lang.protocol.INth;
 import hara.lang.protocol.IPair;
 
-import java.io.InputStream;
-import java.io.IOException;
 import java.util.Iterator;
 import java.util.Map.Entry;
-import java.nio.charset.StandardCharsets;
 
-import hara.kernel.builtin.BuiltinCollection;
 import static hara.kernel.builtin.BuiltinBasic.atomVolatile;
 import static hara.kernel.builtin.BuiltinBasic.symbol;
 import static hara.kernel.builtin.BuiltinCheck.isTruthy;
 import static hara.kernel.builtin.BuiltinCollection.*;
 import static hara.kernel.builtin.BuiltinStruct.list;
 import hara.kernel.builtin.BuiltinCollection;
+import hara.kernel.builtin.BuiltinRuntime;
 import hara.kernel.builtin.BuiltinStruct;
 
 @SuppressWarnings({"rawtypes", "unchecked"})
@@ -250,30 +247,11 @@ public interface Macro {
 
     public static void loadNamespace(RT.Instance rt, Symbol nsName) {
       if (rt.getNamespace(nsName) != null) {
-        return; // Already loaded
+        return;
       }
 
       String path = nsName.getName().replace('.', '/') + ".hal";
-      InputStream is = rt.classLoader().getResourceAsStream(path);
-
-      if (is == null) {
-        throw new Ex.Runtime("Could not find namespace: " + nsName + " (file: " + path + ")");
-      }
-
-      try (is) {
-        String content = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-        hara.kernel.base.Reader rdr =
-            new hara.kernel.base.Reader(new java.io.StringReader(content));
-        Object EOF = new Object();
-
-        while (true) {
-          Object form = Parser.LispReader.read(rdr, false, EOF, false, null);
-          if (form == EOF) break;
-          rt.eval(form);
-        }
-      } catch (IOException e) {
-        throw Ex.Sneaky(e);
-      }
+      BuiltinRuntime.loadResource(rt, path);
     }
 
     @Module.Fn(name = "quote")
@@ -395,6 +373,16 @@ public interface Macro {
     @Module.Var(control = true)
     public static <ITR> IFn fnExpr(IEnv env, ILinearType bindings, ITR args) {
       return new Env.FnEval(null, env.getRuntime(), env, bindings, list(args).cons(symbol("do")));
+    }
+
+    @Module.Fn(name = "defn", complete = true, env = true, vargs = true)
+    @Module.Var(control = true)
+    public static <ITR> Var defnExpr(IEnv env, Symbol sym, ILinearType bindings, ITR body) {
+      IFn function =
+          new Env.FnEval(null, env.getRuntime(), env, bindings, list(body).cons(symbol("do")));
+      Var var = (Var) new Var(sym.getName(), function).withMeta(sym.meta());
+      env.getRuntime().setObj(sym, var);
+      return var;
     }
 
     @Module.Fn(name = "let", complete = true, env = true, vargs = true)

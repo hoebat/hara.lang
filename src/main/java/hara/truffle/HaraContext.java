@@ -24,6 +24,7 @@ import hara.lang.protocol.IFn;
 import hara.lang.protocol.IMetadata;
 import hara.lang.protocol.IDeref;
 import hara.lang.protocol.IDerefTimeout;
+import hara.lang.protocol.IDisplay;
 import hara.lang.protocol.ICount;
 import hara.lang.protocol.INth;
 import hara.verify.noir.NoirArtifact;
@@ -61,16 +62,14 @@ public final class HaraContext {
           "promise", "hara.lib.promise",
           "bytes", "hara.lib.bytes",
           "socket", "hara.lib.socket",
-          "file", "hara.lib.file",
-          "noir", "hara.lib.noir");
+          "file", "hara.lib.file");
   private static final Map<String, String> DEFAULT_LIBRARY_ALIASES =
       Map.of(
           "string", "str",
           "promise", "promise",
           "bytes", "bytes",
           "socket", "socket",
-          "file", "file",
-          "noir", "noir");
+          "file", "file");
   private static final Set<String> MARKER_METHOD_NAMES =
       Set.of(
           "get",
@@ -102,6 +101,8 @@ public final class HaraContext {
   private final NativeFlavorRegistry nativeFlavorRegistry =
       new NativeFlavorRegistry().register(JvmFlavorProvider.INSTANCE);
   private final NoirWasmLoader noirWasmLoader = NoirWasmLoader.discover();
+  private final HaraExtensionRegistry extensionRegistry =
+      new HaraExtensionRegistry(HaraContext.class.getClassLoader());
   private final Map<String, ModuleRecord> modules = new ConcurrentHashMap<>();
   private final Map<String, Set<String>> moduleDependencies = new ConcurrentHashMap<>();
   private final Set<String> loadingModules = ConcurrentHashMap.newKeySet();
@@ -360,7 +361,7 @@ public final class HaraContext {
       throw new HaraException(":require namespace must be a symbol");
     }
     String target = ((Symbol) spec.nth(0)).display();
-    HaraNamespace required = namespaces.get(target);
+    HaraNamespace required = requiredNamespace(target);
     if (required == null) throw new HaraException("Cannot require missing namespace: " + target);
     for (int i = 1; i < spec.count(); i += 2) {
       if (i + 1 >= spec.count() || !(spec.nth(i) instanceof Keyword)) {
@@ -392,6 +393,49 @@ public final class HaraContext {
         throw new HaraException("Unsupported :require option: :" + option);
       }
     }
+  }
+
+  private synchronized HaraNamespace requiredNamespace(String target) {
+    HaraNamespace existing = namespaces.get(target);
+    if (existing != null) return existing;
+    HaraExtensionManifest manifest = extensionRegistry.discover(target);
+    if (manifest == null) return null;
+    return installExtension(manifest);
+  }
+
+  private HaraNamespace installExtension(HaraExtensionManifest manifest) {
+    if (!"wasm".equals(manifest.provider())) {
+      throw new HaraException(
+          "extension/provider-unsupported: "
+              + manifest.provider()
+              + " for "
+              + manifest.namespace());
+    }
+    if (!"hara.noir".equals(manifest.module())) {
+      throw new HaraException(
+          "extension/module-unsupported: " + manifest.module() + " for " + manifest.namespace());
+    }
+    if (!manifest.capabilities().isEmpty()) {
+      throw new HaraException(
+          "extension/capability-denied: "
+              + manifest.capabilities()
+              + " for "
+              + manifest.namespace());
+    }
+    HaraNamespace source = namespaces.get("hara.lib.noir");
+    if (source == null) throw new HaraException("extension/provider-unavailable: hara.noir");
+    LinkedHashMap<String, HaraVar> bindings = new LinkedHashMap<>();
+    for (String export : manifest.exports().keySet()) {
+      HaraVar variable = source.lookup(export);
+      if (variable == null) {
+        throw new HaraException(
+            "extension/malformed: module " + manifest.module() + " has no export " + export);
+      }
+      bindings.put(export, variable);
+    }
+    HaraNamespace generated = namespace(manifest.namespace());
+    bindings.forEach(generated::refer);
+    return generated;
   }
 
   @TruffleBoundary
@@ -630,7 +674,12 @@ public final class HaraContext {
     target.define("in-ns", new UnaryBuiltin("in-ns", this::inNamespace));
     target.define(
         "current-symbols",
-        new VariadicBuiltin("current-symbols", ignored -> currentSymbolNames().toArray()));
+        new VariadicBuiltin(
+            "current-symbols",
+            values -> {
+              requireMethodArity("current-symbols", values, 0);
+              return currentSymbolNames().toArray();
+            }));
     target.define("use", new UnaryBuiltin("use", this::useNamespace));
     target.define("iter", new UnaryBuiltin("iter", this::iterValue));
     target.define("iter-has?", new UnaryBuiltin("iter-has?", this::iterHasNext));
@@ -677,8 +726,7 @@ public final class HaraContext {
         "get", new VariadicBuiltin("get", values -> protocolCall("ILookup", "lookup", values)));
     target.define(
         "assoc", new VariadicBuiltin("assoc", values -> protocolCall("IAssoc", "assoc", values)));
-    target.define(
-        "conj", new VariadicBuiltin("conj", values -> protocolCall("IConj", "conj", values)));
+    target.define("conj", new VariadicBuiltin("conj", this::conjoin));
     target.define(
         "cons",
         new VariadicBuiltin(
@@ -721,8 +769,40 @@ public final class HaraContext {
             "pop", value -> protocolCall("INavigation", "pop-first", new Object[] {value})));
   }
 
+  private Object conjoin(Object[] values) {
+    Object result;
+    int firstValue;
+    if (values.length < 2) {
+      result = BuiltinStruct.vector(new Object[0]);
+      firstValue = 0;
+    } else {
+      result = values[0];
+      firstValue = 1;
+    }
+    for (int i = firstValue; i < values.length; i++) {
+      result = protocolCall("IConj", "conj", new Object[] {result, values[i]});
+    }
+    return result;
+  }
+
+  private static String concatenateStrings(Object[] values) {
+    StringBuilder result = new StringBuilder();
+    for (Object value : values) {
+      Object unwrapped = HaraBox.unwrap(value);
+      if (unwrapped == null || unwrapped == HaraNull.SINGLETON) {
+        continue;
+      }
+      if (unwrapped instanceof IDisplay) {
+        result.append(((IDisplay) unwrapped).display());
+      } else {
+        result.append(unwrapped);
+      }
+    }
+    return result.toString();
+  }
+
   private void installCoreBuiltins(HaraNamespace target) {
-    target.define("str", new UnaryBuiltin("str", value -> String.valueOf(HaraBox.unwrap(value))));
+    target.define("str", new VariadicBuiltin("str", HaraContext::concatenateStrings));
     target.define("promise", new UnaryBuiltin("promise", this::promiseRun));
     target.define("bytes", new VariadicBuiltin("bytes", this::createBytes));
     target.define("array", new VariadicBuiltin("array", HaraArray::new));
@@ -1093,15 +1173,12 @@ public final class HaraContext {
   }
 
   private static Object bitOperation(String operation, Object[] values) {
-    if (values.length < 2) throw new HaraException("bit-" + operation + " expects two integers");
-    int result = int32(values[0], "bit-" + operation);
-    for (int i = 1; i < values.length; i++) {
-      int next = int32(values[i], "bit-" + operation);
-      if ("and".equals(operation)) result &= next;
-      else if ("or".equals(operation)) result |= next;
-      else result ^= next;
-    }
-    return (long) result;
+    if (values.length != 2) throw new HaraException("bit-" + operation + " expects two integers");
+    int left = int32(values[0], "bit-" + operation);
+    int right = int32(values[1], "bit-" + operation);
+    if ("and".equals(operation)) return (long) (left & right);
+    if ("or".equals(operation)) return (long) (left | right);
+    return (long) (left ^ right);
   }
 
   private static Object bitShift(Object[] values, boolean left) {
@@ -1782,8 +1859,8 @@ public final class HaraContext {
 
   private void requireHalPath(String path, String operation) {
     String sourcePath = path.startsWith("classpath:") ? path.substring(10) : path;
-    if (!sourcePath.endsWith(".hal")) {
-      throw new HaraException(operation + " accepts only .hal executable source files");
+    if (!sourcePath.endsWith(".hal") && !sourcePath.endsWith(".hrl")) {
+      throw new HaraException(operation + " accepts only .hal or .hrl executable source files");
     }
   }
 

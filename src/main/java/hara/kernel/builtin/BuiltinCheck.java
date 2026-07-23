@@ -24,6 +24,11 @@ public interface BuiltinCheck {
     }
   }
 
+  @Module.Fn(name = "not", complete = true)
+  public static boolean not(Object value) {
+    return !isTruthy(value);
+  }
+
   @Module.Fn(name = "integer?", complete = true)
   public static <TYPE> boolean isInteger(TYPE x) {
     return (x instanceof Integer) || (x instanceof Long) || (x instanceof BigInteger);

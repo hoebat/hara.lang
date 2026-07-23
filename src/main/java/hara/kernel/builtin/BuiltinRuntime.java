@@ -55,6 +55,37 @@ public interface BuiltinRuntime {
     return rt.readString(input);
   }
 
+  @Module.Fn(name = "load-resource", rt = true)
+  public static Object loadResource(IRuntime rt, String path) {
+    if (path == null || (!path.endsWith(".hal") && !path.endsWith(".hrl"))) {
+      throw new Ex.Runtime("load-resource expects a .hal or .hrl resource path");
+    }
+    java.io.InputStream stream = rt.classLoader().getResourceAsStream(path);
+    if (stream == null) {
+      throw new Ex.Runtime("Could not find .hal or .hrl resource: " + path);
+    }
+    try (stream) {
+      String source = new String(stream.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+      hara.kernel.base.Reader reader =
+          new hara.kernel.base.Reader(new java.io.StringReader(source));
+      Object eof = new Object();
+      Object result = null;
+      while (true) {
+        Object form = hara.kernel.base.Parser.LispReader.read(reader, false, eof, false, null);
+        if (form == eof) return result;
+        result = rt.eval(form);
+      }
+    } catch (java.io.IOException error) {
+      throw Ex.Sneaky(error);
+    }
+  }
+
+  @Module.Fn(name = "require", rt = true)
+  public static Object require(IRuntime rt, String path) {
+    loadResource(rt, path);
+    return null;
+  }
+
   @Module.Fn(name = "ctl", vargs = true, rt = true)
   public static <ITR> Object ctl(IRuntime rt, ITR args) {
     return rt.getRoot().call(Array.toArray(args));

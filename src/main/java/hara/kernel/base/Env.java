@@ -45,7 +45,7 @@ public interface Env {
   public interface Invoke {
 
     public static Predicate<Object> assignable(Method m, int i) {
-      var cparam = m.getParameterTypes()[i];
+      var cparam = boxed(m.getParameterTypes()[i]);
       return (arg) -> {
         if (arg == null) {
           return true;
@@ -53,6 +53,19 @@ public interface Env {
           return cparam.isAssignableFrom(arg.getClass());
         }
       };
+    }
+
+    public static Class<?> boxed(Class<?> type) {
+      if (!type.isPrimitive()) return type;
+      if (type == boolean.class) return Boolean.class;
+      if (type == byte.class) return Byte.class;
+      if (type == char.class) return Character.class;
+      if (type == short.class) return Short.class;
+      if (type == int.class) return Integer.class;
+      if (type == long.class) return Long.class;
+      if (type == float.class) return Float.class;
+      if (type == double.class) return Double.class;
+      return Void.class;
     }
 
     public static <R, ITR> R invokeMatch(List<Method> ms, ITR args, int len) {
@@ -187,6 +200,8 @@ public interface Env {
 
     final AST _body;
     final ILinearType _params;
+    final int _fixedArity;
+    final Symbol _restParam;
 
     final IRuntime _rt;
     final IEnv _env;
@@ -197,11 +212,29 @@ public interface Env {
       _env = env;
       _params = params;
       _body = body;
+      int fixedArity = Math.toIntExact(params.count());
+      Symbol restParam = null;
+      for (int i = 0; i < params.count(); i++) {
+        Object param = params.nth(i);
+        if (param instanceof Symbol && "&".equals(((Symbol) param).getName())) {
+          if (i != params.count() - 2 || !(params.nth(i + 1) instanceof Symbol)) {
+            throw new Ex.Syntax("fn & must be followed by one final rest parameter");
+          }
+          fixedArity = i;
+          restParam = (Symbol) params.nth(i + 1);
+          break;
+        }
+      }
+      _fixedArity = fixedArity;
+      _restParam = restParam;
     }
 
     public void checkArgs(int size) {
-      if (size != _params.count()) {
-        throw new Ex.Arity(size, "Only " + _params.count() + " Args supported");
+      if ((_restParam == null && size != _fixedArity)
+          || (_restParam != null && size < _fixedArity)) {
+        String expected =
+            _restParam == null ? Integer.toString(_fixedArity) : "at least " + _fixedArity;
+        throw new Ex.Arity(size, "Expected " + expected + " arguments");
       }
     }
 
@@ -234,7 +267,10 @@ public interface Env {
 
     public Object invokeEval(java.util.List args) {
       try {
-        var map = zipmap(_params, args);
+        var map = zipmap(Iter.take(_params.iterator(), _fixedArity), args.subList(0, _fixedArity));
+        if (_restParam != null) {
+          map = map.assoc(_restParam, BuiltinStruct.vector(args.subList(_fixedArity, args.size())));
+        }
         return _rt.eval(_body, new FnEnv(_env, map, _rt));
       } catch (Throwable t) {
         throw Ex.Sneaky(t);

@@ -1,6 +1,7 @@
 package hara.kernel.builtin;
 
 import hara.kernel.base.Module;
+import hara.lang.base.Ex;
 import hara.lang.base.Iter;
 import hara.lang.data.*;
 import hara.lang.protocol.*;
@@ -61,6 +62,17 @@ public interface BuiltinCollection {
     return coll;
   }
 
+  @Module.Fn(name = "cons", protocol = true)
+  public static <E> ICons cons(E e, ICons coll) {
+    return coll.cons(e);
+  }
+
+  @Module.Fn(name = "cons", option = true)
+  public static <E> java.util.List<E> cons(E e, java.util.List<E> coll) {
+    coll.add(0, e);
+    return coll;
+  }
+
   @Module.Fn(name = "count", option = true)
   public static <E> long count(E[] e) {
     return e.length;
@@ -72,6 +84,11 @@ public interface BuiltinCollection {
   }
 
   @Module.Fn(name = "count", option = true)
+  public static long count(String s) {
+    return s.length();
+  }
+
+  @Module.Fn(name = "count", option = true)
   public static long count(Iterable coll) {
     return Iter.count(Iter.iter(coll));
   }
@@ -79,11 +96,6 @@ public interface BuiltinCollection {
   @Module.Fn(name = "count", option = true)
   public static long count(java.util.Collection coll) {
     return coll.size();
-  }
-
-  @Module.Fn(name = "count", option = true)
-  public static long count(String s) {
-    return s.length();
   }
 
   @Module.Fn(name = "dissoc", protocol = true)
@@ -213,6 +225,31 @@ public interface BuiltinCollection {
   @Module.Fn(name = "iter", complete = true)
   public static <ITR> Iterator iter(ITR obj) {
     return Iter.iter(obj);
+  }
+
+  @Module.Fn(name = "iter-has?", complete = true)
+  public static boolean iterHas(Iterator iterator) {
+    return iterator.hasNext();
+  }
+
+  @Module.Fn(name = "iter-next", complete = true)
+  public static Object iterNext(Iterator iterator) {
+    if (!iterator.hasNext()) {
+      throw new Ex.Runtime("iter-next reached the end of the iterator");
+    }
+    return iterator.next();
+  }
+
+  @Module.Fn(name = "iter-close", complete = true)
+  public static Object iterClose(Iterator iterator) {
+    if (iterator instanceof AutoCloseable) {
+      try {
+        ((AutoCloseable) iterator).close();
+      } catch (Exception error) {
+        throw Ex.Sneaky(error);
+      }
+    }
+    return null;
   }
 
   @Module.Fn(name = "keys", protocol = true)
