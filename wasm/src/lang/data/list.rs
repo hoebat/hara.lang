@@ -251,6 +251,10 @@ impl<E: Clone> IEmpty for Standard<E> {
 impl<E: Clone> IAssoc<usize, E> for Standard<E> {
     type Output = Self;
     fn assoc(&self, index: usize, value: E) -> Self {
+        if index == self.len() {
+            return self.push_last(value);
+        }
+        assert!(index < self.len(), "list index out of bounds");
         self.iter()
             .cloned()
             .enumerate()
@@ -318,10 +322,14 @@ where
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Mutable<E> {
     values: Vec<E>,
+    metadata: Option<Rc<crate::lang::data::Metadata>>,
 }
 impl<E> Mutable<E> {
     pub fn new() -> Self {
-        Self { values: Vec::new() }
+        Self {
+            values: Vec::new(),
+            metadata: None,
+        }
     }
     pub fn len(&self) -> usize {
         self.values.len()
@@ -350,6 +358,10 @@ impl<E> Mutable<E> {
         self.values.pop()
     }
     pub fn assoc(&mut self, index: usize, value: E) -> Option<E> {
+        if index == self.values.len() {
+            self.values.push(value);
+            return None;
+        }
         self.values
             .get_mut(index)
             .map(|slot| std::mem::replace(slot, value))
@@ -363,6 +375,7 @@ impl<E> FromIterator<E> for Mutable<E> {
     fn from_iter<T: IntoIterator<Item = E>>(iter: T) -> Self {
         Self {
             values: iter.into_iter().collect(),
+            metadata: None,
         }
     }
 }
@@ -370,13 +383,19 @@ impl<E> IMutable for Mutable<E> {}
 impl<E: Clone> IToPersistent for Mutable<E> {
     type Persistent = Standard<E>;
     fn to_persistent(&mut self) -> Self::Persistent {
-        self.values.iter().cloned().collect()
+        self.values
+            .iter()
+            .cloned()
+            .collect::<Standard<_>>()
+            .with_meta(self.metadata.clone())
     }
 }
 impl<E: Clone> IToMutable for Standard<E> {
     type Mutable = Mutable<E>;
     fn to_mutable(&self) -> Self::Mutable {
-        self.iter().cloned().collect()
+        let mut value = self.iter().cloned().collect::<Mutable<_>>();
+        value.metadata = self.metadata.clone();
+        value
     }
 }
 
@@ -423,5 +442,31 @@ mod tests {
         let persistent = mutable.to_persistent();
         assert_eq!(persistent.get(32), Some(&320));
         assert_eq!(original.get(32), Some(&32));
+    }
+
+    #[test]
+    fn assoc_at_count_appends_and_round_trip_keeps_metadata() {
+        use crate::lang::protocol::{IAssoc, IMetadata, IToMutable, IToPersistent};
+        let original = Standard::from(vec![1, 2])
+            .with_meta(Some(crate::lang::data::Metadata::document("doc")));
+        let appended = original.assoc(2, 3);
+        assert_eq!(appended.iter().copied().collect::<Vec<_>>(), vec![1, 2, 3]);
+        assert_eq!(appended.meta().and_then(|value| value.doc()), Some("doc"));
+
+        let mut mutable = original.to_mutable();
+        assert_eq!(mutable.assoc(2, 3), None);
+        let persistent = mutable.to_persistent();
+        assert_eq!(
+            persistent.iter().copied().collect::<Vec<_>>(),
+            vec![1, 2, 3]
+        );
+        assert_eq!(persistent.meta().and_then(|value| value.doc()), Some("doc"));
+    }
+
+    #[test]
+    #[should_panic(expected = "list index out of bounds")]
+    fn persistent_assoc_rejects_index_past_count() {
+        use crate::lang::protocol::IAssoc;
+        let _ = Standard::from(vec![1, 2]).assoc(3, 4);
     }
 }

@@ -4,7 +4,8 @@ use std::rc::Rc;
 
 use crate::lang::protocol::{
     HashType, IAssoc, IColl, IConj, ICount, IDisplay, IDissoc, IEmpty, IEquality, IFind, IHash,
-    ILookup, IMetadata, IMutable, IObjType, IPersistent, IToMutable, IToPersistent, ObjType,
+    ILookup, IMetadata, IMutable, IObjType, IPersistent, IToMutable, IToPersistent, MetaType,
+    ObjType,
 };
 
 #[derive(Debug, Clone)]
@@ -191,6 +192,10 @@ impl<V: Clone> IMetadata for Standard<V> {
             metadata,
             ..self.clone()
         }
+    }
+
+    fn metatype(&self) -> MetaType {
+        MetaType::Map
     }
 }
 impl<V: Clone> IPersistent for Standard<V> {}

@@ -1075,6 +1075,50 @@ mod tests {
     }
 
     #[test]
+    fn keyword_symbol_constructors_and_namespaced_protocol_match_java() {
+        let mut runtime = Runtime::new();
+        assert_eq!(
+            runtime.eval_text("(keyword \"answer\")").unwrap(),
+            ":answer"
+        );
+        assert_eq!(
+            runtime.eval_text("(keyword \"core\" \"answer\")").unwrap(),
+            ":core/answer"
+        );
+        assert_eq!(runtime.eval_text("(symbol \"answer\")").unwrap(), "answer");
+        assert_eq!(
+            runtime.eval_text("(symbol \"core\" \"answer\")").unwrap(),
+            "core/answer"
+        );
+        assert_eq!(
+            runtime
+                .eval_text("(protocol-call INamespaced name :core/answer)")
+                .unwrap(),
+            "\"answer\""
+        );
+        assert_eq!(
+            runtime
+                .eval_text("(protocol-call INamespaced namespace (symbol \"core\" \"answer\"))")
+                .unwrap(),
+            "\"core\""
+        );
+        assert_eq!(
+            runtime
+                .eval_text("(protocol-call INamespaced namespace :answer)")
+                .unwrap(),
+            "nil"
+        );
+        assert!(runtime
+            .eval_text("(keyword \"a/b/c\")")
+            .unwrap_err()
+            .contains("one slash"));
+        assert!(runtime
+            .eval_text("(symbol 1)")
+            .unwrap_err()
+            .contains("string arguments"));
+    }
+
+    #[test]
     fn reader_vectors_use_java_tuple_arity_selection() {
         let mut env = HashMap::new();
         let small = core::eval(&kernel::parse("[1 2 3]").unwrap(), &mut env).unwrap();

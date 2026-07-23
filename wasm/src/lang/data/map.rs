@@ -4,7 +4,8 @@ use std::rc::Rc;
 
 use crate::lang::protocol::{
     HashType, IAssoc, IColl, IConj, ICount, IDisplay, IDissoc, IEmpty, IEquality, IFind, IHash,
-    ILookup, IMetadata, IMutable, IObjType, IPersistent, IToMutable, IToPersistent, ObjType,
+    ILookup, IMetadata, IMutable, IObjType, IPersistent, IToMutable, IToPersistent, MetaType,
+    ObjType,
 };
 
 const SHIFT: usize = 5;
@@ -484,6 +485,10 @@ impl<K: Clone + Eq + Hash, V: Clone> IMetadata for Standard<K, V> {
             metadata,
             ..self.clone()
         }
+    }
+
+    fn metatype(&self) -> MetaType {
+        MetaType::Map
     }
 }
 impl<K: Clone + Eq + Hash, V: Clone> IPersistent for Standard<K, V> {}

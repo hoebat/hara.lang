@@ -2,7 +2,9 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 
-use crate::lang::protocol::{HashType, IDisplay, IHash, IMetadata, INamespaced, IObjType, ObjType};
+use crate::lang::protocol::{
+    HashType, IDisplay, IHash, IMetadata, INamespaced, IObjType, MetaType, ObjType,
+};
 
 thread_local! {
     static INTERNED: RefCell<HashMap<String, Weak<Data>>> = RefCell::new(HashMap::new());
@@ -92,6 +94,10 @@ impl IMetadata for Symbol {
             metadata,
         }
     }
+
+    fn metatype(&self) -> MetaType {
+        MetaType::String
+    }
 }
 impl IDisplay for Symbol {
     fn display(&self) -> String {
@@ -144,7 +150,7 @@ impl std::fmt::Display for Symbol {
 mod tests {
     use super::Symbol;
     use crate::lang::protocol::{
-        HashType, IDisplay, IHash, IMetadata, INamespaced, IObjType, ObjType,
+        HashType, IDisplay, IHash, IMetadata, INamespaced, IObjType, MetaType, ObjType,
     };
 
     #[test]
@@ -157,6 +163,9 @@ mod tests {
         assert_eq!(first.display(), "hara/name");
         assert_eq!(first.obj_type(), ObjType::Symbol);
         assert_eq!(first.hash_seed(), "::SYMBOL");
+        assert_eq!(first.metatype(), MetaType::String);
+        assert_eq!(first.hash_get(), first.hash());
+        assert_eq!(first.hash_type(), HashType::Rapid);
         assert_eq!(Symbol::parse("/").get_namespace(), None);
         let nested = Symbol::parse("a/b/c");
         assert_eq!(nested.get_namespace(), Some("a"));

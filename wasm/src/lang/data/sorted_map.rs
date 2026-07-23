@@ -5,7 +5,7 @@ use std::rc::Rc;
 use crate::lang::protocol::{
     HashType, IAssoc, IColl, IConj, ICount, IDisplay, IDissoc, IEmpty, IEquality, IFind, IHash,
     IIndexedKV, ILookup, IMetadata, IMutable, INth, IObjType, IPersistent, IToMutable,
-    IToPersistent, ObjType,
+    IToPersistent, MetaType, ObjType,
 };
 
 type Link<K, V> = Option<Rc<Node<K, V>>>;
@@ -351,6 +351,10 @@ impl<K: Clone + Ord, V: Clone> IMetadata for Standard<K, V> {
             metadata,
             ..self.clone()
         }
+    }
+
+    fn metatype(&self) -> MetaType {
+        MetaType::Map
     }
 }
 impl<K: Clone + Ord, V: Clone> IPersistent for Standard<K, V> {}

@@ -9,7 +9,7 @@ use crate::lang::data::{
     Keyword, OrderedMap as PMap, OrderedSet as PSet, Symbol, Tuple as PTuple, Vector as PVector,
 };
 use crate::lang::data::{Metadata, MetadataValue};
-use crate::lang::protocol::{IDisplay, IMetadata};
+use crate::lang::protocol::{IDisplay, IMetadata, INamespaced};
 pub use crate::task::{LocalPromiseProvider, Promise, PromiseProvider, PromiseState};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
@@ -720,6 +720,8 @@ impl ProtocolRegistry {
         registry.register("IConj", "conj", protocol_conj);
         registry.register("IDissoc", "dissoc", protocol_dissoc);
         registry.register("IIter", "iter", protocol_iter);
+        registry.register("INamespaced", "name", protocol_namespaced_name);
+        registry.register("INamespaced", "namespace", protocol_namespaced_namespace);
         registry.register("IObjType", "meta", protocol_meta);
         registry.register("IObjType", "with-meta", protocol_with_meta);
         registry
@@ -1727,6 +1729,42 @@ fn protocol_nth(arguments: &[Value]) -> Result<Value, String> {
             .ok_or_else(|| "nth index out of bounds".into());
     }
     collection_nth(&arguments[0], &arguments[1])
+}
+
+fn namespaced_parts(value: &Value) -> Option<(String, Option<String>)> {
+    match value {
+        Value::Keyword(value) => Some((
+            value.get_name().to_owned(),
+            value.get_namespace().map(str::to_owned),
+        )),
+        Value::Symbol(value) => Some((
+            value.get_name().to_owned(),
+            value.get_namespace().map(str::to_owned),
+        )),
+        Value::Var(value) => Some((
+            value.get_name().to_owned(),
+            value.get_namespace().map(str::to_owned),
+        )),
+        _ => None,
+    }
+}
+
+fn protocol_namespaced_name(arguments: &[Value]) -> Result<Value, String> {
+    if arguments.len() != 1 {
+        return Err("INamespaced/name expects one value".into());
+    }
+    namespaced_parts(&arguments[0])
+        .map(|(name, _)| Value::String(name))
+        .ok_or_else(|| "INamespaced/name has no implementation for this value".into())
+}
+
+fn protocol_namespaced_namespace(arguments: &[Value]) -> Result<Value, String> {
+    if arguments.len() != 1 {
+        return Err("INamespaced/namespace expects one value".into());
+    }
+    namespaced_parts(&arguments[0])
+        .map(|(_, namespace)| namespace.map(Value::String).unwrap_or(Value::Nil))
+        .ok_or_else(|| "INamespaced/namespace has no implementation for this value".into())
 }
 
 fn protocol_lookup(arguments: &[Value]) -> Result<Value, String> {
@@ -4032,6 +4070,31 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     _ => return Err(format!("{n} expects a function")),
                 };
                 Ok(Value::Promise(promise_chain(source, n, function)))
+            }
+            Form::Symbol(n) if n == "keyword" || n == "symbol" => {
+                if fs.len() != 2 && fs.len() != 3 {
+                    return Err(format!("{n} expects a name or namespace and name"));
+                }
+                let parts = fs[1..]
+                    .iter()
+                    .map(|form| match eval(form, env)? {
+                        Value::String(value) => Ok(value),
+                        _ => Err(format!("{n} expects string arguments")),
+                    })
+                    .collect::<Result<Vec<_>, _>>()?;
+                match (n.as_str(), parts.as_slice()) {
+                    ("keyword", [name]) => Keyword::parse(name)
+                        .map(Value::Keyword)
+                        .map_err(|error| format!("keyword failed: {error}")),
+                    ("keyword", [namespace, name]) => Keyword::create(Some(namespace), name)
+                        .map(Value::Keyword)
+                        .map_err(|error| format!("keyword failed: {error}")),
+                    ("symbol", [name]) => Ok(Value::Symbol(Symbol::parse(name))),
+                    ("symbol", [namespace, name]) => {
+                        Ok(Value::Symbol(Symbol::create(Some(namespace), name)))
+                    }
+                    _ => unreachable!(),
+                }
             }
             Form::Symbol(n) if n == "set" => Ok(Value::Set(
                 unique_values(

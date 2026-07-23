@@ -86,7 +86,7 @@ pub use hash::{HashType, IHash, IHashCached};
 pub use indexed::IIndexed;
 pub use indexed_kv::IIndexedKV;
 pub use lookup::ILookup;
-pub use metadata::IMetadata;
+pub use metadata::{IMetadata, MetaType};
 pub use mutable::IMutable;
 pub use namespaced::INamespaced;
 pub use nth::INth;

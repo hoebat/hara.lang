@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 
 use crate::lang::protocol::{
-    HashType, IDisplay, IHash, ILookup, IMetadata, INamespaced, IObjType, ObjType,
+    HashType, IDisplay, IHash, ILookup, IMetadata, INamespaced, IObjType, MetaType, ObjType,
 };
 
 thread_local! {
@@ -106,6 +106,10 @@ impl IMetadata for Keyword {
     fn with_meta(&self, _metadata: Option<Self::Metadata>) -> Self {
         self.clone()
     }
+
+    fn metatype(&self) -> MetaType {
+        MetaType::String
+    }
 }
 impl IDisplay for Keyword {
     fn display(&self) -> String {
@@ -170,7 +174,7 @@ mod tests {
     use crate::lang::data::Map;
     use crate::lang::protocol::IAssoc;
     use crate::lang::protocol::{
-        HashType, IDisplay, IHash, IMetadata, INamespaced, IObjType, ObjType,
+        HashType, IDisplay, IHash, IMetadata, INamespaced, IObjType, MetaType, ObjType,
     };
 
     #[test]
@@ -183,6 +187,12 @@ mod tests {
         assert_eq!(first.display(), ":hara/name");
         assert_eq!(first.obj_type(), ObjType::Keyword);
         assert_eq!(first.hash_seed(), "::KEYWORD");
+        assert_eq!(first.metatype(), MetaType::String);
+        assert_eq!(first.hash_get(), first.hash());
+        assert_eq!(
+            first.hash_get_as(HashType::Murmur3),
+            first.hash_calc(HashType::Murmur3)
+        );
         for invalid in ["", "/", "/name", "name/", "a/b/c"] {
             assert!(Keyword::parse(invalid).is_err());
         }
