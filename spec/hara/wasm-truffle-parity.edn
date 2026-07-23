@@ -1,0 +1,22 @@
+{:spec/version "0.1"
+ :language "hara-l0"
+ :engines [:rust-wasm :truffle]
+ :cases
+ [{:id :arithmetic/basic :source "(+ 19 23)" :expect 42}
+  {:id :arithmetic/precedence :source "(- (* 7 8) 14)" :expect 42}
+  {:id :control/if :source "(if (= 2 2) 42 0)" :expect 42}
+  {:id :control/let :source "(let [a 19 b 23] (+ a b))" :expect 42}
+  {:id :function/fixed :source "((fn [x] (+ x 1)) 41)" :expect 42}
+  {:id :function/variadic :source "((fn [x & xs] (+ x (count xs))) 40 1 2)" :expect 42}
+  {:id :function/defn :source "(do (defn answer [x] (+ x 1)) (answer 41))" :expect 42}
+  {:id :collection/count :source "(count [1 2 3])" :expect 3}
+  {:id :collection/nth :source "(nth [40 42] 1)" :expect 42}
+  {:id :collection/get :source "(get {:answer 42} :answer)" :expect 42}
+  {:id :collection/assoc :source "(get (assoc {:answer 41} :answer 42) :answer)" :expect 42}
+  {:id :collection/conj :source "(nth (conj [40] 42) 1)" :expect 42}
+  {:id :iterator/map :source "(iter-next (iter-map (fn [x] (+ x 1)) [41]))" :expect 42}
+  {:id :iterator/filter :source "(iter-next (iter-filter (fn [x] (= x 42)) [1 42]))" :expect 42}
+  {:id :numeric/mod :source "(mod 86 44)" :expect 42}
+  {:id :numeric/bit-and :source "(bit-and 58 42)" :expect 42}
+  {:id :numeric/shift :source "(bit-shift-left 21 1)" :expect 42}
+  {:id :protocol/count :source "(protocol-call ICount count [1 2 3 4])" :expect 4}]}

@@ -30,6 +30,9 @@ jobs:
     - name: Run JVM L0 conformance corpus
       run: mvn -B -Ptruffle -Dtest=hara.truffle.HaraL0ConformanceTest test
 
+    - name: Run Rust WASM and Truffle parity corpus
+      run: mvn -B -Ptruffle -Dtest=hara.truffle.HaraWasmTruffleParityTest test
+
     - name: Run JVM L0 benchmark matrix
       run: ./scripts/run-truffle-benchmark 2 1000 | tee target/l0-benchmark.txt
 
