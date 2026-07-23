@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+cargo build --manifest-path wasm/raw/Cargo.toml --target wasm32-unknown-unknown --release
+echo "Built $ROOT/wasm/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm"

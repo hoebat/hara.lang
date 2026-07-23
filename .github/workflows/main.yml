@@ -12,6 +12,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Set up Rust WASM toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: wasm32-unknown-unknown
+    - name: Build raw Rust WASM extension artifact
+      run: ./scripts/build-hara-wasm-raw
     - name: Set up JDK 21
       uses: actions/setup-java@v4
       with:

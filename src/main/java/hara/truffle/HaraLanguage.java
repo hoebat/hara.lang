@@ -25,6 +25,11 @@ public final class HaraLanguage extends TruffleLanguage<HaraContext> {
     return new HaraContext(environment);
   }
 
+  @Override
+  protected void finalizeContext(HaraContext context) {
+    context.closeExtensions();
+  }
+
   public static HaraContext currentContext() {
     return getCurrentContext(HaraLanguage.class);
   }

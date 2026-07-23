@@ -17,13 +17,14 @@ import java.util.regex.Pattern;
 public final class HaraExtensionManifest {
   private static final Pattern NAMESPACE = Pattern.compile("[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+");
   private static final Set<String> FIELDS =
-      Set.of("namespace", "version", "provider", "module", "exports", "capabilities");
+      Set.of("namespace", "version", "provider", "module", "abi", "exports", "capabilities");
   private static final Set<String> EXPORT_FIELDS = Set.of("args", "returns", "async");
 
   private final String namespace;
   private final String version;
   private final String provider;
   private final String module;
+  private final String abi;
   private final Map<String, Export> exports;
   private final java.util.List<String> capabilities;
 
@@ -32,12 +33,14 @@ public final class HaraExtensionManifest {
       String version,
       String provider,
       String module,
+      String abi,
       Map<String, Export> exports,
       java.util.List<String> capabilities) {
     this.namespace = namespace;
     this.version = version;
     this.provider = provider;
     this.module = module;
+    this.abi = abi;
     this.exports = Collections.unmodifiableMap(new LinkedHashMap<>(exports));
     this.capabilities = Collections.unmodifiableList(new ArrayList<>(capabilities));
   }
@@ -60,10 +63,15 @@ public final class HaraExtensionManifest {
     String version = requireString(map, "version", origin);
     String provider = requireKeyword(map, "provider", origin);
     String module = requireString(map, "module", origin);
+    if (module.startsWith("/") || module.contains("..") || !module.endsWith(".wasm")) {
+      throw invalid(origin, "module must be a relative .wasm file");
+    }
+    String abi = requireKeyword(map, "abi", origin);
     Map<String, Export> exports = parseExports(lookup(map, "exports"), origin);
     java.util.List<String> capabilities =
         parseKeywords(lookup(map, "capabilities"), origin, "capabilities");
-    return new HaraExtensionManifest(namespace, version, provider, module, exports, capabilities);
+    return new HaraExtensionManifest(
+        namespace, version, provider, module, abi, exports, capabilities);
   }
 
   public String namespace() {
@@ -80,6 +88,10 @@ public final class HaraExtensionManifest {
 
   public String module() {
     return module;
+  }
+
+  public String abi() {
+    return abi;
   }
 
   public Map<String, Export> exports() {

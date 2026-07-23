@@ -1,7 +1,8 @@
-{:namespace "hara.extensions.blockchain.proof.noir"
+{:namespace "blockchain.proof.noir"
  :version "0.1.0"
  :provider :wasm
- :module "hara.noir"
+ :module "noir.wasm"
+ :abi :core-v1
  :exports
  {"program"       {:args [:string :string] :returns :noir-program}
   "cache-key"     {:args [:noir-program] :returns :hash}

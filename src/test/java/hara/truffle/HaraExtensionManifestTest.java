@@ -11,15 +11,16 @@ import org.junit.Test;
 public class HaraExtensionManifestTest {
   @Test
   public void packagedNoirProofManifestMatchesTheProviderContract() throws Exception {
-    String resource = HaraExtensionRegistry.resourceName("hara.extensions.blockchain.proof.noir");
+    String resource = HaraExtensionRegistry.resourceName("blockchain.proof.noir");
     try (InputStream input = getClass().getClassLoader().getResourceAsStream(resource)) {
       HaraExtensionManifest manifest =
           HaraExtensionManifest.parse(
               new String(input.readAllBytes(), StandardCharsets.UTF_8), resource);
-      assertEquals("hara.extensions.blockchain.proof.noir", manifest.namespace());
+      assertEquals("blockchain.proof.noir", manifest.namespace());
       assertEquals("0.1.0", manifest.version());
       assertEquals("wasm", manifest.provider());
-      assertEquals("hara.noir", manifest.module());
+      assertEquals("noir.wasm", manifest.module());
+      assertEquals("core-v1", manifest.abi());
       assertEquals(14, manifest.exports().size());
       assertTrue(manifest.exports().get("prove").async());
       assertEquals("promise", manifest.exports().get("verify").returns());
@@ -31,7 +32,8 @@ public class HaraExtensionManifestTest {
   public void malformedManifestsFailBeforeProviderSelection() {
     String base =
         "{:namespace \"demo.extension\" :version \"1\" :provider :wasm "
-            + ":module \"demo\" :exports {\"run\" {:args [] :returns :value}} "
+            + ":module \"demo.wasm\" :abi :core-v1 "
+            + ":exports {\"run\" {:args [] :returns :i32}} "
             + ":capabilities []}";
     assertThrows(
         IllegalArgumentException.class,

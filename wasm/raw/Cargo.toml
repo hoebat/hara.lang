@@ -1,0 +1,11 @@
+[package]
+name = "hara-wasm-raw"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.78"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+im-rc = "15"

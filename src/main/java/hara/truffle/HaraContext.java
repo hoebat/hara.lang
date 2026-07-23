@@ -27,10 +27,6 @@ import hara.lang.protocol.IDerefTimeout;
 import hara.lang.protocol.IDisplay;
 import hara.lang.protocol.ICount;
 import hara.lang.protocol.INth;
-import hara.verify.noir.NoirArtifact;
-import hara.verify.noir.NoirProof;
-import hara.verify.noir.NoirProgram;
-import hara.verify.noir.NoirWasmLoader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -100,9 +96,9 @@ public final class HaraContext {
   private final Map<String, Map<String, Object>> nativeImports = new ConcurrentHashMap<>();
   private final NativeFlavorRegistry nativeFlavorRegistry =
       new NativeFlavorRegistry().register(JvmFlavorProvider.INSTANCE);
-  private final NoirWasmLoader noirWasmLoader = NoirWasmLoader.discover();
   private final HaraExtensionRegistry extensionRegistry =
       new HaraExtensionRegistry(HaraContext.class.getClassLoader());
+  private final Map<String, HaraWasmExtension> loadedExtensions = new ConcurrentHashMap<>();
   private final Map<String, ModuleRecord> modules = new ConcurrentHashMap<>();
   private final Map<String, Set<String>> moduleDependencies = new ConcurrentHashMap<>();
   private final Set<String> loadingModules = ConcurrentHashMap.newKeySet();
@@ -128,6 +124,13 @@ public final class HaraContext {
 
   TruffleLanguage.Env environment() {
     return environment;
+  }
+
+  void closeExtensions() {
+    for (HaraWasmExtension extension : loadedExtensions.values()) {
+      extension.close();
+    }
+    loadedExtensions.clear();
   }
 
   private HaraNamespace namespace(String name) {
@@ -398,44 +401,34 @@ public final class HaraContext {
   private synchronized HaraNamespace requiredNamespace(String target) {
     HaraNamespace existing = namespaces.get(target);
     if (existing != null) return existing;
-    HaraExtensionManifest manifest = extensionRegistry.discover(target);
-    if (manifest == null) return null;
-    return installExtension(manifest);
+    HaraExtensionPackage extensionPackage = extensionRegistry.discover(target);
+    if (extensionPackage == null) return null;
+    return installExtension(extensionPackage);
   }
 
-  private HaraNamespace installExtension(HaraExtensionManifest manifest) {
-    if (!"wasm".equals(manifest.provider())) {
-      throw new HaraException(
-          "extension/provider-unsupported: "
-              + manifest.provider()
-              + " for "
-              + manifest.namespace());
-    }
-    if (!"hara.noir".equals(manifest.module())) {
-      throw new HaraException(
-          "extension/module-unsupported: " + manifest.module() + " for " + manifest.namespace());
-    }
-    if (!manifest.capabilities().isEmpty()) {
-      throw new HaraException(
-          "extension/capability-denied: "
-              + manifest.capabilities()
-              + " for "
-              + manifest.namespace());
-    }
-    HaraNamespace source = namespaces.get("hara.lib.noir");
-    if (source == null) throw new HaraException("extension/provider-unavailable: hara.noir");
-    LinkedHashMap<String, HaraVar> bindings = new LinkedHashMap<>();
-    for (String export : manifest.exports().keySet()) {
-      HaraVar variable = source.lookup(export);
-      if (variable == null) {
-        throw new HaraException(
-            "extension/malformed: module " + manifest.module() + " has no export " + export);
-      }
-      bindings.put(export, variable);
-    }
+  private HaraNamespace installExtension(HaraExtensionPackage extensionPackage) {
+    HaraExtensionManifest manifest = extensionPackage.manifest();
+    HaraWasmExtension extension = new HaraWasmExtension(extensionPackage);
     HaraNamespace generated = namespace(manifest.namespace());
-    bindings.forEach(generated::refer);
+    for (Map.Entry<String, HaraExtensionManifest.Export> export : manifest.exports().entrySet()) {
+      String name = export.getKey();
+      generated.define(
+          name,
+          new VariadicBuiltin(
+              manifest.namespace() + "/" + name,
+              values -> invokeExtension(extension, name, export.getValue(), values)));
+    }
+    loadedExtensions.put(manifest.namespace(), extension);
     return generated;
+  }
+
+  private Object invokeExtension(
+      HaraWasmExtension extension,
+      String name,
+      HaraExtensionManifest.Export export,
+      Object[] values) {
+    if (!export.async()) return extension.invoke(name, values);
+    return new HaraPromise(CompletableFuture.supplyAsync(() -> extension.invoke(name, values)));
   }
 
   @TruffleBoundary
@@ -1032,134 +1025,6 @@ public final class HaraContext {
     socket.define("connect", new VariadicBuiltin("socket/connect", this::socketConnect));
     socket.define("send", new VariadicBuiltin("socket/send", this::socketSend));
     socket.define("close", new UnaryBuiltin("socket/close", this::socketClose));
-
-    HaraNamespace noir = namespace("hara.lib.noir");
-    noir.define("program", new VariadicBuiltin("noir/program", this::noirProgram));
-    noir.define(
-        "cache-key",
-        new UnaryBuiltin(
-            "noir/cache-key", value -> requireNoirProgram(value, "noir/cache-key").cacheKey()));
-    noir.define(
-        "source",
-        new UnaryBuiltin(
-            "noir/source", value -> requireNoirProgram(value, "noir/source").source()));
-    noir.define(
-        "manifest",
-        new UnaryBuiltin(
-            "noir/manifest", value -> requireNoirProgram(value, "noir/manifest").manifest()));
-    noir.define(
-        "loader-id",
-        new VariadicBuiltin(
-            "noir/loader-id",
-            values -> {
-              if (values.length != 0)
-                throw new HaraException("noir/loader-id expects no arguments");
-              return noirWasmLoader.id();
-            }));
-    noir.define(
-        "available?",
-        new VariadicBuiltin(
-            "noir/available?",
-            values -> {
-              if (values.length != 0)
-                throw new HaraException("noir/available? expects no arguments");
-              return noirWasmLoader.available();
-            }));
-    noir.define("compile", new UnaryBuiltin("noir/compile", this::noirCompile));
-    noir.define("prove", new VariadicBuiltin("noir/prove", this::noirProve));
-    noir.define("verify", new VariadicBuiltin("noir/verify", this::noirVerify));
-    noir.define(
-        "artifact-key",
-        new UnaryBuiltin(
-            "noir/artifact-key",
-            value -> requireNoirArtifact(value, "noir/artifact-key").programKey()));
-    noir.define(
-        "artifact-json",
-        new UnaryBuiltin(
-            "noir/artifact-json",
-            value -> requireNoirArtifact(value, "noir/artifact-json").circuitJson()));
-    noir.define(
-        "proof-key",
-        new UnaryBuiltin(
-            "noir/proof-key", value -> requireNoirProof(value, "noir/proof-key").programKey()));
-    noir.define(
-        "proof-bytes",
-        new UnaryBuiltin(
-            "noir/proof-bytes",
-            value -> requireNoirProof(value, "noir/proof-bytes").proofBase64()));
-    noir.define(
-        "public-inputs",
-        new UnaryBuiltin(
-            "noir/public-inputs",
-            value -> requireNoirProof(value, "noir/public-inputs").publicInputsJson()));
-  }
-
-  private Object noirProgram(Object[] values) {
-    if (values.length == 2) {
-      return NoirProgram.create(
-          stringValue(values[0], "noir/program"), stringValue(values[1], "noir/program"));
-    }
-    if (values.length == 4) {
-      return NoirProgram.create(
-          stringValue(values[0], "noir/program"),
-          stringValue(values[1], "noir/program"),
-          stringValue(values[2], "noir/program"),
-          stringValue(values[3], "noir/program"));
-    }
-    throw new HaraException(
-        "noir/program expects name and source, optionally followed by Noir and backend versions");
-  }
-
-  private Object noirCompile(Object value) {
-    NoirProgram program = requireNoirProgram(value, "noir/compile");
-    CompletableFuture<Object> future =
-        noirWasmLoader.compile(program).thenApply(artifact -> (Object) artifact);
-    return new HaraPromise(future);
-  }
-
-  private Object noirProve(Object[] values) {
-    if (values.length != 2) {
-      throw new HaraException("noir/prove expects an artifact and strict JSON inputs");
-    }
-    NoirArtifact artifact = requireNoirArtifact(values[0], "noir/prove");
-    String inputsJson = stringValue(values[1], "noir/prove");
-    CompletableFuture<Object> future =
-        noirWasmLoader.prove(artifact, inputsJson).thenApply(proof -> (Object) proof);
-    return new HaraPromise(future);
-  }
-
-  private Object noirVerify(Object[] values) {
-    if (values.length != 2) {
-      throw new HaraException("noir/verify expects an artifact and proof");
-    }
-    NoirArtifact artifact = requireNoirArtifact(values[0], "noir/verify");
-    NoirProof proof = requireNoirProof(values[1], "noir/verify");
-    CompletableFuture<Object> future =
-        noirWasmLoader.verify(artifact, proof).thenApply(verified -> (Object) verified);
-    return new HaraPromise(future);
-  }
-
-  private static NoirProgram requireNoirProgram(Object value, String operation) {
-    Object input = HaraBox.unwrap(value);
-    if (!(input instanceof NoirProgram))
-      throw new HaraException(operation + " expects a Noir program");
-    return (NoirProgram) input;
-  }
-
-  private static NoirArtifact requireNoirArtifact(Object value, String operation) {
-    Object input = HaraBox.unwrap(value);
-    if (!(input instanceof NoirArtifact)) {
-      throw new HaraException(operation + " expects a compiled Noir artifact");
-    }
-    return (NoirArtifact) input;
-  }
-
-  private static NoirProof requireNoirProof(Object value, String operation) {
-    Object input = HaraBox.unwrap(value);
-    if (!(input instanceof NoirProof)) {
-      throw new HaraException(operation + " expects a Noir proof");
-    }
-    return (NoirProof) input;
   }
 
   private static int int32(Object value, String operation) {
