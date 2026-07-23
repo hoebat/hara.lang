@@ -2,6 +2,7 @@ package hara.lang.base;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.fail;
 import static org.junit.Assert.assertTrue;
 
 import hara.lang.base.iter.CloseableIterator;
@@ -101,6 +102,45 @@ public class CloseableIteratorTest {
     assertTrue(first.closed);
     assertTrue(second.closed);
     zipped.close();
+  }
+
+  @Test
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  public void zipClosesAcquiredResourcesWhenSourceAcquisitionFails() {
+    TrackingIterator acquired = new TrackingIterator(1);
+    AtomicInteger inputClosed = new AtomicInteger();
+    CloseableIterator<Iterator<Object>> input =
+        new CloseableIterator<Iterator<Object>>() {
+          private boolean delivered;
+
+          @Override
+          public boolean hasNext() {
+            if (!delivered) return true;
+            throw new IllegalStateException("source acquisition failed");
+          }
+
+          @Override
+          public Iterator<Object> next() {
+            delivered = true;
+            return (Iterator) acquired;
+          }
+
+          @Override
+          public void close() {
+            inputClosed.incrementAndGet();
+          }
+        };
+
+    Iterator<Object[]> zipped = Iter.zip(input);
+    try {
+      zipped.hasNext();
+      fail("expected source acquisition failure");
+    } catch (IllegalStateException expected) {
+      assertEquals("source acquisition failed", expected.getMessage());
+    }
+    assertTrue(acquired.closed);
+    assertEquals(1, inputClosed.get());
+    assertFalse(zipped.hasNext());
   }
 
   private static final class CountingIterator implements CloseableIterator<Integer> {

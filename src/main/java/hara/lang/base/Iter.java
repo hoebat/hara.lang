@@ -807,8 +807,19 @@ public interface Iter {
 
       private void initialize() {
         if (!initialized && !closed) {
-          its = Iter.toArray(input, Iterator.class);
-          initialized = true;
+          ArrayList<Iterator> acquired = new ArrayList<>();
+          try {
+            while (input.hasNext()) {
+              acquired.add(input.next());
+            }
+            its = acquired.toArray(new Iterator[0]);
+            initialized = true;
+          } catch (RuntimeException | Error failure) {
+            for (Iterator iterator : acquired) Iter.close(iterator);
+            Iter.close(input);
+            closed = true;
+            throw failure;
+          }
         }
       }
 
