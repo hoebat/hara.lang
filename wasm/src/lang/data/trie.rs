@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use crate::lang::protocol::{
-    IAssoc, IConj, ICount, IDissoc, IEmpty, IFind, ILookup, IMutable, IPersistent, IToMutable,
-    IToPersistent,
+    IAssoc, IConj, ICount, IDissoc, IEmpty, IFind, ILookup, IMetadata, IMutable, IPersistent,
+    IToMutable, IToPersistent,
 };
 
 #[derive(Debug, Clone)]
@@ -62,12 +62,14 @@ fn dissoc_node<V: Clone>(node: &Rc<Node<V>>, chars: &[char]) -> Option<Rc<Node<V
 }
 #[derive(Debug, Clone)]
 pub struct Standard<V> {
+    metadata: Option<Rc<str>>,
     root: Rc<Node<V>>,
     size: usize,
 }
 impl<V> Default for Standard<V> {
     fn default() -> Self {
         Self {
+            metadata: None,
             root: Rc::new(Node::default()),
             size: 0,
         }
@@ -95,6 +97,7 @@ impl<V: Clone> Standard<V> {
         let added = self.get(&key).is_none();
         let chars = key.chars().collect::<Vec<_>>();
         Self {
+            metadata: self.metadata.clone(),
             root: assoc_node(&self.root, &chars, value),
             size: self.size + usize::from(added),
         }
@@ -105,6 +108,7 @@ impl<V: Clone> Standard<V> {
         }
         let chars = key.chars().collect::<Vec<_>>();
         Self {
+            metadata: self.metadata.clone(),
             root: dissoc_node(&self.root, &chars).unwrap_or_else(|| Rc::new(Node::default())),
             size: self.size - 1,
         }
@@ -170,7 +174,19 @@ impl<V: Clone + Default> IConj<String> for Standard<V> {
 }
 impl<V: Clone> IEmpty for Standard<V> {
     fn empty(&self) -> Self {
-        Self::new()
+        Self::new().with_meta(self.metadata.clone())
+    }
+}
+impl<V: Clone> IMetadata for Standard<V> {
+    type Metadata = Rc<str>;
+    fn meta(&self) -> Option<&Self::Metadata> {
+        self.metadata.as_ref()
+    }
+    fn with_meta(&self, metadata: Option<Self::Metadata>) -> Self {
+        Self {
+            metadata,
+            ..self.clone()
+        }
     }
 }
 impl<V: Clone> IPersistent for Standard<V> {}
@@ -215,6 +231,30 @@ impl<V: Clone> IToPersistent for Mutable<V> {
 #[cfg(test)]
 mod tests {
     use super::Standard;
+    #[test]
+    fn updates_empty_and_mutable_preserve_metadata() {
+        use crate::lang::protocol::{IEmpty, IMetadata, IToMutable, IToPersistent};
+        use std::rc::Rc;
+        let trie = Standard::new()
+            .assoc_value("cat", 1)
+            .with_meta(Some(Rc::from("doc")));
+        assert_eq!(
+            trie.assoc_value("car", 2).meta().map(|m| m.as_ref()),
+            Some("doc")
+        );
+        assert_eq!(
+            trie.dissoc_value("cat").meta().map(|m| m.as_ref()),
+            Some("doc")
+        );
+        assert_eq!(trie.empty().meta().map(|m| m.as_ref()), Some("doc"));
+        let mut mutable = trie.to_mutable();
+        mutable.assoc("car", 2);
+        assert_eq!(
+            mutable.to_persistent().meta().map(|m| m.as_ref()),
+            Some("doc")
+        );
+    }
+
     #[test]
     fn shares_prefixes_and_iterates_lexically() {
         let a = Standard::new()
