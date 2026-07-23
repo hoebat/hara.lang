@@ -79,7 +79,9 @@ public final class HaraContext {
           "promise", "promise",
           "bytes", "bytes",
           "socket", "socket",
-          "file", "file");
+          "file", "file",
+          "block", "block",
+          "zip", "zip");
   private static final Set<String> MARKER_METHOD_NAMES =
       Set.of(
           "get",

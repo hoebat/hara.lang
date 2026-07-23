@@ -15,7 +15,7 @@ jobs:
     - name: Set up Rust WASM toolchain
       uses: dtolnay/rust-toolchain@stable
       with:
-        targets: wasm32-unknown-unknown
+        targets: wasm32-unknown-unknown,wasm32-wasip1
         components: clippy
     - name: Check Rust module layout
       run: bash wasm/scripts/check-layout.sh
@@ -27,6 +27,22 @@ jobs:
       run: ./scripts/generate-wasm-truffle-parity && git diff --exit-code -- spec/hara/wasm-truffle-parity.edn
     - name: Build raw Rust WASM extension artifact
       run: ./scripts/build-hara-wasm-raw
+    - name: Build browser and WASI Rust runtime artifacts
+      run: |
+        cargo build --manifest-path wasm/Cargo.toml --release --target wasm32-unknown-unknown --lib
+        cargo build --manifest-path wasm/Cargo.toml --release --target wasm32-wasip1 --lib
+    - name: Record Rust runtime artifact sizes
+      run: |
+        {
+          stat -c "browser_wasm_bytes=%s" wasm/target/wasm32-unknown-unknown/release/hara_wasm.wasm
+          stat -c "wasi_wasm_bytes=%s" wasm/target/wasm32-wasip1/release/hara_wasm.wasm
+          stat -c "raw_extension_wasm_bytes=%s" wasm/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm
+        } | tee target/rust-wasm-artifact-sizes.txt
+    - name: Upload Rust runtime artifact sizes
+      uses: actions/upload-artifact@v4
+      with:
+        name: rust-wasm-artifact-sizes
+        path: target/rust-wasm-artifact-sizes.txt
     - name: Build SHA-256 HTA extension artifact
       run: ./scripts/build-crypto-hash-sha256-wasm
     - name: Set up Node.js

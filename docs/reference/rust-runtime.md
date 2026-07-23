@@ -36,7 +36,7 @@ Hara reader/forms
         v
 Rust evaluator + lexical environments
         |
-        +--> persistent values (im-rc)
+        +--> persistent values (Hara-owned structural sharing)
         +--> explicit mutable markers (runtime handles)
         +--> protocol registry
         +--> iterator/promise machinery
@@ -53,17 +53,18 @@ operations use providers and return the same stable Hara errors as the Truffle r
 
 ## Value and ownership model
 
-Use `im-rc` for persistent lists, vectors, maps, and sets in the initial single-threaded WASM
-runtime. Its structural sharing uses reference counting and does not require a tracing garbage
-collector. Keep collection crate types behind the Hara `Value` enum so the language can preserve
-its own equality, hashing, printing, and protocol behavior.
+Persistent values are Hara-owned implementations, split by data structure under
+`wasm/src/lang/data/`. The vector uses a 32-way persistent trie, maps use a native HAMT, sorted
+maps use a persistent balanced tree, and the list, queue, ordered collections, sets, trie, tuples,
+symbols, and keywords retain their Java protocol shapes. Structural sharing uses `Rc`; no tracing
+garbage collector or third-party immutable-collection crate is required.
 
 ```text
 Value
-├── immutable collections  -> im-rc with Rc sharing
+├── immutable collections  -> Hara vector/HAMT/tree/list modules with Rc sharing
 ├── functions/environments -> Rc-owned frames
 ├── array/object markers   -> Rc<RefCell<...>> or opaque handles
-├── promises               -> host future handle
+├── promises               -> provider-backed settlement state
 └── foreign values         -> provider-owned opaque handle
 ```
 
@@ -76,7 +77,7 @@ mutability for ordinary persistent values.
 | --- | --- | --- |
 | Reader, metadata, literals | `Reader`, `Form`, source spans | reader cases in `l0-conformance.edn` |
 | `if`, `do`, `let`, `loop`, `recur`, `fn` | evaluator nodes and lexical frames | compiler/runtime cases |
-| Persistent collections | `Value::{List,Vector,Map,Set}` over `im-rc` | collection and navigation cases |
+| Persistent collections | Hara-owned list, vector trie, HAMT map, and set modules | collection and navigation cases |
 | Protocols | context-local `ProtocolRegistry` | protocol cases |
 | Iterators | closeable `HaraIterator` trait | iterator cases |
 | `promise/*` | `PromiseProvider` plus adoption/recovery rules | generated-library tests |
@@ -132,6 +133,23 @@ The browser playground installs the memory-file and loopback providers explicitl
 install `NativeFileProvider` and `NativeSocketProvider` through the same registry. WASI remains a
 separate host-selection point: the portable core does not assume ambient filesystem or network
 authority.
+
+## Reproducible release evidence
+
+The main workflow verifies all three runtime profiles:
+
+```text
+native  cargo test --manifest-path wasm/Cargo.toml
+browser cargo build --target wasm32-unknown-unknown --release --lib
+        npm run test:hta && npm run test:browser
+wasi    cargo build --target wasm32-wasip1 --release --lib
+parity  1,024 shared cases through Rust WASM and Truffle
+```
+
+CI uploads `rust-wasm-artifact-sizes.txt`, containing byte counts for the browser runtime, WASI
+runtime, and raw HTA extension. It also uploads the Rust-WASM/Truffle timing matrix. These reports
+are generated from the same commit as the conformance run rather than copied into documentation.
+
 
 ## Iterator boundary
 

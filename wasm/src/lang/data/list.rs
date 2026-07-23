@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use crate::lang::protocol::{
-    IAssoc, IConj, ICons, ICount, IEmpty, INth, IPersistent, IPopFirst, IPopLast, IPushFirst,
-    IPushLast,
+    IAssoc, IConj, ICons, ICount, IEmpty, IMutable, INth, IPersistent, IPopFirst, IPopLast,
+    IPushFirst, IPushLast, IToMutable, IToPersistent,
 };
 
 const CHUNK_SIZE: usize = 32;
@@ -228,6 +228,71 @@ impl<E: Clone> IAssoc<usize, E> for Standard<E> {
 }
 impl<E: Clone> IPersistent for Standard<E> {}
 
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Mutable<E> {
+    values: Vec<E>,
+}
+impl<E> Mutable<E> {
+    pub fn new() -> Self {
+        Self { values: Vec::new() }
+    }
+    pub fn len(&self) -> usize {
+        self.values.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.values.is_empty()
+    }
+    pub fn get(&self, index: usize) -> Option<&E> {
+        self.values.get(index)
+    }
+    pub fn iter(&self) -> std::slice::Iter<'_, E> {
+        self.values.iter()
+    }
+    pub fn push_first(&mut self, value: E) -> &mut Self {
+        self.values.insert(0, value);
+        self
+    }
+    pub fn push_last(&mut self, value: E) -> &mut Self {
+        self.values.push(value);
+        self
+    }
+    pub fn pop_first(&mut self) -> Option<E> {
+        (!self.values.is_empty()).then(|| self.values.remove(0))
+    }
+    pub fn pop_last(&mut self) -> Option<E> {
+        self.values.pop()
+    }
+    pub fn assoc(&mut self, index: usize, value: E) -> Option<E> {
+        self.values
+            .get_mut(index)
+            .map(|slot| std::mem::replace(slot, value))
+    }
+    pub fn empty(&mut self) -> &mut Self {
+        self.values.clear();
+        self
+    }
+}
+impl<E> FromIterator<E> for Mutable<E> {
+    fn from_iter<T: IntoIterator<Item = E>>(iter: T) -> Self {
+        Self {
+            values: iter.into_iter().collect(),
+        }
+    }
+}
+impl<E> IMutable for Mutable<E> {}
+impl<E: Clone> IToPersistent for Mutable<E> {
+    type Persistent = Standard<E>;
+    fn to_persistent(&mut self) -> Self::Persistent {
+        self.values.iter().cloned().collect()
+    }
+}
+impl<E: Clone> IToMutable for Standard<E> {
+    type Mutable = Mutable<E>;
+    fn to_mutable(&self) -> Self::Mutable {
+        self.iter().cloned().collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::Standard;
@@ -240,5 +305,18 @@ mod tests {
         assert_eq!(list[0], 0);
         assert_eq!(prefixed[0], -1);
         assert_eq!(appended[65], 65);
+    }
+    #[test]
+    fn mutable_round_trip_preserves_original_and_updates_edges() {
+        use crate::lang::protocol::{IToMutable, IToPersistent};
+        let original = (0..65).collect::<Standard<_>>();
+        let mut mutable = original.to_mutable();
+        assert_eq!(mutable.assoc(32, 320), Some(32));
+        mutable.push_first(-1).push_last(65);
+        assert_eq!(mutable.pop_first(), Some(-1));
+        assert_eq!(mutable.pop_last(), Some(65));
+        let persistent = mutable.to_persistent();
+        assert_eq!(persistent.get(32), Some(&320));
+        assert_eq!(original.get(32), Some(&32));
     }
 }

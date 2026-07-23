@@ -1,5 +1,7 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
+use std::rc::Rc;
 
 use crate::lang::data::{Atom, Symbol};
 use crate::lang::protocol::{IDeref, IDisplay, INamespaced, IReset};
@@ -18,37 +20,43 @@ pub struct VarMetadata {
 pub struct Var<V> {
     symbol: Symbol,
     value: Atom<V>,
-    metadata: VarMetadata,
+    metadata: Rc<RefCell<VarMetadata>>,
 }
 impl<V> Var<V> {
     pub fn new(path: impl AsRef<str>, value: V) -> Self {
         Self {
             symbol: Symbol::parse(path.as_ref()),
             value: Atom::new(value),
-            metadata: VarMetadata::default(),
+            metadata: Rc::new(RefCell::new(VarMetadata::default())),
         }
     }
     pub fn with_metadata(path: impl AsRef<str>, value: V, metadata: VarMetadata) -> Self {
         Self {
             symbol: Symbol::parse(path.as_ref()),
             value: Atom::new(value),
-            metadata,
+            metadata: Rc::new(RefCell::new(metadata)),
         }
     }
     pub fn symbol(&self) -> &Symbol {
         &self.symbol
     }
-    pub fn metadata(&self) -> &VarMetadata {
-        &self.metadata
+    pub fn metadata(&self) -> VarMetadata {
+        self.metadata.borrow().clone()
+    }
+    pub fn set_metadata(&self, metadata: VarMetadata) -> VarMetadata {
+        std::mem::replace(&mut *self.metadata.borrow_mut(), metadata)
+    }
+    pub fn update_metadata(&self, update: impl FnOnce(&mut VarMetadata)) {
+        update(&mut self.metadata.borrow_mut());
     }
     pub fn is_control(&self) -> bool {
-        self.metadata.control
+        self.metadata.borrow().control
     }
     pub fn is_dynamic(&self) -> bool {
-        self.metadata.dynamic
+        self.metadata.borrow().dynamic
     }
     pub fn is_macro(&self) -> bool {
-        self.metadata.macro_form
+        self.metadata.borrow().macro_form
     }
 }
 impl<V: Clone> Var<V> {
@@ -108,6 +116,23 @@ mod tests {
         assert_eq!(var.display(), "#'hello/value");
         assert_eq!(var.reset_value(2), 2);
         assert_eq!(var.deref(), 2);
+        assert!(var.is_dynamic());
+    }
+    #[test]
+    fn cloned_vars_share_metadata_updates() {
+        let var = Var::new("hello/value", 1);
+        let alias = var.clone();
+        var.update_metadata(|meta| {
+            meta.doc = Some("A value".into());
+            meta.arglists.push("[x]".into());
+        });
+        assert_eq!(alias.metadata().doc.as_deref(), Some("A value"));
+        assert_eq!(alias.metadata().arglists, vec!["[x]"]);
+        let old = alias.set_metadata(VarMetadata {
+            dynamic: true,
+            ..Default::default()
+        });
+        assert_eq!(old.doc.as_deref(), Some("A value"));
         assert!(var.is_dynamic());
     }
 }

@@ -1,6 +1,7 @@
 use crate::lang::data::{List, Vector};
 use crate::lang::protocol::{
-    IConj, ICount, IEmpty, INth, IPersistent, IPopFirst, IPopLast, IPushLast,
+    IConj, ICount, IEmpty, IMutable, INth, IPersistent, IPopFirst, IPopLast, IPushLast, IToMutable,
+    IToPersistent,
 };
 
 pub const MAX_LENGTH: usize = 1024;
@@ -203,6 +204,74 @@ impl<E: Clone> IEmpty for Standard<E> {
 }
 impl<E: Clone> IPersistent for Standard<E> {}
 
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Mutable<E: Clone> {
+    value: Standard<E>,
+}
+impl<E: Clone> Mutable<E> {
+    pub fn new() -> Self {
+        Self {
+            value: Standard::new(),
+        }
+    }
+    pub fn len(&self) -> usize {
+        self.value.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.value.is_empty()
+    }
+    pub fn get(&self, index: usize) -> Option<&E> {
+        self.value.get(index)
+    }
+    pub fn peek_first(&self) -> Option<&E> {
+        self.value.peek_first()
+    }
+    pub fn peek_last(&self) -> Option<&E> {
+        self.value.peek_last()
+    }
+    pub fn push_last(&mut self, value: E) -> &mut Self {
+        self.value = self.value.push_last(value);
+        self
+    }
+    pub fn pop_first(&mut self) -> &mut Self {
+        self.value = self.value.pop_first_value();
+        self
+    }
+    pub fn pop_last(&mut self) -> &mut Self {
+        self.value = self.value.pop_last_value();
+        self
+    }
+    pub fn empty(&mut self) -> &mut Self {
+        self.value = Standard::new();
+        self
+    }
+    pub fn iter(&self) -> impl Iterator<Item = &E> {
+        self.value.iter()
+    }
+}
+impl<E: Clone> FromIterator<E> for Mutable<E> {
+    fn from_iter<T: IntoIterator<Item = E>>(iter: T) -> Self {
+        Self {
+            value: iter.into_iter().collect(),
+        }
+    }
+}
+impl<E: Clone> IMutable for Mutable<E> {}
+impl<E: Clone> IToPersistent for Mutable<E> {
+    type Persistent = Standard<E>;
+    fn to_persistent(&mut self) -> Self::Persistent {
+        self.value.clone()
+    }
+}
+impl<E: Clone> IToMutable for Standard<E> {
+    type Mutable = Mutable<E>;
+    fn to_mutable(&self) -> Self::Mutable {
+        Mutable {
+            value: self.clone(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{Standard, MAX_LENGTH};
@@ -222,5 +291,18 @@ mod tests {
         let p = q.pop_last_value();
         assert_eq!(q.peek_last(), Some(&1029));
         assert_eq!(p.peek_last(), Some(&1028));
+    }
+    #[test]
+    fn mutable_round_trip_crosses_chunk_boundaries() {
+        use crate::lang::protocol::{IToMutable, IToPersistent};
+        let original = (0..(MAX_LENGTH + 3)).collect::<Standard<_>>();
+        let mut mutable = original.to_mutable();
+        mutable.pop_first().pop_last().push_last(9999);
+        assert_eq!(mutable.peek_first(), Some(&1));
+        assert_eq!(mutable.peek_last(), Some(&9999));
+        let persistent = mutable.to_persistent();
+        assert_eq!(persistent.peek_first(), Some(&1));
+        assert_eq!(persistent.peek_last(), Some(&9999));
+        assert_eq!(original.peek_first(), Some(&0));
     }
 }

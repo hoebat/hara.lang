@@ -389,6 +389,7 @@ fn error_code(error: &str) -> i32 {
 }
 
 fn evaluate(source: &str) -> Result<i64, i32> {
+    kernel::parse_forms(source).map_err(|_| 1)?;
     let mut env = HashMap::new();
     let value = core::eval_text(source, &mut env).map_err(|error| error_code(&error))?;
     value.parse::<i64>().map_err(|_| 4)
@@ -407,6 +408,9 @@ pub extern "C" fn eval_i64(source_ptr: *const u8, source_len: usize) -> i64 {
 pub extern "C" fn eval_error_code(source_ptr: *const u8, source_len: usize) -> i32 {
     match source_text(source_ptr, source_len) {
         Ok(source) => {
+            if kernel::parse_forms(source).is_err() {
+                return 1;
+            }
             let mut env = HashMap::new();
             match core::eval_text(source, &mut env) {
                 Ok(_) => 0,
@@ -414,6 +418,24 @@ pub extern "C" fn eval_error_code(source_ptr: *const u8, source_len: usize) -> i
             }
         }
         Err(code) => code,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{eval_error_code, evaluate};
+
+    #[test]
+    fn parser_failures_have_the_stable_parse_code() {
+        for source in [")", "[1", "123a", "\"unterminated"] {
+            assert_eq!(evaluate(source), Err(1), "{source}");
+            assert_eq!(
+                eval_error_code(source.as_ptr(), source.len()),
+                1,
+                "{source}"
+            );
+        }
+        assert_eq!(eval_error_code(b"(+ 1 2)".as_ptr(), 7), 0);
     }
 }
 
