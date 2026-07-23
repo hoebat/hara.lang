@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 
-use crate::lang::protocol::{IDisplay, INamespaced};
+use crate::lang::protocol::{IDisplay, ILookup, INamespaced};
 
 thread_local! {
     static INTERNED: RefCell<HashMap<String, Weak<Data>>> = RefCell::new(HashMap::new());
@@ -51,6 +51,14 @@ impl Keyword {
     }
     pub fn same_identity(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
+    }
+
+    pub fn lookup<V: Clone, L: ILookup<Self, V>>(&self, target: &L) -> Option<V> {
+        target.lookup(self)
+    }
+
+    pub fn lookup_or<V: Clone, L: ILookup<Self, V>>(&self, target: &L, fallback: V) -> V {
+        target.lookup_or(self, fallback)
     }
 }
 
@@ -127,6 +135,8 @@ impl std::fmt::Display for Keyword {
 #[cfg(test)]
 mod tests {
     use super::Keyword;
+    use crate::lang::data::Map;
+    use crate::lang::protocol::IAssoc;
     use crate::lang::protocol::{IDisplay, INamespaced};
 
     #[test]
@@ -140,5 +150,9 @@ mod tests {
         for invalid in ["", "/", "/name", "name/", "a/b/c"] {
             assert!(Keyword::parse(invalid).is_err());
         }
+
+        let values = Map::new().assoc(first.clone(), 42);
+        assert_eq!(first.lookup(&values), Some(42));
+        assert_eq!(Keyword::from("missing").lookup_or(&values, 7), 7);
     }
 }

@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::{Rc, Weak};
 
-use crate::lang::protocol::{IDisplay, INamespaced};
+use crate::lang::protocol::{IDisplay, IMetadata, INamespaced};
 
 thread_local! {
     static INTERNED: RefCell<HashMap<String, Weak<Data>>> = RefCell::new(HashMap::new());
@@ -16,7 +16,10 @@ struct Data {
 }
 
 #[derive(Debug, Clone)]
-pub struct Symbol(Rc<Data>);
+pub struct Symbol {
+    data: Rc<Data>,
+    metadata: Option<Rc<str>>,
+}
 
 impl Symbol {
     pub fn create(namespace: Option<&str>, name: &str) -> Self {
@@ -30,7 +33,10 @@ impl Symbol {
     pub fn parse(full: &str) -> Self {
         INTERNED.with(|cache| {
             if let Some(value) = cache.borrow().get(full).and_then(Weak::upgrade) {
-                return Self(value);
+                return Self {
+                    data: value,
+                    metadata: None,
+                };
             }
             let slash = if full == "/" { None } else { full.find('/') };
             let data = Rc::new(Data {
@@ -41,40 +47,57 @@ impl Symbol {
                 full: full.into(),
             });
             cache.borrow_mut().insert(full.into(), Rc::downgrade(&data));
-            Self(data)
+            Self {
+                data,
+                metadata: None,
+            }
         })
     }
 
     pub fn as_str(&self) -> &str {
-        &self.0.full
+        &self.data.full
     }
     pub fn same_identity(&self, other: &Self) -> bool {
-        Rc::ptr_eq(&self.0, &other.0)
+        Rc::ptr_eq(&self.data, &other.data)
     }
 }
 
 impl INamespaced for Symbol {
     fn get_name(&self) -> &str {
-        &self.0.name
+        &self.data.name
     }
     fn get_namespace(&self) -> Option<&str> {
-        self.0.namespace.as_deref()
+        self.data.namespace.as_deref()
+    }
+}
+impl IMetadata for Symbol {
+    type Metadata = Rc<str>;
+
+    fn meta(&self) -> Option<&Self::Metadata> {
+        self.metadata.as_ref()
+    }
+
+    fn with_meta(&self, metadata: Option<Self::Metadata>) -> Self {
+        Self {
+            data: self.data.clone(),
+            metadata,
+        }
     }
 }
 impl IDisplay for Symbol {
     fn display(&self) -> String {
-        self.0.full.clone()
+        self.data.full.clone()
     }
 }
 impl PartialEq for Symbol {
     fn eq(&self, other: &Self) -> bool {
-        self.0.full == other.0.full
+        self.data.full == other.data.full
     }
 }
 impl Eq for Symbol {}
 impl std::hash::Hash for Symbol {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0.full.hash(state);
+        self.data.full.hash(state);
     }
 }
 
@@ -97,7 +120,8 @@ impl std::fmt::Display for Symbol {
 #[cfg(test)]
 mod tests {
     use super::Symbol;
-    use crate::lang::protocol::{IDisplay, INamespaced};
+    use crate::lang::protocol::{IDisplay, IMetadata, INamespaced};
+    use std::rc::Rc;
 
     #[test]
     fn matches_java_namespace_and_interning() {
@@ -108,5 +132,10 @@ mod tests {
         assert_eq!(first.get_name(), "name");
         assert_eq!(first.display(), "hara/name");
         assert_eq!(Symbol::parse("/").get_namespace(), None);
+
+        let documented = first.with_meta(Some(Rc::from("doc")));
+        assert_eq!(documented.meta().map(|value| value.as_ref()), Some("doc"));
+        assert_eq!(documented, first);
+        assert!(documented.same_identity(&first));
     }
 }

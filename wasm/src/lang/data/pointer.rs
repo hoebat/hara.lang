@@ -1,7 +1,8 @@
 use crate::lang::data::Symbol;
-use crate::lang::protocol::{IDisplay, INamespaced};
+use crate::lang::protocol::{IDisplay, IMetadata, INamespaced};
 use std::fmt;
 use std::hash::{Hash, Hasher};
+use std::rc::Rc;
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Pointer(Symbol);
 impl Pointer {
@@ -21,6 +22,15 @@ impl INamespaced for Pointer {
     }
     fn get_namespace(&self) -> Option<&str> {
         self.0.get_namespace()
+    }
+}
+impl IMetadata for Pointer {
+    type Metadata = Rc<str>;
+    fn meta(&self) -> Option<&Self::Metadata> {
+        self.0.meta()
+    }
+    fn with_meta(&self, metadata: Option<Self::Metadata>) -> Self {
+        Self(self.0.with_meta(metadata))
     }
 }
 impl IDisplay for Pointer {
