@@ -689,6 +689,9 @@ public final class HaraContext {
             }));
     target.define("use", new UnaryBuiltin("use", this::useNamespace));
     target.define("iter", new UnaryBuiltin("iter", this::iterValue));
+    target.define("seq", new VariadicBuiltin("seq", this::seqValue));
+    target.define("seq?", new UnaryBuiltin("seq?", this::isSeq));
+    target.define("iter?", new UnaryBuiltin("iter?", this::isIterator));
     target.define("iter-has?", new UnaryBuiltin("iter-has?", this::iterHasNext));
     target.define("iter-next", new UnaryBuiltin("iter-next", this::iterNext));
     target.define("iter-close", new UnaryBuiltin("iter-close", this::iterClose));
@@ -703,7 +706,6 @@ public final class HaraContext {
     target.define("iter-interleave", new VariadicBuiltin("iter-interleave", this::iterInterleave));
     target.define("iter-every?", new VariadicBuiltin("iter-every?", this::iterEvery));
     target.define("iter-any?", new VariadicBuiltin("iter-any?", this::iterAny));
-    target.define("iter-some", new VariadicBuiltin("iter-some", this::iterSome));
     target.define("reduce", new VariadicBuiltin("reduce", this::reduceIterator));
     target.define("iter-take", new VariadicBuiltin("iter-take", this::iterTake));
     target.define("iter-drop", new VariadicBuiltin("iter-drop", this::iterDrop));
@@ -2050,6 +2052,42 @@ public final class HaraContext {
   }
 
   @TruffleBoundary
+  private Object seqValue(Object[] values) {
+    if (values.length != 1 && values.length != 2) {
+      throw new HaraException("seq expects a source, or a transform and source");
+    }
+    Object source = values.length == 1 ? values[0] : values[1];
+    Object lazySource =
+        HaraBox.unwrap(source) instanceof HaraSeq
+            ? HaraBox.unwrap(source)
+            : new HaraSeq((Iterator<?>) snapshotOrIterator(source));
+    if (values.length == 1) return lazySource;
+    Object result = invokeCallable(values[0], new Object[] {lazySource});
+    Object unwrapped = HaraBox.unwrap(result);
+    return unwrapped instanceof HaraSeq
+        ? unwrapped
+        : new HaraSeq((Iterator<?>) iterValue(unwrapped));
+  }
+
+  @TruffleBoundary
+  private Object isSeq(Object value) {
+    return HaraBox.unwrap(value) instanceof HaraSeq;
+  }
+
+  @TruffleBoundary
+  private Object isIterator(Object value) {
+    return HaraBox.unwrap(value) instanceof Iterator<?>;
+  }
+
+  private Object snapshotOrIterator(Object value) {
+    Object target = HaraBox.unwrap(value);
+    if (target instanceof HaraSeq) return target;
+    if (target instanceof Iterator<?>) return target;
+    if (target instanceof HaraArray) return Iter.objects(((HaraArray) target).toArray());
+    return iterValue(target);
+  }
+
+  @TruffleBoundary
   private Object iterHasNext(Object value) {
     Iterator<?> iterator = requireIterator(value, "iter-has?");
     return iterator.hasNext();
@@ -2070,7 +2108,7 @@ public final class HaraContext {
 
   @SuppressWarnings({"rawtypes", "unchecked"})
   private Object concatIterators(Object[] values) {
-    return Iter.concat((Iterator) Iter.map(Iter.objects(values), value -> Iter.iter(value)));
+    return Iter.concat(Iter.map((Iterator) Iter.objects(values), value -> Iter.iter(value)));
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})
@@ -2356,14 +2394,6 @@ public final class HaraContext {
     Iterator source = (Iterator) iterValue(values[1]);
     Object function = values[0];
     return Iter.any(source, value -> truthy(invokeCallable(function, new Object[] {value})));
-  }
-
-  @SuppressWarnings({"rawtypes", "unchecked"})
-  private Object iterSome(Object[] values) {
-    requireIteratorArity(values, 2, "iter-some");
-    Iterator source = (Iterator) iterValue(values[1]);
-    Object function = values[0];
-    return Iter.some(source, value -> truthy(invokeCallable(function, new Object[] {value})));
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})
@@ -2835,6 +2865,38 @@ public final class HaraContext {
         throw new HaraException("nth index out of bounds: " + index);
       }
       return get((int) index);
+    }
+  }
+
+  private static final class HaraSeq implements CloseableIterator<Object> {
+    private final Iterator<?> source;
+    private boolean closed;
+
+    private HaraSeq(Iterator<?> source) {
+      this.source = source;
+    }
+
+    @Override
+    public boolean hasNext() {
+      return !closed && source.hasNext();
+    }
+
+    @Override
+    public Object next() {
+      if (!hasNext()) throw new NoSuchElementException();
+      return source.next();
+    }
+
+    @Override
+    public void close() {
+      if (closed) return;
+      closed = true;
+      Iter.close(source);
+    }
+
+    @Override
+    public String toString() {
+      return "#<seq>";
     }
   }
 

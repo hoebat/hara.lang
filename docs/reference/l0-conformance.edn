@@ -131,7 +131,7 @@
    :expect {:value 42 :type :integer}}
   {:id :module/core-collection-helpers
    :class :module
-   :source "(load-resource \"hara/l0-core.hal\") (+ (first [1 2]) (second [2 3]) (iter-next (rest [3 4])))"
+   :source "(load-resource \"hara/l0-core.hal\") (+ (first [1 2]) (second [2 3]) (first (rest [3 4])))"
    :expect {:value 8 :type :integer}}
   {:id :module/core-iterator-aliases
    :class :module
@@ -139,7 +139,7 @@
    :expect {:value 11 :type :integer}}
   {:id :module/core-predicate-reductions
    :class :module
-   :source "(load-resource \"hara/l0-core.hal\") (+ (if (every? (fn [x] (> x 0)) [1 2]) 1 0) (if (any? (fn [x] (= x 2)) [1 2]) 2 0) (some (fn [x] (= x 2)) [1 2]))"
+   :source "(load-resource \"hara/l0-core.hal\") (+ (if (every? (fn [x] (> x 0)) [1 2]) 1 0) (if (any? (fn [x] (= x 2)) [1 2]) 2 0) (if (protocol-call IFind has? {:a nil} :a) 2 0))"
    :expect {:value 5 :type :integer}}
   {:id :module/core-nested-updates
    :class :module
@@ -147,7 +147,7 @@
    :expect {:value 4 :type :integer}}
   {:id :module/core-navigation
    :class :module
-   :source "(load-resource \"hara/l0-core.hal\") (+ (last [1 2 3]) (iter-next (vals {:a 1})) (if (contains? {:a nil} :a) 1 0))"
+   :source "(load-resource \"hara/l0-core.hal\") (+ (last [1 2 3]) (iter-next (vals {:a 1})) (if (protocol-call IFind has? {:a nil} :a) 1 0))"
    :expect {:value 5 :type :integer}}
   {:id :collection/ordinary-dissoc-navigation
    :class :collection

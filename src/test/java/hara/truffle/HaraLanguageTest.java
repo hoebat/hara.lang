@@ -77,7 +77,6 @@ public class HaraLanguageTest {
       assertTrue(context.eval(HaraLanguage.ID, "(odd? 5)").asBoolean());
       assertEquals(9, context.eval(HaraLanguage.ID, "((constantly 9) nil)").asLong());
       assertTrue(context.eval(HaraLanguage.ID, "(nil? nil)").asBoolean());
-      assertTrue(context.eval(HaraLanguage.ID, "(some? 1)").asBoolean());
       assertTrue(context.eval(HaraLanguage.ID, "(empty? [])").asBoolean());
       assertEquals(1, context.eval(HaraLanguage.ID, "(first [1 2])").asLong());
       assertEquals(2, context.eval(HaraLanguage.ID, "(second [1 2])").asLong());
@@ -95,8 +94,10 @@ public class HaraLanguageTest {
       assertEquals(1, context.eval(HaraLanguage.ID, "(first (reverse [3 2 1]))").asLong());
       assertEquals(":a", context.eval(HaraLanguage.ID, "(iter-next (keys {:a 1}))").toString());
       assertEquals(1, context.eval(HaraLanguage.ID, "(iter-next (vals {:a 1}))").asLong());
-      assertTrue(context.eval(HaraLanguage.ID, "(contains? {:a nil} :a)").asBoolean());
-      assertTrue(!context.eval(HaraLanguage.ID, "(contains? {:a 1} :b)").asBoolean());
+      assertTrue(
+          context.eval(HaraLanguage.ID, "(protocol-call IFind has? {:a nil} :a)").asBoolean());
+      assertTrue(
+          !context.eval(HaraLanguage.ID, "(protocol-call IFind has? {:a 1} :b)").asBoolean());
       assertEquals(2, context.eval(HaraLanguage.ID, "(get (dissoc {:a 1 :b 2} :a) :b)").asLong());
       assertTrue(context.eval(HaraLanguage.ID, "(nil? (get (dissoc {:a 1} :a) :a))").asBoolean());
       assertEquals(1, context.eval(HaraLanguage.ID, "(peek [1 2])").asLong());
@@ -136,7 +137,6 @@ public class HaraLanguageTest {
           context
               .eval(HaraLanguage.ID, "(iter-next (iter-drop 1 (interleave [1 2] [3 4])))")
               .asLong());
-      assertTrue(context.eval(HaraLanguage.ID, "(next [1 2])").hasIterator());
       assertTrue(context.eval(HaraLanguage.ID, "(not-empty [1])").hasArrayElements());
       assertTrue(context.eval(HaraLanguage.ID, "(not-empty [])").isNull());
       assertEquals(4, context.eval(HaraLanguage.ID, "(iter-next (map inc [3]))").asLong());
@@ -159,9 +159,29 @@ public class HaraLanguageTest {
           2, context.eval(HaraLanguage.ID, "(nth (iter-next (partition-pair [1 2])) 1)").asLong());
       assertTrue(context.eval(HaraLanguage.ID, "(every? (fn [x] (> x 0)) [1 2])").asBoolean());
       assertTrue(context.eval(HaraLanguage.ID, "(any? (fn [x] (= x 2)) [1 2])").asBoolean());
-      assertEquals(2, context.eval(HaraLanguage.ID, "(some (fn [x] (= x 2)) [1 2])").asLong());
       assertEquals(6, context.eval(HaraLanguage.ID, "(reduce + [1 2 3])").asLong());
       assertEquals(16, context.eval(HaraLanguage.ID, "(reduce + 10 [1 2 3])").asLong());
+    }
+  }
+
+  @Test
+  public void supportsLazySeqBoundariesAndSourceAwareTransforms() {
+    try (Context context = context()) {
+      context.eval(HaraLanguage.ID, "(load-resource \"hara/l0-core.hal\")");
+      assertTrue(context.eval(HaraLanguage.ID, "(seq? (map inc [1 2 3]))").asBoolean());
+      assertEquals(2, context.eval(HaraLanguage.ID, "(first (map inc [1 2 3]))").asLong());
+      assertEquals(2, context.eval(HaraLanguage.ID, "(first ((map inc) [1 2 3]))").asLong());
+      assertEquals(2, context.eval(HaraLanguage.ID, "(first ((map inc) (seq [1 2 3])))").asLong());
+      assertEquals(2, context.eval(HaraLanguage.ID, "(first (seq (map inc) [1 2 3]))").asLong());
+      assertEquals(
+          3,
+          context
+              .eval(HaraLanguage.ID, "(first (seq (comp (map inc) (map inc)) [1 2 3]))")
+              .asLong());
+      assertEquals(
+          3,
+          context.eval(HaraLanguage.ID, "(first ((comp (map inc) (map inc)) [1 2 3]))").asLong());
+      assertTrue(context.eval(HaraLanguage.ID, "(nil? (rest [1]))").asBoolean());
     }
   }
 

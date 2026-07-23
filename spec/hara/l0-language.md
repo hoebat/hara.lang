@@ -61,26 +61,29 @@ variadic fallback. `apply` spreads the final sequential argument into the
 call. Invocation supports Hara functions, protocol `IFn` implementations,
 multifunctions, and `defstruct` constructors.
 
-The packaged `hara/l0-core.hal` bootstrap defines `nil?`, `some?`, `false?`,
-`true?`, `empty?`, `first`, `second`, `rest`, `next`, and `not-empty` using
-ordinary L0 forms and iterator operations. `rest` returns a lazy iterator;
-`next` returns that iterator only when it has a value, otherwise nil. This is
-the L0 replacement for requiring Clojure `ISeq`/`Seq` navigation.
+The packaged `hara/l0-core.hal` bootstrap defines `nil?`, `false?`, `true?`,
+`empty?`, `first`, `second`, `rest`, and `not-empty` using ordinary L0 forms
+and iterator operations. `rest` returns a lazy `Seq`, or nil when no values
+remain. There is no separate `next` operation.
 
 The same bootstrap provides ordinary names `map`, `filter`, `take`, `drop`,
-`mapcat`, `keep`, `cycle`, `zip`, and `partition-pair`; each returns or
-consumes explicit iterators according to the rules above. Predicate reductions
-`every?`, `any?`, and `some` consume an iterator lazily until their result is
-known; `some` returns the first matching source value or nil.
+`mapcat`, `keep`, `cycle`, `zip`, and `partition-pair`; these return lazy
+`Seq` values. Their `iter-*` counterparts return raw one-shot iterators.
+`map` is also a transform constructor: `((map f) collection)` is eager for
+ordinary collections and lazy for an existing `Seq` or iterator. `seq` makes
+the boundary explicit, so `(seq transform source)` is always lazy. Predicate
+reductions `every?` and `any?` consume an iterator lazily until their result is
+known.
 
 The bootstrap also provides `get-in`, `assoc-in`, `update`, and `update-in` for
 persistent nested values. These are ordinary `.hal` functions built on the
 collection protocol functions; they do not introduce mutable update semantics.
 
 Collection navigation also includes `last`, `reverse`, `key`, `val`, `keys`,
-`vals`, and `contains?`. `keys` and `vals` return lazy iterators over map
-entries, while `reverse` returns a persistent list and does not mutate its
-input.
+and `vals`. Membership is protocol-based: use `IFind/find` to retrieve an
+entry and `IFind/has?` to distinguish absence from a present nil value.
+`keys` and `vals` return lazy `Seq` values, while `reverse` returns a
+persistent list and does not mutate its input.
 
 `reduce` eagerly consumes an iterator with either `(reduce function value)`
 or `(reduce function initial value)`. The two-argument form uses the first
@@ -108,7 +111,7 @@ offending form has a source span.
 Lists, vectors, maps, sets, queues, tuples, ordered collections, and sorted
 collections are persistent values. Literal `[]`, `{}`, lists, and sets never
 become mutable merely because they cross a host boundary. Protocol operations
-such as count, lookup, nth, assoc, dissoc, conj, cons, first, next, and
+such as count, lookup, nth, assoc, dissoc, conj, cons, first, and
 empty preserve the collection-family rules tested by the conformance suites.
 
 The ordinary `dissoc` function accepts a collection followed by one or more
@@ -116,8 +119,9 @@ keys and returns persistent updates. `peek` and `pop` expose first-element
 navigation through the collection protocol; they never mutate the input.
 
 The bootstrap provides lazy `range`, `repeat`, `repeatedly`, and `iterate`
-generators. Finite forms return explicit iterators and infinite forms remain
-lazy until consumed by `take`, `iter-next`, or another iterator operation.
+generators. These return `Seq` values; their `iter-*` primitives return raw
+iterators. Infinite forms remain lazy until consumed by `take`, `iter-next`, or
+another iterator operation.
 
 `take-while` and `drop-while` are lazy iterator combinators. They evaluate
 predicates only as demand advances and close their source when it is exhausted

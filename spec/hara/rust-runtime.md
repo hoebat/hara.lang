@@ -311,11 +311,11 @@ Results wrap as signed 32-bit integers, and invalid shift distances return a sta
 
 ## L0 numeric and truth predicates
 
-The Rust core now provides the small bootstrap predicates `inc`, `dec`, `zero?`, `pos?`, `neg?`, `even?`, `odd?`, `nil?`, `some?`, `true?`, and `false?`. They are pure evaluator operations and do not depend on a host provider.
+The Rust core now provides the small bootstrap predicates `inc`, `dec`, `zero?`, `pos?`, `neg?`, `even?`, `odd?`, `nil?`, `true?`, and `false?`. It does not provide `some` or `some?`; use `any?` for predicate reduction and the collection protocols for membership.
 
 ## Collection membership and navigation
 
-The core collection surface includes `contains?`, `keys`, and `vals` for persistent maps, mutable objects, vectors, lists, and strings where applicable. Map membership tests keys, while sequence membership tests values; object membership tests string or keyword keys.
+The core collection surface includes `keys` and `vals` for persistent maps, mutable objects, vectors, and lists. Membership is exposed by `IFind/find` and `IFind/has?`: maps and objects test keys, vectors and lists test valid numeric indexes, and sets test values. `has?` remains true for a present key whose value is nil.
 
 ## Application and pair helpers
 

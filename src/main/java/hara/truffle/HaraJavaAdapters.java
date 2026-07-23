@@ -19,7 +19,7 @@ public final class HaraJavaAdapters {
     installAssoc(context.defineProtocol("IAssoc", Map.of("assoc", 3)));
     installCount(context.defineProtocol("ICount", Map.of("count", 1)));
     installConj(context.defineProtocol("IConj", Map.of("conj", 2)));
-    installFind(context.defineProtocol("IFind", Map.of("find", 2)));
+    installFind(context.defineProtocol("IFind", Map.of("find", 2, "has?", 2)));
     installEquality(context.defineProtocol("IEquality", Map.of("equality", 2)));
     installHash(context.defineProtocol("IHash", Map.of("hash", 1)));
     installMetadata(context.defineProtocol("IObjType", metadataMethods()));
@@ -120,6 +120,10 @@ public final class HaraJavaAdapters {
         IFind.class,
         "find",
         (receiver, arguments) -> findValue((IFind<?, ?>) receiver, arguments[0]));
+    protocol.extend(
+        IFind.class,
+        "has?",
+        (receiver, arguments) -> ((IFind<Object, Object>) receiver).find(arguments[0]) != null);
   }
 
   public static void installEquality(HaraProtocol protocol) {

@@ -6,6 +6,9 @@
 (defn constantly [value] (fn [ignored & rest] value))
 (defn comp2 [f g] (fn [value] (f (g value))))
 (defn comp3 [f g h] (fn [value] (f (g (h value)))))
+(defn comp
+  ([f g] (comp2 f g))
+  ([f g h] (comp3 f g h)))
 (defn complement [predicate] (fn [value] (not (predicate value))))
 (defn zero? [value] (= value 0))
 (defn pos? [value] (> value 0))
@@ -13,7 +16,6 @@
 (defn even? [value] (= (mod value 2) 0))
 (defn odd? [value] (not (even? value)))
 (defn nil? [value] (= value nil))
-(defn some? [value] (not (nil? value)))
 (defn false? [value] (= value false))
 (defn true? [value] (= value true))
 (defn empty? [value] (not (iter-has? (iter value))))
@@ -21,9 +23,8 @@
   (let [it (iter value)]
     (if (iter-has? it) (iter-next it) nil)))
 (defn second [value] (first (rest value)))
-(defn rest [value] (iter-drop 1 value))
-(defn next [value]
-  (let [it (rest value)]
+(defn rest [value]
+  (let [it (seq (iter-drop 1 value))]
     (if (iter-has? it) it nil)))
 (defn not-empty [value] (if (empty? value) nil value))
 (defn get-in [value keys]
@@ -56,37 +57,41 @@
 (defn val [entry] (second entry))
 (defn keys [value] (map key value))
 (defn vals [value] (map val value))
-(defn contains? [value entry]
-  (not (nil? (protocol-call IFind find value entry))))
 (defn range
-  ([] (iter-range 0))
-  ([end] (iter-range end))
-  ([start end] (iter-range start end)))
+  ([] (seq (iter-range 0)))
+  ([end] (seq (iter-range end)))
+  ([start end] (seq (iter-range start end))))
 (defn repeat
-  ([value] (iter-constantly value))
-  ([amount value] (take amount (iter-constantly value))))
+  ([value] (seq (iter-constantly value)))
+  ([amount value] (take amount (seq (iter-constantly value)))))
 (defn repeatedly
-  ([function] (iter-repeatedly function))
-  ([amount function] (take amount (iter-repeatedly function))))
-(defn iterate [function seed] (iter-iterate function seed))
-(defn take-while [predicate value] (iter-take-while predicate value))
-(defn drop-while [predicate value] (iter-drop-while predicate value))
-(defn partition-all [amount value] (iter-partition-all amount value))
-(defn partition [amount value] (iter-partition amount value))
-(defn interpose [separator value] (iter-interpose separator value))
-(defn interleave [value & rest] (apply iter-interleave value rest))
-(defn map [function value & rest]
-  (if (empty? rest)
-    (iter-map function value)
-    (apply iter-map function (concat [value] rest))))
-(defn filter [predicate value] (iter-filter predicate value))
-(defn take [amount value] (iter-take amount value))
-(defn drop [amount value] (iter-drop amount value))
-(defn mapcat [function value] (iter-mapcat function value))
-(defn keep [function value] (iter-keep function value))
-(defn cycle [value] (iter-cycle value))
-(defn zip [first & rest] (apply iter-zip first rest))
-(defn partition-pair [value] (iter-partition-pair value))
+  ([function] (seq (iter-repeatedly function)))
+  ([amount function] (take amount (seq (iter-repeatedly function)))))
+(defn iterate [function seed] (seq (iter-iterate function seed)))
+(defn take-while [predicate value] (seq (iter-take-while predicate value)))
+(defn drop-while [predicate value] (seq (iter-drop-while predicate value)))
+(defn partition-all [amount value] (seq (iter-partition-all amount value)))
+(defn partition [amount value] (seq (iter-partition amount value)))
+(defn interpose [separator value] (seq (iter-interpose separator value)))
+(defn interleave [value & rest] (seq (apply iter-interleave value rest)))
+(defn map-transform [function]
+  (fn [value & rest]
+    (if (seq? value)
+      (seq (apply iter-map function (concat [value] rest)))
+      (if (iter? value)
+        (seq (apply iter-map function (concat [value] rest)))
+        (apply array (apply iter-map function (concat [value] rest)))))))
+(defn map
+  ([function] (map-transform function))
+  ([function value & rest]
+   (seq (apply iter-map function (concat [value] rest)))))
+(defn filter [predicate value] (seq (iter-filter predicate value)))
+(defn take [amount value] (seq (iter-take amount value)))
+(defn drop [amount value] (seq (iter-drop amount value)))
+(defn mapcat [function value] (seq (iter-mapcat function value)))
+(defn keep [function value] (seq (iter-keep function value)))
+(defn cycle [value] (seq (iter-cycle value)))
+(defn zip [first & rest] (seq (apply iter-zip first rest)))
+(defn partition-pair [value] (seq (iter-partition-pair value)))
 (defn every? [predicate value] (iter-every? predicate value))
 (defn any? [predicate value] (iter-any? predicate value))
-(defn some [predicate value] (iter-some predicate value))
