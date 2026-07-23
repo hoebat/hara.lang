@@ -1505,6 +1505,9 @@ final class HaraAnalyzer {
       return form;
     }
     Symbol operator = (Symbol) list.nth(0);
+    if (locals.containsKey(operator) || enclosingLocals.containsKey(operator)) {
+      return form;
+    }
     if (operator.getNamespace() != null || "defmacro".equals(operator.getName())) {
       return form;
     }
