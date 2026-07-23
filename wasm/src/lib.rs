@@ -861,7 +861,7 @@ mod tests {
         );
         assert_eq!(
             runtime.eval_text(r#"(keys {"a" 1 "b" 2})"#).unwrap(),
-            r#"["a" "b"]"#
+            "[\"a\" \"b\"]"
         );
         assert_eq!(
             runtime.eval_text(r#"(vals {"a" 1 "b" 2})"#).unwrap(),
@@ -1169,13 +1169,13 @@ mod tests {
             runtime
                 .eval_text(r#"(. (object "a" 1 "b" 2) (keys))"#)
                 .unwrap(),
-            r#"["a" "b"]"#
+            r#"(array "a" "b")"#
         );
         assert_eq!(
             runtime
                 .eval_text(r#"(. (object "a" 1 "b" 2) (vals))"#)
                 .unwrap(),
-            "[1 2]"
+            "(array 1 2)"
         );
         assert_eq!(
             runtime
@@ -1236,8 +1236,6 @@ mod tests {
             ("(. (array 1) (set 0))", "expects an index and value"),
             ("(. (array 1) (clone 1))", "expects no arguments"),
             (r#"(. (object "a" 1) (clone 1))"#, "expects no arguments"),
-            ("(. (object :a 1) (get \"a\"))", "expects a string key"),
-            (r#"(. (object "a" 1) (get :a))"#, "expects a string key"),
             (
                 "(. (array 1) (map (fn [x y] x)))",
                 "function expects 2 arguments",

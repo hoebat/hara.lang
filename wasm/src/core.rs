@@ -1928,13 +1928,22 @@ fn dot_call(
                 }
                 Ok(values.remove(index))
             }
-            "clone" => Ok(Value::Array(Rc::new(RefCell::new(array.borrow().clone())))),
+            "clone" => {
+                if !args.is_empty() {
+                    return Err("array/clone expects no arguments".into());
+                }
+                Ok(Value::Array(Rc::new(RefCell::new(array.borrow().clone()))))
+            }
             "slice" => {
-                if args.len() != 2 {
-                    return Err("array/slice expects start and end".into());
+                if args.is_empty() || args.len() > 2 {
+                    return Err("array/slice expects start and optional end".into());
                 }
                 let start = value_index(&args[0])?;
-                let end = value_index(&args[1])?;
+                let end = if args.len() == 2 {
+                    value_index(&args[1])?
+                } else {
+                    array.borrow().len()
+                };
                 let values = array.borrow();
                 if start > end || end > values.len() {
                     return Err("array/slice range is out of bounds".into());
@@ -1942,6 +1951,46 @@ fn dot_call(
                 Ok(Value::Array(Rc::new(RefCell::new(
                     values[start..end].to_vec(),
                 ))))
+            }
+            "map" | "filter" => {
+                if args.len() != 1 {
+                    return Err(format!("array/{name} expects one function"));
+                }
+                let function = match &args[0] {
+                    Value::Function(function) => function,
+                    _ => return Err(format!("array/{name} expects a function")),
+                };
+                let mut output = Vec::new();
+                for value in array.borrow().iter().cloned() {
+                    let mapped = call_function(function, vec![value.clone()])?;
+                    if name == "map" {
+                        output.push(mapped);
+                    } else if mapped.truthy() {
+                        output.push(value);
+                    }
+                }
+                Ok(Value::Array(Rc::new(RefCell::new(output))))
+            }
+            "fold-left" | "fold-right" => {
+                if args.len() != 2 {
+                    return Err(format!("array/{name} expects a function and initial value"));
+                }
+                let function = match &args[0] {
+                    Value::Function(function) => function,
+                    _ => return Err(format!("array/{name} expects a function")),
+                };
+                let values = array.borrow();
+                let mut output = args[1].clone();
+                if name == "fold-left" {
+                    for value in values.iter().cloned() {
+                        output = call_function(function, vec![output, value])?;
+                    }
+                } else {
+                    for value in values.iter().rev().cloned() {
+                        output = call_function(function, vec![value, output])?;
+                    }
+                }
+                Ok(output)
             }
             _ => Err(format!("unsupported array method: {name}")),
         },
