@@ -1,11 +1,11 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use crate::lang::protocol::{
-    IAssoc, IConj, ICount, IDisplay, IEmpty, IEquality, IHash, IMetadata, INth, IPersistent,
-    IPopLast, IPushLast, IToMutable, IToPersistent, IMutable,
-};
 use crate::lang::protocol::hash::HashType;
+use crate::lang::protocol::{
+    IAssoc, IConj, ICount, IDisplay, IEmpty, IEquality, IHash, IMetadata, IMutable, INth,
+    IPersistent, IPopLast, IPushLast, IToMutable, IToPersistent,
+};
 
 const NODE_SHIFT: usize = 5;
 const NODE_WIDTH: usize = 1 << NODE_SHIFT;
@@ -176,8 +176,7 @@ impl<E: Clone> Standard<E> {
             .array_for(self.size - 2)
             .expect("previous vector leaf")
             .clone();
-        let mut root = pop_tail(&self.root, self.shift, self.size)
-            .unwrap_or_else(Node::empty);
+        let mut root = pop_tail(&self.root, self.shift, self.size).unwrap_or_else(Node::empty);
         let mut shift = self.shift;
         if shift > NODE_SHIFT {
             if let Node::Branch(children) = root.as_ref() {
@@ -272,12 +271,7 @@ fn push_tail<E: Clone>(
     Rc::new(Node::Branch(Rc::new(children)))
 }
 
-fn assoc_node<E: Clone>(
-    node: &Rc<Node<E>>,
-    level: usize,
-    index: usize,
-    value: E,
-) -> Rc<Node<E>> {
+fn assoc_node<E: Clone>(node: &Rc<Node<E>>, level: usize, index: usize, value: E) -> Rc<Node<E>> {
     if level == 0 {
         let Node::Leaf(existing) = node.as_ref() else {
             unreachable!("vector terminal node must be a leaf")
@@ -302,11 +296,7 @@ fn assoc_node<E: Clone>(
     Rc::new(Node::Branch(Rc::new(children)))
 }
 
-fn pop_tail<E: Clone>(
-    node: &Rc<Node<E>>,
-    level: usize,
-    size: usize,
-) -> Option<Rc<Node<E>>> {
+fn pop_tail<E: Clone>(node: &Rc<Node<E>>, level: usize, size: usize) -> Option<Rc<Node<E>>> {
     let Node::Branch(existing) = node.as_ref() else {
         unreachable!("vector path must contain branches")
     };
@@ -488,7 +478,10 @@ impl<E: Clone> Mutable<E> {
     }
 
     fn check_editable(&self) {
-        assert!(self.editable.get(), "mutable vector used after to_persistent");
+        assert!(
+            self.editable.get(),
+            "mutable vector used after to_persistent"
+        );
     }
 
     pub fn push_last(&mut self, value: E) -> &mut Self {

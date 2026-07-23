@@ -100,8 +100,12 @@ fn repl(runtime: &mut Runtime) {
             Ok(0) => break,
             Ok(_) => {
                 let source = line.trim();
-                if source == ":quit" || source == ":exit" { break; }
-                if !source.is_empty() { evaluate(runtime, source); }
+                if source == ":quit" || source == ":exit" {
+                    break;
+                }
+                if !source.is_empty() {
+                    evaluate(runtime, source);
+                }
             }
             Err(error) => fail(format!("stdin: {error}")),
         }
@@ -114,9 +118,16 @@ fn atty() -> bool {
 }
 
 #[cfg(unix)]
-unsafe fn libc_isatty(fd: i32) -> i32 { extern "C" { fn isatty(fd: i32) -> i32; } isatty(fd) }
+unsafe fn libc_isatty(fd: i32) -> i32 {
+    extern "C" {
+        fn isatty(fd: i32) -> i32;
+    }
+    isatty(fd)
+}
 #[cfg(not(unix))]
-unsafe fn libc_isatty(_fd: i32) -> i32 { 0 }
+unsafe fn libc_isatty(_fd: i32) -> i32 {
+    0
+}
 
 fn fail(message: String) -> ! {
     eprintln!("hara: {message}");
