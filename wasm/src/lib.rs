@@ -793,6 +793,26 @@ mod tests {
     }
 
     #[test]
+    fn syntax_quote_matches_java_expansion_semantics() {
+        let mut runtime = Runtime::new();
+        assert_eq!(runtime.eval_text("`foo").unwrap(), "foo");
+        assert_eq!(
+            runtime.eval_text("`(a ~(+ 1 2) ~@[4 5])").unwrap(),
+            "(a 3 4 5)"
+        );
+        assert_eq!(runtime.eval_text("`[a ~(+ 1 2)]").unwrap(), "[a 3]");
+        assert_eq!(runtime.eval_text("`{:a ~(+ 1 2)}").unwrap(), "{:a 3}");
+        assert_eq!(
+            runtime.eval_text("`(a (unquote))").unwrap_err(),
+            "unquote expects one argument"
+        );
+        assert_eq!(
+            runtime.eval_text("`(a ~@1)").unwrap_err(),
+            "iter expects a collection"
+        );
+    }
+
+    #[test]
     fn reader_generated_fn_star_and_eval_forms_execute() {
         let mut runtime = Runtime::new();
         assert_eq!(runtime.eval_text("((fn* [x] (+ x 1)) 4)").unwrap(), "5");

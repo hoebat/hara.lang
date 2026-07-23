@@ -3297,6 +3297,70 @@ fn binding_symbol(form: &Form, context: &str) -> Result<(String, Option<Rc<Metad
     }
 }
 
+fn syntax_quote_collection(
+    values: &[Form],
+    vector: bool,
+    env: &mut HashMap<String, Value>,
+) -> Result<Value, String> {
+    let mut output = Vec::new();
+    for value in values {
+        match value {
+            Form::List(parts)
+                if !parts.is_empty()
+                    && matches!(&parts[0], Form::Symbol(name) if name == "unquote") =>
+            {
+                if parts.len() != 2 {
+                    return Err("unquote expects one argument".into());
+                }
+                output.push(eval(&parts[1], env)?);
+            }
+            Form::List(parts)
+                if !parts.is_empty()
+                    && matches!(&parts[0], Form::Symbol(name) if name == "unquote-splicing") =>
+            {
+                if parts.len() != 2 {
+                    return Err("unquote-splicing expects one argument".into());
+                }
+                output.extend(iterator_values(eval(&parts[1], env)?)?);
+            }
+            value => output.push(syntax_quote_value(value, env)?),
+        }
+    }
+    if vector {
+        vector_literal(output)
+    } else {
+        Ok(Value::List(output.into()))
+    }
+}
+
+fn syntax_quote_value(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, String> {
+    match form {
+        Form::Symbol(_) => literal_value(form),
+        Form::List(values)
+            if values.len() == 2
+                && matches!(&values[0], Form::Symbol(name) if name == "unquote") =>
+        {
+            eval(&values[1], env)
+        }
+        Form::List(values) => syntax_quote_collection(values, false, env),
+        Form::Vector(values) => syntax_quote_collection(values, true, env),
+        Form::Map(values) => Ok(Value::Map(
+            values
+                .iter()
+                .map(|(key, value)| {
+                    Ok((
+                        syntax_quote_value(key, env)?,
+                        syntax_quote_value(value, env)?,
+                    ))
+                })
+                .collect::<Result<Vec<_>, String>>()?
+                .into_iter()
+                .collect(),
+        )),
+        _ => literal_value(form),
+    }
+}
+
 pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, String> {
     match form {
         Form::Number(v) => Ok(Value::Number(*v)),
@@ -3311,6 +3375,11 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
         Form::Regex(value) => Ok(Value::Regex(value.clone())),
         Form::Tagged(tag, value) => Ok(Value::Tagged(tag.clone(), Box::new(literal_value(value)?))),
         Form::Metadata(_, value) => eval(value, env),
+        Form::List(fs)
+            if fs.len() == 2 && matches!(&fs[0], Form::Symbol(name) if name == "syntax-quote") =>
+        {
+            syntax_quote_value(&fs[1], env)
+        }
         Form::List(fs)
             if fs.len() == 2 && matches!(&fs[0], Form::Symbol(name) if name == "quote") =>
         {
