@@ -79,9 +79,9 @@ fn main() {
 }
 
 fn evaluate(runtime: &mut Runtime, source: &str) {
-    match runtime.eval(source) {
+    match runtime.eval_native(source) {
         Ok(value) => println!("{value}"),
-        Err(error) => fail(error.as_string().unwrap_or_else(|| format!("{error:?}"))),
+        Err(error) => fail(error),
     }
 }
 

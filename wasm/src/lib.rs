@@ -231,6 +231,11 @@ impl Runtime {
         self.eval_text(source)
             .map_err(|error| JsValue::from_str(&error))
     }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn eval_native(&mut self, source: &str) -> Result<String, String> {
+        self.eval_text(source)
+    }
 }
 
 #[wasm_bindgen]
