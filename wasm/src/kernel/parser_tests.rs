@@ -164,10 +164,14 @@ fn allows_multi_slash_symbols_but_not_keywords_like_java() {
 
 #[test]
 fn validates_keywords_and_merges_metadata_like_java() {
-    for invalid in [":", ":/", ":/name", ":name/", ":a/b/c"] {
-        assert!(parse_forms(invalid)
-            .unwrap_err()
-            .contains("Keyword not allowed"));
+    for (invalid, expected) in [
+        (":", "cannot be empty"),
+        (":/", "single slash"),
+        (":/name", "start with a slash"),
+        (":name/", "end with a slash"),
+        (":a/b/c", "only contain one slash"),
+    ] {
+        assert!(parse_forms(invalid).unwrap_err().contains(expected));
     }
     assert_eq!(
         parse_forms(":ns/name").unwrap(),
@@ -213,66 +217,21 @@ fn supports_dispatch_and_quote_forms() {
     assert!(matches!(&forms[3], Form::Tagged(tag, _) if tag == "tag"));
 }
 #[test]
-fn ports_java_reference_dispatch_forms() {
-    assert_eq!(
-        parse_forms("#:hello{:a 1 :other/b 2}").unwrap(),
-        vec![Form::Map(vec![
-            (Form::Keyword("hello/a".into()), Form::Number(1)),
-            (Form::Keyword("other/b".into()), Form::Number(2))
-        ])]
-    );
-    assert_eq!(
-        parse_forms("#?(:clj hello :rust world)").unwrap(),
-        vec![Form::List(vec![
-            Form::Symbol("?".into()),
-            Form::Map(vec![
-                (Form::Keyword("clj".into()), Form::Symbol("hello".into())),
-                (Form::Keyword("rust".into()), Form::Symbol("world".into()))
-            ])
-        ])]
-    );
-    assert_eq!(
-        parse_forms("#?@(:clj [x])").unwrap(),
-        vec![Form::List(vec![
-            Form::Symbol("?-splicing".into()),
-            Form::Map(vec![(
-                Form::Keyword("clj".into()),
-                Form::Vector(vec![Form::Symbol("x".into())])
-            )])
-        ])]
-    );
-    assert_eq!(
-        parse_forms("#=(f)").unwrap(),
-        vec![Form::List(vec![
-            Form::Symbol("eval".into()),
-            Form::List(vec![Form::Symbol("f".into())])
-        ])]
-    );
-    assert_eq!(
-        parse_forms("#(+ % 1)").unwrap(),
-        vec![Form::List(vec![
-            Form::Symbol("fn*".into()),
-            Form::List(vec![]),
-            Form::List(vec![
-                Form::Symbol("+".into()),
-                Form::Symbol("%".into()),
-                Form::Number(1)
-            ])
-        ])]
-    );
-    assert_eq!(
-        parse_forms("[#|1 #_2 3]").unwrap(),
-        vec![Form::Vector(vec![Form::Number(1), Form::Number(3)])]
-    );
-    assert!(parse_forms("#:hello[1]")
-        .unwrap_err()
-        .contains("expects a map"));
-    assert!(parse_forms("#?(:clj)")
-        .unwrap_err()
-        .contains("feature/value pairs"));
-    assert!(parse_forms("#?[:clj 1]")
-        .unwrap_err()
-        .contains("expects a list"));
+fn rejects_dispatch_forms_absent_from_the_java_reference() {
+    for source in [
+        "#(inc %)",
+        "#:hello{:a 1}",
+        "#?(:clj hello)",
+        "#?@(:clj [x])",
+        "#=(f)",
+        "[#|1]",
+    ] {
+        let error = parse_forms(source).unwrap_err();
+        assert!(
+            error.contains("No dispatch macro for:"),
+            "{source}: {error}"
+        );
+    }
 }
 
 #[test]
@@ -348,7 +307,8 @@ fn shared_reader_corpus_matches_canonical_forms_and_errors() {
         let id = map_value(case, "id").expect("case must contain :id");
         let source = string_value(case, "source");
         let readable = map_value(case, "rust-readable").or_else(|| map_value(case, "readable"));
-        match (readable, map_value(case, "error")) {
+        let expected_error = map_value(case, "rust-error").or_else(|| map_value(case, "error"));
+        match (readable, expected_error) {
             (Some(Form::String(readable)), None) => {
                 let forms = parse_forms(source)
                     .unwrap_or_else(|error| panic!("{id} unexpectedly failed: {error}"));

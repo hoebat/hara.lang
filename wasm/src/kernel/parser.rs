@@ -253,76 +253,9 @@ impl<'a> Parser<'a> {
     }
     fn dispatch(&mut self) -> Result<Option<(Form, Vec<SpannedForm>)>> {
         match self.reader.read_char() {
-            Some('(') => {
-                let children = self.delimited(')', "anonymous function")?;
-                let body = children.iter().map(|child| child.form.clone()).collect();
-                let form = Form::List(vec![
-                    Form::Symbol("fn*".into()),
-                    Form::List(Vec::new()),
-                    Form::List(body),
-                ]);
-                Ok(Some((form, children)))
+            Some(ch @ ('(' | ':' | '=' | '?' | '|')) => {
+                self.error(format!("No dispatch macro for: {ch}"))
             }
-            Some(':') => {
-                let namespace = self.read_required("namespaced map namespace")?;
-                let namespace_name = match &namespace.form {
-                    Form::Symbol(name) | Form::Keyword(name) if !name.is_empty() => {
-                        name.rsplit('/').next().unwrap_or(name).to_owned()
-                    }
-                    _ => return self.error("Namespaced map expects a namespace name"),
-                };
-                let map = self.read_required("namespaced map")?;
-                let Form::Map(entries) = &map.form else {
-                    return self.error("Namespaced map expects a map");
-                };
-                let qualified = entries
-                    .iter()
-                    .map(|(key, value)| {
-                        let key = match key {
-                            Form::Keyword(name) if !name.contains('/') => {
-                                Form::Keyword(format!("{namespace_name}/{name}"))
-                            }
-                            key => key.clone(),
-                        };
-                        (key, value.clone())
-                    })
-                    .collect();
-                Ok(Some((Form::Map(qualified), vec![namespace, map])))
-            }
-            Some('=') => {
-                let (form, children) = self.prefixed("eval")?;
-                Ok(Some((form, children)))
-            }
-            Some('?') => {
-                let splice = if self.reader.peek_char() == Some('@') {
-                    self.reader.read_char();
-                    true
-                } else {
-                    false
-                };
-                let selection = self.read_required("reader conditional")?;
-                let Form::List(values) = &selection.form else {
-                    return self.error("Reader conditional expects a list");
-                };
-                if values.len() % 2 != 0 {
-                    return self.error("Reader conditional requires feature/value pairs");
-                }
-                let entries = values
-                    .chunks(2)
-                    .map(|pair| (pair[0].clone(), pair[1].clone()))
-                    .collect::<Vec<_>>();
-                if entries
-                    .iter()
-                    .enumerate()
-                    .any(|(index, (key, _))| entries[..index].iter().any(|(prior, _)| prior == key))
-                {
-                    return self.error("Duplicate reader conditional feature");
-                }
-                let symbol = if splice { "?-splicing" } else { "?" };
-                let form = Form::List(vec![Form::Symbol(symbol.into()), Form::Map(entries)]);
-                Ok(Some((form, vec![selection])))
-            }
-            Some('|') => Ok(None),
             Some('{') => {
                 let children = self.delimited('}', "set")?;
                 let forms = children
@@ -401,13 +334,21 @@ impl<'a> Parser<'a> {
         }
         if let Some(keyword) = token.strip_prefix(':') {
             let slashes = keyword.bytes().filter(|byte| *byte == b'/').count();
-            if keyword.is_empty()
-                || keyword == "/"
-                || slashes > 1
-                || keyword.starts_with('/')
-                || keyword.ends_with('/')
-            {
-                return self.error(format!("Keyword not allowed: {token}"));
+            let error = if keyword.is_empty() {
+                Some("Keyword name cannot be empty.")
+            } else if keyword == "/" {
+                Some("Keyword name cannot be a single slash.")
+            } else if slashes > 1 {
+                Some("Keyword name can only contain one slash.")
+            } else if keyword.starts_with('/') {
+                Some("Keyword name cannot start with a slash.")
+            } else if keyword.ends_with('/') {
+                Some("Keyword name cannot end with a slash.")
+            } else {
+                None
+            };
+            if let Some(error) = error {
+                return self.error(error);
             }
             return Ok(Form::Keyword(keyword.into()));
         }
@@ -449,10 +390,12 @@ impl<'a> Parser<'a> {
                         .map(|value| Form::Number(if negative { -value } else { value }))
                 } else if body.len() > 1
                     && body.starts_with('0')
-                    && body.chars().all(|ch| ('0'..='7').contains(&ch))
+                    && body.chars().all(|ch| ch.is_ascii_digit())
                 {
-                    i64::from_str_radix(body, 8)
-                        .ok()
+                    body.chars()
+                        .all(|ch| ('0'..='7').contains(&ch))
+                        .then(|| i64::from_str_radix(body, 8).ok())
+                        .flatten()
                         .map(|value| Form::Number(if negative { -value } else { value }))
                 } else if body.contains(['.', 'e', 'E']) {
                     token.parse::<f64>().ok().map(Form::Float)

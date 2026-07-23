@@ -857,10 +857,13 @@ mod tests {
     }
 
     #[test]
-    fn reader_generated_fn_star_and_eval_forms_execute() {
+    fn fn_star_and_eval_forms_execute_while_hash_eval_is_rejected() {
         let mut runtime = Runtime::new();
         assert_eq!(runtime.eval_text("((fn* [x] (+ x 1)) 4)").unwrap(), "5");
-        assert_eq!(runtime.eval_text("#=(+ 2 3)").unwrap(), "5");
+        assert!(runtime
+            .eval_text("#=(+ 2 3)")
+            .unwrap_err()
+            .contains("No dispatch macro for: ="));
         assert_eq!(runtime.eval_text("#[(def x 4) (+ x 2)]").unwrap(), "6");
         assert!(runtime
             .eval_text("(eval)")

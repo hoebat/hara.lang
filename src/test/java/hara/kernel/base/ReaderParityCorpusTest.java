@@ -12,6 +12,8 @@ import hara.lang.data.types.ILinearType;
 import hara.lang.data.types.IMapType;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.Test;
 
 /** Executes the canonical reader corpus shared with the Rust runtime. */
@@ -20,6 +22,18 @@ public class ReaderParityCorpusTest {
 
   private static Keyword key(String name) {
     return Keyword.create(null, name);
+  }
+
+  private static String readAllDisplay(String source) {
+    Reader reader = new Reader(source);
+    Object eof = new Object();
+    List<String> forms = new ArrayList<>();
+    Object form;
+    do {
+      form = Parser.LispReader.read(reader, false, eof, false, null);
+      if (form != eof) forms.add(G.display(form));
+    } while (form != eof);
+    return String.join(" ", forms);
   }
 
   @SuppressWarnings("rawtypes")
@@ -44,19 +58,18 @@ public class ReaderParityCorpusTest {
         fail(id + " must contain exactly one of :readable or :error");
 
       if (readable != null) {
-        Object value = Parser.LispReader.readString(source, null);
-        String actual = G.display(value);
+        String actual = readAllDisplay(source);
         assertEquals(id.toString(), readable, actual);
         assertEquals(
             id + " canonical output must round-trip",
             actual,
-            G.display(Parser.LispReader.readString(actual, null)));
+            readAllDisplay(actual));
       } else {
         RuntimeException error =
             assertThrows(
                 id.toString(),
                 RuntimeException.class,
-                () -> Parser.LispReader.readString(source, null));
+                () -> readAllDisplay(source));
         Throwable cause = error.getCause() == null ? error : error.getCause();
         assertTrue(
             id + ": expected <" + expectedError + "> in <" + cause.getMessage() + ">",
