@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 pub use crate::kernel::Form;
 use crate::lang::data::List as PList;
 use crate::lang::data::{Keyword, Map as PMap, Set as PSet, Symbol, Vector as PVector};
-pub use crate::task::{Promise, PromiseState};
+pub use crate::task::{LocalPromiseProvider, Promise, PromiseProvider, PromiseState};
 use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
@@ -44,13 +44,41 @@ pub enum Value {
     Nil,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Function {
     params: Vec<String>,
     variadic: Option<String>,
     body: Vec<Form>,
     captured: Rc<RefCell<HashMap<String, Value>>>,
     pub name: Option<String>,
+    native: Option<Rc<dyn Fn(Vec<Value>) -> Result<Value, String>>>,
+}
+
+impl std::fmt::Debug for Function {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Function")
+            .field("params", &self.params)
+            .field("variadic", &self.variadic)
+            .field("name", &self.name)
+            .field("native", &self.native.is_some())
+            .finish()
+    }
+}
+
+fn native_function(
+    name: &str,
+    arity: usize,
+    callback: impl Fn(Vec<Value>) -> Result<Value, String> + 'static,
+) -> Value {
+    Value::Function(Rc::new(Function {
+        params: (0..arity).map(|index| format!("arg{index}")).collect(),
+        variadic: None,
+        body: Vec::new(),
+        captured: Rc::new(RefCell::new(HashMap::new())),
+        name: Some(name.into()),
+        native: Some(Rc::new(callback)),
+    }))
 }
 
 thread_local! {
@@ -608,6 +636,7 @@ impl ProtocolRegistry {
 
 thread_local! {
     static ACTIVE_PROTOCOLS: RefCell<Option<ProtocolRegistry>> = const { RefCell::new(None) };
+    static ACTIVE_PROMISE_PROVIDER: RefCell<Option<Rc<dyn PromiseProvider>>> = const { RefCell::new(None) };
     static HOST_CALL_HANDLER: RefCell<Option<Rc<dyn Fn(String, String, Vec<Value>) -> Result<Value, String>>>> = const { RefCell::new(None) };
 }
 
@@ -621,6 +650,27 @@ pub fn with_protocols<R>(registry: &ProtocolRegistry, operation: impl FnOnce() -
     })
 }
 
+/// Runs an evaluation through the selected runtime promise provider.
+pub fn with_promise_provider<R>(
+    provider: Rc<dyn PromiseProvider>,
+    operation: impl FnOnce() -> R,
+) -> R {
+    ACTIVE_PROMISE_PROVIDER.with(|active| {
+        let previous = active.replace(Some(provider));
+        let result = operation();
+        active.replace(previous);
+        result
+    })
+}
+
+fn promise_provider() -> Rc<dyn PromiseProvider> {
+    ACTIVE_PROMISE_PROVIDER.with(|active| {
+        active
+            .borrow()
+            .clone()
+            .unwrap_or_else(|| Rc::new(LocalPromiseProvider))
+    })
+}
 /// Installs the explicit host-call boundary for one evaluation.
 pub fn with_host_calls<R>(
     handler: Rc<dyn Fn(String, String, Vec<Value>) -> Result<Value, String>>,
@@ -899,6 +949,7 @@ pub struct ProviderCapabilities {
 pub struct ProviderRegistry {
     file: Option<Rc<dyn FileProvider>>,
     socket: Option<Rc<dyn SocketProvider>>,
+    promise: Rc<dyn PromiseProvider>,
 }
 
 impl Default for ProviderRegistry {
@@ -906,6 +957,7 @@ impl Default for ProviderRegistry {
         Self {
             file: None,
             socket: None,
+            promise: Rc::new(LocalPromiseProvider),
         }
     }
 }
@@ -920,6 +972,12 @@ impl ProviderRegistry {
     }
     pub fn install_socket<P: SocketProvider + 'static>(&mut self, provider: P) {
         self.socket = Some(Rc::new(provider));
+    }
+    pub fn install_promise<P: PromiseProvider + 'static>(&mut self, provider: P) {
+        self.promise = Rc::new(provider);
+    }
+    pub fn promise(&self) -> Rc<dyn PromiseProvider> {
+        self.promise.clone()
     }
     pub fn file(&self) -> Option<Rc<dyn FileProvider>> {
         self.file.clone()
@@ -1457,6 +1515,7 @@ fn promise_state_value(promise: &Promise) -> Value {
         match promise.state() {
             PromiseState::Pending => "pending",
             PromiseState::Fulfilled(_) => "fulfilled",
+            PromiseState::Rejected(error) if error == "cancelled" => "cancelled",
             PromiseState::Rejected(_) => "rejected",
         }
         .into(),
@@ -1471,50 +1530,114 @@ fn promise_value_result(promise: &Promise) -> Result<Value, String> {
     }
 }
 
+fn promise_all(values: Vec<Value>) -> Promise {
+    let output = Promise::new();
+    if values.is_empty() {
+        output.resolve(Value::Array(Rc::new(RefCell::new(Vec::new()))));
+        return output;
+    }
+    let count = values.len();
+    let remaining = Rc::new(Cell::new(count));
+    let results = Rc::new(RefCell::new(vec![Value::Nil; count]));
+    for (index, value) in values.into_iter().enumerate() {
+        let source = match value {
+            Value::Promise(promise) => promise,
+            value => {
+                let promise = Promise::new();
+                promise.resolve(value);
+                promise
+            }
+        };
+        let destination = output.clone();
+        let remaining = remaining.clone();
+        let results = results.clone();
+        source.on_settle(Rc::new(move |state| match state {
+            PromiseState::Fulfilled(value) => {
+                results.borrow_mut()[index] = value;
+                let left = remaining.get() - 1;
+                remaining.set(left);
+                if left == 0 {
+                    destination.resolve(Value::Array(Rc::new(RefCell::new(
+                        results.borrow().clone(),
+                    ))));
+                }
+            }
+            PromiseState::Rejected(error) => {
+                destination.reject(error);
+            }
+            PromiseState::Pending => {}
+        }));
+    }
+    output
+}
+fn settle_promise_result(destination: &Promise, result: Result<Value, String>) {
+    match result {
+        Ok(Value::Promise(source)) => {
+            destination.adopt(&source);
+        }
+        Ok(value) => {
+            destination.resolve(value);
+        }
+        Err(error) => {
+            destination.reject(error);
+        }
+    }
+}
+
+fn finish_promise(destination: Promise, original: PromiseState, cleanup: Result<Value, String>) {
+    let preserved_destination = destination.clone();
+    let preserve = move || match original.clone() {
+        PromiseState::Fulfilled(value) => {
+            preserved_destination.resolve(value);
+        }
+        PromiseState::Rejected(error) => {
+            preserved_destination.reject(error);
+        }
+        PromiseState::Pending => {}
+    };
+    match cleanup {
+        Ok(Value::Promise(cleanup)) => {
+            cleanup.on_settle(Rc::new(move |state| match state {
+                PromiseState::Fulfilled(_) => preserve(),
+                PromiseState::Rejected(error) => {
+                    destination.reject(error);
+                }
+                PromiseState::Pending => {}
+            }));
+        }
+        Ok(_) => preserve(),
+        Err(error) => {
+            destination.reject(error);
+        }
+    }
+}
+
 fn promise_chain(source: Promise, operation: &str, function: Rc<Function>) -> Promise {
     let output = Promise::new();
     let operation = operation.to_string();
     let destination = output.clone();
-    source.on_settle(Rc::new(move |state| match state {
-        PromiseState::Fulfilled(value) if operation == "promise/map" => {
-            match call_function(&function, vec![value]) {
-                Ok(value) => {
-                    destination.resolve(value);
-                }
-                Err(error) => {
-                    destination.reject(error);
-                }
-            }
+    source.on_settle(Rc::new(move |state| match state.clone() {
+        PromiseState::Fulfilled(value)
+            if operation == "promise/map" || operation == "promise/then" =>
+        {
+            settle_promise_result(&destination, call_function(&function, vec![value]));
         }
-        PromiseState::Rejected(error) if operation == "promise/recover" => {
-            match call_function(&function, vec![Value::String(error)]) {
-                Ok(value) => {
-                    destination.resolve(value);
-                }
-                Err(error) => {
-                    destination.reject(error);
-                }
-            }
+        PromiseState::Rejected(error)
+            if operation == "promise/recover" || operation == "promise/catch" =>
+        {
+            settle_promise_result(
+                &destination,
+                call_function(&function, vec![Value::String(error)]),
+            );
         }
-        PromiseState::Fulfilled(value) if operation == "promise/finally" => {
-            match call_function(&function, Vec::new()) {
-                Ok(_) => {
-                    destination.resolve(value);
-                }
-                Err(error) => {
-                    destination.reject(error);
-                }
-            }
-        }
-        PromiseState::Rejected(error) if operation == "promise/finally" => {
-            match call_function(&function, Vec::new()) {
-                Ok(_) => {
-                    destination.reject(error);
-                }
-                Err(error) => {
-                    destination.reject(error);
-                }
-            }
+        PromiseState::Fulfilled(_) | PromiseState::Rejected(_)
+            if operation == "promise/finally" =>
+        {
+            finish_promise(
+                destination.clone(),
+                state,
+                call_function(&function, Vec::new()),
+            );
         }
         PromiseState::Fulfilled(value) => {
             destination.resolve(value);
@@ -2670,6 +2793,7 @@ fn generated_function(
         body,
         captured: Rc::new(RefCell::new(captured)),
         name: None,
+        native: None,
     }))
 }
 
@@ -2727,6 +2851,15 @@ fn binding_var(env: &mut HashMap<String, Value>, name: &str) -> Option<Rc<RefCel
 }
 
 fn call_function(function: &Function, arguments: Vec<Value>) -> Result<Value, String> {
+    if let Some(native) = &function.native {
+        if function.params.len() != arguments.len() {
+            return Err(format!(
+                "function expects {} arguments",
+                function.params.len()
+            ));
+        }
+        return native(arguments);
+    }
     let tracing = tracing_enabled();
     if tracing {
         TRACE_STACK.with(|stack| {
@@ -2854,6 +2987,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     body: fs[2..].to_vec(),
                     captured: Rc::new(RefCell::new(env.clone())),
                     name: None,
+                    native: None,
                 })))
             }
             Form::Symbol(n) if n == "var" => {
@@ -3028,6 +3162,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     body: fs[3..].to_vec(),
                     captured: Rc::new(RefCell::new(env.clone())),
                     name: Some(name.clone()),
+                    native: None,
                 });
                 let function = Value::Function(function_ref.clone());
                 *cell.borrow_mut() = function.clone();
@@ -3121,6 +3256,73 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     handler(service, method, arguments)
                 })
             }
+            Form::Symbol(n) if n == "promise/new" || n == "promise/run" => {
+                if fs.len() != 2 {
+                    return Err(format!("{n} expects one function"));
+                }
+                let function = match eval(&fs[1], env)? {
+                    Value::Function(function) => function,
+                    _ => return Err(format!("{n} expects a function")),
+                };
+                let provider = promise_provider();
+                if n == "promise/run" {
+                    let task = Rc::new(move || call_function(&function, Vec::new()));
+                    Ok(Value::Promise(provider.run(task)))
+                } else {
+                    let promise = Promise::new();
+                    let resolving = promise.clone();
+                    let resolve = native_function("promise-resolve", 1, move |mut values| {
+                        let value = values.remove(0);
+                        settle_promise_result(&resolving, Ok(value.clone()));
+                        Ok(value)
+                    });
+                    let rejecting = promise.clone();
+                    let reject = native_function("promise-reject", 1, move |mut values| {
+                        let value = values.remove(0);
+                        let error = match &value {
+                            Value::String(error) => error.clone(),
+                            value => value.display(),
+                        };
+                        rejecting.reject(error);
+                        Ok(value)
+                    });
+                    if let Err(error) = call_function(&function, vec![resolve, reject]) {
+                        promise.reject(error);
+                    }
+                    Ok(Value::Promise(promise))
+                }
+            }
+            Form::Symbol(n) if n == "promise/all" => {
+                if fs.len() != 2 {
+                    return Err("promise/all expects one collection".into());
+                }
+                Ok(Value::Promise(promise_all(iterator_values(eval(
+                    &fs[1], env,
+                )?)?)))
+            }
+            Form::Symbol(n) if n == "promise/native?" => {
+                if fs.len() != 2 {
+                    return Err("promise/native? expects one value".into());
+                }
+                Ok(Value::Bool(matches!(eval(&fs[1], env)?, Value::Promise(_))))
+            }
+            Form::Symbol(n) if n == "promise/delay" => {
+                if fs.len() != 3 {
+                    return Err("promise/delay expects milliseconds and a function".into());
+                }
+                let millis = match eval(&fs[1], env)? {
+                    Value::Number(value) if value >= 0 => value as u64,
+                    _ => return Err("promise/delay expects non-negative milliseconds".into()),
+                };
+                let function = match eval(&fs[2], env)? {
+                    Value::Function(function) => function,
+                    _ => return Err("promise/delay expects milliseconds and a function".into()),
+                };
+                let task = Rc::new(move || call_function(&function, Vec::new()));
+                Ok(Value::Promise(
+                    promise_provider().delay(std::time::Duration::from_millis(millis), task),
+                ))
+            }
             Form::Symbol(n) if n == "promise/state" => {
                 if fs.len() != 2 {
                     return Err("promise/state expects one argument".into());
@@ -3176,7 +3378,14 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 Ok(Value::Promise(promise))
             }
             Form::Symbol(n)
-                if ["promise/map", "promise/recover", "promise/finally"].contains(&n.as_str()) =>
+                if [
+                    "promise/map",
+                    "promise/recover",
+                    "promise/then",
+                    "promise/catch",
+                    "promise/finally",
+                ]
+                .contains(&n.as_str()) =>
             {
                 if fs.len() != 3 {
                     return Err(format!("{n} expects a promise and function"));
@@ -3939,6 +4148,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     body: vec![Form::Symbol("__constant".into())],
                     captured: Rc::new(RefCell::new(captured)),
                     name: None,
+                    native: None,
                 })))
             }
             Form::Symbol(n) if n == "complement" => {

@@ -115,8 +115,9 @@ impl Runtime {
                 .cloned()
                 .unwrap_or_else(kernel::GeneratedNamespaceConfig::defaults);
             let resolved = config.rewrite(form);
-            result =
-                core::with_protocols(&self.protocols, || core::eval(&resolved, &mut self.env))?;
+            result = core::with_promise_provider(self.providers.promise(), || {
+                core::with_protocols(&self.protocols, || core::eval(&resolved, &mut self.env))
+            })?;
             if matches!(result, core::Value::Recur(_)) {
                 return Err("recur must be inside loop".into());
             }
@@ -1054,7 +1055,7 @@ mod tests {
             runtime
                 .eval_text("(promise/state (promise/cancel (promise)))")
                 .unwrap(),
-            ":rejected"
+            ":cancelled"
         );
         assert_eq!(
             runtime
@@ -1064,6 +1065,64 @@ mod tests {
         );
     }
 
+    #[test]
+    fn generated_promise_library_matches_the_portable_contract() {
+        let mut runtime = Runtime::new();
+        let cases = [
+            (
+                "(promise/value (promise/new (fn [resolve reject] (resolve 42))))",
+                "42",
+            ),
+            ("(promise/value (promise/run (fn [] 40)))", "40"),
+            (
+                "(promise/value (promise/then (promise/run (fn [] 40)) (fn [x] (+ x 2))))",
+                "42",
+            ),
+            (
+                "(promise/value (promise/then (promise/run (fn [] 40)) (fn [x] (promise/run (fn [] (+ x 2))))))",
+                "42",
+            ),
+            (
+                r#"(promise/value (promise/catch (promise/run (fn [] (throw "bad"))) (fn [error] 7)))"#,
+                "7",
+            ),
+            (
+                "(. (promise/value (promise/all [(promise/run (fn [] 1)) 2 (promise/run (fn [] 3))])) (get 1))",
+                "2",
+            ),
+            (
+                "(promise/value (promise/run (fn [] (promise/run (fn [] 9)))))",
+                "9",
+            ),
+            (
+                "(promise/value (promise/finally (promise/run (fn [] 4)) (fn [] (promise/run (fn [] 99)))))",
+                "4",
+            ),
+            (
+                "(promise/value (promise/delay 0 (fn [] 5)))",
+                "5",
+            ),
+            (
+                "(promise/native? (promise/new (fn [resolve reject] (resolve 1))))",
+                "true",
+            ),
+            (
+                "(let [p (promise/delay 10000 (fn [] 1))] (do (promise/cancel p) (promise/state p)))",
+                ":cancelled",
+            ),
+        ];
+        for (source, expected) in cases {
+            assert_eq!(runtime.eval_text(source).unwrap(), expected, "{source}");
+        }
+        assert!(runtime
+            .eval_text("(promise/delay -1 (fn [] 1))")
+            .unwrap_err()
+            .contains("non-negative"));
+        assert!(runtime
+            .eval_text("(promise/new 1)")
+            .unwrap_err()
+            .contains("expects a function"));
+    }
     #[test]
     fn promise_continuations_preserve_registration_order_and_late_delivery() {
         let promise = core::Promise::new();
