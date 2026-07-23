@@ -837,6 +837,7 @@ fn collection_get(value: &Value, key: &Value, default: Value) -> Result<Value, S
         Value::List(values) => { let index = value_index(key)?; Ok(values.get(index).cloned().unwrap_or(default)) }
         Value::String(text) => { let index = value_index(key)?; Ok(text.chars().nth(index).map(|c| Value::String(c.to_string())).unwrap_or(default)) }
         Value::Map(entries) => Ok(entries.iter().find(|(candidate, _)| candidate == key).map(|(_, value)| value.clone()).unwrap_or(default)),
+        Value::Object(entries) => { let name=match key { Value::String(name) | Value::Keyword(name) => name, _ => return Ok(default) }; Ok(entries.borrow().iter().find(|(candidate, _)| candidate==name).map(|(_, value)| value.clone()).unwrap_or(default)) }
         _ => Err("get expects a collection".into()),
     }
 }

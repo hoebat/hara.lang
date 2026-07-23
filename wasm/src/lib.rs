@@ -634,6 +634,8 @@ mod tests {
     fn nested_associative_helpers_match_l0_shapes() {
         let mut runtime = Runtime::new();
         assert_eq!(runtime.eval_text("(get-in {:a {:b 42}} [:a :b])").unwrap(), "42");
+        assert_eq!(runtime.eval_text("(get-in (object :a (object :b 42)) [:a :b])").unwrap(), "42");
+        assert_eq!(runtime.eval_text("(get (object :a 7) :a)").unwrap(), "7");
         assert_eq!(runtime.eval_text("(get-in {:a {:b 42}} [:a :missing])").unwrap(), "nil");
         assert_eq!(runtime.eval_text("(get-in (assoc-in {} [:a :b] 42) [:a :b])").unwrap(), "42");
         assert_eq!(runtime.eval_text("(get {:a 3} :a)").unwrap(), "3");
