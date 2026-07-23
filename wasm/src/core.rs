@@ -969,6 +969,10 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 let (params, variadic) = function_parts(&fs[1])?;
                 Ok(Value::Function(Rc::new(Function { params, variadic, body: fs[2..].to_vec(), captured: Rc::new(RefCell::new(env.clone())) })))
             }
+            Form::Symbol(n) if n == "def" => {
+                if fs.len()!=3 { return Err("def expects a name and value".into()); }
+                let name=match &fs[1] { Form::Symbol(name)=>name.clone(), _=>return Err("def name must be a symbol".into()) }; let value=eval(&fs[2], env)?; env.insert(name, value.clone()); Ok(value)
+            }
             Form::Symbol(n) if n == "defn" => {
                 if fs.len() < 4 { return Err("defn expects a name, parameters, and a body".into()); }
                 let name = match &fs[1] { Form::Symbol(name) => name.clone(), _ => return Err("defn name must be a symbol".into()) };

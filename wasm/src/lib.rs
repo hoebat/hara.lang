@@ -541,6 +541,14 @@ mod tests {
     }
 
     #[test]
+    fn def_binds_values_in_the_current_environment() {
+        let mut runtime = Runtime::new();
+        assert_eq!(runtime.eval_text("(do (def answer 41) (+ answer 1))").unwrap(), "42");
+        assert_eq!(runtime.eval_text("(do (def answer 1) (def answer 42) answer)").unwrap(), "42");
+        assert!(runtime.eval_text("(def 1 2)").unwrap_err().contains("def name must be a symbol"));
+    }
+
+    #[test]
     fn functions_capture_lexical_values_and_support_defn() {
         let mut runtime = Runtime::new();
         assert_eq!(runtime.eval_text("((fn [x] (+ x 1)) 41)").unwrap(), "42");
