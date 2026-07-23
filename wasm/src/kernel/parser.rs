@@ -237,6 +237,76 @@ impl<'a> Parser<'a> {
     }
     fn dispatch(&mut self) -> Result<Option<(Form, Vec<SpannedForm>)>> {
         match self.reader.read_char() {
+            Some('(') => {
+                let children = self.delimited(')', "anonymous function")?;
+                let body = children.iter().map(|child| child.form.clone()).collect();
+                let form = Form::List(vec![
+                    Form::Symbol("fn*".into()),
+                    Form::List(Vec::new()),
+                    Form::List(body),
+                ]);
+                Ok(Some((form, children)))
+            }
+            Some(':') => {
+                let namespace = self.read_required("namespaced map namespace")?;
+                let namespace_name = match &namespace.form {
+                    Form::Symbol(name) | Form::Keyword(name) if !name.is_empty() => {
+                        name.rsplit('/').next().unwrap_or(name).to_owned()
+                    }
+                    _ => return self.error("Namespaced map expects a namespace name"),
+                };
+                let map = self.read_required("namespaced map")?;
+                let Form::Map(entries) = &map.form else {
+                    return self.error("Namespaced map expects a map");
+                };
+                let qualified = entries
+                    .iter()
+                    .map(|(key, value)| {
+                        let key = match key {
+                            Form::Keyword(name) if !name.contains('/') => {
+                                Form::Keyword(format!("{namespace_name}/{name}"))
+                            }
+                            key => key.clone(),
+                        };
+                        (key, value.clone())
+                    })
+                    .collect();
+                Ok(Some((Form::Map(qualified), vec![namespace, map])))
+            }
+            Some('=') => {
+                let (form, children) = self.prefixed("eval")?;
+                Ok(Some((form, children)))
+            }
+            Some('?') => {
+                let splice = if self.reader.peek_char() == Some('@') {
+                    self.reader.read_char();
+                    true
+                } else {
+                    false
+                };
+                let selection = self.read_required("reader conditional")?;
+                let Form::List(values) = &selection.form else {
+                    return self.error("Reader conditional expects a list");
+                };
+                if values.len() % 2 != 0 {
+                    return self.error("Reader conditional requires feature/value pairs");
+                }
+                let entries = values
+                    .chunks(2)
+                    .map(|pair| (pair[0].clone(), pair[1].clone()))
+                    .collect::<Vec<_>>();
+                if entries
+                    .iter()
+                    .enumerate()
+                    .any(|(index, (key, _))| entries[..index].iter().any(|(prior, _)| prior == key))
+                {
+                    return self.error("Duplicate reader conditional feature");
+                }
+                let symbol = if splice { "?-splicing" } else { "?" };
+                let form = Form::List(vec![Form::Symbol(symbol.into()), Form::Map(entries)]);
+                Ok(Some((form, vec![selection])))
+            }
+            Some('|') => Ok(None),
             Some('{') => {
                 let children = self.delimited('}', "set")?;
                 let forms = children
@@ -285,7 +355,12 @@ impl<'a> Parser<'a> {
                 };
                 Ok(Some((form, vec![value])))
             }
-            Some('[') => self.error("No dispatch macro for: ["),
+            Some('[') => {
+                let children = self.delimited(']', "root")?;
+                let mut forms = vec![Form::Symbol("do".into())];
+                forms.extend(children.iter().map(|child| child.form.clone()));
+                Ok(Some((Form::List(forms), children)))
+            }
             Some(ch) => {
                 if !ch.is_alphabetic() {
                     return self.error(format!("No dispatch macro for: {ch}"));
