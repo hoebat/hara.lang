@@ -1,4 +1,4 @@
-package hara.core.block;
+package hara.lang.block;
 
 import hara.kernel.base.Reader;
 import hara.lang.data.Vector;

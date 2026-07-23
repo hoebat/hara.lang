@@ -734,7 +734,7 @@ mod tests {
         assert!(registry.contains("IIdentity", "identity"));
         assert_eq!(registry.invoke("IIdentity", "identity", &[core::Value::Number(7)]).unwrap(), core::Value::Number(7));
         assert!(registry.invoke("IIdentity", "missing", &[]).unwrap_err().contains("missing protocol method"));
-        assert_eq!(core::receiver_category(&core::Value::Vector(im_rc::Vector::new())), "vector");
+        assert_eq!(core::receiver_category(&core::Value::Vector(Vec::new())), "vector");
     }
 
     #[test]
@@ -891,6 +891,13 @@ mod tests {
         assert_eq!(runtime.eval_text("(get (assoc {} :a 1 :b 2) :b)").unwrap(), "2");
     }
 
+    #[test]
+    fn opaque_extensions_use_compact_tagged_display() {
+        let value = core::Value::Extension(core::ExtensionValue {
+            provider: "math.tensor".into(), type_name: "tensor".into(), handle: 42,
+        });
+        assert_eq!(value.display(), "#ht[:handle 42]");
+    }
     #[test]
     fn iterator_combinators_cover_core_shapes() {
         let mut runtime = Runtime::new();

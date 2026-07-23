@@ -10,6 +10,8 @@ public final class HtaHandle implements AutoCloseable {
   private final long id;
   private final AtomicBoolean released = new AtomicBoolean();
   private volatile HaraWasmExtension extension;
+  private volatile String displayTag = "ht";
+  private volatile String displayKind = "handle";
 
   HtaHandle(String owner, String type, long id) {
     this.owner = Objects.requireNonNull(owner);
@@ -41,6 +43,12 @@ public final class HtaHandle implements AutoCloseable {
     return this;
   }
 
+  HtaHandle displayAs(String tag, String kind) {
+    displayTag = Objects.requireNonNull(tag);
+    displayKind = Objects.requireNonNull(kind);
+    return this;
+  }
+
   void requireUsable(HaraWasmExtension expected) {
     if (released()) throw new HaraException("hta/handle-released: " + owner + ":" + id);
     requireOwner(expected);
@@ -60,6 +68,6 @@ public final class HtaHandle implements AutoCloseable {
 
   @Override
   public String toString() {
-    return "#<hta-handle " + owner + "/" + type + "#" + Long.toUnsignedString(id) + ">";
+    return "#" + displayTag + "[:" + displayKind + " " + Long.toUnsignedString(id) + "]";
   }
 }

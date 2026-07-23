@@ -233,6 +233,16 @@ public class ParserTest {
   }
 
   @Test
+  public void taggedHandleSyntaxReadsAsInertData() {
+    Object result = Parser.LispReader.readString("#math[:tensor 42]", null);
+    assertTrue(result instanceof TaggedLiteral);
+    TaggedLiteral tagged = (TaggedLiteral) result;
+    assertEquals(Symbol.create("math"), tagged.tag());
+    assertEquals("#math[:tensor 42]", tagged.display());
+    assertEquals(result, Parser.LispReader.readString(tagged.display(), null));
+  }
+
+  @Test
   public void testVarQuoteReader() {
     Object result = Parser.LispReader.readString("#'a", null);
     assertTrue(result instanceof List);

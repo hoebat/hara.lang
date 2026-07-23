@@ -1,4 +1,4 @@
-package hara.core.block;
+package hara.lang.block;
 
 import hara.lang.data.Vector;
 import hara.lang.protocol.IMetadata;

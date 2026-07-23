@@ -1,4 +1,4 @@
-package hara.core.zip;
+package hara.lang.zip;
 
 public interface IZipHandler {
   Zipper onStepAtLeftMost(Zipper zipper);

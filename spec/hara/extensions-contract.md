@@ -43,8 +43,31 @@ An extension package contains a `hara.extension.edn` manifest beside its provide
 ```
 
 The portable fields are `namespace`, `version`, `provider`, `module`, `abi`, `exports`,
-`capabilities`, and the optional `host-calls` allowlist. The manifest is metadata, not executable
-Hara code. Extension namespaces are runtime-generated namespaces, not `.hal` source files.
+`capabilities`, and the optional `host-calls` and `handles` maps. Public handle tags are declared by
+wire type:
+
+```clojure
+:handles {"tensor" {:tag math}}
+```
+
+Registered handles print compactly as `#math[:tensor 42]`. An unregistered handle uses the
+provider-neutral fallback `#ht[:handle 42]`; the transport owner and type remain available
+internally for ownership checks and diagnostics. Reading either tagged form creates inert data,
+not a live capability, so source text cannot forge a provider-owned handle.
+
+Browser hosts can load the same EDN descriptor and resolve its sibling WASM module directly:
+
+```javascript
+const context = await loadHtaExtension({
+  worker: new Worker("./hta-worker.js", {type: "module"}),
+  descriptorUrl: new URL("./hara.extension.edn", import.meta.url).toString()
+});
+```
+
+The loader validates `:provider`, `:module`, `:abi`, and `:handles` before starting the worker.
+
+The manifest is metadata, not executable Hara code. Extension namespaces are runtime-generated
+namespaces, not `.hal` source files.
 
 ## Provider lifecycle
 

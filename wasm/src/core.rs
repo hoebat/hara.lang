@@ -1,6 +1,6 @@
 use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
-use im_rc::Vector as PVector;
+
 use std::rc::Rc;
 use std::hash::{Hash, Hasher};
 
@@ -41,10 +41,10 @@ pub enum Value {
     Recur(Vec<Value>),
     Map(Vec<(Value, Value)>),
     Set(Vec<Value>),
-    List(PVector<Value>),
+    List(Vec<Value>),
     Symbol(String),
     Function(Rc<Function>),
-    Vector(PVector<Value>),
+    Vector(Vec<Value>),
     Iterator(Rc<RefCell<IteratorState>>),
     Var(Rc<RefCell<Value>>),
     Extension(ExtensionValue),
@@ -885,12 +885,12 @@ fn protocol_find(arguments: &[Value]) -> Result<Value, String> {
     let key = &arguments[1];
     match collection {
         Value::Map(values) => Ok(values.iter().find(|(candidate, _)| candidate == key)
-            .map(|(candidate, value)| Value::Vector(PVector::from_iter([candidate.clone(), value.clone()])))
+            .map(|(candidate, value)| Value::Vector(Vec::from_iter([candidate.clone(), value.clone()])))
             .unwrap_or(Value::Nil)),
         Value::Object(values) => {
             let key = match key { Value::String(value) | Value::Keyword(value) => value, _ => return Err("IFind/find object expects a string or keyword key".into()) };
             Ok(values.borrow().iter().find(|(candidate, _)| candidate == key)
-                .map(|(candidate, value)| Value::Vector(PVector::from_iter([Value::String(candidate.clone()), value.clone()])))
+                .map(|(candidate, value)| Value::Vector(Vec::from_iter([Value::String(candidate.clone()), value.clone()])))
                 .unwrap_or(Value::Nil))
         }
         Value::Set(values) => values.iter().find(|candidate| *candidate == key)
@@ -898,7 +898,7 @@ fn protocol_find(arguments: &[Value]) -> Result<Value, String> {
         Value::Vector(values) | Value::List(values) => {
             let index = value_index(key)?;
             Ok(values.get(index)
-                .map(|value| Value::Vector(PVector::from_iter([Value::Number(index as i64), value.clone()])))
+                .map(|value| Value::Vector(Vec::from_iter([Value::Number(index as i64), value.clone()])))
                 .unwrap_or(Value::Nil))
         }
         _ => Err("IFind/find has no implementation for this value".into()),
@@ -932,8 +932,8 @@ fn protocol_conj(arguments: &[Value]) -> Result<Value, String> {
     let collection = &arguments[0];
     let item = &arguments[1];
     match collection {
-        Value::Vector(values) => { let mut output = values.clone(); output.push_back(item.clone()); Ok(Value::Vector(output)) }
-        Value::List(values) => { let mut output = values.clone(); output.push_front(item.clone()); Ok(Value::List(output)) }
+        Value::Vector(values) => { let mut output = values.clone(); output.push(item.clone()); Ok(Value::Vector(output)) }
+        Value::List(values) => { let mut output = values.clone(); output.insert(0, item.clone()); Ok(Value::List(output)) }
         Value::Set(values) => { let mut output = values.clone(); output.push(item.clone()); Ok(Value::Set(output)) }
         Value::Map(values) => {
             let entry = match item { Value::Vector(entry) | Value::List(entry) if entry.len() == 2 => entry, _ => return Err("IConj/conj map expects a two-element entry".into()) };
@@ -1023,7 +1023,7 @@ fn dot_call(receiver: Value, method: &Form, env: &mut HashMap<String, Value>) ->
             "delete" => { if args.len()!=1 { return Err("object/delete expects a key".into()); } let key=marker_key(&args[0], "object/delete")?; object.borrow_mut().retain(|(candidate, _)| candidate != &key); Ok(Value::Object(object)) }
             "keys" => { if !args.is_empty() { return Err("object/keys expects no arguments".into()); } Ok(Value::Vector(object.borrow().iter().map(|(key, _)| Value::String(key.clone())).collect())) }
             "vals" => { if !args.is_empty() { return Err("object/vals expects no arguments".into()); } Ok(Value::Vector(object.borrow().iter().map(|(_, value)| value.clone()).collect())) }
-            "pairs" => { if !args.is_empty() { return Err("object/pairs expects no arguments".into()); } Ok(Value::Vector(object.borrow().iter().map(|(key, value)| Value::Vector(PVector::from_iter([Value::String(key.clone()), value.clone()]))).collect())) }
+            "pairs" => { if !args.is_empty() { return Err("object/pairs expects no arguments".into()); } Ok(Value::Vector(object.borrow().iter().map(|(key, value)| Value::Vector(Vec::from_iter([Value::String(key.clone()), value.clone()]))).collect())) }
             "assign" => { if args.len()!=1 { return Err("object/assign expects an object".into()); } let other=match &args[0] { Value::Object(other) => other.clone(), _ => return Err("object/assign expects an object".into()) }; let mut values=object.borrow_mut(); for (key,value) in other.borrow().iter() { if let Some((_, existing))=values.iter_mut().find(|(candidate, _)| candidate==key) { *existing=value.clone(); } else { values.push((key.clone(),value.clone())); } } drop(values); Ok(Value::Object(object)) }
             "clone" => Ok(Value::Object(Rc::new(RefCell::new(object.borrow().clone())))),
             _ => Err(format!("unsupported object method: {name}")),
@@ -1081,8 +1081,8 @@ fn iterator_values(value: Value) -> Result<Vec<Value>, String> {
         Value::Bytes(bytes) => Ok(bytes.into_iter().map(|byte| Value::Number(byte as i8 as i64)).collect()),
         Value::ByteBuffer(bytes) => Ok(bytes.borrow().iter().map(|byte| Value::Number(*byte as i8 as i64)).collect()),
         Value::Array(values) => Ok(values.borrow().clone()),
-        Value::Object(values) => Ok(values.borrow().iter().map(|(key, value)| Value::Vector(PVector::from_iter([Value::String(key.clone()), value.clone()]))).collect()),
-        Value::Map(entries) => Ok(entries.into_iter().map(|(key, value)| Value::Vector(PVector::from_iter([key, value]))).collect()),
+        Value::Object(values) => Ok(values.borrow().iter().map(|(key, value)| Value::Vector(Vec::from_iter([Value::String(key.clone()), value.clone()]))).collect()),
+        Value::Map(entries) => Ok(entries.into_iter().map(|(key, value)| Value::Vector(Vec::from_iter([key, value]))).collect()),
         Value::Set(values) => Ok(values),
         Value::Iterator(iterator) => {
             let mut state = iterator.borrow_mut();
@@ -1860,8 +1860,8 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 if fs.len() != 3 { return Err("conj expects two arguments".into()); }
                 let collection = eval(&fs[1], env)?; let item = eval(&fs[2], env)?;
                 match collection {
-                    Value::Vector(mut values) => { values.push_back(item); Ok(Value::Vector(values)) },
-                    Value::List(mut values) => { values.push_front(item); Ok(Value::List(values)) },
+                    Value::Vector(mut values) => { values.push(item); Ok(Value::Vector(values)) },
+                    Value::List(mut values) => { values.insert(0, item); Ok(Value::List(values)) },
                     Value::Set(mut values) => { if !values.contains(&item) { values.push(item); } Ok(Value::Set(values)) },
                     Value::Map(mut values) => {
                         let entry = match item {
@@ -1881,7 +1881,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
             Form::Symbol(n) if n == "cons" => {
                 if fs.len() != 3 { return Err("cons expects two arguments".into()); }
                 let item = eval(&fs[1], env)?; let collection = eval(&fs[2], env)?;
-                match collection { Value::Vector(mut values) => { values.push_front(item); Ok(Value::Vector(values)) }, Value::List(mut values) => { values.push_front(item); Ok(Value::List(values)) }, _ => Err("cons expects a vector".into()) }
+                match collection { Value::Vector(mut values) => { values.insert(0, item); Ok(Value::Vector(values)) }, Value::List(mut values) => { values.insert(0, item); Ok(Value::List(values)) }, _ => Err("cons expects a vector".into()) }
             }
             Form::Symbol(n) if n == "recur" => {
                 if fs.len() < 2 { return Err("recur expects values".into()); }

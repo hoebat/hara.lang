@@ -375,6 +375,8 @@ final class HaraWasmExtension implements AutoCloseable {
   private Object bindHandles(Object value) {
     if (value instanceof HtaHandle) {
       HtaHandle handle = ((HtaHandle) value).bind(this);
+      String tag = manifest.handleTag(handle.type());
+      if (tag != null) handle.displayAs(tag, handle.type());
       handles.add(handle);
       return handle;
     }

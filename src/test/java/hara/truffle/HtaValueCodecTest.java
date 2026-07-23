@@ -50,6 +50,9 @@ public class HtaValueCodecTest {
     assertEquals("runtime", decoded.owner());
     assertEquals("cursor", decoded.type());
     assertEquals(42L, decoded.id());
+    assertEquals("#ht[:handle 42]", decoded.toString());
+    decoded.displayAs("math", "tensor");
+    assertEquals("#math[:tensor 42]", decoded.toString());
     decoded.close();
     assertThrows(HaraException.class, () -> HtaValueCodec.encode(decoded));
   }

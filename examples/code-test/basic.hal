@@ -1,0 +1,13 @@
+; A small code.test example.
+; Facts register test bodies; code.test/run! executes them and returns results.
+
+(fact "adds numbers"
+  (+ 2 3) => 5)
+
+(fact "counts collections"
+  (count ["hara" "truffle" "test"]) => 3)
+
+(fact "checks map lookup"
+  (get {:status :ready} :status) => :ready)
+
+(code.test/run!)

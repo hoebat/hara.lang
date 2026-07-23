@@ -27,6 +27,11 @@ import hara.lang.protocol.IDerefTimeout;
 import hara.lang.protocol.IDisplay;
 import hara.lang.protocol.ICount;
 import hara.lang.protocol.INth;
+import hara.lang.block.Parser;
+import hara.lang.zip.Zip;
+import hara.lang.zip.Zipper;
+import hara.lang.test.HaraTestRegistry;
+import hara.lang.test.HaraTestResult;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -58,7 +63,11 @@ public final class HaraContext {
           "promise", "hara.lib.promise",
           "bytes", "hara.lib.bytes",
           "socket", "hara.lib.socket",
-          "file", "hara.lib.file");
+          "file", "hara.lib.file",
+          "block", "std.block",
+          "zip", "std.lib.zip");
+  private static final Map<String, String> PORTABLE_LIBRARY_RESOURCES =
+      Map.of("std.block", "std/block.hal", "std.lib.zip", "std/lib/zip.hal");
   private static final Map<String, String> DEFAULT_LIBRARY_ALIASES =
       Map.of(
           "string", "str",
@@ -105,6 +114,7 @@ public final class HaraContext {
   private final Deque<String> loadingStack = new ArrayDeque<>();
   private volatile HaraNamespace currentNamespace;
   private final HaraProtocol ifnProtocol;
+  private final HaraTestRegistry testRegistry = new HaraTestRegistry();
 
   HaraContext(TruffleLanguage.Env environment) {
     this.environment = environment;
@@ -117,6 +127,7 @@ public final class HaraContext {
     installNumericBuiltins(currentNamespace);
     installCoreBuiltins(namespace(CORE_NAMESPACE));
     installGeneratedLibraries();
+    installTestLibrary();
     installNativeLibraries();
     currentNamespace = namespace("user");
     initializeUserNamespace(currentNamespace);
@@ -357,7 +368,7 @@ public final class HaraContext {
 
   private void applyGeneratedRequire(Object specValue, Map<String, String> namespaceAliases) {
     if (!(specValue instanceof ILinearType<?>)) {
-      throw new HaraException(":require expects vectors such as [hara.lib.string :as str]");
+      throw new HaraException(":require expects vectors such as [std.lib.string :as str]");
     }
     ILinearType<?> spec = (ILinearType<?>) specValue;
     if (spec.count() == 0 || !(spec.nth(0) instanceof Symbol)) {
@@ -401,9 +412,59 @@ public final class HaraContext {
   private synchronized HaraNamespace requiredNamespace(String target) {
     HaraNamespace existing = namespaces.get(target);
     if (existing != null) return existing;
+    if (PORTABLE_LIBRARY_RESOURCES.containsKey(target)) {
+      if (supportsJavaLibrary(target)) return installJavaLibrary(target);
+      loadResource(PORTABLE_LIBRARY_RESOURCES.get(target));
+      return namespaces.get(target);
+    }
     HaraExtensionPackage extensionPackage = extensionRegistry.discover(target);
     if (extensionPackage == null) return null;
     return installExtension(extensionPackage);
+  }
+
+  /**
+   * Java implementations are an optional optimization; portable Hara resources are the fallback.
+   */
+  private boolean supportsJavaLibrary(String namespaceName) {
+    return !Boolean.getBoolean("hara.disable.java." + namespaceName);
+  }
+
+  private HaraNamespace installJavaLibrary(String namespaceName) {
+    HaraNamespace target = namespace(namespaceName);
+    if ("std.block".equals(namespaceName)) {
+      target.define(
+          "parse",
+          new UnaryBuiltin(
+              "std.block/parse",
+              value -> Parser.parseString(String.valueOf(HaraBox.unwrap(value)))));
+      target.define(
+          "parse-root",
+          new UnaryBuiltin(
+              "std.block/parse-root",
+              value -> Parser.parseRoot(String.valueOf(HaraBox.unwrap(value)))));
+    } else if ("std.lib.zip".equals(namespaceName)) {
+      target.define(
+          "zipper",
+          new UnaryBuiltin("std.lib.zip/zipper", value -> Zip.zipper(HaraBox.unwrap(value))));
+      target.define(
+          "step-left",
+          new UnaryBuiltin(
+              "std.lib.zip/step-left", value -> Zip.stepLeft((Zipper) HaraBox.unwrap(value))));
+      target.define(
+          "step-right",
+          new UnaryBuiltin(
+              "std.lib.zip/step-right", value -> Zip.stepRight((Zipper) HaraBox.unwrap(value))));
+      target.define(
+          "step-inside",
+          new UnaryBuiltin(
+              "std.lib.zip/step-inside", value -> Zip.stepInside((Zipper) HaraBox.unwrap(value))));
+      target.define(
+          "step-outside",
+          new UnaryBuiltin(
+              "std.lib.zip/step-outside",
+              value -> Zip.stepOutside((Zipper) HaraBox.unwrap(value))));
+    }
+    return target;
   }
 
   private HaraNamespace installExtension(HaraExtensionPackage extensionPackage) {
@@ -631,7 +692,10 @@ public final class HaraContext {
     String namespace = symbol.getNamespace();
     String namespaceName = namespace == null ? currentNamespace.name() : namespace;
     Map<String, HaraMacro> namespaceMacros = macros.get(namespaceName);
-    return namespaceMacros == null ? null : namespaceMacros.get(symbol.getName());
+    HaraMacro macro = namespaceMacros == null ? null : namespaceMacros.get(symbol.getName());
+    if (macro != null || INTRINSIC_NAMESPACE.equals(namespaceName)) return macro;
+    Map<String, HaraMacro> intrinsicMacros = macros.get(INTRINSIC_NAMESPACE);
+    return intrinsicMacros == null ? null : intrinsicMacros.get(symbol.getName());
   }
 
   void defineMacro(Symbol symbol, HaraMacro macro) {
@@ -776,6 +840,96 @@ public final class HaraContext {
         "pop",
         new UnaryBuiltin(
             "pop", value -> protocolCall("INavigation", "pop-first", new Object[] {value})));
+  }
+
+  private void installTestLibrary() {
+    HaraNamespace tests = namespace("code.test");
+    tests.define(
+        "register!",
+        new VariadicBuiltin(
+            "code.test/register!",
+            values -> {
+              if (values.length != 2 || !(values[1] instanceof HaraFunction)) {
+                throw new HaraException("code.test/register! expects a name and function");
+              }
+              testRegistry.register(currentNamespace.name(), String.valueOf(values[0]), null, (HaraFunction) values[1]);
+              return null;
+            }));
+    tests.define(
+        "run!",
+        new VariadicBuiltin(
+            "code.test/run!",
+            values -> {
+              ArrayList<Object> results = new ArrayList<>();
+              for (HaraTestResult result : testRegistry.runAll()) {
+                results.add(
+                    Map.of(
+                        "status", result.status().name(),
+                        "name", result.test().name(),
+                        "elapsed", result.elapsedMillis()));
+              }
+              return results;
+            }));
+    tests.define(
+        "assert!",
+        new VariadicBuiltin(
+            "code.test/assert!",
+            values -> {
+              if (values.length != 2) throw new HaraException("code.test/assert! expects actual and expected");
+              if (!Eq.eq(HaraBox.unwrap(values[0]), HaraBox.unwrap(values[1]))) {
+                throw new HaraException("Assertion failed: expected " + values[1] + ", received " + values[0]);
+              }
+              return true;
+            }));
+    defineMacro(
+        Symbol.create("fact"),
+        HaraMacro.nativeMacro(Symbol.create("fact"), this::expandFact));
+  }
+
+  private Object expandFact(List<?> invocation) {
+    if (invocation.count() < 3) throw new HaraException("fact expects a name and body");
+    Object name = invocation.nth(1);
+    ArrayList<Object> body = new ArrayList<>();
+    for (int i = 2; i < invocation.count(); i++) {
+      Object form = invocation.nth(i);
+      if (i + 2 < invocation.count()
+          && form instanceof Symbol
+          && "=>".equals(((Symbol) form).getName())) {
+        throw new HaraException("fact assertion is missing an actual expression");
+      }
+      if (i + 2 < invocation.count()
+          && invocation.nth(i + 1) instanceof Symbol
+          && "=>".equals(((Symbol) invocation.nth(i + 1)).getName())) {
+        body.add(List.Standard.from(null, Symbol.create("code.test", "assert!"), form, invocation.nth(i + 2)));
+        i += 2;
+      } else {
+        body.add(form);
+      }
+    }
+    Object[] fnBody = new Object[body.size() + 1];
+    fnBody[0] = Symbol.create("fn");
+    fnBody[1] = hara.lang.data.Vector.Standard.EMPTY;
+    if (body.size() == 1) {
+      fnBody = new Object[] {Symbol.create("fn"), hara.lang.data.Vector.Standard.EMPTY, body.get(0)};
+    } else {
+      ArrayList<Object> forms = new ArrayList<>();
+      forms.add(Symbol.create("fn"));
+      forms.add(hara.lang.data.Vector.Standard.EMPTY);
+      forms.add(List.Standard.from(null, prepend(Symbol.create("do"), body)));
+      fnBody = forms.toArray();
+    }
+    return List.Standard.from(
+        null,
+        Symbol.create("code.test", "register!"),
+        name,
+        List.Standard.from(null, fnBody));
+  }
+
+  private static Object[] prepend(Object first, java.util.List<Object> rest) {
+    Object[] values = new Object[rest.size() + 1];
+    values[0] = first;
+    for (int i = 0; i < rest.size(); i++) values[i + 1] = rest.get(i);
+    return values;
   }
 
   private Object conjoin(Object[] values) {
@@ -1828,8 +1982,14 @@ public final class HaraContext {
 
   @TruffleBoundary
   public Object requireModule(Object[] arguments) {
+    if (arguments.length == 1) {
+      Object requestedNamespace = unwrapQuoted(arguments[0]);
+      if (requestedNamespace instanceof Symbol) {
+        return requireNamespace((Symbol) requestedNamespace);
+      }
+    }
     if (arguments.length < 1 || arguments.length > 2 || !(arguments[0] instanceof String)) {
-      throw new HaraException("require expects a path string");
+      throw new HaraException("require expects a path string or namespace symbol");
     }
     String callerNamespace = currentNamespace.name();
     try {
@@ -1877,6 +2037,18 @@ public final class HaraContext {
       currentNamespace = namespace(callerNamespace);
       initializeUserNamespace(currentNamespace);
     }
+  }
+
+  @TruffleBoundary
+  private Object requireNamespace(Symbol symbol) {
+    if (symbol.getNamespace() != null) {
+      throw new HaraException("require expects an unqualified namespace symbol");
+    }
+    String target = symbol.display();
+    if (requiredNamespace(target) == null) {
+      throw new HaraException("Cannot require missing namespace: " + target);
+    }
+    return null;
   }
 
   private void applyRequireOptions(Object options, ModuleRecord module) {

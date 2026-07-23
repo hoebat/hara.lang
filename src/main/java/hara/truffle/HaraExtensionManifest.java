@@ -2,6 +2,7 @@ package hara.truffle;
 
 import hara.kernel.base.Parser;
 import hara.lang.data.Keyword;
+import hara.lang.data.Symbol;
 import hara.lang.data.types.ILinearType;
 import hara.lang.data.types.IMapType;
 import java.util.ArrayList;
@@ -16,6 +17,9 @@ import java.util.regex.Pattern;
 /** Strict metadata for a provider-generated namespace loaded through {@code :require}. */
 public final class HaraExtensionManifest {
   private static final Pattern NAMESPACE = Pattern.compile("[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+");
+  private static final Pattern HANDLE_TAG =
+      Pattern.compile("[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)*");
+  private static final Pattern HANDLE_TYPE = Pattern.compile("[a-z][a-z0-9-]*");
   private static final Set<String> FIELDS =
       Set.of(
           "namespace",
@@ -25,11 +29,13 @@ public final class HaraExtensionManifest {
           "abi",
           "exports",
           "capabilities",
-          "host-calls");
+          "host-calls",
+          "handles");
   private static final Set<String> REQUIRED_FIELDS =
       Set.of("namespace", "version", "provider", "module", "abi", "exports", "capabilities");
   private static final Set<String> EXPORT_FIELDS = Set.of("args", "returns", "async");
 
+  private static final Set<String> HANDLE_FIELDS = Set.of("tag");
   private final String namespace;
   private final String version;
   private final String provider;
@@ -39,6 +45,7 @@ public final class HaraExtensionManifest {
   private final java.util.List<String> capabilities;
   private final Map<String, java.util.List<String>> hostCalls;
 
+  private final Map<String, String> handleTags;
   private HaraExtensionManifest(
       String namespace,
       String version,
@@ -47,7 +54,8 @@ public final class HaraExtensionManifest {
       String abi,
       Map<String, Export> exports,
       java.util.List<String> capabilities,
-      Map<String, java.util.List<String>> hostCalls) {
+      Map<String, java.util.List<String>> hostCalls,
+      Map<String, String> handleTags) {
     this.namespace = namespace;
     this.version = version;
     this.provider = provider;
@@ -60,6 +68,7 @@ public final class HaraExtensionManifest {
         (service, methods) ->
             copiedHostCalls.put(service, Collections.unmodifiableList(new ArrayList<>(methods))));
     this.hostCalls = Collections.unmodifiableMap(copiedHostCalls);
+    this.handleTags = Collections.unmodifiableMap(new LinkedHashMap<>(handleTags));
   }
 
   public static HaraExtensionManifest parse(String source, String origin) {
@@ -89,8 +98,9 @@ public final class HaraExtensionManifest {
         parseKeywords(lookup(map, "capabilities"), origin, "capabilities");
     Map<String, java.util.List<String>> hostCalls =
         parseHostCalls(lookup(map, "host-calls"), origin);
+    Map<String, String> handleTags = parseHandleTags(lookup(map, "handles"), origin);
     return new HaraExtensionManifest(
-        namespace, version, provider, module, abi, exports, capabilities, hostCalls);
+        namespace, version, provider, module, abi, exports, capabilities, hostCalls, handleTags);
   }
 
   public String namespace() {
@@ -125,8 +135,41 @@ public final class HaraExtensionManifest {
     return hostCalls;
   }
 
+  public String handleTag(String type) {
+    return handleTags.get(type);
+  }
+
   public boolean permitsHostCall(String service, String method) {
     return hostCalls.getOrDefault(service, java.util.List.of()).contains(method);
+  }
+
+  private static Map<String, String> parseHandleTags(Object value, String origin) {
+    if (value == null) return Map.of();
+    if (!(value instanceof IMapType<?, ?>)) throw invalid(origin, "handles must be a map");
+    LinkedHashMap<String, String> result = new LinkedHashMap<>();
+    Iterator<?> iterator = ((IMapType<?, ?>) value).iterator();
+    while (iterator.hasNext()) {
+      Map.Entry<?, ?> entry = (Map.Entry<?, ?>) iterator.next();
+      if (!(entry.getKey() instanceof String)
+          || !HANDLE_TYPE.matcher((String) entry.getKey()).matches()) {
+        throw invalid(origin, "handle types must be lower-case strings");
+      }
+      if (!(entry.getValue() instanceof IMapType<?, ?>)) {
+        throw invalid(origin, "handle " + entry.getKey() + " must be a map");
+      }
+      IMapType<?, ?> spec = (IMapType<?, ?>) entry.getValue();
+      rejectUnknownKeys(spec, HANDLE_FIELDS, origin, "handle " + entry.getKey());
+      Object tagValue = lookup(spec, "tag");
+      if (!(tagValue instanceof Symbol) || ((Symbol) tagValue).getNamespace() != null) {
+        throw invalid(origin, "handle tags must be unqualified symbols");
+      }
+      String tag = ((Symbol) tagValue).getName();
+      if (!HANDLE_TAG.matcher(tag).matches()) {
+        throw invalid(origin, "handle tags must be lower-case symbols");
+      }
+      result.put((String) entry.getKey(), tag);
+    }
+    return result;
   }
 
   private static Map<String, java.util.List<String>> parseHostCalls(Object value, String origin) {

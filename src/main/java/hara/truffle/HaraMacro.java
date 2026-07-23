@@ -9,6 +9,7 @@ import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 
 final class HaraMacro {
   private static final int MAX_EXPANSION_CACHE_ENTRIES = 256;
@@ -19,9 +20,15 @@ final class HaraMacro {
   private final Symbol restParameter;
   private final Object[] body;
   private final Map<InvocationKey, Object> expansionCache = new ConcurrentHashMap<>();
+  private final Function<List<?>, Object> nativeExpander;
 
   HaraMacro(Symbol name, ILinearType<?> parameters, Object[] body) {
+    this(name, parameters, body, null);
+  }
+
+  private HaraMacro(Symbol name, ILinearType<?> parameters, Object[] body, Function<List<?>, Object> nativeExpander) {
     this.name = name;
+    this.nativeExpander = nativeExpander;
     ArrayList<Symbol> fixed = new ArrayList<>();
     Symbol variadic = null;
     for (int i = 0; i < parameters.count(); i++) {
@@ -47,7 +54,12 @@ final class HaraMacro {
     this.body = body;
   }
 
+  static HaraMacro nativeMacro(Symbol name, Function<List<?>, Object> expander) {
+    return new HaraMacro(name, Vector.Standard.EMPTY, new Object[0], expander);
+  }
+
   Object expand(List<?> invocation) {
+    if (nativeExpander != null) return nativeExpander.apply(invocation);
     long argumentCount = invocation.count() - 1;
     if (argumentCount < parameters.length
         || (restParameter == null && argumentCount != parameters.length)) {

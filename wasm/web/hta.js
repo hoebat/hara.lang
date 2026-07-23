@@ -5,7 +5,7 @@ const decoder = new TextDecoder("utf-8", { fatal: true });
 
 export class HtaKeyword { constructor(name) { this.name = name; } }
 export class HtaSymbol { constructor(name) { this.name = name; } }
-export class HtaHandle { constructor(owner,type,id,context=null){this.owner=owner;this.type=type;this.id=BigInt(id);this.context=context;this.released=false;} release(){if(this.released)return;this.released=true;if(this.context)this.context.releaseHandle(this);} }
+export class HtaHandle { constructor(owner,type,id,context=null,displayTag="ht",displayKind="handle"){this.owner=owner;this.type=type;this.id=BigInt(id);this.context=context;this.displayTag=displayTag;this.displayKind=displayKind;this.released=false;} release(){if(this.released)return;this.released=true;if(this.context)this.context.releaseHandle(this);} toString(){return `#${this.displayTag}[:${this.displayKind} ${this.id}]`;} }
 
 export function encodeHta(value) {
   const output = [...MAGIC];
@@ -22,6 +22,59 @@ export function decodeHta(input) {
   const value = reader.value();
   if (reader.cursor !== bytes.length) throw new Error("hta/value-malformed: trailing bytes");
   return value;
+}
+
+export function parseHtaManifest(source) {
+  const reader = new ManifestReader(source);
+  const value = reader.value();
+  reader.space();
+  if (reader.cursor !== source.length || !(value instanceof Map)) throw new Error("hta/manifest-malformed: expected one EDN map");
+  const namespace = manifestField(value,"namespace"), provider = manifestField(value,"provider"), module = manifestField(value,"module"), abi = manifestField(value,"abi");
+  if (typeof namespace !== "string" || !/^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$/.test(namespace)) throw new Error("hta/manifest-malformed: invalid namespace");
+  if (!(provider instanceof HtaKeyword) || provider.name !== "wasm") throw new Error("hta/manifest-malformed: provider must be :wasm");
+  if (typeof module !== "string" || module.startsWith("/") || module.includes("..") || !module.endsWith(".wasm")) throw new Error("hta/manifest-malformed: invalid module");
+  if (!(abi instanceof HtaKeyword)) throw new Error("hta/manifest-malformed: abi must be a keyword");
+  const handleTags = {}, handles = manifestField(value,"handles");
+  if (handles !== undefined) {
+    if (!(handles instanceof Map)) throw new Error("hta/manifest-malformed: handles must be a map");
+    for (const [type,spec] of handles) {
+      const tag = spec instanceof Map ? manifestField(spec,"tag") : undefined;
+      if (typeof type !== "string" || !/^[a-z][a-z0-9-]*$/.test(type) || !(tag instanceof HtaSymbol) || !/^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)*$/.test(tag.name)) throw new Error("hta/manifest-malformed: invalid handle tag");
+      handleTags[type] = tag.name;
+    }
+  }
+  return Object.freeze({namespace,module,abi:abi.name,handleTags:Object.freeze(handleTags)});
+}
+
+export async function loadHtaExtension({worker,descriptor,descriptorUrl,packageUrl,moduleBytes,hostCalls={}}) {
+  if (descriptor === undefined) {
+    if (!descriptorUrl) throw new Error("hta/manifest-missing: descriptor or descriptorUrl is required");
+    const response = await fetch(descriptorUrl);
+    if (!response.ok) throw new Error(`hta/manifest-load-failed: ${response.status}`);
+    descriptor = await response.text();
+  }
+  const manifest = parseHtaManifest(descriptor);
+  let moduleUrl;
+  if (moduleBytes === undefined) {
+    const base = packageUrl ?? descriptorUrl;
+    if (!base) throw new Error("hta/manifest-missing: packageUrl is required with inline descriptors");
+    moduleUrl = new URL(manifest.module,base).toString();
+  }
+  const context = new HtaContext({worker,moduleUrl,moduleBytes,hostCalls,handleTags:manifest.handleTags});
+  context.manifest = manifest;
+  return context;
+}
+
+function manifestField(map,name) { for (const [key,value] of map) if (key instanceof HtaKeyword && key.name===name) return value; }
+
+class ManifestReader {
+  constructor(source){this.source=source;this.cursor=0;}
+  space(){while(this.cursor<this.source.length){const ch=this.source[this.cursor];if(/[\s,]/.test(ch)){this.cursor++;continue;}if(ch===';'){while(this.cursor<this.source.length&&this.source[this.cursor]!=='\n')this.cursor++;continue;}break;}}
+  value(){this.space();const ch=this.source[this.cursor++];if(ch===undefined)throw new Error("hta/manifest-malformed: unexpected EOF");if(ch==='{')return this.map();if(ch==='[')return this.vector();if(ch==='\"')return this.string();if(ch===':')return new HtaKeyword(this.token());this.cursor--;const token=this.token();if(token==='nil')return null;if(token==='true')return true;if(token==='false')return false;if(/^-?[0-9]+$/.test(token))return Number(token);return new HtaSymbol(token);}
+  map(){const result=new Map();for(;;){this.space();if(this.source[this.cursor]==='}'){this.cursor++;return result;}const key=this.value();this.space();if(this.source[this.cursor]==='}')throw new Error("hta/manifest-malformed: map value missing");result.set(key,this.value());}}
+  vector(){const result=[];for(;;){this.space();if(this.source[this.cursor]===']'){this.cursor++;return result;}result.push(this.value());}}
+  string(){let result='';while(this.cursor<this.source.length){const ch=this.source[this.cursor++];if(ch==='\"')return result;if(ch==='\\'){const escaped=this.source[this.cursor++];if(escaped==='u'){const code=this.source.slice(this.cursor,this.cursor+4);if(!/^[0-9a-fA-F]{4}$/.test(code))throw new Error("hta/manifest-malformed: invalid unicode escape");result+=String.fromCharCode(parseInt(code,16));this.cursor+=4;}else{const escapes={n:'\n',r:'\r',t:'\t',b:'\b',f:'\f','\"':'\"','\\':'\\'};if(!(escaped in escapes))throw new Error("hta/manifest-malformed: invalid string escape");result+=escapes[escaped];}}else result+=ch;}throw new Error("hta/manifest-malformed: unterminated string");}
+  token(){this.space();const start=this.cursor;while(this.cursor<this.source.length&&!/[\s,{}\[\]\"]/ .test(this.source[this.cursor]))this.cursor++;if(start===this.cursor)throw new Error("hta/manifest-malformed: invalid token");return this.source.slice(start,this.cursor);}
 }
 
 function writeValue(output, value) {
@@ -72,8 +125,8 @@ class Reader {
 }
 
 export class HtaContext {
-  constructor({ worker, moduleUrl, moduleBytes, hostCalls = {} }) {
-    this.worker=worker;this.hostCalls=hostCalls;this.next=1;this.pending=new Map();
+  constructor({ worker, moduleUrl, moduleBytes, hostCalls = {}, handleTags = {} }) {
+    this.worker=worker;this.hostCalls=hostCalls;this.handleTags=handleTags;this.next=1;this.pending=new Map();
     this.ready=new Promise((resolve,reject)=>{this.readyResolve=resolve;this.readyReject=reject;});
     worker.addEventListener("message", event=>this.message(event.data));
     worker.addEventListener("error", error=>this.fail(error));
@@ -93,7 +146,7 @@ export class HtaContext {
   close(){this.worker.postMessage({type:"close"});this.worker.terminate();}
 }
 
-function bindHandles(value,context){if(value instanceof HtaHandle){value.context=context;return value;}if(Array.isArray(value)){value.forEach(item=>bindHandles(item,context));}else if(value instanceof Set){for(const item of value)bindHandles(item,context);}else if(value instanceof Map){for(const [key,item]of value){bindHandles(key,context);bindHandles(item,context);}}return value;}
+function bindHandles(value,context){if(value instanceof HtaHandle){value.context=context;const tag=context.handleTags[value.type];if(tag){value.displayTag=tag;value.displayKind=value.type;}return value;}if(Array.isArray(value)){value.forEach(item=>bindHandles(item,context));}else if(value instanceof Set){for(const item of value)bindHandles(item,context);}else if(value instanceof Map){for(const [key,item]of value){bindHandles(key,context);bindHandles(item,context);}}return value;}
 function validateHandles(value,context){if(value instanceof HtaHandle){if(value.released)throw new Error("hta/handle-released");if(value.context!==context)throw new Error("hta/handle-owner-mismatch");return;}if(Array.isArray(value)){value.forEach(item=>validateHandles(item,context));}else if(value instanceof Set){for(const item of value)validateHandles(item,context);}else if(value instanceof Map){for(const [key,item]of value){validateHandles(key,context);validateHandles(item,context);}}}
 function errorValue(error){return new Map([[new HtaKeyword("code"),new HtaKeyword("host/error")],[new HtaKeyword("message"),String(error?.message??error)],[new HtaKeyword("origin"),new HtaKeyword("browser")],[new HtaKeyword("retryable"),false]]);}
 function errorFrom(value){if(value instanceof Error)return value;if(value instanceof Map){for(const[key,item]of value)if(key instanceof HtaKeyword&&key.name==="message")return new Error(String(item));}return new Error(String(value));}

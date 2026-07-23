@@ -586,10 +586,15 @@ public interface Parser {
         if (ch == -1) throw new Ex.Runtime("EOF while reading character");
         BiFunction fn = dispatchMacros[ch];
 
-        if (fn == null) {
+        if (fn != null) return fn.apply(r, opts);
+        if (!Character.isLetter(ch))
           throw new Ex.Runtime(String.format("No dispatch macro for: %c", (char) ch));
-        }
-        return fn.apply(r, opts);
+
+        String token = readToken(r, (char) ch, true);
+        Object tag = matchSymbol(token);
+        if (!(tag instanceof Symbol)) throw new Ex.Runtime("Invalid reader tag: " + token);
+        Object form = read(r, true, null, true, opts);
+        return new TaggedLiteral((Symbol) tag, form);
       }
     }
 

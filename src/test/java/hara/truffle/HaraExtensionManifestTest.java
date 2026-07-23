@@ -28,6 +28,23 @@ public class HaraExtensionManifestTest {
   }
 
   @Test
+  public void parsesCompactPublicHandleTags() {
+    String source =
+        "{:namespace \"math.tensor\" :version \"1\" :provider :wasm "
+            + ":module \"tensor.wasm\" :abi :hta-v1 "
+            + ":exports {\"open\" {:args [] :returns :value :async true}} "
+            + ":handles {\"tensor\" {:tag math}} :capabilities []}";
+    HaraExtensionManifest manifest = HaraExtensionManifest.parse(source, "test");
+    assertEquals("math", manifest.handleTag("tensor"));
+    assertEquals(null, manifest.handleTag("buffer"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            HaraExtensionManifest.parse(
+                source.replace(":tag math", ":tag Math"), "test"));
+  }
+
+  @Test
   public void malformedManifestsFailBeforeProviderSelection() {
     String base =
         "{:namespace \"demo.extension\" :version \"1\" :provider :wasm "

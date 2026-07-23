@@ -46,16 +46,123 @@ public final class HaraJavaAdapters {
             "IWatch", Map.of("watch-add", 3, "watch-remove", 2, "watch-list", 1)));
     installNamespaced(context.defineProtocol("INamespaced", Map.of("name", 1, "namespace", 1)));
     installContext(context.defineProtocol("IContext", Map.of("call", -1)));
+    installApplicable(
+        context.defineProtocol(
+            "IApplicable",
+            Map.of("apply-in", 3, "apply-default", 1, "transform-in", 3, "transform-out", 4)));
+    installPointer(
+        context.defineProtocol("IPointer", Map.of("ptr-context", 1, "ptr-keys", 1, "ptr-val", 2)));
+    installSpace(
+        context.defineProtocol(
+            "ISpace",
+            Map.of(
+                "context-set", 4,
+                "context-unset", 2,
+                "context-list", 1,
+                "context-get", 2,
+                "rt-active", 1,
+                "rt-get", 2,
+                "rt-start", 2,
+                "rt-started?", 2,
+                "rt-stopped?", 2,
+                "rt-stop", 2)));
     installInvokeIn(context.defineProtocol("IInvokeIn", Map.of("invoke-in", -1)));
     installRuntime(context.defineProtocol("IHasRuntime", Map.of("runtime", 1)));
     installExceptionInfo(context.defineProtocol("IExInfo", Map.of("data", 1)));
     installMetadataValue(context.defineProtocol("IMetadata", Map.of("metatype", 1)));
     installPair(context.defineProtocol("IPair", Map.of("key", 1, "value", 1)));
     installComponent(context.defineProtocol("IComponent", componentMethods()));
+    installComponentQuery(context.defineProtocol("IComponentQuery", Map.of(
+        "started?", 1, "stopped?", 1, "info", 2, "remote?", 1, "health", 1)));
+    installComponentProps(context.defineProtocol("IComponentProps", Map.of("props", 1)));
+    installComponentOptions(context.defineProtocol("IComponentOptions", Map.of("get-options", 1)));
+    installComponentTrack(context.defineProtocol("IComponentTrack", Map.of("get-track-path", 1)));
   }
 
   public static void installIFn(HaraProtocol protocol) {
     protocol.extend(IFn.class, "invoke", HaraJavaAdapters::invokeFunction);
+  }
+
+  public static void installApplicable(HaraProtocol protocol) {
+    protocol.extend(
+        IApplicable.class,
+        "apply-in",
+        (receiver, arguments) ->
+            ((IApplicable) receiver).applyIn(arguments[0], (Object[]) arguments[1]));
+    protocol.extend(
+        IApplicable.class,
+        "apply-default",
+        (receiver, arguments) -> ((IApplicable) receiver).applyDefault());
+    protocol.extend(
+        IApplicable.class,
+        "transform-in",
+        (receiver, arguments) ->
+            ((IApplicable) receiver).transformIn(arguments[0], (Object[]) arguments[1]));
+    protocol.extend(
+        IApplicable.class,
+        "transform-out",
+        (receiver, arguments) ->
+            ((IApplicable) receiver)
+                .transformOut(arguments[0], (Object[]) arguments[1], arguments[2]));
+  }
+
+  public static void installPointer(HaraProtocol protocol) {
+    protocol.extend(
+        IPointer.class, "ptr-context", (receiver, arguments) -> ((IPointer) receiver).ptrContext());
+    protocol.extend(
+        IPointer.class, "ptr-keys", (receiver, arguments) -> ((IPointer) receiver).ptrKeys());
+    protocol.extend(
+        IPointer.class,
+        "ptr-val",
+        (receiver, arguments) -> ((IPointer) receiver).ptrVal(arguments[0]));
+  }
+
+  public static void installSpace(HaraProtocol protocol) {
+    protocol.extend(
+        ISpace.class,
+        "context-set",
+        (receiver, arguments) -> {
+          ((ISpace) receiver).contextSet(arguments[0], arguments[1], arguments[2]);
+          return receiver;
+        });
+    protocol.extend(
+        ISpace.class,
+        "context-unset",
+        (receiver, arguments) -> {
+          ((ISpace) receiver).contextUnset(arguments[0]);
+          return receiver;
+        });
+    protocol.extend(
+        ISpace.class, "context-list", (receiver, arguments) -> ((ISpace) receiver).contextList());
+    protocol.extend(
+        ISpace.class,
+        "context-get",
+        (receiver, arguments) -> ((ISpace) receiver).contextGet(arguments[0]));
+    protocol.extend(
+        ISpace.class, "rt-active", (receiver, arguments) -> ((ISpace) receiver).activeRuntimes());
+    protocol.extend(
+        ISpace.class,
+        "rt-get",
+        (receiver, arguments) -> ((ISpace) receiver).runtimeGet(arguments[0]));
+    protocol.extend(
+        ISpace.class,
+        "rt-start",
+        (receiver, arguments) -> ((ISpace) receiver).runtimeStart(arguments[0]));
+    protocol.extend(
+        ISpace.class,
+        "rt-started?",
+        (receiver, arguments) -> ((ISpace) receiver).runtimeStarted(arguments[0]));
+    protocol.extend(
+        ISpace.class,
+        "rt-stopped?",
+        (receiver, arguments) -> ((ISpace) receiver).runtimeStopped(arguments[0]));
+    protocol.extend(
+        ISpace.class,
+        "rt-stop",
+        (receiver, arguments) -> {
+          ((ISpace) receiver).runtimeStop(arguments[0]);
+          return receiver;
+        });
   }
 
   /** Invokes an existing Java IFn using the same collection lookup semantics as protocol calls. */
@@ -387,6 +494,26 @@ public final class HaraJavaAdapters {
         IComponent.class, "kill", (receiver, arguments) -> ((IComponent) receiver).kill());
     protocol.extend(
         IComponent.class, "remote?", (receiver, arguments) -> ((IComponent) receiver).isRemote());
+  }
+
+  public static void installComponentQuery(HaraProtocol protocol) {
+    protocol.extend(IComponentQuery.class, "started?", (receiver, arguments) -> ((IComponentQuery) receiver).started());
+    protocol.extend(IComponentQuery.class, "stopped?", (receiver, arguments) -> ((IComponentQuery) receiver).stopped());
+    protocol.extend(IComponentQuery.class, "info", (receiver, arguments) -> ((IComponentQuery) receiver).info(arguments[0]));
+    protocol.extend(IComponentQuery.class, "remote?", (receiver, arguments) -> ((IComponentQuery) receiver).remote());
+    protocol.extend(IComponentQuery.class, "health", (receiver, arguments) -> ((IComponentQuery) receiver).health());
+  }
+
+  public static void installComponentProps(HaraProtocol protocol) {
+    protocol.extend(IComponentProps.class, "props", (receiver, arguments) -> ((IComponentProps) receiver).props());
+  }
+
+  public static void installComponentOptions(HaraProtocol protocol) {
+    protocol.extend(IComponentOptions.class, "get-options", (receiver, arguments) -> ((IComponentOptions) receiver).options());
+  }
+
+  public static void installComponentTrack(HaraProtocol protocol) {
+    protocol.extend(IComponentTrack.class, "get-track-path", (receiver, arguments) -> ((IComponentTrack) receiver).trackPath());
   }
 
   private static Map<String, Integer> metadataMethods() {

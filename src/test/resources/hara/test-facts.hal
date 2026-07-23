@@ -1,0 +1,1 @@
+(fact "runner addition" (+ 2 2) => 4)

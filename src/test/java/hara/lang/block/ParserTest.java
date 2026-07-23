@@ -1,4 +1,4 @@
-package hara.core.block;
+package hara.lang.block;
 
 import org.junit.Test;
 
