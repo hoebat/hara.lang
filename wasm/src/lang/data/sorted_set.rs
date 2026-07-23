@@ -194,6 +194,13 @@ impl<E: Clone + Ord> Mutable<E> {
         self
     }
 }
+impl<E: Clone + Ord> std::ops::Deref for Mutable<E> {
+    type Target = Standard<E>;
+    fn deref(&self) -> &Self::Target {
+        self.check();
+        &self.set
+    }
+}
 impl<E> IMutable for Mutable<E> {}
 impl<E: Clone + Ord> IToPersistent for Mutable<E> {
     type Persistent = Standard<E>;

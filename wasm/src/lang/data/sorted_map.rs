@@ -477,6 +477,13 @@ impl<K: Clone + Ord, V: Clone> Mutable<K, V> {
         self
     }
 }
+impl<K: Clone + Ord, V: Clone> std::ops::Deref for Mutable<K, V> {
+    type Target = Standard<K, V>;
+    fn deref(&self) -> &Self::Target {
+        self.check();
+        &self.map
+    }
+}
 impl<K, V> IMutable for Mutable<K, V> {}
 impl<K: Clone + Ord, V: Clone> IToPersistent for Mutable<K, V> {
     type Persistent = Standard<K, V>;

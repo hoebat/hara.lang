@@ -220,6 +220,13 @@ impl<E: Clone + Eq + Hash> Mutable<E> {
         self
     }
 }
+impl<E: Clone + Eq + Hash> std::ops::Deref for Mutable<E> {
+    type Target = Standard<E>;
+    fn deref(&self) -> &Self::Target {
+        self.check();
+        &self.set
+    }
+}
 impl<E> IMutable for Mutable<E> {}
 impl<E: Clone + Eq + Hash> IToPersistent for Mutable<E> {
     type Persistent = Standard<E>;

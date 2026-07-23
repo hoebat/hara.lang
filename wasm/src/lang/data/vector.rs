@@ -513,6 +513,21 @@ pub struct Mutable<E> {
 }
 
 impl<E: Clone> Mutable<E> {
+    pub fn new() -> Self {
+        Self {
+            editable: Rc::new(Cell::new(true)),
+            values: Vec::new(),
+            metadata: None,
+        }
+    }
+
+    pub fn from_iter(values: impl IntoIterator<Item = E>) -> Self {
+        Self {
+            values: values.into_iter().collect(),
+            ..Self::new()
+        }
+    }
+
     fn from_standard(vector: &Standard<E>) -> Self {
         Self {
             editable: Rc::new(Cell::new(true)),
@@ -528,6 +543,25 @@ impl<E: Clone> Mutable<E> {
         );
     }
 
+    pub fn len(&self) -> usize {
+        self.check_editable();
+        self.values.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn get(&self, index: usize) -> Option<&E> {
+        self.check_editable();
+        self.values.get(index)
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, E> {
+        self.check_editable();
+        self.values.iter()
+    }
+
     pub fn push_last(&mut self, value: E) -> &mut Self {
         self.check_editable();
         self.values.push(value);
@@ -541,6 +575,29 @@ impl<E: Clone> Mutable<E> {
         }
         self.values[index] = value;
         self
+    }
+
+    pub fn pop_last(&mut self) -> Option<E> {
+        self.check_editable();
+        self.values.pop()
+    }
+
+    pub fn empty(&mut self) -> &mut Self {
+        self.check_editable();
+        self.values.clear();
+        self
+    }
+}
+
+impl<E: Clone> Default for Mutable<E> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<E: Clone> FromIterator<E> for Mutable<E> {
+    fn from_iter<T: IntoIterator<Item = E>>(iter: T) -> Self {
+        Self::from_iter(iter)
     }
 }
 
@@ -603,6 +660,27 @@ mod tests {
         let appended = vector.push_last(33);
 
         assert!(vector.shares_root_with(&appended));
+    }
+
+    #[test]
+    fn mutable_vector_matches_java_update_surface() {
+        use super::Mutable;
+        let mut vector = Mutable::from_iter([1, 2, 3]);
+        assert_eq!(vector.len(), 3);
+        assert_eq!(vector.get(1), Some(&2));
+        vector.assoc(1, 5).assoc(3, 4);
+        assert_eq!(vector.iter().copied().collect::<Vec<_>>(), vec![1, 5, 3, 4]);
+        assert_eq!(vector.pop_last(), Some(4));
+        vector.empty();
+        assert!(vector.is_empty());
+        assert_eq!(vector.pop_last(), None);
+    }
+
+    #[test]
+    #[should_panic(expected = "index out of bounds")]
+    fn mutable_vector_rejects_assoc_past_count() {
+        let mut vector = super::Mutable::from_iter([1, 2, 3]);
+        vector.assoc(4, 5);
     }
 
     #[test]
