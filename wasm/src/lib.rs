@@ -1317,6 +1317,72 @@ mod tests {
     }
 
     #[test]
+    fn bytes_and_bits_cover_conversion_copy_and_overflow_boundaries() {
+        let mut runtime = Runtime::new();
+        let cases = [
+            ("(bytes/u8 -128)", "128"),
+            ("(bytes/u8 255)", "255"),
+            ("(bytes/s8 -128)", "-128"),
+            ("(bytes/s8 128)", "-128"),
+            ("(bytes/s8 255)", "-1"),
+            ("(bytes/get (bytes -128 0 127 255) 0)", "128"),
+            ("(bytes/get (bytes -128 0 127 255) 3)", "255"),
+            ("(bytes/slice (bytes 1 2 3) 1)", "(bytes 2 3)"),
+            ("(bytes/slice (bytes 1 2 3) 1 1)", "(bytes)"),
+            (
+                "(let [b (bytes 0)] (count [(bytes/set b 0 255) (bytes/get b 0)]))",
+                "2",
+            ),
+            ("(bit-not -2147483648)", "2147483647"),
+            ("(bit-not 2147483647)", "-2147483648"),
+            ("(bit-and -2147483648 2147483647)", "0"),
+            ("(bit-or -2147483648 1)", "-2147483647"),
+            ("(bit-xor -1 2147483647)", "-2147483648"),
+            ("(bit-shift-left 1 0)", "1"),
+            ("(bit-shift-left 1 31)", "-2147483648"),
+            ("(bit-shift-left 2147483647 1)", "-2"),
+            ("(bit-shift-right -2147483648 31)", "-1"),
+            ("(bit-shift-right 2147483647 31)", "0"),
+            ("(bit-shift-left 2147483648 0)", "-2147483648"),
+        ];
+        for (source, expected) in cases {
+            assert_eq!(runtime.eval_text(source).unwrap(), expected, "{source}");
+        }
+
+        let invalid = [
+            ("(bytes -129)", "range -128..255"),
+            ("(bytes 256)", "range -128..255"),
+            ("(bytes/u8 -129)", "range -128..255"),
+            ("(bytes/s8 256)", "range -128..255"),
+            ("(bytes/get (bytes 1) 1)", "out of bounds"),
+            ("(bytes/set (bytes 1) 1 0)", "out of bounds"),
+            ("(bytes/slice (bytes 1 2) 2 1)", "out of bounds"),
+            ("(bytes/slice (bytes 1 2) 0 3)", "out of bounds"),
+            ("(str/decode (bytes 255))", "invalid UTF-8"),
+            ("(bit-shift-left 1 -1)", "range 0..31"),
+            ("(bit-shift-right 1 32)", "range 0..31"),
+        ];
+        for (source, message) in invalid {
+            assert!(
+                runtime.eval_text(source).unwrap_err().contains(message),
+                "{source}"
+            );
+        }
+
+        assert_eq!(
+            runtime
+                .eval_text("(let [source (bytes 1 2 3) copy (bytes/copy source)] (do (bytes/set copy 0 9) (bytes/get source 0)))")
+                .unwrap(),
+            "1"
+        );
+        assert_eq!(
+            runtime
+                .eval_text("(let [source (bytes 1 2 3) part (bytes/slice source 0 2)] (do (bytes/set part 0 9) (bytes/get source 0)))")
+                .unwrap(),
+            "1"
+        );
+    }
+    #[test]
     fn iterator_aliases_and_combinators_match_core_shapes() {
         let mut runtime = Runtime::new();
         assert_eq!(

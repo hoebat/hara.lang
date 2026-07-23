@@ -419,15 +419,19 @@ impl Value {
                     .collect::<Vec<_>>()
                     .join(" ")
             ),
-            Self::ByteBuffer(values) => format!(
-                "(bytes {})",
-                values
+            Self::ByteBuffer(values) => {
+                let body = values
                     .borrow()
                     .iter()
                     .map(|v| (*v as i8).to_string())
                     .collect::<Vec<_>>()
-                    .join(" ")
-            ),
+                    .join(" ");
+                if body.is_empty() {
+                    "(bytes)".into()
+                } else {
+                    format!("(bytes {body})")
+                }
+            }
             Self::Array(values) => format!(
                 "(array {})",
                 values
@@ -3534,12 +3538,16 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 byte_copy(&eval(&fs[1], env)?)
             }
             Form::Symbol(n) if n == "bytes/slice" => {
-                if fs.len() != 4 {
-                    return Err("bytes/slice expects bytes, start, and end".into());
+                if fs.len() != 3 && fs.len() != 4 {
+                    return Err("bytes/slice expects bytes, start, and optional end".into());
                 }
                 let value = eval(&fs[1], env)?;
                 let start = eval(&fs[2], env)?;
-                let end = eval(&fs[3], env)?;
+                let end = if fs.len() == 4 {
+                    eval(&fs[3], env)?
+                } else {
+                    byte_count(&value)?
+                };
                 byte_slice(&value, &start, &end)
             }
             Form::Symbol(n) if n == "bytes/count" => {
