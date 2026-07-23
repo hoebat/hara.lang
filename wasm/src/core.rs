@@ -6,7 +6,7 @@ pub use crate::kernel::Form;
 use crate::kernel::Var as KernelVar;
 use crate::lang::data::List as PList;
 use crate::lang::data::{
-    Keyword, OrderedMap as PMap, OrderedSet as PSet, Symbol, Vector as PVector,
+    Keyword, OrderedMap as PMap, OrderedSet as PSet, Symbol, Tuple as PTuple, Vector as PVector,
 };
 use crate::lang::data::{Metadata, MetadataValue};
 use crate::lang::protocol::{IDisplay, IMetadata};
@@ -48,6 +48,7 @@ pub enum Value {
     List(PList<Value>),
     Symbol(Symbol),
     Function(Rc<Function>),
+    Tuple(Box<PTuple<Value>>),
     Vector(PVector<Value>),
     Iterator(Rc<RefCell<IteratorState>>),
     Var(KernelVar<Value>),
@@ -284,6 +285,9 @@ impl IteratorState {
                 IteratorGenerator::Map(function, source) => {
                     let value = iterator_next(source)?;
                     match value {
+                        Value::Tuple(values) => {
+                            call_function(function, values.iter().cloned().collect())
+                        }
                         Value::Vector(values) => {
                             call_function(function, values.iter().cloned().collect())
                         }
@@ -404,6 +408,7 @@ impl PartialEq for Value {
             (Value::List(a), Value::List(b)) => a == b,
             (Value::Symbol(a), Value::Symbol(b)) => a == b,
             (Value::Function(a), Value::Function(b)) => Rc::ptr_eq(a, b),
+            (Value::Tuple(a), Value::Tuple(b)) => a == b,
             (Value::Vector(a), Value::Vector(b)) => a == b,
             (Value::Iterator(a), Value::Iterator(b)) => Rc::ptr_eq(a, b),
             (Value::Var(a), Value::Var(b)) => a.same_identity(b),
@@ -518,6 +523,14 @@ impl Value {
             ),
             Self::Symbol(v) => v.as_str().to_owned(),
             Self::Function(_) => "<fn>".into(),
+            Self::Tuple(values) => format!(
+                "[{}]",
+                values
+                    .iter()
+                    .map(Value::display)
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            ),
             Self::Vector(values) => format!(
                 "[{}]",
                 values
@@ -572,6 +585,7 @@ impl Value {
                 Value::Character(_) => 23,
                 Value::Regex(_) => 24,
                 Value::Tagged(_, _) => 25,
+                Value::Tuple(_) => 26,
             };
             type_tag.hash(state);
             match value {
@@ -622,6 +636,7 @@ impl Value {
                     entries.hash(state);
                 }
                 Value::List(v) => v.iter().for_each(|item| hash_value(item, state)),
+                Value::Tuple(v) => v.iter().for_each(|item| hash_value(item, state)),
                 Value::Vector(v) => v.iter().for_each(|item| hash_value(item, state)),
                 Value::Function(v) => Rc::as_ptr(v).hash(state),
                 Value::Iterator(v) => Rc::as_ptr(v).hash(state),
@@ -1256,6 +1271,7 @@ pub fn receiver_category(value: &Value) -> &'static str {
         Value::Promise(_) => "promise",
         Value::Recur(_) => "recur",
         Value::List(_) => "list",
+        Value::Tuple(_) => "tuple",
         Value::Vector(_) => "vector",
         Value::Map(_) => "map",
         Value::Set(_) => "set",
@@ -1399,6 +1415,12 @@ fn value_to_metadata(value: &Value) -> Result<MetadataValue, String> {
         Value::String(value) => Ok(MetadataValue::String(value.clone())),
         Value::Keyword(value) => Ok(MetadataValue::Keyword(value.clone())),
         Value::Symbol(value) => Ok(MetadataValue::Symbol(value.clone())),
+        Value::Tuple(values) => Ok(MetadataValue::Vector(
+            values
+                .iter()
+                .map(value_to_metadata)
+                .collect::<Result<_, _>>()?,
+        )),
         Value::Vector(values) => Ok(MetadataValue::Vector(
             values
                 .iter()
@@ -1469,6 +1491,7 @@ fn metadata_to_value(value: &MetadataValue) -> Result<Value, String> {
 fn value_metadata(value: &Value) -> Option<Rc<Metadata>> {
     match value {
         Value::Symbol(value) => value.meta().cloned(),
+        Value::Tuple(value) => value.meta().cloned(),
         Value::Vector(value) => value.meta().cloned(),
         Value::List(value) => value.meta().cloned(),
         Value::Map(value) => value.meta().cloned(),
@@ -1558,6 +1581,10 @@ fn protocol_dissoc(arguments: &[Value]) -> Result<Value, String> {
 
 fn pair_parts(value: &Value) -> Option<(Value, Value)> {
     match value {
+        Value::Tuple(values) if values.len() >= 2 => Some((
+            values.get(0).unwrap().clone(),
+            values.get(1).unwrap().clone(),
+        )),
         Value::Vector(values) if values.len() >= 2 => Some((values[0].clone(), values[1].clone())),
         Value::List(values) if values.len() >= 2 => Some((values[0].clone(), values[1].clone())),
         _ => None,
@@ -1607,6 +1634,7 @@ fn protocol_find(arguments: &[Value]) -> Result<Value, String> {
                 .unwrap_or(Value::Nil))
         }
         Value::Set(values) => Ok(values.get(key).cloned().unwrap_or(Value::Nil)),
+        Value::Tuple(values) => indexed_find(values.get(value_index(key)?), value_index(key)?),
         Value::Vector(values) => indexed_find(values.get(value_index(key)?), value_index(key)?),
         Value::List(values) => indexed_find(values.get(value_index(key)?), value_index(key)?),
         _ => Err("IFind/find has no implementation for this value".into()),
@@ -1633,6 +1661,9 @@ fn protocol_has(arguments: &[Value]) -> Result<Value, String> {
             _ => false,
         },
         Value::Set(values) => values.contains(key),
+        Value::Tuple(values) => value_index(key)
+            .map(|index| index < values.len())
+            .unwrap_or(false),
         Value::Vector(values) => value_index(key)
             .map(|index| index < values.len())
             .unwrap_or(false),
@@ -1652,6 +1683,14 @@ fn protocol_iter(arguments: &[Value]) -> Result<Value, String> {
     }
 }
 
+fn tuple_push_last(values: &PTuple<Value>, item: Value) -> Result<Value, String> {
+    Ok(Value::Tuple(Box::new(values.push_last(item)?)))
+}
+
+fn tuple_push_first(values: &PTuple<Value>, item: Value) -> Result<Value, String> {
+    Ok(Value::Tuple(Box::new(values.push_first(item)?)))
+}
+
 fn protocol_conj(arguments: &[Value]) -> Result<Value, String> {
     if arguments.len() != 2 {
         return Err("IConj/conj expects a collection and value".into());
@@ -1659,6 +1698,7 @@ fn protocol_conj(arguments: &[Value]) -> Result<Value, String> {
     let collection = &arguments[0];
     let item = &arguments[1];
     match collection {
+        Value::Tuple(values) => tuple_push_last(values, item.clone()),
         Value::Vector(values) => {
             let output = values.push_last(item.clone());
             Ok(Value::Vector(output))
@@ -2356,6 +2396,7 @@ fn byte_set(value: &Value, index: &Value, item: &Value) -> Result<Value, String>
 fn iterator_values(value: Value) -> Result<Vec<Value>, String> {
     match value {
         Value::Nil => Ok(Vec::new()),
+        Value::Tuple(values) => Ok(values.iter().cloned().collect()),
         Value::Vector(values) => Ok(values.iter().cloned().collect()),
         Value::List(values) => Ok(values.iter().cloned().collect()),
         Value::String(text) => Ok(text.chars().map(|c| Value::String(c.to_string())).collect()),
@@ -2412,6 +2453,7 @@ fn make_iterator(value: Value) -> Result<Value, String> {
         | Value::Map(_)
         | Value::Set(_)
         | Value::List(_)
+        | Value::Tuple(_)
         | Value::Vector(_) => Ok(Value::Iterator(Rc::new(RefCell::new(IteratorState::new(
             iterator_values(value)?,
         ))))),
@@ -2785,6 +2827,7 @@ fn collection_count(value: &Value) -> Result<Value, String> {
     let count = match value {
         Value::Nil => 0,
         Value::String(v) => v.chars().count(),
+        Value::Tuple(v) => v.len(),
         Value::Vector(v) => v.len(),
         Value::List(v) => v.len(),
         Value::Map(v) => v.len(),
@@ -2840,6 +2883,10 @@ fn iterator_is_finite(value: &Value) -> bool {
 fn collection_get(value: &Value, key: &Value, default: Value) -> Result<Value, String> {
     match value {
         Value::Nil => Ok(default),
+        Value::Tuple(values) => {
+            let index = value_index(key)?;
+            Ok(values.get(index).cloned().unwrap_or(default))
+        }
         Value::Vector(values) => {
             let index = value_index(key)?;
             Ok(values.get(index).cloned().unwrap_or(default))
@@ -3020,6 +3067,7 @@ fn metadata_from_form(form: &Form) -> Result<Rc<Metadata>, String> {
 fn attach_metadata(value: Value, metadata: Rc<Metadata>) -> Result<Value, String> {
     Ok(match value {
         Value::Symbol(value) => Value::Symbol(value.with_meta(Some(metadata))),
+        Value::Tuple(value) => Value::Tuple(Box::new(value.with_meta(Some(metadata)))),
         Value::Vector(value) => Value::Vector(value.with_meta(Some(metadata))),
         Value::List(value) => Value::List(value.with_meta(Some(metadata))),
         Value::Map(value) => Value::Map(value.with_meta(Some(metadata))),
@@ -3031,6 +3079,14 @@ fn attach_metadata(value: Value, metadata: Rc<Metadata>) -> Result<Value, String
         Value::Keyword(value) => Value::Keyword(value),
         _ => return Err("metadata can only be applied to object values".into()),
     })
+}
+
+fn vector_literal(values: Vec<Value>) -> Result<Value, String> {
+    if values.len() <= 5 {
+        Ok(Value::Tuple(Box::new(PTuple::from_values(values)?)))
+    } else {
+        Ok(Value::Vector(values.into()))
+    }
 }
 
 fn literal_value(form: &Form) -> Result<Value, String> {
@@ -3050,9 +3106,9 @@ fn literal_value(form: &Form) -> Result<Value, String> {
         Form::String(v) => Ok(Value::String(v.clone())),
         Form::Keyword(v) => Ok(Value::Keyword(v.clone().into())),
         Form::Symbol(v) => Ok(Value::Symbol(v.clone().into())),
-        Form::Vector(values) => Ok(Value::Vector(
-            values.iter().map(literal_value).collect::<Result<_, _>>()?,
-        )),
+        Form::Vector(values) => {
+            vector_literal(values.iter().map(literal_value).collect::<Result<_, _>>()?)
+        }
         Form::Set(values) => Ok(Value::Set(
             unique_values(values.iter().map(literal_value).collect::<Result<_, _>>()?).into(),
         )),
@@ -3251,12 +3307,12 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
             )
             .into(),
         )),
-        Form::Vector(values) => Ok(Value::Vector(
+        Form::Vector(values) => vector_literal(
             values
                 .iter()
                 .map(|value| eval(value, env))
                 .collect::<Result<_, _>>()?,
-        )),
+        ),
         Form::Symbol(n) if n == "nil" => Ok(Value::Nil),
         Form::Symbol(n) if n == "true" => Ok(Value::Bool(true)),
         Form::Symbol(n) if n == "false" => Ok(Value::Bool(false)),
@@ -4765,6 +4821,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 let collection = eval(&fs[1], env)?;
                 let item = eval(&fs[2], env)?;
                 match collection {
+                    Value::Tuple(values) => tuple_push_last(&values, item),
                     Value::Vector(values) => Ok(Value::Vector(values.push_last(item))),
                     Value::List(values) => Ok(Value::List(
                         std::iter::once(item)
@@ -4787,6 +4844,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 let item = eval(&fs[1], env)?;
                 let collection = eval(&fs[2], env)?;
                 match collection {
+                    Value::Tuple(values) => tuple_push_first(&values, item),
                     Value::Vector(values) => Ok(Value::Vector(
                         std::iter::once(item)
                             .chain(values.iter().cloned())

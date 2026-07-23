@@ -934,6 +934,25 @@ mod tests {
     }
 
     #[test]
+    fn reader_vectors_use_java_tuple_arity_selection() {
+        let mut env = HashMap::new();
+        let small = core::eval(&kernel::parse("[1 2 3]").unwrap(), &mut env).unwrap();
+        let large = core::eval(&kernel::parse("[1 2 3 4 5 6]").unwrap(), &mut env).unwrap();
+        assert!(matches!(small, core::Value::Tuple(_)));
+        assert!(matches!(large, core::Value::Vector(_)));
+
+        let mut runtime = Runtime::new();
+        assert_eq!(runtime.eval_text("(nth [1 2 3] 1)").unwrap(), "2");
+        assert_eq!(runtime.eval_text("(conj [1 2 3] 4)").unwrap(), "[1 2 3 4]");
+        assert_eq!(
+            runtime
+                .eval_text("(protocol-call ILookup lookup (protocol-call IObjType meta (protocol-call IObjType with-meta [1] {:doc \"tuple\"})) :doc)")
+                .unwrap(),
+            "\"tuple\""
+        );
+    }
+
+    #[test]
     fn reader_maps_and_sets_preserve_java_insertion_order() {
         let mut runtime = Runtime::new();
         assert_eq!(runtime.eval_text("{:b 2 :a 1}").unwrap(), "{:b 2 :a 1}");

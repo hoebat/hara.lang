@@ -168,7 +168,7 @@ fn one(form: Form, env: Rc<RefCell<HashMap<String, Value>>>, k: Cont) -> Step {
             0,
             Vec::new(),
             env,
-            Box::new(move |r| k(r.map(|v| Value::Vector(v.into())))),
+            Box::new(move |r| k(r.and_then(vector_literal))),
         ),
         Form::List(v) if v.is_empty() => k(Ok(Value::Nil)),
         Form::List(v) if v.len() == 2 && matches!(&v[0],Form::Symbol(n)if n=="quote") => {
