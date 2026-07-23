@@ -64,9 +64,7 @@ pub struct Runtime {
     providers: core::ProviderRegistry,
     resources: HashMap<String, String>,
     loaded_resources: HashSet<String>,
-    namespaces: HashMap<String, HashMap<String, core::Value>>,
-    current_namespace: String,
-    namespace_aliases: HashMap<String, String>,
+    namespace_registry: kernel::NamespaceRegistry<core::Value>,
     generated_configs: HashMap<String, kernel::GeneratedNamespaceConfig>,
 }
 
@@ -81,9 +79,7 @@ impl Runtime {
             providers: core::ProviderRegistry::new(),
             resources: HashMap::new(),
             loaded_resources: HashSet::new(),
-            namespaces: HashMap::new(),
-            current_namespace: "user".into(),
-            namespace_aliases: HashMap::new(),
+            namespace_registry: kernel::NamespaceRegistry::new("user"),
             generated_configs: HashMap::from([(
                 "user".into(),
                 kernel::GeneratedNamespaceConfig::defaults(),
@@ -111,7 +107,7 @@ impl Runtime {
             }
             let config = self
                 .generated_configs
-                .get(&self.current_namespace)
+                .get(&self.current_namespace())
                 .cloned()
                 .unwrap_or_else(kernel::GeneratedNamespaceConfig::defaults);
             let resolved = config.rewrite(form);
@@ -121,104 +117,99 @@ impl Runtime {
             if matches!(result, core::Value::Recur(_)) {
                 return Err("recur must be inside loop".into());
             }
+            self.save_namespace();
+            self.refresh_qualified_bindings();
         }
+        self.save_namespace();
         self.refresh_qualified_bindings();
         Ok(result.display())
     }
 
     fn refresh_qualified_bindings(&mut self) {
-        let qualified = self
-            .env
-            .keys()
-            .filter(|name| name.contains('/'))
-            .cloned()
-            .collect::<Vec<_>>();
-        for name in qualified {
-            self.env.remove(&name);
-        }
-        let mut bindings = Vec::new();
-        for (namespace, values) in &self.namespaces {
-            for (name, value) in values {
-                if !name.contains('/') {
-                    bindings.push((format!("{namespace}/{name}"), value.clone()));
-                }
+        self.env.retain(|name, _| !name.contains('/'));
+        for namespace in self.namespace_registry.all() {
+            for (_, var) in namespace.mappings() {
+                self.env
+                    .insert(var.symbol().as_str().to_owned(), core::Value::Var(var));
             }
         }
-        for (name, value) in &self.env {
-            if !name.contains('/') {
-                bindings.push((
-                    format!("{}/{}", self.current_namespace, name),
-                    value.clone(),
-                ));
-            }
-        }
-        for (qualified, value) in bindings {
-            self.env.insert(qualified, value);
-        }
-        let aliases = self.namespace_aliases.clone();
-        for (alias, target) in aliases {
-            let prefix = format!("{target}/");
-            let aliased = self
-                .env
-                .iter()
-                .filter_map(|(name, value)| {
-                    name.strip_prefix(&prefix)
-                        .map(|suffix| (format!("{alias}/{suffix}"), value.clone()))
-                })
-                .collect::<Vec<_>>();
-            for (name, value) in aliased {
-                self.env.insert(name, value);
+        for (alias, namespace) in self.namespace_registry.current().aliases() {
+            for (local, var) in namespace.mappings() {
+                self.env.insert(
+                    format!("{}/{}", alias.as_str(), local.as_str()),
+                    core::Value::Var(var),
+                );
             }
         }
     }
 
     fn save_namespace(&mut self) {
-        let values = self
+        let namespace = self.namespace_registry.current();
+        let namespace_name = namespace.name().as_str().to_owned();
+        let locals = self
             .env
             .iter()
             .filter(|(name, _)| !name.contains('/'))
             .map(|(name, value)| (name.clone(), value.clone()))
-            .collect();
-        self.namespaces
-            .insert(self.current_namespace.clone(), values);
+            .collect::<Vec<_>>();
+        for (name, value) in locals {
+            let path = format!("{namespace_name}/{name}");
+            let var = match value {
+                core::Value::Var(var) if var.symbol().as_str() == path => var,
+                core::Value::Var(var) => var.requalify(&path),
+                value => namespace.intern(&name, value),
+            };
+            namespace.map_var(crate::lang::data::Symbol::parse(&name), var.clone());
+            self.env.insert(name, core::Value::Var(var));
+        }
     }
 
-    /// Creates a namespace without selecting it.
     pub fn create_namespace(&mut self, name: &str) -> bool {
-        if self.namespaces.contains_key(name) || name == self.current_namespace {
+        if name.is_empty() || self.namespace_registry.find(name).is_some() {
             return false;
         }
-        self.namespaces.insert(name.into(), HashMap::new());
+        self.namespace_registry.find_or_create(name);
         true
     }
 
-    /// Selects a namespace, preserving the current namespace environment.
     pub fn use_namespace(&mut self, name: &str) -> bool {
+        if name.is_empty() {
+            return false;
+        }
         self.save_namespace();
-        let next = self.namespaces.remove(name).unwrap_or_default();
-        self.env = next;
-        self.current_namespace = name.into();
+        let namespace = self.namespace_registry.set_current(name);
+        self.env = namespace
+            .mappings()
+            .into_iter()
+            .map(|(name, var)| (name.as_str().to_owned(), core::Value::Var(var)))
+            .collect();
         self.refresh_qualified_bindings();
         true
     }
 
     pub fn current_namespace(&self) -> String {
-        self.current_namespace.clone()
+        self.namespace_registry.current().name().as_str().to_owned()
     }
 
-    /// Adds an explicit alias for a namespace.
     pub fn alias_namespace(&mut self, alias: &str, target: &str) -> bool {
         if alias.is_empty() || target.is_empty() {
             return false;
         }
-        self.namespace_aliases.insert(alias.into(), target.into());
+        let Some(target) = self.namespace_registry.find(target) else {
+            return false;
+        };
+        self.namespace_registry.current().alias(alias, target);
+        self.refresh_qualified_bindings();
         true
     }
 
     pub fn resolve_namespace(&self, name: &str) -> String {
-        self.namespace_aliases
-            .get(name)
-            .cloned()
+        self.namespace_registry
+            .current()
+            .aliases()
+            .into_iter()
+            .find(|(alias, _)| alias.as_str() == name)
+            .map(|(_, namespace)| namespace.name().as_str().to_owned())
             .unwrap_or_else(|| name.into())
     }
 
@@ -639,6 +630,33 @@ mod tests {
             "7"
         );
         assert_eq!(runtime.eval_text("(helper)").unwrap(), "7");
+    }
+
+    #[test]
+    fn namespace_registry_owns_qualified_vars_without_changing_identity() {
+        let mut runtime = Runtime::new();
+        runtime.use_namespace("alpha");
+        runtime
+            .eval_text("(def ^{:dynamic true} answer 41)")
+            .unwrap();
+        let local = match runtime.env.get("answer").unwrap() {
+            core::Value::Var(var) => var.clone(),
+            _ => panic!("definition must be a Var"),
+        };
+        assert_eq!(local.symbol().as_str(), "alpha/answer");
+        let qualified = match runtime.env.get("alpha/answer").unwrap() {
+            core::Value::Var(var) => var.clone(),
+            _ => panic!("qualified definition must be a Var"),
+        };
+        assert!(local.same_identity(&qualified));
+        assert!(qualified.is_dynamic());
+        runtime.use_namespace("user");
+        runtime.alias_namespace("a", "alpha");
+        let alias = match runtime.env.get("a/answer").unwrap() {
+            core::Value::Var(var) => var.clone(),
+            _ => panic!("alias must resolve to a Var"),
+        };
+        assert!(local.same_identity(&alias));
     }
 
     #[test]
