@@ -71,8 +71,18 @@ public final class HaraRootNode extends RootNode {
       frame.setObject(parameterSlots[minimumArity], BuiltinStruct.vector(rest));
     }
 
-    Object result = body.execute(frame);
-    return exportResult ? HaraBox.export(result) : result;
+    try {
+      Object result = body.execute(frame);
+      return exportResult ? HaraBox.export(result) : result;
+    } catch (RuntimeException error) {
+      if (!HaraException.tracingEnabled()) throw error;
+      throw HaraException.withFrame(error, this, frameLabel());
+    }
+  }
+
+  private String frameLabel() {
+    if (sourceSection == null || !sourceSection.isAvailable()) return "<hara>";
+    return sourceSection.getSource().getName();
   }
 
   @TruffleBoundary
