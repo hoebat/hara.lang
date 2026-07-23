@@ -78,4 +78,25 @@ public class LanguageAgnosticProtocolAcceptanceTest {
     assertEquals(Constant.MetaType.OBJECT, metadata.invoke("metatype", value, new Object[0]));
     assertTrue(value.toString().contains("CallableBox"));
   }
+  @Test
+  public void oneHaraAlgorithmConsumesAndProducesGuestAndJavaBackedCollections() {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      Value appendAndCount =
+          context.eval(
+              HaraLanguage.ID,
+              "(do "
+                  + "  (defstruct Bucket [items]) "
+                  + "  (extend-type Bucket IConj "
+                  + "    (conj [self item] (Bucket (conj (field self :items) item)))) "
+                  + "  (extend-type Bucket ICount "
+                  + "    (count [self] (count (field self :items)))) "
+                  + "  (fn [value] "
+                  + "    (let [updated (conj value 42)] (count updated))))");
+
+      assertEquals(3L, appendAndCount.execute(Vector.Standard.from(null, 1L, 2L)).asLong());
+      Value bucket = context.eval(HaraLanguage.ID, "(Bucket [1 2])");
+      assertEquals(3L, appendAndCount.execute(bucket).asLong());
+    }
+  }
+
 }
