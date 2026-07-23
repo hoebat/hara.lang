@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
@@ -5,6 +6,10 @@ use std::rc::Rc;
 
 use crate::lang::data::{Atom, Symbol};
 use crate::lang::protocol::{IDeref, IDisplay, INamespaced, IReset};
+
+thread_local! {
+    static DYNAMIC_BINDINGS: RefCell<HashMap<usize, Vec<Box<dyn Any>>>> = RefCell::new(HashMap::new());
+}
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct VarMetadata {
@@ -18,6 +23,7 @@ pub struct VarMetadata {
 
 #[derive(Debug, Clone)]
 pub struct Var<V> {
+    identity: Rc<()>,
     symbol: Symbol,
     value: Atom<V>,
     metadata: Rc<RefCell<VarMetadata>>,
@@ -25,6 +31,7 @@ pub struct Var<V> {
 impl<V> Var<V> {
     pub fn new(path: impl AsRef<str>, value: V) -> Self {
         Self {
+            identity: Rc::new(()),
             symbol: Symbol::parse(path.as_ref()),
             value: Atom::new(value),
             metadata: Rc::new(RefCell::new(VarMetadata::default())),
@@ -32,6 +39,7 @@ impl<V> Var<V> {
     }
     pub fn with_metadata(path: impl AsRef<str>, value: V, metadata: VarMetadata) -> Self {
         Self {
+            identity: Rc::new(()),
             symbol: Symbol::parse(path.as_ref()),
             value: Atom::new(value),
             metadata: Rc::new(RefCell::new(metadata)),
@@ -49,6 +57,12 @@ impl<V> Var<V> {
     pub fn update_metadata(&self, update: impl FnOnce(&mut VarMetadata)) {
         update(&mut self.metadata.borrow_mut());
     }
+    pub fn same_identity(&self, other: &Self) -> bool {
+        Rc::ptr_eq(&self.identity, &other.identity)
+    }
+    fn identity_key(&self) -> usize {
+        Rc::as_ptr(&self.identity) as usize
+    }
     pub fn is_control(&self) -> bool {
         self.metadata.borrow().control
     }
@@ -59,21 +73,58 @@ impl<V> Var<V> {
         self.metadata.borrow().macro_form
     }
 }
-impl<V: Clone> Var<V> {
+impl<V: Clone + 'static> Var<V> {
     pub fn deref_value(&self) -> V {
-        self.value.deref_value()
+        let key = self.identity_key();
+        DYNAMIC_BINDINGS.with(|bindings| {
+            bindings
+                .borrow()
+                .get(&key)
+                .and_then(|stack| stack.last())
+                .and_then(|value| value.downcast_ref::<V>())
+                .cloned()
+                .unwrap_or_else(|| self.value.deref_value())
+        })
+    }
+    pub fn bind(&self, value: V) {
+        let key = self.identity_key();
+        DYNAMIC_BINDINGS.with(|bindings| {
+            bindings
+                .borrow_mut()
+                .entry(key)
+                .or_default()
+                .push(Box::new(value));
+        });
+    }
+    pub fn unbind(&self) -> Result<V, String> {
+        let key = self.identity_key();
+        DYNAMIC_BINDINGS.with(|bindings| {
+            let mut bindings = bindings.borrow_mut();
+            let stack = bindings
+                .get_mut(&key)
+                .ok_or_else(|| "Var has no dynamic binding".to_string())?;
+            let value = stack
+                .pop()
+                .and_then(|value| value.downcast::<V>().ok())
+                .map(|value| *value)
+                .ok_or_else(|| "Var dynamic binding type mismatch".to_string())?;
+            if stack.is_empty() {
+                bindings.remove(&key);
+            }
+            Ok(value)
+        })
     }
     pub fn reset_value(&self, value: V) -> V {
         self.value.reset(value).expect("unvalidated var")
     }
 }
-impl<V: Clone> IDeref for Var<V> {
+impl<V: Clone + 'static> IDeref for Var<V> {
     type Output = V;
     fn deref(&self) -> V {
         self.deref_value()
     }
 }
-impl<V: Clone> IReset<V> for Var<V> {
+impl<V: Clone + 'static> IReset<V> for Var<V> {
     type Error = String;
     fn reset(&self, value: V) -> Result<V, String> {
         Ok(self.reset_value(value))
@@ -117,6 +168,21 @@ mod tests {
         assert_eq!(var.reset_value(2), 2);
         assert_eq!(var.deref(), 2);
         assert!(var.is_dynamic());
+    }
+    #[test]
+    fn dynamic_bindings_are_nested_thread_local_and_share_identity() {
+        let var = Var::new("hello/value", 1);
+        let alias = var.clone();
+        assert!(var.same_identity(&alias));
+        var.bind(2);
+        assert_eq!(alias.deref(), 2);
+        alias.bind(3);
+        assert_eq!(var.deref(), 3);
+        assert_eq!(var.unbind().unwrap(), 3);
+        assert_eq!(alias.deref(), 2);
+        assert_eq!(alias.unbind().unwrap(), 2);
+        assert_eq!(var.deref(), 1);
+        assert!(var.unbind().is_err());
     }
     #[test]
     fn cloned_vars_share_metadata_updates() {
