@@ -65,4 +65,14 @@ public class TaskProcessTest {
     assertEquals(Map.of("environment", true), inputs.get("env"));
     assertEquals(Map.of("lookup", true), inputs.get("lookup"));
   }
+
+  @Test
+  public void adaptsMainFunctionToTheConfiguredInputCount() throws Exception {
+    TaskFunction original = args -> List.of(args);
+    Object[] adapted = TaskProcess.mainFunction(original, 2);
+    TaskFunction function = (TaskFunction) adapted[0];
+    assertEquals(List.of(1L, Map.of("p", true), "extra"),
+        function.apply(new Object[] {1L, Map.of("p", true), Map.of(), Map.of(), "extra"}));
+    assertTrue((Boolean) adapted[1]);
+  }
 }

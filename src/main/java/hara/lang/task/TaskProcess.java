@@ -17,7 +17,31 @@ public final class TaskProcess {
   public static Object[] mainFunction(TaskFunction function, int count) {
     if (count < 1 || count > 4) throw new IllegalArgumentException("count is between 1 and 4");
     int arity = function.minimumArity();
-    return new Object[] {function, arity > count};
+    TaskFunction adapted = new TaskFunction() {
+      @Override
+      public Object apply(Object[] arguments) throws Exception {
+        if (arguments.length < 4) {
+          throw new IllegalArgumentException("main function requires input, params, lookup, and env");
+        }
+        Object[] forwarded = new Object[Math.max(0, arguments.length - (4 - count))];
+        if (count == 4) {
+          System.arraycopy(arguments, 0, forwarded, 0, arguments.length);
+        } else {
+          System.arraycopy(arguments, 0, forwarded, 0, count);
+          if (arguments.length > 4) {
+            System.arraycopy(arguments, 4, forwarded, count, arguments.length - 4);
+          }
+        }
+        return function.apply(forwarded);
+      }
+
+      @Override
+      public int minimumArity() { return 4; }
+
+      @Override
+      public boolean variadic() { return true; }
+    };
+    return new Object[] {adapted, arity > count};
   }
 
   public static boolean selectFilter(Object selector, Object id) {

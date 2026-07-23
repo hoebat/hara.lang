@@ -1188,6 +1188,79 @@ mod tests {
     }
 
     #[test]
+    fn marker_dot_contract_covers_results_identity_callbacks_and_rejections() {
+        let mut runtime = Runtime::new();
+        let cases = [
+            ("(. (. (array 1 2 3) (map (fn [x] (* x 2)))) (get 2))", "6"),
+            (
+                "(. (. (array 1 2 3 4) (filter (fn [x] (> x 2)))) (get 0))",
+                "3",
+            ),
+            ("(. (. (array 1 2 3) (slice 1)) (get 1))", "3"),
+            (
+                "(. (array 1 2 3) (fold-left (fn [out x] (- out x)) 0))",
+                "-6",
+            ),
+            (
+                "(. (array 1 2 3) (fold-right (fn [x out] (- x out)) 0))",
+                "2",
+            ),
+            ("(let [a (array 1)] (= a (. a (push-last 2))))", "true"),
+            ("(let [a (array 1)] (= a (. a (set 0 2))))", "true"),
+            ("(let [a (array 1)] (= a (. a (insert 1 2))))", "true"),
+            ("(let [a (array 1)] (= a (. a (clone))))", "false"),
+            (
+                r#"(let [o (object "a" 1)] (= o (. o (set "a" 2))))"#,
+                "true",
+            ),
+            (r#"(. (object "a" 1) (delete "a"))"#, "1"),
+            (r#"(. (object "a" 1) (delete "missing"))"#, "nil"),
+            (r#"(. (. (object "a" 1) (keys)) (get 0))"#, r#""a""#),
+            (r#"(. (. (. (object "a" 1) (pairs)) (get 0)) (get 1))"#, "1"),
+            ("(iter-next (iter (array 7 8)))", "7"),
+            (r#"(second (iter-next (iter (object "a" 7))))"#, "7"),
+        ];
+        for (source, expected) in cases {
+            assert_eq!(runtime.eval_text(source).unwrap(), expected, "{source}");
+        }
+
+        let invalid = [
+            ("(. [1 2] (get 0))", "array or object marker"),
+            ("(. {} (get \"a\"))", "array or object marker"),
+            ("(. 1 (get 0))", "array or object marker"),
+            ("(. (array 1) (unknown))", "unsupported array method"),
+            (
+                r#"(. (object "a" 1) (unknown))"#,
+                "unsupported object method",
+            ),
+            ("(. (array 1) (set 0))", "expects an index and value"),
+            ("(. (array 1) (clone 1))", "expects no arguments"),
+            (r#"(. (object "a" 1) (clone 1))"#, "expects no arguments"),
+            ("(. (object :a 1) (get \"a\"))", "expects a string key"),
+            (r#"(. (object "a" 1) (get :a))"#, "expects a string key"),
+            (
+                "(. (array 1) (map (fn [x y] x)))",
+                "function expects 2 arguments",
+            ),
+            ("(x:array 1)", "unbound symbol: x:array"),
+            ("(x:object)", "unbound symbol: x:object"),
+            ("(x:get nil 0)", "unbound symbol: x:get"),
+            ("(x:set nil 0 1)", "unbound symbol: x:set"),
+            (
+                r#"(host-symbol "java.lang.String")"#,
+                "unbound symbol: host-symbol",
+            ),
+            (r#"(host-get nil "value")"#, "unbound symbol: host-get"),
+            (r#"(host-call nil "run")"#, "unbound symbol: host-call"),
+        ];
+        for (source, message) in invalid {
+            assert!(
+                runtime.eval_text(source).unwrap_err().contains(message),
+                "{source}"
+            );
+        }
+    }
+    #[test]
     fn marker_arrays_and_objects_use_restricted_dot_calls() {
         let mut runtime = Runtime::new();
         assert_eq!(runtime.eval_text("(count (array 1 2 3))").unwrap(), "3");
