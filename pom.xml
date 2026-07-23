@@ -270,7 +270,13 @@
 					<execution>
 						<id>theme-generated-javadocs</id>
 						<phase>prepare-package</phase>
-						<configuration><target><concat destfile="/reports/apidocs/stylesheet.css" append="true"><fileset dir="/docs" includes="javadoc-theme.css"/></concat></target></configuration>
+						<configuration>
+							<target>
+								<concat destfile="${project.build.directory}/reports/apidocs/stylesheet.css" append="true">
+									<fileset dir="${project.basedir}/docs" includes="javadoc-theme.css"/>
+								</concat>
+							</target>
+						</configuration>
 						<goals><goal>run</goal></goals>
 					</execution>
 				</executions>
