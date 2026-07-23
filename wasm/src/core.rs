@@ -43,7 +43,7 @@ pub struct Function {
 }
 
 #[derive(Debug, Clone)]
-enum IteratorGenerator { Constant(Value), Repeated(Rc<Function>), Iterate(Rc<Function>, Value), TakeWhile(Rc<Function>, Value), DropWhile(Rc<Function>, Value, bool), Map(Rc<Function>, Value), Filter(Rc<Function>, Value), Mapcat(Rc<Function>, Value, Option<Value>), Keep(Rc<Function>, Value), Zip(Vec<Value>), Interleave(Vec<Value>, usize) }
+enum IteratorGenerator { Constant(Value), Repeated(Rc<Function>), Iterate(Rc<Function>, Value), TakeWhile(Rc<Function>, Value), DropWhile(Rc<Function>, Value, bool), Map(Rc<Function>, Value), Filter(Rc<Function>, Value), Mapcat(Rc<Function>, Value, Option<Value>), Keep(Rc<Function>, Value), Zip(Vec<Value>), Interleave(Vec<Value>, usize), Partition(Value, usize, bool) }
 
 #[derive(Debug, Clone)]
 pub struct IteratorState {
@@ -73,6 +73,7 @@ impl IteratorState {
                 IteratorGenerator::Keep(function, source) => { loop { let value=iterator_next(source)?; let mapped=call_function(function, vec![value])?; if !matches!(mapped, Value::Nil) { break Ok(mapped); } } },
                 IteratorGenerator::Zip(sources) => { let mut values=Vec::new(); for source in sources.iter() { match iterator_next(source) { Ok(value)=>values.push(value), Err(error)=>{ self.closed=true; return Err(error); } } } Ok(Value::Vector(values)) },
                 IteratorGenerator::Interleave(sources, index) => { if sources.is_empty() { self.closed=true; return Err("iter-next reached the end of the iterator".into()); } let source=&sources[*index]; let value=iterator_next(source).map_err(|error| { self.closed=true; error })?; *index=(*index+1)%sources.len(); Ok(value) },
+                IteratorGenerator::Partition(source, amount, all) => { let mut values=Vec::new(); for _ in 0..*amount { match iterator_next(source) { Ok(value)=>values.push(value), Err(error)=>{ self.closed=true; if values.is_empty() || !*all { return Err(error); } break; } } } if values.is_empty() { self.closed=true; Err("iter-next reached the end of the iterator".into()) } else { Ok(Value::Vector(values)) } },
             };
         }
         if self.values.is_empty() { return Err("iter-next reached the end of the iterator".into()); }
@@ -777,6 +778,8 @@ fn iterator_take_while(function: Rc<Function>, value: Value) -> Result<Value, St
     Ok(Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::TakeWhile(function, source))))))
 }
 fn iterator_map(function: Rc<Function>, value: Value) -> Result<Value, String> { let source=match value { Value::Iterator(iterator) => Value::Iterator(iterator), value => make_iterator(value)? }; if let Value::Iterator(iterator)=&source { if iterator.borrow().generator.is_none() { let values=iterator_values(source)?; return Ok(iterator_from_values(values.into_iter().map(|value| call_function(&function, vec![value])).collect::<Result<Vec<_>,_>>()?)); } } Ok(Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::Map(function, source)))))) }
+fn iterator_partition(value: Value, amount: usize, all: bool) -> Result<Value, String> { if amount==0 { return Err("partition amount must be positive".into()); } let source=match value { Value::Iterator(iterator)=>Value::Iterator(iterator), value=>make_iterator(value)? }; if let Value::Iterator(iterator)=&source { if iterator.borrow().generator.is_none() { let values=iterator_values(source)?; let mut output=Vec::new(); for chunk in values.chunks(amount) { if !all && chunk.len()!=amount { break; } output.push(Value::Vector(chunk.to_vec())); } return Ok(iterator_from_values(output)); } } Ok(Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::Partition(source,amount,all)))))) }
+
 fn iterator_interleave(values: Vec<Value>) -> Result<Value, String> { let sources=values.into_iter().map(|value| match value { Value::Iterator(iterator)=>Ok(Value::Iterator(iterator)), value=>make_iterator(value) }).collect::<Result<Vec<_>,_>>()?; if sources.iter().any(|value| matches!(value,Value::Iterator(iterator) if iterator.borrow().generator.is_some())) { return Ok(Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::Interleave(sources,0)))))); } let collections=sources.iter().map(|value| iterator_values(value.clone())).collect::<Result<Vec<_>,_>>()?; let limit=collections.iter().map(Vec::len).min().unwrap_or(0); let mut output=Vec::new(); for index in 0..limit { for values in &collections { output.push(values[index].clone()); } } Ok(iterator_from_values(output)) }
 
 fn iterator_zip(values: Vec<Value>) -> Result<Value, String> { let sources=values.into_iter().map(|value| match value { Value::Iterator(iterator)=>Ok(Value::Iterator(iterator)), value=>make_iterator(value) }).collect::<Result<Vec<_>,_>>()?; if sources.iter().any(|value| matches!(value,Value::Iterator(iterator) if iterator.borrow().generator.is_some())) { return Ok(Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::Zip(sources)))))); } let collections=sources.iter().map(|value| iterator_values(value.clone())).collect::<Result<Vec<_>,_>>()?; let limit=collections.iter().map(Vec::len).min().unwrap_or(0); Ok(iterator_from_values((0..limit).map(|index| Value::Vector(collections.iter().map(|values| values[index].clone()).collect())).collect())) }
@@ -1140,8 +1143,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 let function=match eval(&fs[1], env)? { Value::Function(function)=>function, _=>return Err(format!("{n} expects a function")) }; iterator_keep(function,eval(&fs[2], env)?)
             }
             Form::Symbol(n) if ["iter-partition-all", "partition-all", "iter-partition", "partition"].contains(&n.as_str()) => {
-                if fs.len()!=3 { return Err(format!("{n} expects an amount and collection")); } let amount=value_index(&eval(&fs[1], env)?)?; if amount==0 { return Err(format!("{n} amount must be positive")); }
-                let values=iterator_values(eval(&fs[2], env)?)?; let mut output=Vec::new(); for chunk in values.chunks(amount) { if n.contains("partition") && !n.contains("all") && chunk.len()!=amount { break; } output.push(Value::Vector(chunk.to_vec())); } Ok(iterator_from_values(output))
+                if fs.len()!=3 { return Err(format!("{n} expects an amount and collection")); } let amount=value_index(&eval(&fs[1], env)?)?; iterator_partition(eval(&fs[2], env)?, amount, n.contains("all"))
             }
             Form::Symbol(n) if ["iter-interpose", "interpose"].contains(&n.as_str()) => {
                 if fs.len()!=3 { return Err(format!("{n} expects a separator and collection")); } let separator=eval(&fs[1], env)?; let values=iterator_values(eval(&fs[2], env)?)?; let mut output=Vec::new(); for (index,value) in values.into_iter().enumerate() { if index>0 { output.push(separator.clone()); } output.push(value); } Ok(iterator_from_values(output))

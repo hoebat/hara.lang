@@ -26,6 +26,9 @@ import hara.lang.protocol.IDeref;
 import hara.lang.protocol.IDerefTimeout;
 import hara.lang.protocol.ICount;
 import hara.lang.protocol.INth;
+import hara.verify.noir.NoirArtifact;
+import hara.verify.noir.NoirProgram;
+import hara.verify.noir.NoirWasmLoader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -57,14 +60,16 @@ public final class HaraContext {
           "promise", "hara.lib.promise",
           "bytes", "hara.lib.bytes",
           "socket", "hara.lib.socket",
-          "file", "hara.lib.file");
+          "file", "hara.lib.file",
+          "noir", "hara.lib.noir");
   private static final Map<String, String> DEFAULT_LIBRARY_ALIASES =
       Map.of(
           "string", "str",
           "promise", "promise",
           "bytes", "bytes",
           "socket", "socket",
-          "file", "file");
+          "file", "file",
+          "noir", "noir");
   private static final Set<String> MARKER_METHOD_NAMES =
       Set.of(
           "get",
@@ -95,6 +100,7 @@ public final class HaraContext {
   private final Map<String, Map<String, Object>> nativeImports = new ConcurrentHashMap<>();
   private final NativeFlavorRegistry nativeFlavorRegistry =
       new NativeFlavorRegistry().register(JvmFlavorProvider.INSTANCE);
+  private final NoirWasmLoader noirWasmLoader = NoirWasmLoader.discover();
   private final Map<String, ModuleRecord> modules = new ConcurrentHashMap<>();
   private final Map<String, Set<String>> moduleDependencies = new ConcurrentHashMap<>();
   private final Set<String> loadingModules = ConcurrentHashMap.newKeySet();
@@ -945,6 +951,88 @@ public final class HaraContext {
     socket.define("connect", new VariadicBuiltin("socket/connect", this::socketConnect));
     socket.define("send", new VariadicBuiltin("socket/send", this::socketSend));
     socket.define("close", new UnaryBuiltin("socket/close", this::socketClose));
+
+    HaraNamespace noir = namespace("hara.lib.noir");
+    noir.define("program", new VariadicBuiltin("noir/program", this::noirProgram));
+    noir.define(
+        "cache-key",
+        new UnaryBuiltin(
+            "noir/cache-key", value -> requireNoirProgram(value, "noir/cache-key").cacheKey()));
+    noir.define(
+        "source",
+        new UnaryBuiltin(
+            "noir/source", value -> requireNoirProgram(value, "noir/source").source()));
+    noir.define(
+        "manifest",
+        new UnaryBuiltin(
+            "noir/manifest", value -> requireNoirProgram(value, "noir/manifest").manifest()));
+    noir.define(
+        "loader-id",
+        new VariadicBuiltin(
+            "noir/loader-id",
+            values -> {
+              if (values.length != 0)
+                throw new HaraException("noir/loader-id expects no arguments");
+              return noirWasmLoader.id();
+            }));
+    noir.define(
+        "available?",
+        new VariadicBuiltin(
+            "noir/available?",
+            values -> {
+              if (values.length != 0)
+                throw new HaraException("noir/available? expects no arguments");
+              return noirWasmLoader.available();
+            }));
+    noir.define("compile", new UnaryBuiltin("noir/compile", this::noirCompile));
+    noir.define(
+        "artifact-key",
+        new UnaryBuiltin(
+            "noir/artifact-key",
+            value -> requireNoirArtifact(value, "noir/artifact-key").programKey()));
+    noir.define(
+        "artifact-json",
+        new UnaryBuiltin(
+            "noir/artifact-json",
+            value -> requireNoirArtifact(value, "noir/artifact-json").circuitJson()));
+  }
+
+  private Object noirProgram(Object[] values) {
+    if (values.length == 2) {
+      return NoirProgram.create(
+          stringValue(values[0], "noir/program"), stringValue(values[1], "noir/program"));
+    }
+    if (values.length == 4) {
+      return NoirProgram.create(
+          stringValue(values[0], "noir/program"),
+          stringValue(values[1], "noir/program"),
+          stringValue(values[2], "noir/program"),
+          stringValue(values[3], "noir/program"));
+    }
+    throw new HaraException(
+        "noir/program expects name and source, optionally followed by Noir and backend versions");
+  }
+
+  private Object noirCompile(Object value) {
+    NoirProgram program = requireNoirProgram(value, "noir/compile");
+    CompletableFuture<Object> future =
+        noirWasmLoader.compile(program).thenApply(artifact -> (Object) artifact);
+    return new HaraPromise(future);
+  }
+
+  private static NoirProgram requireNoirProgram(Object value, String operation) {
+    Object input = HaraBox.unwrap(value);
+    if (!(input instanceof NoirProgram))
+      throw new HaraException(operation + " expects a Noir program");
+    return (NoirProgram) input;
+  }
+
+  private static NoirArtifact requireNoirArtifact(Object value, String operation) {
+    Object input = HaraBox.unwrap(value);
+    if (!(input instanceof NoirArtifact)) {
+      throw new HaraException(operation + " expects a compiled Noir artifact");
+    }
+    return (NoirArtifact) input;
   }
 
   private static int int32(Object value, String operation) {

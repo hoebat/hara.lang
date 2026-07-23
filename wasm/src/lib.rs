@@ -627,6 +627,8 @@ mod tests {
         assert_eq!(runtime.eval_text("(first (take 2 (keep (fn [x] (if (even? x) (* x 10) nil)) (iterate (fn [x] (+ x 1)) 0))))").unwrap(), "0");
         assert_eq!(runtime.eval_text("(nth (take 3 (zip (iterate (fn [x] (+ x 1)) 0) (repeat :x))) 2)").unwrap(), "[2 :x]");
         assert_eq!(runtime.eval_text("(nth (take 4 (interleave (iterate (fn [x] (+ x 1)) 0) (repeat :x))) 3)").unwrap(), ":x");
+        assert_eq!(runtime.eval_text("(nth (take 3 (partition-all 2 (iterate (fn [x] (+ x 1)) 0))) 2)").unwrap(), "[4 5]");
+        assert_eq!(runtime.eval_text("(nth (take 2 (partition 2 (iterate (fn [x] (+ x 1)) 0))) 1)").unwrap(), "[2 3]");
         assert_eq!(runtime.eval_text("(first (take 4 (iterate (fn [x] (+ x 2)) 0)))").unwrap(), "0");
         assert_eq!(runtime.eval_text("(second (repeat :x))").unwrap(), ":x");
         assert_eq!(runtime.eval_text("(first (rest (iterate (fn [x] (+ x 1)) 0)))").unwrap(), "1");
