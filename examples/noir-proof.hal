@@ -1,5 +1,5 @@
 (ns example.noir-proof
-  (:require [blockchain.proof.noir :as noir]))
+  (:require [hara.extensions.blockchain.proof.noir :as noir]))
 
 (def square-program
   (noir/program

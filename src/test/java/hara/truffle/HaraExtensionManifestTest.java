@@ -11,12 +11,12 @@ import org.junit.Test;
 public class HaraExtensionManifestTest {
   @Test
   public void packagedNoirProofManifestMatchesTheProviderContract() throws Exception {
-    String resource = HaraExtensionRegistry.resourceName("blockchain.proof.noir");
+    String resource = HaraExtensionRegistry.resourceName("hara.extensions.blockchain.proof.noir");
     try (InputStream input = getClass().getClassLoader().getResourceAsStream(resource)) {
       HaraExtensionManifest manifest =
           HaraExtensionManifest.parse(
               new String(input.readAllBytes(), StandardCharsets.UTF_8), resource);
-      assertEquals("blockchain.proof.noir", manifest.namespace());
+      assertEquals("hara.extensions.blockchain.proof.noir", manifest.namespace());
       assertEquals("0.1.0", manifest.version());
       assertEquals("wasm", manifest.provider());
       assertEquals("hara.noir", manifest.module());

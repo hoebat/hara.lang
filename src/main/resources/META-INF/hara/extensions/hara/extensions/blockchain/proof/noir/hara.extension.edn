@@ -1,4 +1,4 @@
-{:namespace "blockchain.proof.noir"
+{:namespace "hara.extensions.blockchain.proof.noir"
  :version "0.1.0"
  :provider :wasm
  :module "hara.noir"

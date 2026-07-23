@@ -106,13 +106,14 @@ namespace can therefore be backed by a pod or WASM provider without changing the
 
 ## Packaged Noir proof provider
 
-The first classpath package is `blockchain.proof.noir`. Its manifest lives at
-`META-INF/hara/extensions/blockchain/proof/noir/hara.extension.edn`, selects the `:wasm` provider,
+The first classpath package is `hara.extensions.blockchain.proof.noir`. Its manifest lives at
+`META-INF/hara/extensions/hara/extensions/blockchain/proof/noir/hara.extension.edn`, selects the
+`:wasm` provider,
 and exports the Noir compile/prove/verify boundary without exposing compiler or WASM objects:
 
 ```hal
 (ns proof.example
-  (:require [blockchain.proof.noir :as noir]))
+  (:require [hara.extensions.blockchain.proof.noir :as noir]))
 
 (def program
   (noir/program

@@ -19,7 +19,7 @@ public class HaraNoirLibraryTest {
           context
               .eval(
                   HaraLanguage.ID,
-                  "(ns app (:require [blockchain.proof.noir :as noir])) "
+                  "(ns app (:require [hara.extensions.blockchain.proof.noir :as noir])) "
                       + "(let [a (noir/program \"first_cut\" \""
                       + SOURCE
                       + "\") b (noir/program \"first_cut\" \""
@@ -31,7 +31,7 @@ public class HaraNoirLibraryTest {
           context
               .eval(
                   HaraLanguage.ID,
-                  "(ns app (:require [blockchain.proof.noir :as noir])) "
+                  "(ns app (:require [hara.extensions.blockchain.proof.noir :as noir])) "
                       + "(noir/manifest (noir/program \"first_cut\" \""
                       + SOURCE
                       + "\"))")
@@ -42,7 +42,8 @@ public class HaraNoirLibraryTest {
   @Test
   public void unavailableLoaderIsAnExplicitCapabilityFailure() {
     try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
-      context.eval(HaraLanguage.ID, "(ns app (:require [blockchain.proof.noir :as noir]))");
+      context.eval(
+          HaraLanguage.ID, "(ns app (:require [hara.extensions.blockchain.proof.noir :as noir]))");
       assertFalse(context.eval(HaraLanguage.ID, "(noir/available?)").asBoolean());
       assertEquals("unavailable", context.eval(HaraLanguage.ID, "(noir/loader-id)").asString());
       PolyglotException error =

@@ -9,7 +9,7 @@ import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.junit.Test;
 
-public class BlockchainProofNoirPackageTest {
+public class HaraExtensionsBlockchainProofNoirPackageTest {
   private static final String SOURCE = "fn main(value: u8) { assert(value > 0); }";
 
   @Test
@@ -18,7 +18,9 @@ public class BlockchainProofNoirPackageTest {
       PolyglotException missing =
           assertThrows(
               PolyglotException.class,
-              () -> context.eval(HaraLanguage.ID, "(blockchain.proof.noir/available?)"));
+              () ->
+                  context.eval(
+                      HaraLanguage.ID, "(hara.extensions.blockchain.proof.noir/available?)"));
       assertTrue(missing.getMessage().contains("Unbound symbol"));
 
       assertEquals(
@@ -26,9 +28,9 @@ public class BlockchainProofNoirPackageTest {
           context
               .eval(
                   HaraLanguage.ID,
-                  "(ns app (:require [blockchain.proof.noir])) "
-                      + "(blockchain.proof.noir/source "
-                      + "(blockchain.proof.noir/program \"identity_demo\" \""
+                  "(ns app (:require [hara.extensions.blockchain.proof.noir])) "
+                      + "(hara.extensions.blockchain.proof.noir/source "
+                      + "(hara.extensions.blockchain.proof.noir/program \"identity_demo\" \""
                       + SOURCE
                       + "\"))")
               .asString());
@@ -46,7 +48,8 @@ public class BlockchainProofNoirPackageTest {
           context
               .eval(
                   HaraLanguage.ID,
-                  "(ns app (:require [blockchain.proof.noir :as noir :refer [available?]])) "
+                  "(ns app (:require [hara.extensions.blockchain.proof.noir "
+                      + ":as noir :refer [available?]])) "
                       + "(available?)")
               .asBoolean());
       assertEquals(
@@ -68,7 +71,7 @@ public class BlockchainProofNoirPackageTest {
               () ->
                   context.eval(
                       HaraLanguage.ID,
-                      "(ns app (:require [blockchain.proof.noir :as noir])) "
+                      "(ns app (:require [hara.extensions.blockchain.proof.noir :as noir])) "
                           + "(deref (noir/compile "
                           + "(noir/program \"identity_demo\" \""
                           + SOURCE
