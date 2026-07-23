@@ -59,7 +59,7 @@ jobs:
         run: |
           rustup target add wasm32-unknown-unknown
           cargo install wasm-bindgen-cli --version 0.2.126 --locked
-          cargo build --manifest-path wasm/Cargo.toml --target wasm32-unknown-unknown --release
+          cargo build --manifest-path wasm/Cargo.toml --target wasm32-unknown-unknown --release --lib
           npm ci --prefix wasm/web
           npm run --prefix wasm/web test:noir
           mkdir -p site-build/wasm
