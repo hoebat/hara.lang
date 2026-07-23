@@ -56,14 +56,19 @@ The current Hara L0 slice supports:
 * literals, `quote`, `do`, `if`, `when`, `when-not`, `and`, and `or`;
 * lexical `let`, `loop`/`recur`, closures, variadic and multi-arity functions, and destructuring;
 * variadic arithmetic/comparisons, BigInteger/BigDecimal values, and explicit ratio-free numeric behavior;
-* persistent collections, protocol-backed `count`/`get`/`assoc`/`conj`/`cons`/`nth`/`empty`, iterator-first collection protocols including lazy cycle/partition/mapcat/keep operations, canonical `bytes` with `byte-count`/`byte-get`/`byte-set`, and mutable `x:array`/`x:object` values;
+* persistent collections, protocol-backed `count`/`get`/`assoc`/`conj`/`cons`/`nth`/`empty`, iterator-first collection protocols including lazy cycle/partition/mapcat/keep operations, canonical `bytes` with `bytes/count`/`bytes/get`/`bytes/set`, and explicit mutable `array`/`object` marker values;
 * context-local Vars, namespaces, `load-string`/`load-file`, transactional module rollback, and compile-time macros;
 * immutable `defstruct` values with metadata and Polyglot members;
 * language-level protocols via `defprotocol`, `extend-type`, and `protocol-call`, including extending `IFn`;
-* explicit capability-gated host interop through `host-symbol`, `host-get`, and `host-call`.
+* explicit capability-gated file and socket libraries, with no guest-visible JVM host interop.
 
 The generated runtime-library namespace contract is documented in
 [`spec/hara/runtime-libraries.md`](spec/hara/runtime-libraries.md).
+
+Automatic extensions are documented in
+[`spec/hara/extensions.md`](spec/hara/extensions.md). An extension is loaded through an
+ordinary `:require`; its manifest selects a pod or WASM provider, and the runtime generates
+the requested namespace without exposing provider-specific loading forms.
 
 The collection model is iterator-first and does not require `ISeq`, transducers, `transduce`, or `eduction`. Host interop is disabled unless the embedding context grants it. The Native Image workflow runs the verified fallback-runtime profile; optimized Truffle host compilation remains a separate runtime-quality task because the current generic host paths violate GraalVM’s blocklist checks.
 
