@@ -482,6 +482,24 @@ mod tests {
     }
 
     #[test]
+    fn structural_hashes_are_stable_and_order_independent_for_maps_and_sets() {
+        let mut runtime = Runtime::new();
+        let _ = &mut runtime;
+        let map_a = core::Value::Map(vec![
+            (core::Value::Keyword("a".into()), core::Value::Number(1)),
+            (core::Value::Keyword("b".into()), core::Value::Number(2)),
+        ]);
+        let map_b = core::Value::Map(vec![
+            (core::Value::Keyword("b".into()), core::Value::Number(2)),
+            (core::Value::Keyword("a".into()), core::Value::Number(1)),
+        ]);
+        let set_a = core::Value::Set(vec![core::Value::Number(1), core::Value::Number(2), core::Value::Number(3)]);
+        let set_b = core::Value::Set(vec![core::Value::Number(3), core::Value::Number(1), core::Value::Number(2)]);
+        assert_eq!(map_a.stable_hash(), map_b.stable_hash());
+        assert_eq!(set_a.stable_hash(), set_b.stable_hash());
+    }
+
+    #[test]
     fn map_membership_keys_and_values_are_portable() {
         let mut runtime = Runtime::new();
         assert_eq!(runtime.eval_text(r#"(protocol-call IFind has? {"a" 1} "a")"#).unwrap(), "true");

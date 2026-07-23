@@ -2,6 +2,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 use im_rc::Vector as PVector;
 use std::rc::Rc;
+use std::hash::{Hash, Hasher};
 
 #[path = "fiber.rs"]
 mod fiber;
@@ -192,6 +193,41 @@ impl Value {
     }
     fn truthy(&self) -> bool {
         !matches!(self, Self::Nil | Self::Bool(false))
+    }
+
+    /// Stable structural hash used by protocol and collection conformance tests.
+    pub fn stable_hash(&self) -> u64 {
+        fn hash_value(value: &Value, state: &mut std::collections::hash_map::DefaultHasher) {
+            std::mem::discriminant(value).hash(state);
+            match value {
+                Value::Number(v) => v.hash(state),
+                Value::Bool(v) => v.hash(state),
+                Value::String(v) | Value::Keyword(v) | Value::Symbol(v) => v.hash(state),
+                Value::Bytes(v) => v.hash(state),
+                Value::ByteBuffer(v) => v.borrow().hash(state),
+                Value::Array(v) => v.borrow().iter().for_each(|item| hash_value(item, state)),
+                Value::Object(v) => v.borrow().iter().for_each(|(key, item)| { key.hash(state); hash_value(item, state); }),
+                Value::Promise(v) => Rc::as_ptr(&v.state).hash(state),
+                Value::Recur(v) => v.iter().for_each(|item| hash_value(item, state)),
+                Value::Map(v) => {
+                    let mut entries = v.iter().map(|(key, item)| { let mut h = std::collections::hash_map::DefaultHasher::new(); hash_value(key, &mut h); hash_value(item, &mut h); h.finish() }).collect::<Vec<_>>();
+                    entries.sort_unstable(); entries.hash(state);
+                }
+                Value::Set(v) => {
+                    let mut entries = v.iter().map(|item| { let mut h = std::collections::hash_map::DefaultHasher::new(); hash_value(item, &mut h); h.finish() }).collect::<Vec<_>>();
+                    entries.sort_unstable(); entries.hash(state);
+                }
+                Value::List(v) | Value::Vector(v) => v.iter().for_each(|item| hash_value(item, state)),
+                Value::Function(v) => Rc::as_ptr(v).hash(state),
+                Value::Iterator(v) => Rc::as_ptr(v).hash(state),
+                Value::Var(v) => Rc::as_ptr(v).hash(state),
+                Value::Extension(v) => { v.provider.hash(state); v.type_name.hash(state); v.handle.hash(state); }
+                Value::Nil => {}
+            }
+        }
+        let mut state = std::collections::hash_map::DefaultHasher::new();
+        hash_value(self, &mut state);
+        state.finish()
     }
 }
 
