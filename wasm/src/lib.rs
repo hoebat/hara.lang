@@ -434,6 +434,14 @@ mod tests {
     }
 
     #[test]
+    fn promises_support_map_recover_and_finally() {
+        let mut runtime = Runtime::new();
+        assert_eq!(runtime.eval_text("(promise/state (promise/map (promise/resolve (promise) 41) (fn [x] (+ x 1))))").unwrap(), ":fulfilled");
+        assert_eq!(runtime.eval_text("(promise/value (promise/recover (promise/reject (promise) :bad) (fn [x] (str x :ok))))").unwrap(), "\":bad:ok\"");
+        assert_eq!(runtime.eval_text("(promise/value (promise/finally (promise/resolve (promise) 42) (fn [] 0)))").unwrap(), "42");
+    }
+
+    #[test]
     fn promises_settle_once_and_adopt() {
         let pending = core::Promise::new();
         let adopted = core::Promise::new();

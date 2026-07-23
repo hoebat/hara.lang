@@ -1054,6 +1054,20 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 if !promise.adopt(&other) { return Err("promise source is pending or destination is settled".into()); }
                 Ok(Value::Promise(promise))
             }
+            Form::Symbol(n) if ["promise/map", "promise/recover", "promise/finally"].contains(&n.as_str()) => {
+                if fs.len()!=3 { return Err(format!("{n} expects a promise and function")); }
+                let source=promise_value(&eval(&fs[1], env)?, n)?; let function=match eval(&fs[2], env)? { Value::Function(function)=>function, _=>return Err(format!("{n} expects a function")) }; let output=Promise::new();
+                match source.state() {
+                    PromiseState::Fulfilled(value) if n=="promise/map" => match call_function(&function, vec![value]) { Ok(value)=>{ output.resolve(value); }, Err(error)=>{ output.reject(error); } },
+                    PromiseState::Rejected(error) if n=="promise/recover" => match call_function(&function, vec![Value::String(error)]) { Ok(value)=>{ output.resolve(value); }, Err(error)=>{ output.reject(error); } },
+                    PromiseState::Fulfilled(value) if n=="promise/finally" => { let _=call_function(&function,Vec::new()); output.resolve(value); },
+                    PromiseState::Rejected(error) if n=="promise/finally" => { let _=call_function(&function,Vec::new()); output.reject(error); },
+                    PromiseState::Fulfilled(value) => { output.resolve(value); },
+                    PromiseState::Rejected(error) => { output.reject(error); },
+                    PromiseState::Pending => {},
+                }
+                Ok(Value::Promise(output))
+            }
             Form::Symbol(n) if n == "array" => {
                 let values = fs[1..].iter().map(|form| eval(form, env)).collect::<Result<Vec<_>, _>>()?;
                 Ok(Value::Array(Rc::new(RefCell::new(values))))
