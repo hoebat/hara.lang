@@ -36,7 +36,7 @@ java -jar target/hara-truffle.jar repl
 ```
 
 The REPL supports multiline forms, persistent history, symbol and Java completion, and inline
-documentation. See [`docs/user-guide.md`](docs/user-guide.md) and [`spec/hara/repl.md`](spec/hara/repl.md).
+documentation. See [`User guide`](user-guide.md) and [`REPL specification`](reference/repl.md).
 
 ## 5. Run a file or stdin
 

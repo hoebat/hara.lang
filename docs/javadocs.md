@@ -23,8 +23,7 @@ After the public classes have complete lifecycle and capability Javadocs, genera
 mvn -Pjavadoc javadoc:javadoc
 ```
 
-The generated output is written under `target/site/apidocs/`. The project should eventually publish
-that directory alongside the static site.
+The generated output is written under `target/site/apidocs/`. In the published documentation site, the generated API is available at [`/api/java/`](../api/java/index.html) alongside the Material pages.
 
 ## Required Javadoc topics
 

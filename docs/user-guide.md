@@ -71,5 +71,5 @@ Hara forms always go through the reader and evaluator.
 
 ## Learn the exact rules
 
-Use the [L0 language specification](../spec/hara/l0-language.md) for semantics and the
-[runtime-library contract](../spec/hara/runtime-libraries.md) for portable operations.
+Use the [L0 language specification](reference/l0-language.md) for semantics and the
+[runtime-library contract](reference/runtime-libraries.md) for portable operations.
