@@ -164,7 +164,7 @@ public class CollectionProtocolConformanceTest {
     assertEquals(2L, lookup.invoke("lookup", mutable, new Object[] {"b"}));
   }
 
-
+  @Test
   public void emptyPreservesEverySupportedCollectionFamily() {
     HaraProtocol empty = new HaraProtocol("IEmpty", java.util.Map.of("empty", 1));
     HaraJavaAdapters.installEmpty(empty);
@@ -185,7 +185,11 @@ public class CollectionProtocolConformanceTest {
     };
     for (Object receiver : persistent) {
       Object result = empty.invoke("empty", receiver, new Object[0]);
-      assertEquals(receiver.getClass(), result.getClass());
+      if (receiver instanceof Tuple.Tup1) {
+        assertTrue(result instanceof Tuple.Tup0);
+      } else {
+        assertEquals(receiver.getClass(), result.getClass());
+      }
       assertEquals(0L, count.invoke("count", result, new Object[0]));
       assertEquals(1L, count.invoke("count", receiver, new Object[0]));
     }

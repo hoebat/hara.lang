@@ -1,6 +1,9 @@
 package hara.truffle;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThrows;
+import static org.junit.Assert.assertTrue;
 
 import hara.lang.data.List;
 import hara.lang.data.Map;
@@ -53,6 +56,57 @@ public class CollectionProtocolDifferentialTest {
       protocolIterator.forEachRemaining(element -> actual.add(comparable(element)));
       assertEquals(expected, actual);
     }
+  }
+
+  @Test
+  public void nilAndUnsupportedValuesHaveExplicitProtocolBoundaries() {
+    HaraProtocol lookup = new HaraProtocol("ILookup", java.util.Map.of("lookup", -1));
+    HaraJavaAdapters.installLookup(lookup);
+    HaraProtocol count = new HaraProtocol("ICount", java.util.Map.of("count", 1));
+    HaraJavaAdapters.installCount(count);
+    HaraProtocol conj = new HaraProtocol("IConj", java.util.Map.of("conj", 2));
+    HaraJavaAdapters.installConj(conj);
+    HaraProtocol empty = new HaraProtocol("IEmpty", java.util.Map.of("empty", 1));
+    HaraJavaAdapters.installEmpty(empty);
+    HaraProtocol assoc = new HaraProtocol("IAssoc", java.util.Map.of("assoc", 3));
+    HaraJavaAdapters.installAssoc(assoc);
+
+    assertEquals(0L, count.invoke("count", null, new Object[0]));
+    assertEquals("fallback", lookup.invoke("lookup", null, new Object[] {"key", "fallback"}));
+    assertEquals(null, empty.invoke("empty", null, new Object[0]));
+    Object singleton = conj.invoke("conj", null, new Object[] {"value"});
+    assertTrue(singleton instanceof List.Standard);
+    assertEquals("value", ((Iterable<?>) singleton).iterator().next());
+
+    HaraException primitive =
+        assertThrows(
+            HaraException.class,
+            () -> assoc.invoke("assoc", 42L, new Object[] {"key", "value"}));
+    assertTrue(primitive.getMessage().contains("IAssoc/assoc"));
+    assertTrue(primitive.getMessage().contains("category=number"));
+    assertTrue(primitive.getMessage().contains("primitive:number"));
+  }
+
+  @Test
+  public void invalidIndexesDuplicatesAndMapEntryShapeMatchJavaValues() {
+    HaraProtocol nth = new HaraProtocol("INth", java.util.Map.of("nth", 2));
+    HaraJavaAdapters.installNth(nth);
+    Vector.Standard<String> vector = Vector.Standard.from(null, "only");
+    assertThrows(RuntimeException.class, () -> nth.invoke("nth", vector, new Object[] {-1L}));
+    assertThrows(RuntimeException.class, () -> nth.invoke("nth", vector, new Object[] {1L}));
+
+    Set.Standard<String> set = Set.Standard.from(null, "same", "same");
+    assertEquals(1L, set.count());
+    assertSame("same", set.find("same"));
+
+    Map.Standard<String, Long> map = Map.Standard.from(null, "key", 1L, "key", 2L);
+    assertEquals(1L, map.count());
+    assertEquals(2L, map.lookup("key").longValue());
+    Object entry = map.iterator().next();
+    assertTrue(entry instanceof IPair);
+    IPair<?, ?> pair = (IPair<?, ?>) entry;
+    assertEquals("key", pair.getKey());
+    assertEquals(Long.valueOf(2L), pair.getValue());
   }
 
   private static Object comparable(Object value) {
