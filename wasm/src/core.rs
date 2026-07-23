@@ -831,6 +831,29 @@ fn collection_nth(value: &Value, key: &Value) -> Result<Value, String> {
     collection_get(value, key, missing).and_then(|result| if result == Value::Nil { Err("nth index out of bounds".into()) } else { Ok(result) })
 }
 
+fn collection_assoc(value: &Value, key: &Value, replacement: Value) -> Result<Value, String> {
+    match value {
+        Value::Map(entries) => { let mut output=entries.clone(); if let Some((_, item))=output.iter_mut().find(|(candidate, _)| candidate==key) { *item=replacement; } else { output.push((key.clone(), replacement)); } Ok(Value::Map(output)) }
+        Value::Object(entries) => { let name=marker_key(key, "object")?; let mut output=entries.borrow().clone(); if let Some((_, item))=output.iter_mut().find(|(candidate, _)| candidate==&name) { *item=replacement; } else { output.push((name,replacement)); } Ok(Value::Object(Rc::new(RefCell::new(output)))) }
+        Value::Nil => Ok(Value::Map(vec![(key.clone(), replacement)])),
+        _ => Err("assoc expects a map or object".into()),
+    }
+}
+
+fn collection_get_in(value: Value, keys: &[Value]) -> Result<Value, String> {
+    if keys.is_empty() { return Ok(value); }
+    let next=collection_get(&value, &keys[0], Value::Nil)?;
+    if matches!(next, Value::Nil) { Ok(Value::Nil) } else { collection_get_in(next, &keys[1..]) }
+}
+
+fn collection_assoc_in(value: Value, keys: &[Value], replacement: Value) -> Result<Value, String> {
+    if keys.is_empty() { return Ok(replacement); }
+    let current=if matches!(value, Value::Nil) { Value::Map(Vec::new()) } else { value };
+    let child=collection_get(&current, &keys[0], Value::Nil)?;
+    let updated=collection_assoc_in(child, &keys[1..], replacement)?;
+    collection_assoc(&current, &keys[0], updated)
+}
+
 fn literal_value(form: &Form) -> Result<Value, String> {
     match form {
         Form::Number(v) => Ok(Value::Number(*v)), Form::String(v) => Ok(Value::String(v.clone())), Form::Keyword(v) => Ok(Value::Keyword(v.clone())), Form::Symbol(v) => Ok(Value::Symbol(v.clone())),
@@ -1179,6 +1202,27 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
             Form::Symbol(n) if n == "nth" => {
                 if fs.len() != 3 { return Err("nth expects two arguments".into()); }
                 collection_nth(&eval(&fs[1], env)?, &eval(&fs[2], env)?)
+            }
+            Form::Symbol(n) if n == "assoc" => {
+                if fs.len() < 4 || fs.len() % 2 != 0 { return Err("assoc expects a collection and key/value pairs".into()); }
+                let mut value=eval(&fs[1], env)?;
+                for pair in fs[2..].chunks(2) { let key=eval(&pair[0], env)?; let replacement=eval(&pair[1], env)?; value=collection_assoc(&value, &key, replacement)?; }
+                Ok(value)
+            }
+            Form::Symbol(n) if n == "get-in" => {
+                if fs.len()!=3 { return Err("get-in expects a collection and keys".into()); }
+                let value=eval(&fs[1], env)?; let keys=iterator_values(eval(&fs[2], env)?)?; collection_get_in(value, &keys)
+            }
+            Form::Symbol(n) if n == "assoc-in" => {
+                if fs.len()!=4 { return Err("assoc-in expects a collection, keys, and value".into()); }
+                let value=eval(&fs[1], env)?; let keys=iterator_values(eval(&fs[2], env)?)?; let replacement=eval(&fs[3], env)?; collection_assoc_in(value, &keys, replacement)
+            }
+            Form::Symbol(n) if n == "update" || n == "update-in" => {
+                if (n=="update" && fs.len()<4) || (n=="update-in" && fs.len()<4) { return Err(format!("{n} expects a collection, key path, and function")); }
+                let value=eval(&fs[1], env)?; let (keys, function_form, extra_forms)=if n=="update" { (vec![eval(&fs[2], env)?], &fs[3], &fs[4..]) } else { (iterator_values(eval(&fs[2], env)?)?, &fs[3], &fs[4..]) };
+                let current=collection_get_in(value.clone(), &keys)?; let function=eval(function_form, env)?; let mut args=vec![current]; args.extend(extra_forms.iter().map(|form| eval(form, env)).collect::<Result<Vec<_>,_>>()?);
+                let replacement=match function { Value::Function(function)=>call_function(&function,args)?, _=>return Err(format!("{n} expects a function")) };
+                if n=="update" { collection_assoc(&value,&keys[0],replacement) } else { collection_assoc_in(value,&keys,replacement) }
             }
             Form::Symbol(n) if n == "conj" => {
                 if fs.len() != 3 { return Err("conj expects two arguments".into()); }

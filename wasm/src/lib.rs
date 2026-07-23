@@ -603,6 +603,18 @@ mod tests {
     }
 
     #[test]
+    fn nested_associative_helpers_match_l0_shapes() {
+        let mut runtime = Runtime::new();
+        assert_eq!(runtime.eval_text("(get-in {:a {:b 42}} [:a :b])").unwrap(), "42");
+        assert_eq!(runtime.eval_text("(get-in {:a {:b 42}} [:a :missing])").unwrap(), "nil");
+        assert_eq!(runtime.eval_text("(get-in (assoc-in {} [:a :b] 42) [:a :b])").unwrap(), "42");
+        assert_eq!(runtime.eval_text("(get {:a 3} :a)").unwrap(), "3");
+        assert_eq!(runtime.eval_text("(get (update {:a 3} :a (fn [x] (+ x 2))) :a)").unwrap(), "5");
+        assert_eq!(runtime.eval_text("(get-in (update-in {:a {:b 3}} [:a :b] (fn [x y] (+ x y)) 4) [:a :b])").unwrap(), "7");
+        assert_eq!(runtime.eval_text("(get (assoc {} :a 1 :b 2) :b)").unwrap(), "2");
+    }
+
+    #[test]
     fn iterator_combinators_cover_core_shapes() {
         let mut runtime = Runtime::new();
         assert_eq!(runtime.eval_text("(count (take-while (fn [x] (< x 3)) (range 5)))").unwrap(), "3");
