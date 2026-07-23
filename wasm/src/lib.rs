@@ -600,6 +600,22 @@ mod tests {
     }
 
     #[test]
+    fn promise_continuations_preserve_registration_order_and_late_delivery() {
+        let promise = core::Promise::new();
+        let events = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+        let first = events.clone();
+        promise.on_settle(std::rc::Rc::new(move |_| first.borrow_mut().push(1)));
+        let second = events.clone();
+        promise.on_settle(std::rc::Rc::new(move |_| second.borrow_mut().push(2)));
+        assert!(promise.resolve(core::Value::Number(7)));
+        assert_eq!(*events.borrow(), vec![1, 2]);
+        let late = events.clone();
+        promise.on_settle(std::rc::Rc::new(move |_| late.borrow_mut().push(3)));
+        assert_eq!(*events.borrow(), vec![1, 2, 3]);
+        assert!(!promise.reject("late"));
+    }
+
+    #[test]
     fn promises_settle_once_and_adopt() {
         let pending = core::Promise::new();
         let adopted = core::Promise::new();

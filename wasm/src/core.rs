@@ -187,7 +187,7 @@ impl Value {
             Self::Vector(values) => format!("[{}]", values.iter().map(Value::display).collect::<Vec<_>>().join(" ")),
             Self::Iterator(iterator) => if iterator.borrow().seq { "<seq>".into() } else { "<iterator>".into() },
             Self::Var(_) => "<var>".into(),
-            Self::Extension(value) => format!("<extension:{}/{}#{}>", value.provider, value.type_name, value.handle),
+            Self::Extension(value) => format!("#ht[:handle {}]", value.handle),
             Self::Nil => "nil".into(),
         }
     }
