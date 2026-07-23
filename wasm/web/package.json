@@ -1,0 +1,15 @@
+{
+  "name": "hara-wasm-browser",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:noir": "vite build --config vite.noir.config.js",
+    "test:noir": "npm run build:noir && cp node_modules/@noir-lang/noir_wasm/dist/web/main.mjs dist/noir-wasm.mjs && node --test noir-loader.test.js"
+  },
+  "dependencies": {
+    "@noir-lang/noir_wasm": "1.0.0-beta.25"
+  },
+  "devDependencies": {
+    "vite": "8.1.5"
+  }
+}

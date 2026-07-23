@@ -54,6 +54,19 @@ jobs:
       - name: Build MkDocs site
         run: mkdocs build --strict --site-dir site-build
 
+      - name: Build Rust WASM package
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo install wasm-bindgen-cli --version 0.2.126 --locked
+          cargo build --manifest-path wasm/Cargo.toml --target wasm32-unknown-unknown --release
+          npm ci --prefix wasm/web
+          npm run --prefix wasm/web test:noir
+          mkdir -p site-build/wasm
+          wasm-bindgen --target web --out-dir site-build/wasm/pkg wasm/target/wasm32-unknown-unknown/release/hara_wasm.wasm
+          cp wasm/web/index.html wasm/web/playground.css wasm/web/playground.js site-build/wasm/
+          cp wasm/web/dist/noir-loader.js site-build/wasm/
+          cp wasm/web/node_modules/@noir-lang/noir_wasm/dist/web/main.mjs site-build/wasm/noir-wasm.mjs
+
       - name: Add Java API documentation
         run: |
           mkdir -p site-build/api/java
