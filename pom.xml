@@ -42,12 +42,13 @@
 			<artifactId>wasm</artifactId>
 			<version>${graalvm.version}</version>
 			<type>pom</type>
+					<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.graalvm.wasm</groupId>
 			<artifactId>wasm-language</artifactId>
 			<version>${graalvm.version}</version>
-			<scope>runtime</scope>
+			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>junit</groupId>
