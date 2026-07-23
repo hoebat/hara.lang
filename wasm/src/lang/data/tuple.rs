@@ -1,6 +1,9 @@
 use std::rc::Rc;
 
-use crate::lang::protocol::{IEmpty, IMetadata};
+use crate::lang::protocol::{
+    IConj, ICons, ICount, IEmpty, IMetadata, INth, IPeekFirst, IPeekLast, IPersistent, IPopFirst,
+    IPopLast, IPushFirst, IPushLast,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Tuple<E> {
@@ -119,6 +122,63 @@ impl<E: Clone> Tuple<E> {
         self.len().checked_sub(1).and_then(|i| self.get(i))
     }
 }
+impl<E: Clone> ICount for Tuple<E> {
+    fn count(&self) -> usize {
+        self.len()
+    }
+}
+impl<E: Clone> INth<E> for Tuple<E> {
+    fn nth(&self, index: usize) -> Option<&E> {
+        self.get(index)
+    }
+}
+impl<E: Clone> IPeekFirst<E> for Tuple<E> {
+    fn peek_first(&self) -> Option<E> {
+        Tuple::peek_first(self).cloned()
+    }
+}
+impl<E: Clone> IPeekLast<E> for Tuple<E> {
+    fn peek_last(&self) -> Option<E> {
+        Tuple::peek_last(self).cloned()
+    }
+}
+impl<E: Clone> IPushFirst<E> for Tuple<E> {
+    type Output = Self;
+    fn push_first(&self, value: E) -> Self {
+        Tuple::push_first(self, value).expect("tuple arity cannot exceed 8")
+    }
+}
+impl<E: Clone> IPushLast<E> for Tuple<E> {
+    type Output = Self;
+    fn push_last(&self, value: E) -> Self {
+        Tuple::push_last(self, value).expect("tuple arity cannot exceed 8")
+    }
+}
+impl<E: Clone> IPopFirst for Tuple<E> {
+    type Output = Self;
+    fn pop_first(&self) -> Self {
+        Tuple::pop_first(self)
+    }
+}
+impl<E: Clone> IPopLast for Tuple<E> {
+    type Output = Self;
+    fn pop_last(&self) -> Self {
+        Tuple::pop_last(self)
+    }
+}
+impl<E: Clone> ICons<E> for Tuple<E> {
+    type Output = Self;
+    fn cons(&self, value: E) -> Self {
+        IPushFirst::push_first(self, value)
+    }
+}
+impl<E: Clone> IConj<E> for Tuple<E> {
+    type Output = Self;
+    fn conj(&self, value: E) -> Self {
+        IPushLast::push_last(self, value)
+    }
+}
+impl<E: Clone> IPersistent for Tuple<E> {}
 impl<E: Clone> IMetadata for Tuple<E> {
     type Metadata = Rc<str>;
     fn meta(&self) -> Option<&Self::Metadata> {

@@ -4,7 +4,7 @@ use std::rc::Rc;
 use crate::lang::protocol::hash::HashType;
 use crate::lang::protocol::{
     IAssoc, IConj, ICount, IDisplay, IEmpty, IEquality, IHash, IMetadata, IMutable, INth,
-    IPersistent, IPopLast, IPushLast, IToMutable, IToPersistent,
+    IPeekFirst, IPeekLast, IPersistent, IPopLast, IPushLast, IToMutable, IToPersistent,
 };
 
 const NODE_SHIFT: usize = 5;
@@ -389,6 +389,19 @@ impl<E: Clone> IAssoc<usize, E> for Standard<E> {
     }
 }
 
+impl<E: Clone> IPeekFirst<E> for Standard<E> {
+    fn peek_first(&self) -> Option<E> {
+        self.get(0).cloned()
+    }
+}
+impl<E: Clone> IPeekLast<E> for Standard<E> {
+    fn peek_last(&self) -> Option<E> {
+        self.size
+            .checked_sub(1)
+            .and_then(|index| self.get(index))
+            .cloned()
+    }
+}
 impl<E: Clone> IPushLast<E> for Standard<E> {
     type Output = Self;
     fn push_last(&self, value: E) -> Self {

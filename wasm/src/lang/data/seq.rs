@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use crate::lang::data::Tuple;
 use crate::lang::protocol::{
-    IConj, ICons, ICount, IEmpty, IMetadata, IPersistent, IPopFirst, IPushFirst,
+    IConj, ICons, ICount, IEmpty, IMetadata, IPeekFirst, IPersistent, IPopFirst, IPushFirst,
 };
 
 #[derive(Clone)]
@@ -71,6 +71,11 @@ impl<E: Clone + 'static> Seq<E> {
 impl<E: Clone + 'static> ICount for Seq<E> {
     fn count(&self) -> usize {
         Seq::count(self)
+    }
+}
+impl<E: Clone + 'static> IPeekFirst<E> for Seq<E> {
+    fn peek_first(&self) -> Option<E> {
+        Seq::peek_first(self)
     }
 }
 impl<E: Clone + 'static> IPushFirst<E> for Seq<E> {

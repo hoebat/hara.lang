@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use crate::lang::protocol::{
-    IAssoc, IConj, ICons, ICount, IEmpty, IMetadata, IMutable, INth, IPersistent, IPopFirst,
-    IPopLast, IPushFirst, IPushLast, IToMutable, IToPersistent,
+    IAssoc, IConj, ICons, ICount, IEmpty, IMetadata, IMutable, INth, IPeekFirst, IPeekLast,
+    IPersistent, IPopFirst, IPopLast, IPushFirst, IPushLast, IToMutable, IToPersistent,
 };
 
 const CHUNK_SIZE: usize = 32;
@@ -191,6 +191,19 @@ impl<E: Clone> ICount for Standard<E> {
 impl<E: Clone> INth<E> for Standard<E> {
     fn nth(&self, index: usize) -> Option<&E> {
         self.get(index)
+    }
+}
+impl<E: Clone> IPeekFirst<E> for Standard<E> {
+    fn peek_first(&self) -> Option<E> {
+        self.get(0).cloned()
+    }
+}
+impl<E: Clone> IPeekLast<E> for Standard<E> {
+    fn peek_last(&self) -> Option<E> {
+        self.size
+            .checked_sub(1)
+            .and_then(|index| self.get(index))
+            .cloned()
     }
 }
 impl<E: Clone> IPushFirst<E> for Standard<E> {

@@ -1,6 +1,6 @@
 use crate::lang::data::{List, Tuple};
 use crate::lang::protocol::{
-    IConj, ICons, ICount, IEmpty, IMetadata, INth, IPersistent, IPopFirst, IPushFirst,
+    IConj, ICons, ICount, IEmpty, IMetadata, INth, IPeekFirst, IPersistent, IPopFirst, IPushFirst,
 };
 use std::rc::Rc;
 
@@ -56,6 +56,11 @@ impl<E: Clone> INth<E> for Cons<E> {
         } else {
             self.more.get(index - 1)
         }
+    }
+}
+impl<E: Clone, M: Clone> IPeekFirst<E> for Cons<E, M> {
+    fn peek_first(&self) -> Option<E> {
+        Some(self.first.clone())
     }
 }
 impl<E: Clone, M: Clone> IPushFirst<E> for Cons<E, M> {

@@ -1,7 +1,7 @@
 use crate::lang::data::{List, Vector};
 use crate::lang::protocol::{
-    IConj, ICount, IEmpty, IMetadata, IMutable, INth, IPersistent, IPopFirst, IPopLast, IPushLast,
-    IToMutable, IToPersistent,
+    IConj, ICount, IEmpty, IMetadata, IMutable, INth, IPeekFirst, IPeekLast, IPersistent,
+    IPopFirst, IPopLast, IPushLast, IToMutable, IToPersistent,
 };
 use std::rc::Rc;
 
@@ -179,6 +179,16 @@ impl<E: Clone> ICount for Standard<E> {
 impl<E: Clone> INth<E> for Standard<E> {
     fn nth(&self, index: usize) -> Option<&E> {
         self.get(index)
+    }
+}
+impl<E: Clone> IPeekFirst<E> for Standard<E> {
+    fn peek_first(&self) -> Option<E> {
+        Standard::peek_first(self).cloned()
+    }
+}
+impl<E: Clone> IPeekLast<E> for Standard<E> {
+    fn peek_last(&self) -> Option<E> {
+        Standard::peek_last(self).cloned()
     }
 }
 impl<E: Clone> IPushLast<E> for Standard<E> {
