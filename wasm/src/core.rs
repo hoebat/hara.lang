@@ -764,6 +764,11 @@ fn iterator_constant(value: Value) -> Value { Value::Iterator(Rc::new(RefCell::n
 fn iterator_repeated(function: Rc<Function>) -> Value { Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::Repeated(function))))) }
 fn iterator_iterate(function: Rc<Function>, seed: Value) -> Value { Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::Iterate(function, seed))))) }
 fn iterator_take(value: Value, amount: usize) -> Result<Value, String> { let mut output=Vec::new(); for _ in 0..amount { match iterator_next(&value) { Ok(item)=>output.push(item), Err(_) => break } } Ok(iterator_from_values(output)) }
+fn iterator_drop(value: Value, amount: usize) -> Result<Value, String> {
+    let iterator=match value { Value::Iterator(_) => value, value => make_iterator(value)? };
+    for _ in 0..amount { if iterator_next(&iterator).is_err() { break; } }
+    Ok(iterator)
+}
 
 fn iterator_cycle(value: Value) -> Result<Value, String> {
     let values = iterator_values(value)?; let state = IteratorState { values, index: 0, closed: false, cycle: true, generator: None }; Ok(Value::Iterator(Rc::new(RefCell::new(state))))
@@ -825,7 +830,7 @@ fn collection_empty(value: Value) -> Result<Value, String> {
 }
 
 fn collection_count(value: &Value) -> Result<Value, String> {
-    let count = match value { Value::Nil => 0, Value::String(v) => v.chars().count(), Value::Vector(v) => v.len(), Value::List(v) => v.len(), Value::Map(v) => v.len(), Value::Bytes(v) => v.len(), Value::ByteBuffer(v) => v.borrow().len(), Value::Array(v) => v.borrow().len(), Value::Object(v) => v.borrow().len(), Value::Iterator(v) => { let state = v.borrow(); state.values.len().saturating_sub(state.index) }, _ => return Err("count expects a collection".into()) };
+    let count = match value { Value::Nil => 0, Value::String(v) => v.chars().count(), Value::Vector(v) => v.len(), Value::List(v) => v.len(), Value::Map(v) => v.len(), Value::Bytes(v) => v.len(), Value::ByteBuffer(v) => v.borrow().len(), Value::Array(v) => v.borrow().len(), Value::Object(v) => v.borrow().len(), Value::Iterator(v) => { let state = v.borrow(); if state.generator.is_some() { return Err("count expects a finite collection".into()); } state.values.len().saturating_sub(state.index) }, _ => return Err("count expects a collection".into()) };
     Ok(Value::Number(count as i64))
 }
 
@@ -1091,7 +1096,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 if fs.len()!=3 { return Err(format!("{n} expects an amount and collection")); } let amount=value_index(&eval(&fs[1], env)?)?; iterator_take(eval(&fs[2], env)?, amount)
             }
             Form::Symbol(n) if ["iter-drop", "drop"].contains(&n.as_str()) => {
-                if fs.len()!=3 { return Err(format!("{n} expects an amount and collection")); } let amount=value_index(&eval(&fs[1], env)?)?; let values=iterator_values(eval(&fs[2], env)?)?; Ok(iterator_from_values(values.into_iter().skip(amount).collect()))
+                if fs.len()!=3 { return Err(format!("{n} expects an amount and collection")); } let amount=value_index(&eval(&fs[1], env)?)?; iterator_drop(eval(&fs[2], env)?, amount)
             }
             Form::Symbol(n) if ["iter-take-while", "take-while", "iter-drop-while", "drop-while"].contains(&n.as_str()) => {
                 if fs.len()!=3 { return Err(format!("{n} expects a predicate and collection")); }
