@@ -135,7 +135,9 @@ impl<'a> Parser<'a> {
                                 position: self.reader.position(),
                             })?);
                         }
-                        other => return self.error(format!("unsupported escape: \\{other}")),
+                        other => {
+                            return self.error(format!("Unsupported escape character: \\{other}"))
+                        }
                     }
                 }
                 Some(ch) => out.push(ch),
@@ -280,7 +282,7 @@ impl<'a> Parser<'a> {
                 let value = self.read_required("tagged literal")?;
                 Ok(Some(Form::Tagged(tag, Box::new(value.form))))
             }
-            None => self.error("EOF after #"),
+            None => self.error("EOF while reading hash dispatch"),
         }
     }
     fn atom(&self, token: String) -> Result<Form> {
@@ -416,6 +418,20 @@ impl<'a> Parser<'a> {
                 let token = self
                     .reader
                     .read_while(|c| !c.is_whitespace() && !"()[]{}".contains(c));
+                if let Some(digit) = token
+                    .strip_prefix('u')
+                    .filter(|digits| digits.len() == 4)
+                    .and_then(|digits| digits.chars().find(|ch| !ch.is_ascii_hexdigit()))
+                {
+                    return self.error(format!("Invalid digit: {digit}"));
+                }
+                if let Some(digit) = token
+                    .strip_prefix('o')
+                    .filter(|digits| (1..=3).contains(&digits.len()))
+                    .and_then(|digits| digits.chars().find(|ch| !(('0'..='7').contains(ch))))
+                {
+                    return self.error(format!("Invalid digit: {digit}"));
+                }
                 let value = match token.as_str() {
                     "newline" => Some('\n'),
                     "space" => Some(' '),
@@ -631,6 +647,22 @@ mod tests {
             parse_forms("^:ignored :keyword").unwrap(),
             vec![Form::Keyword("keyword".into())]
         );
+    }
+
+    #[test]
+    fn matches_java_malformed_reader_failures() {
+        for (source, expected) in [
+            (")", "Unmatched delimiter"),
+            ("\"", "EOF while reading string"),
+            ("\"\\u12X4\"", "Invalid digit"),
+            ("\"\\q\"", "Unsupported escape character"),
+            ("\\u12X4", "Invalid digit"),
+            ("{:a 1 :b}", "even number of forms"),
+            ("#", "EOF while reading hash dispatch"),
+        ] {
+            let error = parse_forms(source).unwrap_err();
+            assert!(error.contains(expected), "{source}: {error}");
+        }
     }
 
     #[test]
