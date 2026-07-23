@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$ROOT"
+
+mvn -B -Ptruffle -DskipTests test-compile dependency:copy-dependencies \
+  -DincludeScope=runtime \
+  -DoutputDirectory="$ROOT/target/truffle-dependencies"
+
+exec java \
+  -cp "$ROOT/target/test-classes:$ROOT/target/classes:$ROOT/target/truffle-dependencies/*" \
+  hara.truffle.HaraWasmTruffleParityBenchmark "$@"

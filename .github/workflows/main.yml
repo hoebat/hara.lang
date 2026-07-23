@@ -16,6 +16,8 @@ jobs:
       uses: dtolnay/rust-toolchain@stable
       with:
         targets: wasm32-unknown-unknown
+    - name: Verify generated parity corpus
+      run: ./scripts/generate-wasm-truffle-parity && git diff --exit-code -- spec/hara/wasm-truffle-parity.edn
     - name: Build raw Rust WASM extension artifact
       run: ./scripts/build-hara-wasm-raw
     - name: Set up JDK 21
@@ -32,6 +34,15 @@ jobs:
 
     - name: Run Rust WASM and Truffle parity corpus
       run: mvn -B -Ptruffle -Dtest=hara.truffle.HaraWasmTruffleParityTest test
+
+    - name: Benchmark Rust WASM and Truffle parity corpus
+      run: ./scripts/run-wasm-truffle-parity-benchmark 3 100 1000 target/wasm-truffle-parity-speed.csv
+
+    - name: Upload Rust WASM and Truffle parity speed report
+      uses: actions/upload-artifact@v4
+      with:
+        name: wasm-truffle-parity-speed
+        path: target/wasm-truffle-parity-speed.csv
 
     - name: Run JVM L0 benchmark matrix
       run: ./scripts/run-truffle-benchmark 2 1000 | tee target/l0-benchmark.txt
