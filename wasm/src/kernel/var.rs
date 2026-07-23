@@ -102,6 +102,14 @@ impl<V> Var<V> {
     }
 }
 impl<V: Clone + 'static> Var<V> {
+    pub fn requalify(&self, path: impl AsRef<str>) -> Self {
+        Self {
+            identity: self.identity.clone(),
+            symbol: Symbol::parse(path.as_ref()),
+            value: self.value.clone(),
+            metadata: self.metadata.clone(),
+        }
+    }
     pub fn deref_value(&self) -> V {
         let key = self.identity_key();
         DYNAMIC_BINDINGS.with(|bindings| {
@@ -228,5 +236,19 @@ mod tests {
         });
         assert_eq!(old.doc.as_deref(), Some("A value"));
         assert!(var.is_dynamic());
+    }
+    #[test]
+    fn requalification_preserves_identity_root_metadata_and_bindings() {
+        let var = Var::new("value", 1);
+        var.update_metadata(|meta| meta.dynamic = true);
+        let qualified = var.requalify("hello/value");
+        assert!(var.same_identity(&qualified));
+        assert_eq!(qualified.symbol().as_str(), "hello/value");
+        qualified.reset_value(2);
+        assert_eq!(var.deref(), 2);
+        var.bind(3);
+        assert_eq!(qualified.deref(), 3);
+        qualified.unbind().unwrap();
+        assert!(qualified.is_dynamic());
     }
 }
