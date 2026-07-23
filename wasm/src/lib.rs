@@ -619,6 +619,8 @@ mod tests {
         assert!(runtime.eval_text("(count (repeat :x))").unwrap_err().contains("finite collection"));
         assert_eq!(runtime.eval_text("(count (take 3 (repeatedly (constantly 7))))").unwrap(), "3");
         assert_eq!(runtime.eval_text("(count (take 5 (iterate (fn [x] (+ x 2)) 0)))").unwrap(), "5");
+        assert_eq!(runtime.eval_text("(count (take 3 (take-while (fn [x] (< x 10)) (iterate (fn [x] (+ x 2)) 0))))").unwrap(), "3");
+        assert_eq!(runtime.eval_text("(first (take 2 (drop-while (fn [x] (< x 4)) (iterate (fn [x] (+ x 2)) 0))))").unwrap(), "4");
         assert_eq!(runtime.eval_text("(first (take 4 (iterate (fn [x] (+ x 2)) 0)))").unwrap(), "0");
         assert_eq!(runtime.eval_text("(second (repeat :x))").unwrap(), ":x");
         assert_eq!(runtime.eval_text("(first (rest (iterate (fn [x] (+ x 1)) 0)))").unwrap(), "1");

@@ -43,7 +43,7 @@ pub struct Function {
 }
 
 #[derive(Debug, Clone)]
-enum IteratorGenerator { Constant(Value), Repeated(Rc<Function>), Iterate(Rc<Function>, Value) }
+enum IteratorGenerator { Constant(Value), Repeated(Rc<Function>), Iterate(Rc<Function>, Value), TakeWhile(Rc<Function>, Value), DropWhile(Rc<Function>, Value, bool) }
 
 #[derive(Debug, Clone)]
 pub struct IteratorState {
@@ -65,6 +65,8 @@ impl IteratorState {
                 IteratorGenerator::Constant(value) => Ok(value.clone()),
                 IteratorGenerator::Repeated(function) => call_function(function, Vec::new()),
                 IteratorGenerator::Iterate(function, current) => { let output=current.clone(); *current=call_function(function, vec![current.clone()])?; Ok(output) },
+                IteratorGenerator::TakeWhile(function, source) => { let value=iterator_next(source)?; if call_function(function, vec![value.clone()])?.truthy() { Ok(value) } else { self.closed=true; Err("iter-next reached the end of the iterator".into()) } },
+                IteratorGenerator::DropWhile(function, source, started) => { loop { let value=iterator_next(source)?; if *started || !call_function(function, vec![value.clone()])?.truthy() { *started=true; break Ok(value); } } },
             };
         }
         if self.values.is_empty() { return Err("iter-next reached the end of the iterator".into()); }
@@ -763,6 +765,16 @@ fn iterator_from_values(values: Vec<Value>) -> Value { Value::Iterator(Rc::new(R
 fn iterator_constant(value: Value) -> Value { Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::Constant(value))))) }
 fn iterator_repeated(function: Rc<Function>) -> Value { Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::Repeated(function))))) }
 fn iterator_iterate(function: Rc<Function>, seed: Value) -> Value { Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::Iterate(function, seed))))) }
+fn iterator_take_while(function: Rc<Function>, value: Value) -> Result<Value, String> {
+    let source=match value { Value::Iterator(iterator) => { if iterator.borrow().generator.is_none() { Value::Iterator(iterator) } else { Value::Iterator(iterator) } }, value => make_iterator(value)? };
+    if let Value::Iterator(iterator)=&source { if iterator.borrow().generator.is_none() { let values=iterator_values(source)?; let mut output=Vec::new(); for value in values { if !call_function(&function, vec![value.clone()])?.truthy() { break; } output.push(value); } return Ok(iterator_from_values(output)); } }
+    Ok(Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::TakeWhile(function, source))))))
+}
+fn iterator_drop_while(function: Rc<Function>, value: Value) -> Result<Value, String> {
+    let source=match value { Value::Iterator(iterator) => Value::Iterator(iterator), value => make_iterator(value)? };
+    if let Value::Iterator(iterator)=&source { if iterator.borrow().generator.is_none() { let values=iterator_values(source)?; let mut output=Vec::new(); let mut dropping=true; for value in values { if dropping && call_function(&function, vec![value.clone()])?.truthy() { continue; } dropping=false; output.push(value); } return Ok(iterator_from_values(output)); } }
+    Ok(Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::DropWhile(function, source, false))))))
+}
 fn iterator_take(value: Value, amount: usize) -> Result<Value, String> { let mut output=Vec::new(); for _ in 0..amount { match iterator_next(&value) { Ok(item)=>output.push(item), Err(_) => break } } Ok(iterator_from_values(output)) }
 fn iterator_drop(value: Value, amount: usize) -> Result<Value, String> {
     let iterator=match value { Value::Iterator(_) => value, value => make_iterator(value)? };
@@ -1097,13 +1109,8 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
             }
             Form::Symbol(n) if ["iter-take-while", "take-while", "iter-drop-while", "drop-while"].contains(&n.as_str()) => {
                 if fs.len()!=3 { return Err(format!("{n} expects a predicate and collection")); }
-                let predicate=eval(&fs[1], env)?; let values=iterator_values(eval(&fs[2], env)?)?; let mut output=Vec::new(); let mut dropping=n.contains("drop-while");
-                for value in values {
-                    let result=match &predicate { Value::Function(function) => call_function(function, vec![value.clone()])?, _ => return Err(format!("{n} expects a function")) };
-                    if n.contains("take-while") { if !result.truthy() { break; } output.push(value); }
-                    else if dropping && result.truthy() { continue } else { dropping=false; output.push(value); }
-                }
-                Ok(iterator_from_values(output))
+                let predicate=match eval(&fs[1], env)? { Value::Function(function)=>function, _=>return Err(format!("{n} expects a function")) }; let value=eval(&fs[2], env)?;
+                if n.contains("take-while") { iterator_take_while(predicate,value) } else { iterator_drop_while(predicate,value) }
             }
             Form::Symbol(n) if ["iter-mapcat", "mapcat"].contains(&n.as_str()) => {
                 if fs.len()!=3 { return Err(format!("{n} expects a function and collection")); }
