@@ -473,6 +473,15 @@ mod tests {
         assert_eq!(runtime.eval_text("(= :ready :ready)").unwrap(), "true");
     }
 
+    #[test]
+    fn persistent_vectors_and_lists_keep_previous_values() {
+        let mut runtime = Runtime::new();
+        assert_eq!(runtime.eval_text("(let (source [1 2]) (get (conj source 3) 2))").unwrap(), "3");
+        assert_eq!(runtime.eval_text("(let (source [1 2]) (count source))").unwrap(), "2");
+        assert_eq!(runtime.eval_text("(let (source (rest [1 2])) (count (conj source 2)))").unwrap(), "2");
+        assert_eq!(runtime.eval_text("(let (source (rest [1 2])) (count source))").unwrap(), "1");
+    }
+
     fn protocol_identity(arguments: &[core::Value]) -> Result<core::Value, String> {
         arguments.first().cloned().ok_or_else(|| "missing receiver".into())
     }
@@ -596,7 +605,7 @@ mod tests {
         assert!(registry.contains("IIdentity", "identity"));
         assert_eq!(registry.invoke("IIdentity", "identity", &[core::Value::Number(7)]).unwrap(), core::Value::Number(7));
         assert!(registry.invoke("IIdentity", "missing", &[]).unwrap_err().contains("missing protocol method"));
-        assert_eq!(core::receiver_category(&core::Value::Vector(vec![])), "vector");
+        assert_eq!(core::receiver_category(&core::Value::Vector(im_rc::Vector::new())), "vector");
     }
 
     #[test]

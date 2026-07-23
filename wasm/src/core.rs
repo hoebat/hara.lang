@@ -1,5 +1,6 @@
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use im_rc::Vector as PVector;
 use std::rc::Rc;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -28,10 +29,10 @@ pub enum Value {
     Recur(Vec<Value>),
     Map(Vec<(Value, Value)>),
     Set(Vec<Value>),
-    List(Vec<Value>),
+    List(PVector<Value>),
     Symbol(String),
     Function(Rc<Function>),
-    Vector(Vec<Value>),
+    Vector(PVector<Value>),
     Iterator(Rc<RefCell<IteratorState>>),
     Var(Rc<RefCell<Value>>),
     Nil,
@@ -74,9 +75,9 @@ impl IteratorState {
                 IteratorGenerator::Filter(function, source) => { loop { let value=iterator_next(source)?; if call_function(function, vec![value.clone()])?.truthy() { break Ok(value); } } },
                 IteratorGenerator::Mapcat(function, source, pending) => { loop { if let Some(iterator)=pending { match iterator_next(iterator) { Ok(value)=>break Ok(value), Err(_)=>*pending=None } } let value=iterator_next(source)?; *pending=Some(make_iterator(call_function(function, vec![value])?)?); } },
                 IteratorGenerator::Keep(function, source) => { loop { let value=iterator_next(source)?; let mapped=call_function(function, vec![value])?; if !matches!(mapped, Value::Nil) { break Ok(mapped); } } },
-                IteratorGenerator::Zip(sources) => { let mut values=Vec::new(); for source in sources.iter() { match iterator_next(source) { Ok(value)=>values.push(value), Err(error)=>{ self.closed=true; return Err(error); } } } Ok(Value::Vector(values)) },
+                IteratorGenerator::Zip(sources) => { let mut values=Vec::new(); for source in sources.iter() { match iterator_next(source) { Ok(value)=>values.push(value), Err(error)=>{ self.closed=true; return Err(error); } } } Ok(Value::Vector(values.into())) },
                 IteratorGenerator::Interleave(sources, index) => { if sources.is_empty() { self.closed=true; return Err("iter-next reached the end of the iterator".into()); } let source=&sources[*index]; let value=iterator_next(source).map_err(|error| { self.closed=true; error })?; *index=(*index+1)%sources.len(); Ok(value) },
-                IteratorGenerator::Partition(source, amount, all) => { let mut values=Vec::new(); for _ in 0..*amount { match iterator_next(source) { Ok(value)=>values.push(value), Err(error)=>{ self.closed=true; if values.is_empty() || !*all { return Err(error); } break; } } } if values.is_empty() { self.closed=true; Err("iter-next reached the end of the iterator".into()) } else { Ok(Value::Vector(values)) } },
+                IteratorGenerator::Partition(source, amount, all) => { let mut values=Vec::new(); for _ in 0..*amount { match iterator_next(source) { Ok(value)=>values.push(value), Err(error)=>{ self.closed=true; if values.is_empty() || !*all { return Err(error); } break; } } } if values.is_empty() { self.closed=true; Err("iter-next reached the end of the iterator".into()) } else { Ok(Value::Vector(values.into())) } },
             };
         }
         if self.values.is_empty() { return Err("iter-next reached the end of the iterator".into()); }
@@ -767,7 +768,7 @@ fn dot_call(receiver: Value, method: &Form, env: &mut HashMap<String, Value>) ->
             "delete" => { if args.len()!=1 { return Err("object/delete expects a key".into()); } let key=marker_key(&args[0], "object/delete")?; object.borrow_mut().retain(|(candidate, _)| candidate != &key); Ok(Value::Object(object)) }
             "keys" => { if !args.is_empty() { return Err("object/keys expects no arguments".into()); } Ok(Value::Vector(object.borrow().iter().map(|(key, _)| Value::String(key.clone())).collect())) }
             "vals" => { if !args.is_empty() { return Err("object/vals expects no arguments".into()); } Ok(Value::Vector(object.borrow().iter().map(|(_, value)| value.clone()).collect())) }
-            "pairs" => { if !args.is_empty() { return Err("object/pairs expects no arguments".into()); } Ok(Value::Vector(object.borrow().iter().map(|(key, value)| Value::Vector(vec![Value::String(key.clone()), value.clone()])).collect())) }
+            "pairs" => { if !args.is_empty() { return Err("object/pairs expects no arguments".into()); } Ok(Value::Vector(object.borrow().iter().map(|(key, value)| Value::Vector(PVector::from_iter([Value::String(key.clone()), value.clone()]))).collect())) }
             "assign" => { if args.len()!=1 { return Err("object/assign expects an object".into()); } let other=match &args[0] { Value::Object(other) => other.clone(), _ => return Err("object/assign expects an object".into()) }; let mut values=object.borrow_mut(); for (key,value) in other.borrow().iter() { if let Some((_, existing))=values.iter_mut().find(|(candidate, _)| candidate==key) { *existing=value.clone(); } else { values.push((key.clone(),value.clone())); } } drop(values); Ok(Value::Object(object)) }
             "clone" => Ok(Value::Object(Rc::new(RefCell::new(object.borrow().clone())))),
             _ => Err(format!("unsupported object method: {name}")),
@@ -820,13 +821,13 @@ fn byte_set(value: &Value, index: &Value, item: &Value) -> Result<Value, String>
 fn iterator_values(value: Value) -> Result<Vec<Value>, String> {
     match value {
         Value::Nil => Ok(Vec::new()),
-        Value::Vector(values) | Value::List(values) => Ok(values),
+        Value::Vector(values) | Value::List(values) => Ok(values.iter().cloned().collect()),
         Value::String(text) => Ok(text.chars().map(|c| Value::String(c.to_string())).collect()),
         Value::Bytes(bytes) => Ok(bytes.into_iter().map(|byte| Value::Number(byte as i8 as i64)).collect()),
         Value::ByteBuffer(bytes) => Ok(bytes.borrow().iter().map(|byte| Value::Number(*byte as i8 as i64)).collect()),
         Value::Array(values) => Ok(values.borrow().clone()),
-        Value::Object(values) => Ok(values.borrow().iter().map(|(key, value)| Value::Vector(vec![Value::String(key.clone()), value.clone()])).collect()),
-        Value::Map(entries) => Ok(entries.into_iter().map(|(key, value)| Value::Vector(vec![key, value])).collect()),
+        Value::Object(values) => Ok(values.borrow().iter().map(|(key, value)| Value::Vector(PVector::from_iter([Value::String(key.clone()), value.clone()]))).collect()),
+        Value::Map(entries) => Ok(entries.into_iter().map(|(key, value)| Value::Vector(PVector::from_iter([key, value]))).collect()),
         Value::Set(values) => Ok(values),
         Value::Iterator(iterator) => {
             let mut state = iterator.borrow_mut();
@@ -853,7 +854,7 @@ fn iterator_take_while(function: Rc<Function>, value: Value) -> Result<Value, St
     Ok(Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::TakeWhile(function, source))))))
 }
 fn iterator_map(function: Rc<Function>, value: Value) -> Result<Value, String> { let source=match value { Value::Iterator(iterator) => Value::Iterator(iterator), value => make_iterator(value)? }; if let Value::Iterator(iterator)=&source { if iterator.borrow().generator.is_none() { let values=iterator_values(source)?; return Ok(iterator_from_values(values.into_iter().map(|value| call_function(&function, vec![value])).collect::<Result<Vec<_>,_>>()?)); } } Ok(Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::Map(function, source)))))) }
-fn iterator_partition(value: Value, amount: usize, all: bool) -> Result<Value, String> { if amount==0 { return Err("partition amount must be positive".into()); } let source=match value { Value::Iterator(iterator)=>Value::Iterator(iterator), value=>make_iterator(value)? }; if let Value::Iterator(iterator)=&source { if iterator.borrow().generator.is_none() { let values=iterator_values(source)?; let mut output=Vec::new(); for chunk in values.chunks(amount) { if !all && chunk.len()!=amount { break; } output.push(Value::Vector(chunk.to_vec())); } return Ok(iterator_from_values(output)); } } Ok(Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::Partition(source,amount,all)))))) }
+fn iterator_partition(value: Value, amount: usize, all: bool) -> Result<Value, String> { if amount==0 { return Err("partition amount must be positive".into()); } let source=match value { Value::Iterator(iterator)=>Value::Iterator(iterator), value=>make_iterator(value)? }; if let Value::Iterator(iterator)=&source { if iterator.borrow().generator.is_none() { let values=iterator_values(source)?; let mut output=Vec::new(); for chunk in values.chunks(amount) { if !all && chunk.len()!=amount { break; } output.push(Value::Vector(chunk.to_vec().into())); } return Ok(iterator_from_values(output)); } } Ok(Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::Partition(source,amount,all)))))) }
 
 fn iterator_interleave(values: Vec<Value>) -> Result<Value, String> { let sources=values.into_iter().map(|value| match value { Value::Iterator(iterator)=>Ok(Value::Iterator(iterator)), value=>make_iterator(value) }).collect::<Result<Vec<_>,_>>()?; if sources.iter().any(|value| matches!(value,Value::Iterator(iterator) if iterator.borrow().generator.is_some())) { return Ok(Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::Interleave(sources,0)))))); } let collections=sources.iter().map(|value| iterator_values(value.clone())).collect::<Result<Vec<_>,_>>()?; let limit=collections.iter().map(Vec::len).min().unwrap_or(0); let mut output=Vec::new(); for index in 0..limit { for values in &collections { output.push(values[index].clone()); } } Ok(iterator_from_values(output)) }
 
@@ -917,7 +918,7 @@ fn collection_first(value: Value) -> Result<Value, String> {
 
 fn collection_rest(value: Value) -> Result<Value, String> {
     if matches!(value, Value::Iterator(_)) { return iterator_drop(value, 1); }
-    let mut values = iterator_values(value)?; if !values.is_empty() { values.remove(0); } Ok(Value::List(values))
+    let mut values = iterator_values(value)?; if !values.is_empty() { values.remove(0); } Ok(Value::List(values.into_iter().collect()))
 }
 
 fn collection_last(value: Value) -> Result<Value, String> { Ok(iterator_values(value)?.into_iter().last().unwrap_or(Value::Nil)) }
@@ -1341,7 +1342,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 if fs.len()<2 { return Err(format!("{n} expects collections")); } let collections=fs[1..].iter().map(|form| eval(form, env)).collect::<Result<Vec<_>,_>>()?; iterator_interleave(collections)
             }
             Form::Symbol(n) if ["iter-partition-pair", "partition-pair"].contains(&n.as_str()) => {
-                if fs.len()!=2 { return Err(format!("{n} expects one collection")); } let values=iterator_values(eval(&fs[1], env)?)?; Ok(iterator_from_values(values.chunks(2).filter(|chunk| chunk.len()==2).map(|chunk| Value::Vector(chunk.to_vec())).collect()))
+                if fs.len()!=2 { return Err(format!("{n} expects one collection")); } let values=iterator_values(eval(&fs[1], env)?)?; Ok(iterator_from_values(values.chunks(2).filter(|chunk| chunk.len()==2).map(|chunk| Value::Vector(chunk.to_vec().into())).collect()))
             }
             Form::Symbol(n) if ["iter-zip", "zip"].contains(&n.as_str()) => {
                 if fs.len()<3 { return Err(format!("{n} expects collections")); } let collections=fs[1..].iter().map(|form| eval(form, env)).collect::<Result<Vec<_>,_>>()?; iterator_zip(collections)
@@ -1447,7 +1448,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
             }
             Form::Symbol(n) if n == "reverse" => {
                 if fs.len()!=2 { return Err("reverse expects one collection".into()); }
-                let mut values=iterator_values(eval(&fs[1], env)? )?; values.reverse(); Ok(Value::List(values))
+                let mut values=iterator_values(eval(&fs[1], env)? )?; values.reverse(); Ok(Value::List(values.into_iter().collect()))
             }
             Form::Symbol(n) if n == "contains?" => { if fs.len()!=3 { return Err("contains? expects a collection and entry".into()); } let value=eval(&fs[1], env)?; let entry=eval(&fs[2], env)?; collection_contains(&value, &entry) }
             Form::Symbol(n) if n == "keys" => { if fs.len()!=2 { return Err("keys expects one collection".into()); } collection_keys(&eval(&fs[1], env)?) }
@@ -1510,8 +1511,8 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 if fs.len() != 3 { return Err("conj expects two arguments".into()); }
                 let collection = eval(&fs[1], env)?; let item = eval(&fs[2], env)?;
                 match collection {
-                    Value::Vector(mut values) => { values.push(item); Ok(Value::Vector(values)) },
-                    Value::List(mut values) => { values.insert(0, item); Ok(Value::List(values)) },
+                    Value::Vector(mut values) => { values.push_back(item); Ok(Value::Vector(values)) },
+                    Value::List(mut values) => { values.push_front(item); Ok(Value::List(values)) },
                     Value::Set(mut values) => { if !values.contains(&item) { values.push(item); } Ok(Value::Set(values)) },
                     Value::Map(mut values) => {
                         let entry = match item {
@@ -1531,7 +1532,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
             Form::Symbol(n) if n == "cons" => {
                 if fs.len() != 3 { return Err("cons expects two arguments".into()); }
                 let item = eval(&fs[1], env)?; let collection = eval(&fs[2], env)?;
-                match collection { Value::Vector(mut values) => { values.insert(0, item); Ok(Value::Vector(values)) }, Value::List(mut values) => { values.insert(0, item); Ok(Value::List(values)) }, _ => Err("cons expects a vector".into()) }
+                match collection { Value::Vector(mut values) => { values.push_front(item); Ok(Value::Vector(values)) }, Value::List(mut values) => { values.push_front(item); Ok(Value::List(values)) }, _ => Err("cons expects a vector".into()) }
             }
             Form::Symbol(n) if n == "recur" => {
                 if fs.len() < 2 { return Err("recur expects values".into()); }
