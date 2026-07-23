@@ -3,7 +3,8 @@ use std::hash::Hash;
 
 use crate::lang::data::Map;
 use crate::lang::protocol::{
-    IConj, ICount, IDissoc, IEmpty, IFind, IMutable, IPersistent, IToMutable, IToPersistent,
+    IConj, ICount, IDissoc, IEmpty, IFind, IMetadata, IMutable, IPersistent, IToMutable,
+    IToPersistent,
 };
 
 #[derive(Debug, Clone)]
@@ -93,7 +94,20 @@ impl<E: Clone + Eq + Hash> IDissoc<E> for Standard<E> {
 }
 impl<E: Clone + Eq + Hash> IEmpty for Standard<E> {
     fn empty(&self) -> Self {
-        Self::new()
+        Self {
+            lookup: self.lookup.empty(),
+        }
+    }
+}
+impl<E: Clone + Eq + Hash> IMetadata for Standard<E> {
+    type Metadata = std::rc::Rc<str>;
+    fn meta(&self) -> Option<&Self::Metadata> {
+        self.lookup.meta()
+    }
+    fn with_meta(&self, metadata: Option<Self::Metadata>) -> Self {
+        Self {
+            lookup: self.lookup.with_meta(metadata),
+        }
     }
 }
 impl<E: Clone + Eq + Hash> IPersistent for Standard<E> {}
@@ -139,6 +153,16 @@ impl<E: Clone + Eq + Hash> IToPersistent for Mutable<E> {
 #[cfg(test)]
 mod tests {
     use super::Standard;
+    #[test]
+    fn persistent_operations_preserve_metadata() {
+        use crate::lang::protocol::{IEmpty, IMetadata};
+        use std::rc::Rc;
+        let set = Standard::from(vec![1, 2]).with_meta(Some(Rc::from("doc")));
+        for value in [set.conj_value(3), set.dissoc_value(&1), set.empty()] {
+            assert_eq!(value.meta().map(|m| m.as_ref()), Some("doc"));
+        }
+    }
+
     #[test]
     fn is_map_backed_unique_and_persistent() {
         let a = [1, 2, 2].into_iter().collect::<Standard<_>>();

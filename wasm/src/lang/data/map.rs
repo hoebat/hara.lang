@@ -3,7 +3,7 @@ use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 
 use crate::lang::protocol::{
-    IAssoc, ICount, IDissoc, IEmpty, IFind, ILookup, IMutable, IPersistent, IToMutable,
+    IAssoc, ICount, IDissoc, IEmpty, IFind, ILookup, IMetadata, IMutable, IPersistent, IToMutable,
     IToPersistent,
 };
 
@@ -344,12 +344,14 @@ fn collect<'a, K, V>(node: &'a Node<K, V>, out: &mut Vec<(&'a K, &'a V)>) {
 
 #[derive(Debug, Clone)]
 pub struct Standard<K, V> {
+    metadata: Option<Rc<str>>,
     root: Rc<Node<K, V>>,
     size: usize,
 }
 impl<K, V> Default for Standard<K, V> {
     fn default() -> Self {
         Self {
+            metadata: None,
             root: Node::empty(),
             size: 0,
         }
@@ -374,6 +376,7 @@ impl<K: Clone + Eq + Hash, V: Clone> Standard<K, V> {
     pub fn assoc_value(&self, key: K, value: V) -> Self {
         let (root, added) = assoc_node(&self.root, 0, key_hash(&key), key, value);
         Self {
+            metadata: self.metadata.clone(),
             root,
             size: self.size + usize::from(added),
         }
@@ -382,6 +385,7 @@ impl<K: Clone + Eq + Hash, V: Clone> Standard<K, V> {
         let (root, removed) = dissoc_node(&self.root, 0, key_hash(key), key);
         if removed {
             Self {
+                metadata: self.metadata.clone(),
                 root,
                 size: self.size - 1,
             }
@@ -464,7 +468,19 @@ impl<K: Clone + Eq + Hash, V: Clone> ILookup<K, V> for Standard<K, V> {
 }
 impl<K: Clone + Eq + Hash, V: Clone> IEmpty for Standard<K, V> {
     fn empty(&self) -> Self {
-        Self::new()
+        Self::new().with_meta(self.metadata.clone())
+    }
+}
+impl<K: Clone + Eq + Hash, V: Clone> IMetadata for Standard<K, V> {
+    type Metadata = Rc<str>;
+    fn meta(&self) -> Option<&Self::Metadata> {
+        self.metadata.as_ref()
+    }
+    fn with_meta(&self, metadata: Option<Self::Metadata>) -> Self {
+        Self {
+            metadata,
+            ..self.clone()
+        }
     }
 }
 impl<K: Clone + Eq + Hash, V: Clone> IPersistent for Standard<K, V> {}
@@ -518,6 +534,30 @@ mod tests {
             0.hash(state)
         }
     }
+    #[test]
+    fn persistent_operations_and_mutable_round_trip_preserve_metadata() {
+        use crate::lang::protocol::{IEmpty, IMetadata, IToMutable, IToPersistent};
+        use std::rc::Rc;
+        let map = Standard::new()
+            .assoc_value("a", 1)
+            .with_meta(Some(Rc::from("doc")));
+        assert_eq!(
+            map.assoc_value("b", 2).meta().map(|m| m.as_ref()),
+            Some("doc")
+        );
+        assert_eq!(
+            map.dissoc_value(&"a").meta().map(|m| m.as_ref()),
+            Some("doc")
+        );
+        assert_eq!(map.empty().meta().map(|m| m.as_ref()), Some("doc"));
+        let mut mutable = map.to_mutable();
+        mutable.assoc("b", 2);
+        assert_eq!(
+            mutable.to_persistent().meta().map(|m| m.as_ref()),
+            Some("doc")
+        );
+    }
+
     #[test]
     fn assoc_collision_removal_and_persistence() {
         let empty = Standard::new();
