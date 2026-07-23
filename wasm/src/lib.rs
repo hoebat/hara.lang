@@ -620,6 +620,8 @@ mod tests {
         assert_eq!(runtime.eval_text("(count (take 3 (repeatedly (constantly 7))))").unwrap(), "3");
         assert_eq!(runtime.eval_text("(count (take 5 (iterate (fn [x] (+ x 2)) 0)))").unwrap(), "5");
         assert_eq!(runtime.eval_text("(first (take 4 (iterate (fn [x] (+ x 2)) 0)))").unwrap(), "0");
+        assert_eq!(runtime.eval_text("(second (repeat :x))").unwrap(), ":x");
+        assert_eq!(runtime.eval_text("(first (rest (iterate (fn [x] (+ x 1)) 0)))").unwrap(), "1");
         assert_eq!(runtime.eval_text("(nth (take 4 (iterate (fn [x] (+ x 2)) 0)) 3)").unwrap(), "6");
     }
 

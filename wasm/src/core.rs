@@ -809,21 +809,18 @@ fn collection_first(value: Value) -> Result<Value, String> {
 }
 
 fn collection_rest(value: Value) -> Result<Value, String> {
+    if matches!(value, Value::Iterator(_)) { return iterator_drop(value, 1); }
     let mut values = iterator_values(value)?; if !values.is_empty() { values.remove(0); } Ok(Value::List(values))
 }
 
 fn collection_last(value: Value) -> Result<Value, String> { Ok(iterator_values(value)?.into_iter().last().unwrap_or(Value::Nil)) }
 
 fn collection_second(value: Value) -> Result<Value, String> {
-    let mut values = iterator_values(value)?.into_iter();
-    values.next();
-    Ok(values.next().unwrap_or(Value::Nil))
+    if let Value::Iterator(iterator)=&value { let mut state=iterator.borrow_mut(); let _=state.next()?; return Ok(state.next().unwrap_or(Value::Nil)); }
+    let mut values = iterator_values(value)?.into_iter(); values.next(); Ok(values.next().unwrap_or(Value::Nil))
 }
 
-fn collection_next(value: Value) -> Result<Value, String> {
-    let mut values = iterator_values(value)?;
-    if values.is_empty() { Ok(Value::Nil) } else { values.remove(0); Ok(Value::List(values)) }
-}
+fn collection_next(value: Value) -> Result<Value, String> { collection_rest(value) }
 
 fn collection_empty(value: Value) -> Result<Value, String> {
     match value { Value::Iterator(iterator) => Ok(Value::Bool(!iterator.borrow().has_next())), value => Ok(Value::Bool(iterator_values(value)?.is_empty())) }
