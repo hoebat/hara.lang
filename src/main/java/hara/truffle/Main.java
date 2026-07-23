@@ -815,6 +815,28 @@ public final class Main {
       return 0;
     }
 
-    private record ScoredCandidate(String name, int score, String description) {}
+    private static final class ScoredCandidate {
+      private final String name;
+      private final int score;
+      private final String description;
+
+      private ScoredCandidate(String name, int score, String description) {
+        this.name = name;
+        this.score = score;
+        this.description = description;
+      }
+
+      private String name() {
+        return name;
+      }
+
+      private int score() {
+        return score;
+      }
+
+      private String description() {
+        return description;
+      }
+    }
   }
 }

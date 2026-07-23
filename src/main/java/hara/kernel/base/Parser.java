@@ -644,8 +644,8 @@ public interface Parser {
         if (meta instanceof Symbol || meta instanceof String)
           meta = hashMap(Array.objects(keyword("tag"), meta));
         else if (meta instanceof Keyword) meta = hashMap(Array.objects(meta, Constant.T));
-        else if (!(meta instanceof Map))
-          throw new IllegalArgumentException("Metadata must be Symbol,Keyword,String or ");
+        else if (!(meta instanceof IMapType))
+          throw new IllegalArgumentException("Metadata must be Symbol,Keyword,String or map");
 
         Object o = read(r, true, null, true, opts);
         if (o instanceof IObjType) {

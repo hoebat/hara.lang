@@ -26,11 +26,39 @@ public class ResourceRegistryTest {
     int starts;
     int stops;
     boolean started;
-    @Override public IComponent start() { starts++; started = true; return this; }
-    @Override public IComponent stop() { stops++; started = false; return this; }
-    @Override public IMetadata getProps() { return null; }
-    @Override public IMetadata getStatus() { return null; }
-    @Override public boolean isStarted() { return started; }
-    @Override public boolean isStopped() { return !started; }
+
+    @Override
+    public IComponent start() {
+      starts++;
+      started = true;
+      return this;
+    }
+
+    @Override
+    public IComponent stop() {
+      stops++;
+      started = false;
+      return this;
+    }
+
+    @Override
+    public IMetadata getProps() {
+      return null;
+    }
+
+    @Override
+    public IMetadata getStatus() {
+      return null;
+    }
+
+    @Override
+    public boolean isStarted() {
+      return started;
+    }
+
+    @Override
+    public boolean isStopped() {
+      return !started;
+    }
   }
 }

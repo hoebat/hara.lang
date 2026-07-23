@@ -39,9 +39,7 @@ public class HaraExtensionManifestTest {
     assertEquals(null, manifest.handleTag("buffer"));
     assertThrows(
         IllegalArgumentException.class,
-        () ->
-            HaraExtensionManifest.parse(
-                source.replace(":tag math", ":tag Math"), "test"));
+        () -> HaraExtensionManifest.parse(source.replace(":tag math", ":tag Math"), "test"));
   }
 
   @Test

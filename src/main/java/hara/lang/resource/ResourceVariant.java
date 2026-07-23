@@ -12,6 +12,11 @@ public final class ResourceVariant {
     this.config = config == null ? Collections.emptyMap() : Map.copyOf(config);
   }
 
-  public String id() { return id; }
-  public Map<String, Object> config() { return config; }
+  public String id() {
+    return id;
+  }
+
+  public Map<String, Object> config() {
+    return config;
+  }
 }
