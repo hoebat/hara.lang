@@ -19,7 +19,7 @@ public class Project {
 
   private static final String PROJECT_FILE = "project.hara";
   private static final String SRC_DIR = "src";
-  private static final String MAIN_FILE = "main.hrl";
+  private static final String MAIN_FILE = "main.hal";
 
   public static void create(String name) {
     if (name == null || name.isEmpty()) {

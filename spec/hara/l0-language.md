@@ -61,7 +61,7 @@ variadic fallback. `apply` spreads the final sequential argument into the
 call. Invocation supports Hara functions, protocol `IFn` implementations,
 multifunctions, and `defstruct` constructors.
 
-The packaged `hara/l0-core.hara` bootstrap defines `nil?`, `some?`, `false?`,
+The packaged `hara/l0-core.hal` bootstrap defines `nil?`, `some?`, `false?`,
 `true?`, `empty?`, `first`, `second`, `rest`, `next`, and `not-empty` using
 ordinary L0 forms and iterator operations. `rest` returns a lazy iterator;
 `next` returns that iterator only when it has a value, otherwise nil. This is
@@ -74,7 +74,7 @@ consumes explicit iterators according to the rules above. Predicate reductions
 known; `some` returns the first matching source value or nil.
 
 The bootstrap also provides `get-in`, `assoc-in`, `update`, and `update-in` for
-persistent nested values. These are ordinary `.hara` functions built on the
+persistent nested values. These are ordinary `.hal` functions built on the
 collection protocol functions; they do not introduce mutable update semantics.
 
 Collection navigation also includes `last`, `reverse`, `key`, `val`, `keys`,
@@ -151,27 +151,28 @@ exhaustion error, and closing a wrapper closes its acquired source iterators.
 The language does not include mandatory transducers, `transduce`, or
 `eduction`.
 
-## 5. Explicit mutable values and bytes
+## 5. Explicit marker values and bytes
 
 Persistent literals remain distinct from target-like mutable values:
 
-* `x:array` creates a mutable indexed array.
-* `x:object` creates a mutable keyed object.
+* `array` creates a mutable indexed marker.
+* `object` creates a mutable string-keyed marker.
 
-The `x:*` operation vocabulary is `x:len`, `x:get`, `x:set`, `x:delete`,
-`x:append`, `x:insert`, `x:remove`, `x:clone`, and `x:slice`. Mutation returns
-the mutated target for set/delete/append/insert/remove; clone and slice return
-independent values. Invalid indexes and unsupported targets produce Hara
-errors rather than mutating a persistent value. Mutable values have identity
-semantics and are not specified as thread-safe; callers synchronize access
-when sharing them between host threads.
+Only values created by these markers accept restricted dot calls. Array methods
+are `get`, `set`, `push-first`, `push-last`, `pop-first`, `pop-last`, `insert`,
+`remove`, `clone`, `slice`, `map`, `filter`, `fold-left`, and `fold-right`.
+Object methods are `has?`, `get`, `set`, `delete`, `clone`, `assign`, `keys`,
+`vals`, and `pairs`. A call has the form `(. target (method arguments...))` and
+does not expose host members or reflection. Marker arrays also implement the
+ordinary `ICount` and `INth` collection protocols. Mutable values have identity
+semantics and are not specified as thread-safe.
 
-Bytes are an ordinary value category constructed with `(bytes ...)`, not
-`x:bytes`. Elements use signed-byte storage and accept the checked `-128..255`
-input domain. Ordinary byte operations are `byte-count`, `byte-get`,
-`byte-set`, `byte-copy`, `byte-slice`, `byte-u8`, and `byte-s8`.
-`byte-get` returns a signed element and accepts an optional fallback for an
-invalid index; without a fallback it reports a bounds error. `byte-set`
+Bytes are an ordinary value category constructed with `(bytes ...)`. Elements
+use signed-byte storage and accept the checked `-128..255` input domain.
+Operations live in `hara.lib.bytes`: `bytes/count`, `bytes/get`, `bytes/set`,
+`bytes/copy`, `bytes/slice`, `bytes/u8`, and `bytes/s8`. `bytes/get` returns a
+signed element and accepts an optional fallback for an invalid index; without
+a fallback it reports a bounds error. `bytes/set`
 mutates and returns the same byte value after checked conversion. Copy and
 slice allocate independent storage. Readable bytes print as `(bytes ...)`,
 and equality/hashing use byte content. Raw connector transport preserves
@@ -222,20 +223,21 @@ referred Vars preserve live Var identity.
 `defmacro` runs in the context-local compile-time registry. Syntax-quote,
 unquote, unquote-splicing, variadic macros, `macroexpand-1`, and recursive
 `macroexpand` are supported. Literal `require` loads filesystem or packaged
-`.hara` modules during analysis when necessary, supports aliases, `:refer`,
+`.hal` modules during analysis when necessary, supports aliases, `:refer`,
 `:refer-macros`, and `:reload`, and rolls back failed loads transactionally.
 Already compiled Truffle call targets are immutable; a newly compiled source
 observes a reloaded macro/module definition.
 
 The packaged L0 bootstrap is intentionally small and language-level: its
-current functions are defined in `hara/l0-core.hara`. The complete Foundation
+current functions are defined in `hara/l0-core.hal`. The complete Foundation
 stdlib and KMI/L1 port are later migration work, not hidden Java semantics.
 
 ## 9. Host and Native Image boundary
 
-Host access is capability-gated. `host-symbol`, `host-get`, and `host-call`
-fail deterministically when host interop is disabled. Polyglot array/member
-access is available only for values that explicitly expose that interop.
+Level 0 has no guest-visible JVM or general host interop. `host-symbol`,
+`host-get`, and `host-call` are unbound symbols. Polyglot array/member access is
+available only for values that explicitly expose that interop; guest dot calls
+remain restricted to `array` and `object` markers.
 Native Image must include the same language resources and supported adapters;
 reflection, generated classes, mutable classpaths, and unrestricted host
 loading are not required by the core profile.

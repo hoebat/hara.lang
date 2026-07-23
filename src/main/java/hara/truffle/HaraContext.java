@@ -2,8 +2,15 @@ package hara.truffle;
 
 import com.oracle.truffle.api.CompilerDirectives.TruffleBoundary;
 import com.oracle.truffle.api.TruffleLanguage;
+import com.oracle.truffle.api.TruffleFile;
 import com.oracle.truffle.api.source.Source;
 import hara.kernel.builtin.BuiltinStruct;
+import hara.kernel.flavor.NativeCapability;
+import hara.kernel.flavor.NativeFlavorAccess;
+import hara.kernel.flavor.NativeFlavorException;
+import hara.kernel.flavor.NativeFlavorProvider;
+import hara.kernel.flavor.NativeFlavorRegistry;
+import hara.kernel.jvm.JvmFlavorProvider;
 import hara.lang.base.Iter;
 import hara.lang.base.Eq;
 import hara.lang.base.primitive.Num;
@@ -17,13 +24,13 @@ import hara.lang.protocol.IFn;
 import hara.lang.protocol.IMetadata;
 import hara.lang.protocol.IDeref;
 import hara.lang.protocol.IDerefTimeout;
+import hara.lang.protocol.ICount;
+import hara.lang.protocol.INth;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -42,6 +49,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 public final class HaraContext {
+  private static final String INTRINSIC_NAMESPACE = "hara.lang.intrinsic";
   private static final String CORE_NAMESPACE = "hara.lib.core";
   private static final Map<String, String> GENERATED_LIBRARIES =
       Map.of(
@@ -57,10 +65,36 @@ public final class HaraContext {
           "bytes", "bytes",
           "socket", "socket",
           "file", "file");
+  private static final Set<String> MARKER_METHOD_NAMES =
+      Set.of(
+          "get",
+          "set",
+          "push-first",
+          "push-last",
+          "pop-first",
+          "pop-last",
+          "insert",
+          "remove",
+          "clone",
+          "slice",
+          "map",
+          "filter",
+          "fold-left",
+          "fold-right",
+          "has?",
+          "delete",
+          "assign",
+          "keys",
+          "vals",
+          "pairs");
   private final TruffleLanguage.Env environment;
   private final Map<String, HaraNamespace> namespaces = new ConcurrentHashMap<>();
   private final Map<String, Map<String, HaraMacro>> macros = new ConcurrentHashMap<>();
   private final Map<String, Map<String, String>> aliases = new ConcurrentHashMap<>();
+  private final Map<String, String> nativeFlavors = new ConcurrentHashMap<>();
+  private final Map<String, Map<String, Object>> nativeImports = new ConcurrentHashMap<>();
+  private final NativeFlavorRegistry nativeFlavorRegistry =
+      new NativeFlavorRegistry().register(JvmFlavorProvider.INSTANCE);
   private final Map<String, ModuleRecord> modules = new ConcurrentHashMap<>();
   private final Map<String, Set<String>> moduleDependencies = new ConcurrentHashMap<>();
   private final Set<String> loadingModules = ConcurrentHashMap.newKeySet();
@@ -70,14 +104,16 @@ public final class HaraContext {
 
   HaraContext(TruffleLanguage.Env environment) {
     this.environment = environment;
-    currentNamespace = namespace(CORE_NAMESPACE);
+    currentNamespace = namespace(INTRINSIC_NAMESPACE);
     Map<String, Integer> ifnMethods = new LinkedHashMap<>();
     ifnMethods.put("invoke", -1);
     ifnProtocol = new HaraProtocol("IFn", ifnMethods);
     currentNamespace.define("IFn", ifnProtocol);
     HaraJavaAdapters.install(this);
     installNumericBuiltins(currentNamespace);
+    installCoreBuiltins(namespace(CORE_NAMESPACE));
     installGeneratedLibraries();
+    installNativeLibraries();
     currentNamespace = namespace("user");
     initializeUserNamespace(currentNamespace);
   }
@@ -102,10 +138,87 @@ public final class HaraContext {
   @TruffleBoundary
   public void setCurrentNamespace(Symbol symbol, Object[] clauses) {
     setCurrentNamespace(symbol);
+    configureNativeFlavor(clauses);
     configureGeneratedAliases(clauses);
   }
 
+  private void configureNativeFlavor(Object[] clauses) {
+    List<?> flavorClause = null;
+    for (Object clauseValue : clauses) {
+      if (!(clauseValue instanceof List<?>)) continue;
+      List<?> clause = (List<?>) clauseValue;
+      if (clause.count() > 0
+          && clause.nth(0) instanceof Keyword
+          && "flavor".equals(((Keyword) clause.nth(0)).getName())) {
+        if (flavorClause != null) throw new HaraException("ns accepts only one :flavor clause");
+        flavorClause = clause;
+      }
+    }
+    if (flavorClause != null) {
+      if (flavorClause.count() != 2 || !(flavorClause.nth(1) instanceof Keyword)) {
+        throw new HaraException(":flavor expects one keyword");
+      }
+      Keyword flavor = (Keyword) flavorClause.nth(1);
+      if (flavor.getNamespace() != null) {
+        throw new HaraException(":flavor expects an unqualified keyword");
+      }
+      nativeFlavorRegistry.require(flavor.getName());
+      nativeFlavors.put(currentNamespace.name(), flavor.getName());
+    }
+
+    for (Object clauseValue : clauses) {
+      if (!(clauseValue instanceof List<?>)) continue;
+      List<?> clause = (List<?>) clauseValue;
+      if (clause.count() == 0
+          || !(clause.nth(0) instanceof Keyword)
+          || !"import".equals(((Keyword) clause.nth(0)).getName())) continue;
+      NativeFlavorProvider provider = nativeProvider();
+      if (provider == null) throw new HaraException(":import requires an ns :flavor declaration");
+      Map<String, Object> imports =
+          nativeImports.computeIfAbsent(
+              currentNamespace.name(), ignored -> new ConcurrentHashMap<>());
+      for (int i = 1; i < clause.count(); i++) {
+        Object spec = clause.nth(i);
+        if (spec instanceof Symbol) {
+          importNativeType(provider, imports, ((Symbol) spec).display());
+        } else if (spec instanceof ILinearType<?>) {
+          ILinearType<?> group = (ILinearType<?>) spec;
+          if (group.count() == 0) continue;
+          Object packageValue = group.nth(0);
+          String packageName =
+              packageValue instanceof Symbol
+                  ? ((Symbol) packageValue).display()
+                  : String.valueOf(packageValue);
+          for (int j = 1; j < group.count(); j++) {
+            Object classValue = group.nth(j);
+            String className =
+                classValue instanceof Symbol
+                    ? ((Symbol) classValue).display()
+                    : String.valueOf(classValue);
+            importNativeType(provider, imports, packageName + "." + className);
+          }
+        } else {
+          throw new HaraException(":import expects class symbols or package vectors");
+        }
+      }
+    }
+  }
+
+  private void importNativeType(
+      NativeFlavorProvider provider, Map<String, Object> imports, String name) {
+    Object type = provider.resolveType(name, nativeAccess());
+    String simpleName = name.substring(name.lastIndexOf('.') + 1);
+    Object previous = imports.putIfAbsent(simpleName, type);
+    if (previous != null && previous != type) {
+      throw new HaraException("Native import already exists: " + simpleName);
+    }
+  }
+
   private void initializeUserNamespace(HaraNamespace target) {
+    HaraNamespace intrinsic = namespace(INTRINSIC_NAMESPACE);
+    for (Map.Entry<String, HaraVar> entry : intrinsic.vars.entrySet()) {
+      if (target.lookup(entry.getKey()) == null) target.refer(entry.getKey(), entry.getValue());
+    }
     HaraNamespace core = namespace(CORE_NAMESPACE);
     for (Map.Entry<String, HaraVar> entry : core.vars.entrySet()) {
       if (target.lookup(entry.getKey()) == null) target.refer(entry.getKey(), entry.getValue());
@@ -122,6 +235,7 @@ public final class HaraContext {
     Set<String> excluded = new LinkedHashSet<>();
     Map<String, String> overrides = new LinkedHashMap<>();
     ArrayList<Object> requireSpecs = new ArrayList<>();
+    boolean intrinsicsSeen = false;
     for (Object clauseValue : clauses) {
       if (!(clauseValue instanceof List<?>) || ((List<?>) clauseValue).count() == 0) {
         throw new HaraException("ns clauses must be non-empty lists");
@@ -132,6 +246,8 @@ public final class HaraContext {
         throw new HaraException("ns clause must start with a keyword");
       String clauseName = ((Keyword) head).getName();
       if ("intrinsics".equals(clauseName)) {
+        if (intrinsicsSeen) throw new HaraException("ns accepts only one :intrinsics clause");
+        intrinsicsSeen = true;
         if (clause.count() != 2) {
           throw new HaraException(":intrinsics expects :all or an options map");
         }
@@ -141,6 +257,17 @@ public final class HaraContext {
           throw new HaraException(":intrinsics expects :all or an options map");
         }
         IMapType options = (IMapType) intrinsicOptions;
+        Iterator<?> optionIterator = options.iterator();
+        while (optionIterator.hasNext()) {
+          java.util.Map.Entry<?, ?> entry = (java.util.Map.Entry<?, ?>) optionIterator.next();
+          if (!(entry.getKey() instanceof Keyword)) {
+            throw new HaraException(":intrinsics option keys must be keywords");
+          }
+          String optionName = ((Keyword) entry.getKey()).getName();
+          if (!"exclude".equals(optionName) && !"aliases".equals(optionName)) {
+            throw new HaraException("Unsupported :intrinsics option: :" + optionName);
+          }
+        }
         Object excludeValue = options.lookup(Keyword.create("exclude"));
         if (excludeValue != null) {
           if (!(excludeValue instanceof ILinearType<?>)) {
@@ -172,6 +299,8 @@ public final class HaraContext {
         }
       } else if ("require".equals(clauseName)) {
         for (int i = 1; i < clause.count(); i++) requireSpecs.add(clause.nth(i));
+      } else if ("flavor".equals(clauseName) || "import".equals(clauseName)) {
+        // Native clauses are handled separately from portable library aliases.
       } else {
         throw new HaraException("Unsupported ns clause: :" + clauseName);
       }
@@ -275,6 +404,7 @@ public final class HaraContext {
   /** Names visible in the current namespace, used by interactive tooling. */
   public java.util.List<String> currentSymbolNames() {
     LinkedHashSet<String> names = new LinkedHashSet<>(currentNamespace.symbolNames());
+    names.addAll(MARKER_METHOD_NAMES);
     for (Map.Entry<String, String> alias :
         aliases.getOrDefault(currentNamespace.name(), Map.of()).entrySet()) {
       HaraNamespace target = namespaces.get(alias.getValue());
@@ -357,6 +487,71 @@ public final class HaraContext {
 
   public Object lookupHostSymbol(String name) {
     return environment.lookupHostSymbol(name);
+  }
+
+  private NativeFlavorAccess nativeAccess() {
+    ClassLoader loader = Thread.currentThread().getContextClassLoader();
+    if (loader == null) loader = HaraContext.class.getClassLoader();
+    Set<NativeCapability> capabilities =
+        hostInteropAllowed() ? Set.of(NativeCapability.REFLECTION) : Set.of();
+    return NativeFlavorAccess.of(loader, capabilities);
+  }
+
+  private NativeFlavorProvider nativeProvider() {
+    String flavor = nativeFlavors.get(currentNamespace.name());
+    return flavor == null ? null : nativeFlavorRegistry.require(flavor);
+  }
+
+  public boolean hasNativeSymbol(Symbol symbol) {
+    Map<String, Object> imports = nativeImports.get(currentNamespace.name());
+    if (imports == null) return false;
+    String importedName = symbol.getNamespace() == null ? symbol.getName() : symbol.getNamespace();
+    return imports.containsKey(importedName);
+  }
+
+  public Object resolveNativeSymbol(Symbol symbol) {
+    Map<String, Object> imports = nativeImports.get(currentNamespace.name());
+    if (imports == null) throw new HaraException("No native imports in the current namespace");
+    String importedName = symbol.getNamespace() == null ? symbol.getName() : symbol.getNamespace();
+    Object type = imports.get(importedName);
+    if (type == null) throw new HaraException("Native type is not imported: " + importedName);
+    if (symbol.getNamespace() == null) return type;
+    NativeFlavorProvider provider = nativeProvider();
+    try {
+      return provider.readStatic(type, symbol.getName(), nativeAccess());
+    } catch (NativeFlavorException error) {
+      if (error.kind() != NativeFlavorException.Kind.UNSUPPORTED) throw error;
+      return new VariadicBuiltin(
+          symbol.display(),
+          arguments -> provider.invokeStatic(type, symbol.getName(), arguments, nativeAccess()));
+    }
+  }
+
+  public boolean matchesNativeThrowable(Symbol type, Throwable throwable) {
+    if (!hasNativeSymbol(type)) return false;
+    NativeFlavorProvider provider = nativeProvider();
+    return provider != null
+        && provider.matchesThrowable(resolveNativeSymbol(type), throwable, nativeAccess());
+  }
+
+  public Object constructNative(Object type, Object[] arguments) {
+    NativeFlavorProvider provider = nativeProvider();
+    if (provider == null) throw new HaraException("new requires an ns :flavor declaration");
+    return provider.construct(HaraBox.unwrap(type), arguments, nativeAccess());
+  }
+
+  public Object readNativeMember(Object receiver, String member) {
+    NativeFlavorProvider provider = nativeProvider();
+    if (provider == null)
+      throw new HaraException("Native member access requires an ns :flavor declaration");
+    return provider.readMember(HaraBox.unwrap(receiver), member, nativeAccess());
+  }
+
+  public Object indexNative(Object receiver, Object index) {
+    NativeFlavorProvider provider = nativeProvider();
+    if (provider == null)
+      throw new HaraException("Native indexed access requires an ns :flavor declaration");
+    return provider.index(HaraBox.unwrap(receiver), HaraBox.unwrap(index), nativeAccess());
   }
 
   @TruffleBoundary
@@ -490,8 +685,12 @@ public final class HaraContext {
         "pop",
         new UnaryBuiltin(
             "pop", value -> protocolCall("INavigation", "pop-first", new Object[] {value})));
+  }
+
+  private void installCoreBuiltins(HaraNamespace target) {
     target.define("str", new UnaryBuiltin("str", value -> String.valueOf(HaraBox.unwrap(value))));
     target.define("promise", new UnaryBuiltin("promise", this::promiseRun));
+    target.define("bytes", new VariadicBuiltin("bytes", this::createBytes));
     target.define("array", new VariadicBuiltin("array", HaraArray::new));
     target.define("object", new VariadicBuiltin("object", HaraObject::new));
     target.define("bit-and", new VariadicBuiltin("bit-and", values -> bitOperation("and", values)));
@@ -503,6 +702,40 @@ public final class HaraContext {
     target.define(
         "bit-shift-right",
         new VariadicBuiltin("bit-shift-right", values -> bitShift(values, false)));
+  }
+
+  private Object createBytes(Object[] values) {
+    byte[] result = new byte[values.length];
+    for (int i = 0; i < values.length; i++) {
+      result[i] = (byte) byteNumber(values[i], "bytes");
+    }
+    return result;
+  }
+
+  private void installNativeLibraries() {
+    HaraNamespace jvm = namespace("hara.native.jvm");
+    jvm.define(
+        "set!",
+        new VariadicBuiltin(
+            "hara.native.jvm/set!",
+            values -> {
+              if (values.length != 3)
+                throw new HaraException("hara.native.jvm/set! expects 3 arguments");
+              String member;
+              if (values[1] instanceof Symbol) member = ((Symbol) values[1]).getName();
+              else if (values[1] instanceof Keyword) member = ((Keyword) values[1]).getName();
+              else if (values[1] instanceof String) member = (String) values[1];
+              else throw new HaraException("JVM member must be a symbol, keyword, or string");
+              NativeFlavorProvider provider = nativeProvider();
+              if (provider == null) {
+                throw new HaraException("hara.native.jvm/set! requires an ns :flavor declaration");
+              }
+              return provider.writeMember(
+                  HaraBox.unwrap(values[0]), member, HaraBox.unwrap(values[2]), nativeAccess());
+            }));
+    namespace("hara.native.jvm.reflect");
+    namespace("hara.native.jvm.classpath");
+    namespace("hara.native.jvm.compiler");
   }
 
   private void installGeneratedLibraries() {
@@ -967,9 +1200,8 @@ public final class HaraContext {
   private Object fileResolve(Object[] values) {
     requireFileIO("file/resolve");
     if (values.length != 2) throw new HaraException("file/resolve expects a root and path");
-    return Path.of(stringValue(values[0], "file/resolve"), stringValue(values[1], "file/resolve"))
-        .normalize()
-        .toString();
+    TruffleFile root = environment.getPublicTruffleFile(stringValue(values[0], "file/resolve"));
+    return root.resolve(stringValue(values[1], "file/resolve")).normalize().getPath();
   }
 
   private Object fileRead(Object value) {
@@ -1012,22 +1244,18 @@ public final class HaraContext {
 
   private Object socketConnect(Object[] values) {
     requireSocketIO("socket/connect");
-    if (values.length < 2 || values.length > 3) {
-      throw new HaraException("socket/connect expects a host, port, and optional options");
+    if (values.length != 4) {
+      throw new HaraException("socket/connect expects a host, port, options, and callback");
     }
     String host = stringValue(values[0], "socket/connect");
     int port = ((Number) HaraBox.unwrap(values[1])).intValue();
-    return new HaraPromise(
-        CompletableFuture.supplyAsync(
-            () -> {
-              try {
-                Socket socket = new Socket();
-                socket.connect(new InetSocketAddress(host, port));
-                return new HaraSocket(socket);
-              } catch (IOException error) {
-                throw new CompletionException(error);
-              }
-            }));
+    try {
+      Socket socket = new Socket();
+      socket.connect(new InetSocketAddress(host, port));
+      return invokeCallable(values[3], new Object[] {null, new HaraSocket(socket)});
+    } catch (IOException error) {
+      return invokeCallable(values[3], new Object[] {error.getMessage(), null});
+    }
   }
 
   private Object socketSend(Object[] values) {
@@ -1037,17 +1265,13 @@ public final class HaraContext {
     }
     HaraSocket connection = (HaraSocket) HaraBox.unwrap(values[0]);
     byte[] contents = bytesValue(values[1], "socket/send").clone();
-    return new HaraPromise(
-        CompletableFuture.supplyAsync(
-            () -> {
-              try {
-                connection.socket.getOutputStream().write(contents);
-                connection.socket.getOutputStream().flush();
-                return (long) contents.length;
-              } catch (IOException error) {
-                throw new CompletionException(error);
-              }
-            }));
+    try {
+      connection.socket.getOutputStream().write(contents);
+      connection.socket.getOutputStream().flush();
+      return (long) contents.length;
+    } catch (IOException error) {
+      throw new HaraException("socket/send failed: " + error.getMessage());
+    }
   }
 
   private Object socketClose(Object value) {
@@ -1057,16 +1281,12 @@ public final class HaraContext {
       throw new HaraException("socket/close expects a socket connection");
     }
     HaraSocket connection = (HaraSocket) input;
-    return new HaraPromise(
-        CompletableFuture.supplyAsync(
-            () -> {
-              try {
-                connection.socket.close();
-                return null;
-              } catch (IOException error) {
-                throw new CompletionException(error);
-              }
-            }));
+    try {
+      connection.socket.close();
+      return null;
+    } catch (IOException error) {
+      throw new HaraException("socket/close failed: " + error.getMessage());
+    }
   }
 
   public Object invokeMarkerMethod(Object receiverValue, String method, Object[] arguments) {
@@ -1077,7 +1297,12 @@ public final class HaraContext {
     if (receiver instanceof HaraObject) {
       return invokeObjectMethod((HaraObject) receiver, method, arguments);
     }
-    throw new HaraException("Dot calls are only supported on values created by array or object");
+    NativeFlavorProvider provider = nativeProvider();
+    if (provider == null) {
+      throw new HaraException(
+          "Dot calls are only supported on values created by array or object unless the namespace selects a native flavor");
+    }
+    return provider.invokeMember(receiver, method, arguments, nativeAccess());
   }
 
   private Object invokeArrayMethod(HaraArray array, String method, Object[] arguments) {
@@ -1317,6 +1542,13 @@ public final class HaraContext {
     return ((HaraProtocol) variable.get()).invoke(methodName, receiver, arguments);
   }
 
+  private void requireHalPath(String path, String operation) {
+    String sourcePath = path.startsWith("classpath:") ? path.substring(10) : path;
+    if (!sourcePath.endsWith(".hal")) {
+      throw new HaraException(operation + " accepts only .hal executable source files");
+    }
+  }
+
   private Object loadString(Object value) {
     if (!(value instanceof String)) {
       throw new HaraException("load-string expects a string");
@@ -1334,10 +1566,16 @@ public final class HaraContext {
     if (!(value instanceof String)) {
       throw new HaraException("load-file expects a path string");
     }
+    requireHalPath((String) value, "load-file");
+    requireFileIO("load-file");
     ContextSnapshot snapshot = snapshot();
     try {
-      Path path = canonicalPath((String) value);
-      Object result = parseAndExecute(Files.readString(path), path.toString());
+      String path = canonicalPath((String) value);
+      Object result =
+          parseAndExecute(
+              new String(
+                  environment.getPublicTruffleFile(path).readAllBytes(), StandardCharsets.UTF_8),
+              path);
       registerModule(path);
       return result;
     } catch (IOException | RuntimeException error) {
@@ -1352,6 +1590,7 @@ public final class HaraContext {
     if (!(value instanceof String) || ((String) value).isEmpty()) {
       throw new HaraException("load-resource expects a non-empty resource name");
     }
+    requireHalPath((String) value, "load-resource");
     ContextSnapshot snapshot = snapshot();
     try (InputStream input =
         HaraContext.class.getClassLoader().getResourceAsStream((String) value)) {
@@ -1376,10 +1615,11 @@ public final class HaraContext {
     String callerNamespace = currentNamespace.name();
     try {
       String requested = (String) arguments[0];
+      requireHalPath(requested, "require");
       boolean classpath = requested.startsWith("classpath:") || getResource(requested) != null;
       String resourceName =
           requested.startsWith("classpath:") ? requested.substring(10) : requested;
-      String key = classpath ? "classpath:" + resourceName : canonicalPath(requested).toString();
+      String key = classpath ? "classpath:" + resourceName : canonicalPath(requested);
       boolean reload =
           arguments.length == 2 && requireOption(arguments[1], "reload") == Boolean.TRUE;
       if (!loadingStack.isEmpty()) {
@@ -1522,7 +1762,7 @@ public final class HaraContext {
         requested.startsWith("classpath:")
             ? requested
             : (getResource(requested) == null
-                ? canonicalPath(requested).toString()
+                ? canonicalPath(requested)
                 : "classpath:" + requested);
     ModuleRecord module = modules.get(key);
     return module == null ? 0L : module.revision;
@@ -1538,7 +1778,7 @@ public final class HaraContext {
         requested.startsWith("classpath:")
             ? requested
             : (getResource(requested) == null
-                ? canonicalPath(requested).toString()
+                ? canonicalPath(requested)
                 : "classpath:" + requested);
     Set<String> dependencies = moduleDependencies.getOrDefault(key, Set.of());
     return BuiltinStruct.vector(new LinkedHashSet<>(dependencies).toArray());
@@ -1623,7 +1863,7 @@ public final class HaraContext {
     }
     Object function = values[0];
     Object[] sourceValues = java.util.Arrays.copyOfRange(values, 1, values.length);
-    Iterator zipped = (Iterator) iterZip(sourceValues);
+    Iterator zipped = iterZipArrays(sourceValues);
     return closeable(Iter.map(zipped, value -> invokeCallable(function, (Object[]) value)), zipped);
   }
 
@@ -1952,6 +2192,11 @@ public final class HaraContext {
   }
 
   private Object iterZip(Object[] values) {
+    CloseableIterator<Object[]> zipped = iterZipArrays(values);
+    return closeable(Iter.map(zipped, BuiltinStruct::vector), zipped);
+  }
+
+  private CloseableIterator<Object[]> iterZipArrays(Object[] values) {
     if (values.length == 0) {
       throw new HaraException("iter-zip expects at least one source");
     }
@@ -2208,12 +2453,12 @@ public final class HaraContext {
     return (Iterator<?>) target;
   }
 
-  private Path canonicalPath(String value) {
-    return Path.of(value).toAbsolutePath().normalize();
+  private String canonicalPath(String value) {
+    return environment.getPublicTruffleFile(value).getAbsoluteFile().normalize().getPath();
   }
 
-  private void registerModule(Path path) {
-    String key = path.toString();
+  private void registerModule(String path) {
+    String key = path;
     ModuleRecord previous = modules.get(key);
     String namespaceName = currentNamespace.name();
     modules.put(
@@ -2355,11 +2600,24 @@ public final class HaraContext {
     }
   }
 
-  private static final class HaraArray extends ArrayList<Object> {
+  private static final class HaraArray extends ArrayList<Object> implements ICount, INth<Object> {
     private HaraArray() {}
 
     private HaraArray(Object[] values) {
       super(java.util.Arrays.asList(values));
+    }
+
+    @Override
+    public long count() {
+      return size();
+    }
+
+    @Override
+    public Object nth(long index) {
+      if (index < 0 || index >= size()) {
+        throw new HaraException("nth index out of bounds: " + index);
+      }
+      return get((int) index);
     }
   }
 
@@ -2458,6 +2716,11 @@ public final class HaraContext {
     private VariadicBuiltin(String name, Function<Object[], Object> implementation) {
       this.name = name;
       this.implementation = implementation;
+    }
+
+    @Override
+    public Supplier<Object> getArg0() {
+      return () -> implementation.apply(new Object[0]);
     }
 
     @Override

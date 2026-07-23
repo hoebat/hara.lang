@@ -2,7 +2,7 @@
   "resources": {
     "includes": [
       {
-        "pattern": "hara/.*\\.hara"
+        "pattern": "hara/.*\\.hal"
       },
       {
         "pattern": "spec/hara/.*\\.edn"

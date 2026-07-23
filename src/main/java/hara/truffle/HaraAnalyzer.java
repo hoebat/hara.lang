@@ -130,55 +130,6 @@ final class HaraAnalyzer {
     Object operator = list.nth(0);
     if (operator instanceof Symbol) {
       Symbol symbolOperator = (Symbol) operator;
-      if ("x".equals(symbolOperator.getNamespace())
-          || "x:array".equals(symbolOperator.getName())
-          || "x:object".equals(symbolOperator.getName())
-          || "x:len".equals(symbolOperator.getName())
-          || "x:get".equals(symbolOperator.getName())
-          || "x:set".equals(symbolOperator.getName())
-          || "x:delete".equals(symbolOperator.getName())
-          || "x:append".equals(symbolOperator.getName())
-          || "x:insert".equals(symbolOperator.getName())
-          || "x:remove".equals(symbolOperator.getName())
-          || "x:clone".equals(symbolOperator.getName())
-          || "x:slice".equals(symbolOperator.getName())) {
-        if ("array".equals(symbolOperator.getName())
-            || "x:array".equals(symbolOperator.getName())) {
-          return analyzeMutableCollection(list, HaraNodes.CollectionLiteral.Kind.MUTABLE_ARRAY);
-        }
-        if ("object".equals(symbolOperator.getName())
-            || "x:object".equals(symbolOperator.getName())) {
-          return analyzeMutableCollection(list, HaraNodes.CollectionLiteral.Kind.MUTABLE_OBJECT);
-        }
-        String mutableName = symbolOperator.getName();
-        if ("len".equals(mutableName) || "x:len".equals(mutableName)) {
-          return analyzeMutableOperation(list, HaraNodes.MutableOperation.Operator.LENGTH, 2, 2);
-        }
-        if ("get".equals(mutableName) || "x:get".equals(mutableName)) {
-          return analyzeMutableOperation(list, HaraNodes.MutableOperation.Operator.GET, 3, 4);
-        }
-        if ("set".equals(mutableName) || "x:set".equals(mutableName)) {
-          return analyzeMutableOperation(list, HaraNodes.MutableOperation.Operator.SET, 4, 4);
-        }
-        if ("delete".equals(mutableName) || "x:delete".equals(mutableName)) {
-          return analyzeMutableOperation(list, HaraNodes.MutableOperation.Operator.DELETE, 3, 3);
-        }
-        if ("append".equals(mutableName) || "x:append".equals(mutableName)) {
-          return analyzeMutableOperation(list, HaraNodes.MutableOperation.Operator.APPEND, 3, 3);
-        }
-        if ("insert".equals(mutableName) || "x:insert".equals(mutableName)) {
-          return analyzeMutableOperation(list, HaraNodes.MutableOperation.Operator.INSERT, 4, 4);
-        }
-        if ("remove".equals(mutableName) || "x:remove".equals(mutableName)) {
-          return analyzeMutableOperation(list, HaraNodes.MutableOperation.Operator.REMOVE, 3, 3);
-        }
-        if ("clone".equals(mutableName) || "x:clone".equals(mutableName)) {
-          return analyzeMutableOperation(list, HaraNodes.MutableOperation.Operator.CLONE, 2, 2);
-        }
-        if ("slice".equals(mutableName) || "x:slice".equals(mutableName)) {
-          return analyzeMutableOperation(list, HaraNodes.MutableOperation.Operator.SLICE, 3, 4);
-        }
-      }
       if (symbolOperator.getNamespace() != null) {
         return analyzeInvocation(list);
       }
@@ -246,6 +197,8 @@ final class HaraAnalyzer {
           return analyzeMacroExpand(list, false);
         case "macroexpand":
           return analyzeMacroExpand(list, true);
+        case "new":
+          return analyzeNativeNew(list);
         case "ns":
           return analyzeNamespace(list);
         case "require":
@@ -258,12 +211,6 @@ final class HaraAnalyzer {
           return analyzeMarkerCall(list);
         case "protocol-call":
           return analyzeProtocolCall(list);
-        case "host-symbol":
-          return analyzeHostSymbol(list);
-        case "host-get":
-          return analyzeHostGet(list);
-        case "host-call":
-          return analyzeHostCall(list);
         case "+":
           return analyzeAdd(list);
         case "-":
@@ -274,18 +221,6 @@ final class HaraAnalyzer {
           return analyzeVariadicNumeric(list, HaraNodes.Numeric.Operator.DIVIDE, "/", 1L);
         case "mod":
           return analyzeNumeric(list, HaraNodes.Numeric.Operator.REMAINDER, "mod");
-        case "bytes":
-          return analyzeBytes(list);
-        case "byte-u8":
-          return analyzeByteValue(list, HaraNodes.ByteValue.Operator.UNSIGNED);
-        case "byte-s8":
-          return analyzeByteValue(list, HaraNodes.ByteValue.Operator.SIGNED);
-        case "byte-count":
-          return analyzeByteOperation(list, HaraNodes.MutableOperation.Operator.BYTE_LENGTH, 2, 2);
-        case "byte-get":
-          return analyzeByteOperation(list, HaraNodes.MutableOperation.Operator.BYTE_GET, 3, 4);
-        case "byte-set":
-          return analyzeByteOperation(list, HaraNodes.MutableOperation.Operator.BYTE_SET, 4, 4);
         case "<":
           return analyzeCompare(list, HaraNodes.Compare.Operator.LESS, "<");
         case "<=":
@@ -298,10 +233,6 @@ final class HaraAnalyzer {
           return analyzeCompare(list, HaraNodes.Compare.Operator.EQUAL, "=");
         case "not=":
           return analyzeCompare(list, HaraNodes.Compare.Operator.NOT_EQUAL, "not=");
-        case "byte-copy":
-          return analyzeByteCopy(list);
-        case "byte-slice":
-          return analyzeByteSlice(list);
         default:
           return analyzeInvocation(list);
       }
@@ -1110,9 +1041,7 @@ final class HaraAnalyzer {
               recurTarget);
       catches[i] =
           new HaraNodes.Try.CatchClause(
-              ((Symbol) catchForm.nth(1)).getName(),
-              catchSlot,
-              catchAnalyzer.analyzeDo(catchForm, 3));
+              (Symbol) catchForm.nth(1), catchSlot, catchAnalyzer.analyzeDo(catchForm, 3));
     }
     HaraExpressionNode finallyBody = null;
     if (finallyForm != null) {
@@ -1216,64 +1145,6 @@ final class HaraAnalyzer {
     HaraExpressionNode[] values = new HaraExpressionNode[(int) form.count() - 1];
     for (int i = 1; i < form.count(); i++) values[i - 1] = analyze(form.nth(i));
     return new HaraNodes.CompareChain(operator, values);
-  }
-
-  private HaraExpressionNode analyzeBytes(List<?> form) {
-    HaraExpressionNode[] elements = new HaraExpressionNode[(int) form.count() - 1];
-    for (int i = 1; i < form.count(); i++) {
-      elements[i - 1] = analyze(form.nth(i));
-    }
-    return new HaraNodes.Bytes(elements);
-  }
-
-  private HaraExpressionNode analyzeByteValue(List<?> form, HaraNodes.ByteValue.Operator operator) {
-    requireCount(
-        form, 2, operator == HaraNodes.ByteValue.Operator.UNSIGNED ? "byte-u8" : "byte-s8");
-    return new HaraNodes.ByteValue(operator, analyze(form.nth(1)));
-  }
-
-  private HaraExpressionNode analyzeByteCopy(List<?> form) {
-    requireCount(form, 2, "byte-copy");
-    return new HaraNodes.ByteCopy(analyze(form.nth(1)));
-  }
-
-  private HaraExpressionNode analyzeByteSlice(List<?> form) {
-    requireCount(form, 4, "byte-slice");
-    return new HaraNodes.ByteSlice(
-        analyze(form.nth(1)), analyze(form.nth(2)), analyze(form.nth(3)));
-  }
-
-  private HaraExpressionNode analyzeByteOperation(
-      List<?> form, HaraNodes.MutableOperation.Operator operator, int minimum, int maximum) {
-    if (form.count() < minimum || form.count() > maximum) {
-      throw error("byte operation has an invalid arity");
-    }
-    HaraExpressionNode[] arguments = new HaraExpressionNode[(int) form.count() - 1];
-    for (int i = 1; i < form.count(); i++) {
-      arguments[i - 1] = analyze(form.nth(i));
-    }
-    return new HaraNodes.MutableOperation(operator, arguments);
-  }
-
-  private HaraExpressionNode analyzeMutableCollection(
-      List<?> form, HaraNodes.CollectionLiteral.Kind kind) {
-    HaraExpressionNode[] elements = new HaraExpressionNode[(int) form.count() - 1];
-    for (int i = 1; i < form.count(); i++) {
-      elements[i - 1] = analyze(form.nth(i));
-    }
-    return new HaraNodes.CollectionLiteral(kind, elements);
-  }
-
-  private HaraExpressionNode analyzeMutableOperation(
-      List<?> form, HaraNodes.MutableOperation.Operator operator, int minimum, int maximum) {
-    if (form.count() < minimum || form.count() > maximum) {
-      throw error("mutable operation has an invalid arity");
-    }
-    HaraExpressionNode[] arguments = new HaraExpressionNode[(int) form.count() - 1];
-    for (int i = 1; i < form.count(); i++) {
-      arguments[i - 1] = analyze(form.nth(i));
-    }
-    return new HaraNodes.MutableOperation(operator, arguments);
   }
 
   private HaraExpressionNode analyzeDef(List<?> form) {
@@ -1471,45 +1342,41 @@ final class HaraAnalyzer {
         analyze(form.nth(1)), methodName, analyze(form.nth(3)), arguments);
   }
 
-  private HaraExpressionNode analyzeHostSymbol(List<?> form) {
-    requireCount(form, 2, "host-symbol");
-    if (!(form.nth(1) instanceof String)) {
-      throw error("host-symbol expects a string name");
-    }
-    return new HaraNodes.HostSymbol((String) form.nth(1));
-  }
-
-  private HaraExpressionNode analyzeHostGet(List<?> form) {
-    requireCount(form, 3, "host-get");
-    return new HaraNodes.HostGet(analyze(form.nth(1)), memberName(form.nth(2)));
-  }
-
-  private HaraExpressionNode analyzeHostCall(List<?> form) {
-    if (form.count() < 3) {
-      throw error("host-call expects a target and member name");
-    }
-    HaraExpressionNode[] arguments = new HaraExpressionNode[(int) form.count() - 3];
-    for (int i = 3; i < form.count(); i++) {
-      arguments[i - 3] = analyze(form.nth(i));
-    }
-    return new HaraNodes.HostCall(analyze(form.nth(1)), memberName(form.nth(2)), arguments);
-  }
-
   private HaraExpressionNode analyzeMarkerCall(List<?> form) {
-    requireCount(form, 3, ".");
-    if (!(form.nth(2) instanceof List<?>)) {
-      throw error("dot expects a method call such as (. value (filter predicate))");
+    if (form.count() < 3) throw error("dot expects a receiver and at least one member step");
+    HaraExpressionNode result = analyze(form.nth(1));
+    for (int i = 2; i < form.count(); i++) {
+      Object step = form.nth(i);
+      if (step instanceof Symbol) {
+        Symbol member = (Symbol) step;
+        if (member.getNamespace() != null) throw error("dot field must be an unqualified symbol");
+        result = new HaraNodes.NativeReadMember(result, member.getName());
+      } else if (step instanceof List<?>) {
+        List<?> call = (List<?>) step;
+        if (call.count() == 0
+            || !(call.nth(0) instanceof Symbol)
+            || ((Symbol) call.nth(0)).getNamespace() != null) {
+          throw error("dot method must be an unqualified symbol");
+        }
+        HaraExpressionNode[] arguments = new HaraExpressionNode[(int) call.count() - 1];
+        for (int j = 1; j < call.count(); j++) arguments[j - 1] = analyze(call.nth(j));
+        result = new HaraNodes.MarkerCall(result, ((Symbol) call.nth(0)).getName(), arguments);
+      } else if (step instanceof ILinearType<?>
+          && "[".equals(((ILinearType<?>) step).startString())
+          && ((ILinearType<?>) step).count() == 1) {
+        result = new HaraNodes.NativeIndex(result, analyze(((ILinearType<?>) step).nth(0)));
+      } else {
+        throw error("dot steps must be fields, method lists, or one-element index vectors");
+      }
     }
-    List<?> call = (List<?>) form.nth(2);
-    if (call.count() == 0
-        || !(call.nth(0) instanceof Symbol)
-        || ((Symbol) call.nth(0)).getNamespace() != null) {
-      throw error("dot method must be an unqualified symbol");
-    }
-    HaraExpressionNode[] arguments = new HaraExpressionNode[(int) call.count() - 1];
-    for (int i = 1; i < call.count(); i++) arguments[i - 1] = analyze(call.nth(i));
-    return new HaraNodes.MarkerCall(
-        analyze(form.nth(1)), ((Symbol) call.nth(0)).getName(), arguments);
+    return result;
+  }
+
+  private HaraExpressionNode analyzeNativeNew(List<?> form) {
+    if (form.count() < 2) throw error("new expects a type and optional arguments");
+    HaraExpressionNode[] arguments = new HaraExpressionNode[(int) form.count() - 2];
+    for (int i = 2; i < form.count(); i++) arguments[i - 2] = analyze(form.nth(i));
+    return new HaraNodes.NativeConstruct(analyze(form.nth(1)), arguments);
   }
 
   private String memberName(Object value) {

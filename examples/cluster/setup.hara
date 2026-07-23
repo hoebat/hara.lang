@@ -1,4 +1,0 @@
-{:runtimes
- {:node-1 {:src "src/node.hrl"}
-  :node-2 {:src "src/node.hrl"}
-  :node-3 {:src "src/node.hrl"}}}

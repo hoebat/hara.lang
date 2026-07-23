@@ -22,7 +22,7 @@ This mode is deliberately interpreter-first and disables JVM-dynamic features th
 Use the native CLI entrypoint for small scripts:
 
 * `hara native eval "(+ 1 2)"`
-* `hara native run path/to/script.hrl`
+* `hara native run path/to/script.hal`
 * `hara native stdin`
 
 For packaging, the Maven build now supports a `native` profile that switches the jar entrypoint to `hara.kernel.NativeMain`:

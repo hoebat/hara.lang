@@ -44,6 +44,7 @@ public class RTTest {
   @Test
   public void testClassEnvAlias() {
     RT.Instance<Object> rt = new RT.Instance<>(null, "test");
+    rt.getCurrentNs().nativeFlavor = "jvm";
     RT.ClassEnv classEnv = rt._userEnv._class;
     Symbol sym = Symbol.create("Str");
 

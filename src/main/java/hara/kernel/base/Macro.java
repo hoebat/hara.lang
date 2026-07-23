@@ -1,5 +1,6 @@
 package hara.kernel.base;
 
+import hara.kernel.flavor.NativeFlavorProvider;
 import hara.kernel.protocol.IEnv;
 import hara.kernel.protocol.IRuntime;
 import hara.lang.base.Eq;
@@ -49,20 +50,23 @@ public interface Macro {
 
     public static <R, AST> R dotExpr(IRuntime rt, Object o, AST cmd) {
       if (cmd instanceof Symbol) {
-        return (R) Reflect.getInstanceField(o, G.display(cmd));
+        return (R)
+            nativeProvider(rt).readMember(o, G.display(cmd), ((RT.Instance) rt).nativeAccess());
       } else if (cmd instanceof List) {
         var l = (List) cmd;
         var method = l.peekFirst();
         return (R)
-            Reflect.invokeInstanceMethod(
-                o,
-                G.display(method),
-                Iter.toArray(Iter.map(Iter.drop(Iter.iter(l), 1), (expr) -> rt.eval(expr))));
+            nativeProvider(rt)
+                .invokeMember(
+                    o,
+                    G.display(method),
+                    Iter.toArray(Iter.map(Iter.drop(Iter.iter(l), 1), (expr) -> rt.eval(expr))),
+                    ((RT.Instance) rt).nativeAccess());
 
       } else if (cmd instanceof Vector || cmd instanceof Tuple.Tup1) {
         var idx = rt.eval(((INth) cmd).nth(0));
         if (o.getClass().isArray()) {
-          return (R) ((Object[]) o)[(int) idx];
+          return (R) nativeProvider(rt).index(o, idx, ((RT.Instance) rt).nativeAccess());
         } else if (o instanceof ILookup) {
           return (R) BuiltinCollection.get((ILookup) o, idx);
         } else if (o instanceof Iterable) {
@@ -72,6 +76,17 @@ public interface Macro {
         }
       }
       throw new Ex.Unsupported();
+    }
+
+    private static NativeFlavorProvider nativeProvider(IRuntime runtime) {
+      if (!(runtime instanceof RT.Instance)) {
+        throw new Ex.Runtime("Runtime does not support native flavors");
+      }
+      NativeFlavorProvider provider = ((RT.Instance) runtime).nativeProvider();
+      if (provider == null) {
+        throw new Ex.Runtime("Native interop requires an ns :flavor declaration");
+      }
+      return provider;
     }
 
     @Module.Fn(name = ".", complete = true, vargs = true, env = true)
@@ -88,11 +103,12 @@ public interface Macro {
     @Module.Fn(name = "new", complete = true, vargs = true, env = true)
     @Module.Var(control = true)
     public static <R, ITR> R newExpr(IEnv env, Symbol clsym, ITR args) {
-      Class cls = (Class) Eval.eval(clsym, env);
+      Object type = Eval.eval(clsym, env);
 
       // Evaluate args
       Object[] evalArgs = Iter.toArray(Iter.map(Iter.iter(args), arg -> Eval.eval(arg, env)));
-      return (R) Reflect.invokeConstructor(cls, evalArgs);
+      RT.Instance runtime = (RT.Instance) env.getRuntime();
+      return (R) nativeProvider(runtime).construct(type, evalArgs, runtime.nativeAccess());
     }
   }
 
@@ -104,6 +120,19 @@ public interface Macro {
       if (env.getRuntime() instanceof RT.Instance) {
         RT.Instance rt = (RT.Instance) env.getRuntime();
         rt.setCurrentNs(name);
+
+        Iterator flavorIt = Iter.iter(args);
+        while (flavorIt.hasNext()) {
+          Object arg = flavorIt.next();
+          if (arg instanceof List) {
+            List l = (List) arg;
+            if (l.count() > 0
+                && l.peekFirst() instanceof Keyword
+                && "flavor".equals(((Keyword) l.peekFirst()).getName())) {
+              processFlavor(rt, l);
+            }
+          }
+        }
 
         Iterator it = Iter.iter(args);
         while (it.hasNext()) {
@@ -117,6 +146,8 @@ public interface Macro {
                 processImport(rt, l);
               } else if ("require".equals(kwName)) {
                 processRequire(rt, l);
+              } else if ("flavor".equals(kwName)) {
+                // Applied in the first pass so clause order does not affect imports.
               } else {
                 throw new Ex.Runtime("Unsupported ns option: " + kwName);
               }
@@ -129,28 +160,45 @@ public interface Macro {
       }
     }
 
+    public static void processFlavor(RT.Instance rt, List l) {
+      if (l.count() != 2 || !(l.nth(1) instanceof Keyword)) {
+        throw new Ex.Runtime(":flavor expects one keyword");
+      }
+      Keyword flavor = (Keyword) l.nth(1);
+      if (flavor.getNamespace() != null) {
+        throw new Ex.Runtime(":flavor expects an unqualified keyword");
+      }
+      rt._nativeFlavors.require(flavor.getName());
+      rt.getCurrentNs().nativeFlavor = flavor.getName();
+    }
+
     public static void processImport(RT.Instance rt, List l) {
+      NativeFlavorProvider provider = rt.nativeProvider();
+      if (provider == null) {
+        throw new Ex.Runtime(":import requires an ns :flavor declaration");
+      }
       Iterator it = Iter.drop(l.iterator(), 1);
       while (it.hasNext()) {
         Object spec = it.next();
         if (spec instanceof Symbol) {
           // Single class import: java.util.Date
           Symbol sym = (Symbol) spec;
-          Class cls = rt.classFor(sym.getName());
-          if (cls == null) throw new Ex.Runtime("Class not found: " + sym.getName());
-          rt.aliasAdd(Symbol.create(cls.getSimpleName()), cls);
+          Class cls = (Class) provider.resolveType(sym.getName(), rt.nativeAccess());
+          rt.getCurrentNs().imports.put(Symbol.create(cls.getSimpleName()), cls);
         } else if (spec instanceof Iterable) {
           // Package import: [java.util Date List]
           Iterator specIt = Iter.iter(spec);
           if (!specIt.hasNext()) continue;
           Object pkgObj = specIt.next();
-          String pkg = pkgObj.toString();
+          String pkg = pkgObj instanceof Symbol ? ((Symbol) pkgObj).display() : pkgObj.toString();
           while (specIt.hasNext()) {
             Object clsObj = specIt.next();
-            String clsName = pkg + "." + clsObj.toString();
-            Class cls = rt.classFor(clsName);
-            if (cls == null) throw new Ex.Runtime("Class not found: " + clsName);
-            rt.aliasAdd(Symbol.create(cls.getSimpleName()), cls);
+            String clsName =
+                pkg
+                    + "."
+                    + (clsObj instanceof Symbol ? ((Symbol) clsObj).display() : clsObj.toString());
+            Class cls = (Class) provider.resolveType(clsName, rt.nativeAccess());
+            rt.getCurrentNs().imports.put(Symbol.create(cls.getSimpleName()), cls);
           }
         }
       }
@@ -205,7 +253,7 @@ public interface Macro {
         return; // Already loaded
       }
 
-      String path = nsName.getName().replace('.', '/') + ".hrl";
+      String path = nsName.getName().replace('.', '/') + ".hal";
       InputStream is = rt.classLoader().getResourceAsStream(path);
 
       if (is == null) {

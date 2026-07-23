@@ -32,6 +32,9 @@ public class MacroTest {
   @Before
   public void setUp() {
     rt = new RT.Instance<>(null, "test");
+    rt.eval(
+        rt.readString(
+            "(ns test (:flavor :jvm) (:import hara.kernel.base.MacroTest$TestClass [java.lang Exception RuntimeException]))"));
     rt.setObj(Symbol.create("test-instance"), new Var("test-instance", new TestClass()));
   }
 
@@ -52,10 +55,19 @@ public class MacroTest {
   @Test
   public void testNew() {
     // (new hara.kernel.base.MacroTest$TestClass "created")
-    String code = "(new hara.kernel.base.MacroTest$TestClass \"created\")";
+    String code = "(new TestClass \"created\")";
     Object res = rt.eval(rt.readString(code));
     assertTrue(res instanceof TestClass);
     assertEquals("created", ((TestClass) res).testField);
+  }
+
+  @Test
+  public void testExplicitJvmFieldWrite() {
+    assertEquals(
+        "changed",
+        rt.eval(
+            rt.readString(
+                "(do (hara.native.jvm/set! test-instance \"testField\" \"changed\") (. test-instance testField))")));
   }
 
   @Test
@@ -187,7 +199,7 @@ public class MacroTest {
   @Test
   public void testTryCatch() {
     String code =
-        "(try (throw (new java.lang.RuntimeException \"error\")) (catch java.lang.RuntimeException e (. e (getMessage))))";
+        "(try (throw (new RuntimeException \"error\")) (catch RuntimeException e (. e (getMessage))))";
     Object result = rt.eval(rt.readString(code));
     assertEquals("error", result);
   }
@@ -202,7 +214,7 @@ public class MacroTest {
   @Test
   public void testThrow() {
     try {
-      rt.eval(rt.readString("(throw (new java.lang.Exception \"fail\"))"));
+      rt.eval(rt.readString("(throw (new Exception \"fail\"))"));
       fail("Should have thrown exception");
     } catch (Exception e) {
       // Just verify we got an exception
