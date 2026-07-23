@@ -9,6 +9,7 @@ import hara.lang.base.G;
 import hara.lang.data.Keyword;
 import hara.lang.data.Symbol;
 import hara.lang.protocol.IMetadata;
+import org.jline.reader.History;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.Reference;
@@ -18,7 +19,6 @@ import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 
 import java.io.IOException;
-import java.nio.file.Paths;
 
 /**
  * Interactive Read-Eval-Print Loop (REPL) for the Hara runtime.
@@ -33,13 +33,19 @@ public class Repl {
   private final LineReader lineReader;
   private final JLineInputReader inputReader;
   private final Reader reader;
+  private final ReplConfig config;
 
   public Repl(RT.Instance rt) throws IOException {
+    this(rt, ReplConfig.defaults(".hara_history"));
+  }
+
+  public Repl(RT.Instance rt, ReplConfig config) throws IOException {
     NativeMode.requireDisabled("interactive REPL");
     this.rt = rt;
 
     // Initialize Terminal
     this.terminal = TerminalBuilder.builder().system(true).build();
+    this.config = config.withColor(config.color() && !"dumb".equalsIgnoreCase(terminal.getType()));
 
     // Initialize Completion System
     PackageTree packageTree = new PackageTree();
@@ -54,9 +60,7 @@ public class Repl {
             .terminal(terminal)
             .completer(completer)
             .parser(new LispParser())
-            .variable(
-                LineReader.HISTORY_FILE,
-                Paths.get(System.getProperty("user.home"), ".hara_history"))
+            .variable(LineReader.HISTORY_FILE, this.config.historyFile())
             .option(LineReader.Option.HISTORY_INCREMENTAL, true)
             .build();
 
@@ -70,14 +74,52 @@ public class Repl {
     // Bind to F1
     this.lineReader.getKeyMaps().get(LineReader.MAIN).bind(new Reference("show-doc"), "\033OP");
 
-    this.inputReader = new JLineInputReader(lineReader);
+    this.inputReader =
+        new JLineInputReader(
+            lineReader,
+            () -> this.config.prompt(currentNamespace()),
+            this.config::continuationPrompt,
+            this::handleCommand);
     this.reader = new Reader(inputReader);
   }
 
   /** Print the REPL banner with session information. */
   public void printBanner() {
-    System.out.println("Hara Runtime Environment (HRE)");
-    System.out.println("Session: " + rt._key);
+    terminal.writer().println(config.banner("JVM interpreter", rt._key));
+    terminal.writer().flush();
+  }
+
+  private String currentNamespace() {
+    return rt.getCurrentNs() == null ? "user" : rt.getCurrentNs().name.display();
+  }
+
+  private JLineInputReader.CommandResult handleCommand(String line) {
+    String command = line.strip();
+    var writer = terminal.writer();
+    if ("/quit".equals(command) || "/exit".equals(command)) {
+      return JLineInputReader.CommandResult.EOF;
+    } else if ("/help".equals(command)) {
+      writer.println("/help       show REPL commands");
+      writer.println("/history    show persistent input history");
+      writer.println("/clear      clear the terminal");
+      writer.println("/splash     show the Hara banner");
+      writer.println("/ns         show the current namespace");
+      writer.println("/quit       exit the REPL");
+    } else if ("/history".equals(command)) {
+      for (History.Entry entry : lineReader.getHistory()) {
+        writer.println((entry.index() + 1) + ": " + entry.line());
+      }
+    } else if ("/clear".equals(command)) {
+      lineReader.callWidget(LineReader.CLEAR_SCREEN);
+    } else if ("/splash".equals(command)) {
+      writer.println(config.banner("JVM interpreter", rt._key));
+    } else if ("/ns".equals(command)) {
+      writer.println(currentNamespace());
+    } else {
+      writer.println("Unknown command: " + command + ". Try /help.");
+    }
+    writer.flush();
+    return JLineInputReader.CommandResult.CONSUMED;
   }
 
   /**
@@ -98,7 +140,8 @@ public class Repl {
         if (form == EOF_SENTINEL) break;
 
         Object res = rt.eval(form);
-        System.out.println(G.display(res));
+        terminal.writer().println(G.display(res));
+        terminal.writer().flush();
       } catch (Throwable t) {
         Throwable cause = t;
         while (cause instanceof java.lang.reflect.InvocationTargetException
@@ -116,7 +159,8 @@ public class Repl {
         if (cause instanceof Ex.Runtime
             || cause instanceof Ex.Unsupported
             || cause instanceof Ex.Arity) {
-          System.out.println("Error: " + cause.getMessage());
+          terminal.writer().println("Error: " + cause.getMessage());
+          terminal.writer().flush();
         } else {
           t.printStackTrace();
         }

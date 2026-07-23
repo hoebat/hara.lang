@@ -8,6 +8,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import hara.kernel.ReplConfig;
 import hara.kernel.base.Parser;
 import hara.lang.base.G;
 import hara.lang.data.Keyword;
@@ -19,10 +20,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Iterator;
-import java.nio.file.Paths;
 import org.jline.reader.Candidate;
 import org.jline.reader.Completer;
 import org.jline.reader.EndOfFileException;
+import org.jline.reader.History;
 import org.jline.reader.LineReader;
 import org.jline.reader.LineReaderBuilder;
 import org.jline.reader.ParsedLine;
@@ -287,26 +288,59 @@ public final class Main {
   private static int runJLineRepl(Context context, PrintStream output, PrintStream error)
       throws IOException {
     try (Terminal terminal = TerminalBuilder.builder().system(true).build()) {
+      ReplConfig baseConfig = ReplConfig.defaults(".hara_truffle_history");
+      ReplConfig config =
+          baseConfig.withColor(baseConfig.color() && !"dumb".equalsIgnoreCase(terminal.getType()));
       LineReader reader =
           LineReaderBuilder.builder()
               .terminal(terminal)
               .parser(new LispLineParser())
               .completer(new HaraCompleter(context))
-              .variable(
-                  LineReader.HISTORY_FILE,
-                  Paths.get(System.getProperty("user.home"), ".hara_truffle_history"))
+              .variable(LineReader.HISTORY_FILE, config.historyFile())
               .option(LineReader.Option.HISTORY_INCREMENTAL, true)
               .build();
+      terminal.writer().println(config.banner("Truffle", "polyglot"));
+      terminal.writer().flush();
       StringBuilder source = new StringBuilder();
       while (true) {
         try {
-          String line = reader.readLine(source.length() == 0 ? "hara> " : "..> ");
-          if (source.length() == 0 && ":quit".equals(line.trim())) return 0;
-          if (source.length() == 0 && ":help".equals(line.trim())) {
-            output.println(":quit          exit the REPL");
-            output.println(":help          show this help");
-            output.println(":history       show evaluated forms");
-            continue;
+          String line =
+              reader.readLine(
+                  source.length() == 0 ? config.prompt("user") : config.continuationPrompt());
+          if (source.length() == 0) {
+            String command = line.strip();
+            if ("/quit".equals(command) || "/exit".equals(command) || ":quit".equals(command))
+              return 0;
+            if ("/help".equals(command) || ":help".equals(command)) {
+              printInteractiveHelp(terminal);
+              continue;
+            }
+            if ("/history".equals(command) || ":history".equals(command)) {
+              for (History.Entry entry : reader.getHistory()) {
+                terminal.writer().println((entry.index() + 1) + ": " + entry.line());
+              }
+              terminal.writer().flush();
+              continue;
+            }
+            if ("/clear".equals(command)) {
+              reader.callWidget(LineReader.CLEAR_SCREEN);
+              continue;
+            }
+            if ("/splash".equals(command)) {
+              terminal.writer().println(config.banner("Truffle", "polyglot"));
+              terminal.writer().flush();
+              continue;
+            }
+            if ("/ns".equals(command)) {
+              terminal.writer().println("user");
+              terminal.writer().flush();
+              continue;
+            }
+            if (line.startsWith("/")) {
+              terminal.writer().println("Unknown command: " + command + ". Try /help.");
+              terminal.writer().flush();
+              continue;
+            }
           }
           source.append(line).append('\n');
           if (!isComplete(source)) continue;
@@ -325,6 +359,16 @@ public final class Main {
         }
       }
     }
+  }
+
+  private static void printInteractiveHelp(Terminal terminal) {
+    terminal.writer().println("/help       show REPL commands");
+    terminal.writer().println("/history    show persistent input history");
+    terminal.writer().println("/clear      clear the terminal");
+    terminal.writer().println("/splash     show the Hara banner");
+    terminal.writer().println("/ns         show the current namespace");
+    terminal.writer().println("/quit       exit the REPL");
+    terminal.writer().flush();
   }
 
   private static String display(Value result) {

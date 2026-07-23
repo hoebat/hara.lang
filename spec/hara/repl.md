@@ -25,8 +25,9 @@ evaluate -> print value
   +----> EOF -> exit
 ```
 
-The current banner identifies the Hara runtime environment and session key. Embedders may replace
-the banner or suppress it; banner customization must not change evaluation semantics.
+The default banner uses Hara ASCII art and identifies the runtime and session. Embedders may replace
+the splash or suppress it through `ReplConfig`; `hara.repl.splash` and `hara.repl.no-color` provide
+process-level configuration. Banner customization must not change evaluation semantics.
 
 ## History
 
@@ -79,8 +80,6 @@ state.
 
 ## Slash-command boundary
 
-The dispatcher described below is the target control-layer contract; the current implementation provides the JLine loop, history, completion, and documentation widget, while slash-command dispatch remains to be implemented.
-
 Slash commands are intentionally a separate REPL control layer. They are not Hara symbols and are
 never sent to the evaluator:
 
@@ -89,7 +88,7 @@ input line
    |
    +--> starts with / ? -- yes --> REPL command dispatcher
    |                                  |
-   |                                  +--> /help /history /clear /quit
+   |                                  +--> /help /history /clear /splash /ns /quit
    |
    +--> no ------------------------> Hara reader/evaluator
 ```

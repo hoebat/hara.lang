@@ -3,6 +3,8 @@ package hara.kernel.base;
 import org.jline.reader.LineReader;
 import org.junit.Test;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import static org.junit.Assert.*;
 
 public class JLineInputReaderTest {
@@ -48,5 +50,57 @@ public class JLineInputReaderTest {
     // Read EOF
     len = reader.read(cbuf, 0, 100);
     assertEquals(-1, len);
+  }
+
+  @Test
+  public void dispatchesSlashCommandsOnlyAtPrimaryPrompt() throws IOException {
+    List<String> prompts = new ArrayList<>();
+    List<String> commands = new ArrayList<>();
+    String[] lines = {"/help", "(list", "/still-source", ")"};
+    int[] next = {0};
+    LineReader mockLineReader =
+        (LineReader)
+            java.lang.reflect.Proxy.newProxyInstance(
+                JLineInputReaderTest.class.getClassLoader(),
+                new Class[] {LineReader.class},
+                (proxy, method, args) -> {
+                  if (method.getName().equals("readLine")) {
+                    prompts.add((String) args[0]);
+                    return next[0] < lines.length ? lines[next[0]++] : null;
+                  }
+                  return null;
+                });
+
+    JLineInputReader reader =
+        new JLineInputReader(
+            mockLineReader,
+            () -> "primary> ",
+            () -> "more> ",
+            line -> {
+              commands.add(line);
+              return JLineInputReader.CommandResult.CONSUMED;
+            });
+    char[] cbuf = new char[100];
+
+    int len = reader.read(cbuf, 0, cbuf.length);
+
+    assertEquals("(list\n/still-source\n)\n", new String(cbuf, 0, len));
+    assertEquals(List.of("/help"), commands);
+    assertEquals(List.of("primary> ", "primary> ", "more> ", "more> ", "more> "), prompts);
+  }
+
+  @Test
+  public void quitCommandReturnsEof() throws IOException {
+    LineReader mockLineReader =
+        (LineReader)
+            java.lang.reflect.Proxy.newProxyInstance(
+                JLineInputReaderTest.class.getClassLoader(),
+                new Class[] {LineReader.class},
+                (proxy, method, args) -> method.getName().equals("readLine") ? "/quit" : null);
+    JLineInputReader reader =
+        new JLineInputReader(
+            mockLineReader, () -> "> ", () -> "... ", line -> JLineInputReader.CommandResult.EOF);
+
+    assertEquals(-1, reader.read(new char[8], 0, 8));
   }
 }
