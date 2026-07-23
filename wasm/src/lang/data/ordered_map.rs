@@ -3,8 +3,8 @@ use std::hash::Hash;
 
 use crate::lang::data::{Map, Vector};
 use crate::lang::protocol::{
-    IAssoc, ICount, IDissoc, IEmpty, IFind, ILookup, IMetadata, IMutable, INth, IPersistent,
-    IToMutable, IToPersistent,
+    HashType, IAssoc, IColl, IConj, ICount, IDisplay, IDissoc, IEmpty, IEquality, IFind, IHash,
+    ILookup, IMetadata, IMutable, INth, IObjType, IPersistent, IToMutable, IToPersistent, ObjType,
 };
 
 const COMPACT_MINIMUM: usize = 32;
@@ -158,6 +158,68 @@ impl<K: Clone + Eq + Hash, V: Clone> IMetadata for Standard<K, V> {
     }
 }
 impl<K: Clone + Eq + Hash, V: Clone> IPersistent for Standard<K, V> {}
+impl<K: Clone + Eq + Hash, V: Clone> IntoIterator for Standard<K, V> {
+    type Item = (K, V);
+    type IntoIter = std::vec::IntoIter<(K, V)>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter().cloned().collect::<Vec<_>>().into_iter()
+    }
+}
+impl<K: Clone + Eq + Hash, V: Clone> IConj<(K, V)> for Standard<K, V> {
+    type Output = Self;
+    fn conj(&self, (k, v): (K, V)) -> Self {
+        self.assoc_value(k, v)
+    }
+}
+impl<K: Clone + Eq + Hash, V: Clone + PartialEq> IEquality for Standard<K, V> {
+    fn equality(&self, other: &Self) -> bool {
+        self.len() == other.len() && self.iter().all(|(k, v)| other.get(k) == Some(v))
+    }
+}
+impl<K: Clone + Eq + Hash + std::fmt::Debug, V: Clone + std::fmt::Debug> IDisplay
+    for Standard<K, V>
+{
+    fn display(&self) -> String {
+        format!(
+            "{{{}}}",
+            self.iter()
+                .map(|(k, v)| format!("{k:?} {v:?}"))
+                .collect::<Vec<_>>()
+                .join(" ")
+        )
+    }
+}
+impl<K: Clone + Eq + Hash, V: Clone + Hash> IHash for Standard<K, V> {
+    fn hash_calc(&self, _: HashType) -> u64 {
+        self.iter()
+            .map(|(k, v)| {
+                let mut s = std::collections::hash_map::DefaultHasher::new();
+                std::hash::Hash::hash(k, &mut s);
+                std::hash::Hash::hash(v, &mut s);
+                std::hash::Hasher::finish(&s)
+            })
+            .fold(0u64, u64::wrapping_add)
+    }
+}
+impl<K: Clone + Eq + Hash + std::fmt::Debug, V: Clone + std::fmt::Debug> IObjType
+    for Standard<K, V>
+{
+    fn obj_type(&self) -> ObjType {
+        ObjType::Map
+    }
+}
+impl<K, V> IColl<(K, V)> for Standard<K, V>
+where
+    K: Clone + Eq + Hash + std::fmt::Debug,
+    V: Clone + PartialEq + Hash + std::fmt::Debug,
+{
+    fn start_string(&self) -> &'static str {
+        "{"
+    }
+    fn end_string(&self) -> &'static str {
+        "}"
+    }
+}
 impl<K: Clone + Eq + Hash, V: Clone> IToMutable for Standard<K, V> {
     type Mutable = Mutable<K, V>;
     fn to_mutable(&self) -> Self::Mutable {
