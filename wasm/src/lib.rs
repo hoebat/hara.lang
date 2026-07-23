@@ -57,7 +57,7 @@ impl Runtime {
     pub fn new() -> Runtime {
         Runtime {
             env: HashMap::new(),
-            protocols: core::ProtocolRegistry::new(),
+            protocols: core::ProtocolRegistry::core(),
             providers: core::ProviderRegistry::new(),
             resources: HashMap::new(),
             loaded_resources: HashSet::new(),
@@ -69,7 +69,7 @@ impl Runtime {
 
     fn eval_text(&mut self, source: &str) -> Result<String, String> {
         self.refresh_qualified_bindings();
-        let result=core::eval_text(source, &mut self.env);
+        let result = core::with_protocols(&self.protocols, || core::eval_text(source, &mut self.env));
         self.refresh_qualified_bindings();
         result
     }
@@ -486,6 +486,10 @@ mod tests {
         arguments.first().cloned().ok_or_else(|| "missing receiver".into())
     }
 
+    fn protocol_custom_iterator(_arguments: &[core::Value]) -> Result<core::Value, String> {
+        Ok(core::iterator_from_values(vec![core::Value::Number(7), core::Value::Number(8)]))
+    }
+
     #[test]
     fn promise_values_are_composable_and_settle_once() {
         let mut runtime = Runtime::new();
@@ -595,6 +599,14 @@ mod tests {
         assert_eq!(runtime.eval_text("(protocol-call ICount count [1 2 3])").unwrap(), "3");
         assert_eq!(runtime.eval_text("(protocol-call INth nth (bytes 1 -3) 1)").unwrap(), "-3");
         assert_eq!(runtime.eval_text(r#"(protocol-call ILookup lookup {"a" 9} "a")"#).unwrap(), "9");
+        assert_eq!(runtime.eval_text(r#"(protocol-call IAssoc assoc {"a" 9} "b" 10)"#).unwrap(), r#"{"a" 9 "b" 10}"#);
+        assert_eq!(runtime.eval_text(r#"(protocol-call IConj conj [1] 2)"#).unwrap(), "[1 2]");
+        assert_eq!(runtime.eval_text(r#"(protocol-call IDissoc dissoc {"a" 9 "b" 10} "a")"#).unwrap(), r#"{"b" 10}"#);
+        runtime.protocols.register("ITest", "echo", protocol_identity);
+        assert_eq!(runtime.eval_text("(protocol-call ITest echo 7)").unwrap(), "7");
+        runtime.protocols.register("IIter", "iter", protocol_custom_iterator);
+        assert_eq!(runtime.eval_text("(iter-next (iter 99))").unwrap(), "7");
+        assert!(runtime.has_protocol_method("IAssoc", "assoc"));
         assert!(runtime.eval_text("(protocol-call Missing nope 1)").unwrap_err().contains("missing protocol method"));
     }
 
@@ -602,6 +614,7 @@ mod tests {
     fn protocol_registry_dispatches_by_protocol_and_method() {
         let mut registry = core::ProtocolRegistry::new();
         registry.register("IIdentity", "identity", protocol_identity);
+        assert!(core::ProtocolRegistry::core().contains("IAssoc", "assoc"));
         assert!(registry.contains("IIdentity", "identity"));
         assert_eq!(registry.invoke("IIdentity", "identity", &[core::Value::Number(7)]).unwrap(), core::Value::Number(7));
         assert!(registry.invoke("IIdentity", "missing", &[]).unwrap_err().contains("missing protocol method"));

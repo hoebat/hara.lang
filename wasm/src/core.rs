@@ -146,7 +146,7 @@ impl Value {
 
 pub type ProtocolFn = fn(&[Value]) -> Result<Value, String>;
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct ProtocolRegistry {
     methods: HashMap<(String, String), ProtocolFn>,
 }
@@ -167,6 +167,33 @@ impl ProtocolRegistry {
     pub fn contains(&self, protocol: &str, method: &str) -> bool {
         self.methods.contains_key(&(protocol.to_string(), method.to_string()))
     }
+
+    /// Returns the built-in collection protocol registry used by evaluator dispatch.
+    pub fn core() -> Self {
+        let mut registry = Self::new();
+        registry.register("ICount", "count", protocol_count);
+        registry.register("INth", "nth", protocol_nth);
+        registry.register("ILookup", "lookup", protocol_lookup);
+        registry.register("IAssoc", "assoc", protocol_assoc);
+        registry.register("IConj", "conj", protocol_conj);
+        registry.register("IDissoc", "dissoc", protocol_dissoc);
+        registry.register("IIter", "iter", protocol_iter);
+        registry
+    }
+}
+
+thread_local! {
+    static ACTIVE_PROTOCOLS: RefCell<Option<ProtocolRegistry>> = const { RefCell::new(None) };
+}
+
+/// Runs an evaluation with a registry available to protocol dispatch.
+pub fn with_protocols<R>(registry: &ProtocolRegistry, operation: impl FnOnce() -> R) -> R {
+    ACTIVE_PROTOCOLS.with(|active| {
+        let previous = active.replace(Some(registry.clone()));
+        let result = operation();
+        active.replace(previous);
+        result
+    })
 }
 
 #[allow(dead_code)]
@@ -680,21 +707,67 @@ fn value_index(value: &Value) -> Result<usize, String> {
     match value { Value::Number(index) if *index >= 0 => Ok(*index as usize), _ => Err("index must be a non-negative integer".into()) }
 }
 
-fn protocol_call(protocol: &str, method: &str, arguments: &[Value]) -> Result<Value, String> {
-    match (protocol, method) {
-        ("ICount", "count") if arguments.len() == 1 => collection_count(&arguments[0]),
-        ("INth", "nth") if arguments.len() == 2 => {
-            if let Value::Bytes(bytes) = &arguments[0] {
-                let index = value_index(&arguments[1])?; return bytes.get(index).map(|byte| Value::Number(*byte as i8 as i64)).ok_or_else(|| "nth index out of bounds".into());
-            }
-            if let Value::ByteBuffer(bytes) = &arguments[0] {
-                let index = value_index(&arguments[1])?; return bytes.borrow().get(index).map(|byte| Value::Number(*byte as i8 as i64)).ok_or_else(|| "nth index out of bounds".into());
-            }
-            collection_nth(&arguments[0], &arguments[1])
-        }
-        ("ILookup", "lookup") if arguments.len() == 2 || arguments.len() == 3 => collection_get(&arguments[0], &arguments[1], arguments.get(2).cloned().unwrap_or(Value::Nil)),
-        _ => Err(format!("missing protocol method: {protocol}/{method}")),
+fn protocol_count(arguments: &[Value]) -> Result<Value, String> {
+    if arguments.len() == 1 { collection_count(&arguments[0]) } else { Err("ICount/count expects one argument".into()) }
+}
+
+fn protocol_nth(arguments: &[Value]) -> Result<Value, String> {
+    if arguments.len() != 2 { return Err("INth/nth expects a collection and index".into()); }
+    if let Value::Bytes(bytes) = &arguments[0] {
+        let index = value_index(&arguments[1])?;
+        return bytes.get(index).map(|byte| Value::Number(*byte as i8 as i64)).ok_or_else(|| "nth index out of bounds".into());
     }
+    if let Value::ByteBuffer(bytes) = &arguments[0] {
+        let index = value_index(&arguments[1])?;
+        return bytes.borrow().get(index).map(|byte| Value::Number(*byte as i8 as i64)).ok_or_else(|| "nth index out of bounds".into());
+    }
+    collection_nth(&arguments[0], &arguments[1])
+}
+
+fn protocol_lookup(arguments: &[Value]) -> Result<Value, String> {
+    if arguments.len() == 2 || arguments.len() == 3 {
+        collection_get(&arguments[0], &arguments[1], arguments.get(2).cloned().unwrap_or(Value::Nil))
+    } else { Err("ILookup/lookup expects a collection, key, and optional default".into()) }
+}
+
+fn protocol_assoc(arguments: &[Value]) -> Result<Value, String> {
+    if arguments.len() == 3 { collection_assoc(&arguments[0], &arguments[1], arguments[2].clone()) }
+    else { Err("IAssoc/assoc expects a collection, key, and value".into()) }
+}
+
+fn protocol_dissoc(arguments: &[Value]) -> Result<Value, String> {
+    if arguments.len() == 2 { collection_dissoc(&arguments[0], &[arguments[1].clone()]) }
+    else { Err("IDissoc/dissoc expects a collection and key".into()) }
+}
+
+fn protocol_iter(arguments: &[Value]) -> Result<Value, String> {
+    if arguments.len() == 1 && matches!(arguments[0], Value::Iterator(_)) { Ok(arguments[0].clone()) }
+    else { Err("IIter/iter has no implementation for this value".into()) }
+}
+
+fn protocol_conj(arguments: &[Value]) -> Result<Value, String> {
+    if arguments.len() != 2 { return Err("IConj/conj expects a collection and value".into()); }
+    let collection = &arguments[0];
+    let item = &arguments[1];
+    match collection {
+        Value::Vector(values) => { let mut output = values.clone(); output.push_back(item.clone()); Ok(Value::Vector(output)) }
+        Value::List(values) => { let mut output = values.clone(); output.push_front(item.clone()); Ok(Value::List(output)) }
+        Value::Set(values) => { let mut output = values.clone(); output.push(item.clone()); Ok(Value::Set(output)) }
+        Value::Map(values) => {
+            let entry = match item { Value::Vector(entry) | Value::List(entry) if entry.len() == 2 => entry, _ => return Err("IConj/conj map expects a two-element entry".into()) };
+            let mut output = values.clone();
+            if let Some((_, value)) = output.iter_mut().find(|(key, _)| key == &entry[0]) { *value = entry[1].clone(); }
+            else { output.push((entry[0].clone(), entry[1].clone())); }
+            Ok(Value::Map(output))
+        }
+        _ => Err("IConj/conj expects a collection".into()),
+    }
+}
+
+fn protocol_call(protocol: &str, method: &str, arguments: &[Value]) -> Result<Value, String> {
+    ACTIVE_PROTOCOLS.with(|active| {
+        active.borrow().as_ref().cloned().unwrap_or_else(ProtocolRegistry::core).invoke(protocol, method, arguments)
+    })
 }
 
 fn promise_value(value: &Value, operation: &str) -> Result<Promise, String> {
@@ -840,10 +913,19 @@ fn iterator_values(value: Value) -> Result<Vec<Value>, String> {
 }
 
 fn make_iterator(value: Value) -> Result<Value, String> {
-    Ok(Value::Iterator(Rc::new(RefCell::new(IteratorState::new(iterator_values(value)?)))))
+    match &value {
+        Value::Nil | Value::String(_) | Value::Bytes(_) | Value::ByteBuffer(_) | Value::Array(_) | Value::Object(_) |
+        Value::Map(_) | Value::Set(_) | Value::List(_) | Value::Vector(_) | Value::Iterator(_) => {
+            Ok(Value::Iterator(Rc::new(RefCell::new(IteratorState::new(iterator_values(value)?)))))
+        }
+        _ => match protocol_call("IIter", "iter", &[value])? {
+            Value::Iterator(iterator) => Ok(Value::Iterator(iterator)),
+            _ => Err("IIter/iter must return an iterator".into()),
+        },
+    }
 }
 
-fn iterator_from_values(values: Vec<Value>) -> Value { Value::Iterator(Rc::new(RefCell::new(IteratorState::new(values)))) }
+pub fn iterator_from_values(values: Vec<Value>) -> Value { Value::Iterator(Rc::new(RefCell::new(IteratorState::new(values)))) }
 
 fn iterator_constant(value: Value) -> Value { Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::Constant(value))))) }
 fn iterator_repeated(function: Rc<Function>) -> Value { Value::Iterator(Rc::new(RefCell::new(IteratorState::generated(IteratorGenerator::Repeated(function))))) }
@@ -1170,7 +1252,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 match &fs[1] { Form::Symbol(_) => Ok(Value::Nil), _ => Err("ns expects a namespace symbol".into()) }
             }
             Form::Symbol(n) if n == "protocol-call" => {
-                if fs.len() < 4 || fs.len() > 5 { return Err("protocol-call expects protocol, method, value, and optional arguments".into()); }
+                if fs.len() < 4 { return Err("protocol-call expects protocol, method, value, and optional arguments".into()); }
                 let protocol = match &fs[1] { Form::Symbol(name) => name.as_str(), _ => return Err("protocol name must be a symbol".into()) };
                 let method = match &fs[2] { Form::Symbol(name) => name.as_str(), _ => return Err("protocol method must be a symbol".into()) };
                 let mut arguments = vec![eval(&fs[3], env)?];
