@@ -2,8 +2,12 @@ package hara.truffle;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertThrows;
 
 import com.oracle.truffle.api.interop.InteropLibrary;
+import com.oracle.truffle.api.interop.InvalidArrayIndexException;
+import com.oracle.truffle.api.interop.UnknownKeyException;
+import com.oracle.truffle.api.interop.UnsupportedMessageException;
 import hara.lang.data.Map;
 import hara.lang.data.Vector;
 import java.util.ArrayList;
