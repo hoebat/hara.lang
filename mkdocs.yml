@@ -9,8 +9,8 @@ theme:
   custom_dir: overrides
   language: en
   font: false
-  favicon: assets/favicon.svg
-  logo: assets/hara-mark.svg
+  favicon: assets/hara-mark.png
+  logo: assets/hara-mark.png
   features:
     - navigation.tabs
     - navigation.sections
