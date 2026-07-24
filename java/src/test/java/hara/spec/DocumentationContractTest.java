@@ -46,8 +46,8 @@ public class DocumentationContractTest {
     assertTrue(userGuide.contains("(. a (get 3))"));
     assertFalse(userGuide.contains("(array:push-last"));
     assertFalse(userGuide.contains("(array:get"));
-    assertTrue(Files.exists(Path.of("examples/hello.hal")));
-    assertFalse(Files.exists(Path.of("examples/hello.hara")));
+    assertTrue(Files.exists(Path.of("lib/examples/hello.hal")));
+    assertFalse(Files.exists(Path.of("lib/examples/hello.hara")));
   }
 
   @Test
@@ -73,7 +73,7 @@ public class DocumentationContractTest {
             Path.of("docs/namespaces.md"),
             Path.of("docs/user-guide.md"),
             Path.of("docs/reference/namespaces.md"),
-            Path.of("examples/code-test/README.md"));
+            Path.of("lib/examples/code-test/README.md"));
     for (Path guide : currentGuides) {
       String content = Files.readString(guide, StandardCharsets.UTF_8);
       assertFalse("Stale launcher in " + guide, content.contains("truffle-hara"));

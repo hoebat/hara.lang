@@ -15,7 +15,7 @@ import org.junit.Test;
 public class NamespaceWalkthroughTest {
   @Test
   public void loadsAndCallsTheServiceProjectByNamespace() {
-    Path root = Path.of("examples", "services").toAbsolutePath().normalize();
+    Path root = Path.of("lib", "examples", "services").toAbsolutePath().normalize();
     try (Context context =
         Context.newBuilder(HaraLanguage.ID)
             .currentWorkingDirectory(root)
@@ -41,7 +41,7 @@ public class NamespaceWalkthroughTest {
 
   @Test
   public void runsEveryServiceNamespaceFactInHara() {
-    Path root = Path.of("examples", "services").toAbsolutePath().normalize();
+    Path root = Path.of("lib", "examples", "services").toAbsolutePath().normalize();
     try (Context context =
         Context.newBuilder(HaraLanguage.ID)
             .currentWorkingDirectory(root)
@@ -68,7 +68,7 @@ public class NamespaceWalkthroughTest {
           context.eval(
               HaraLanguage.ID,
               Files.readString(
-                  Path.of("examples", "code-test", "tasks.hal"), StandardCharsets.UTF_8));
+                  Path.of("lib", "examples", "code-test", "tasks.hal"), StandardCharsets.UTF_8));
       assertEquals(3, task.getArraySize());
       assertEquals(2, task.getArrayElement(0).asInt());
       assertEquals(6, task.getArrayElement(2).asInt());
@@ -80,7 +80,7 @@ public class NamespaceWalkthroughTest {
       Value results =
           context.eval(
               HaraLanguage.ID,
-              Files.readString(Path.of("examples", "code-test", file), StandardCharsets.UTF_8));
+              Files.readString(Path.of("lib", "examples", "code-test", file), StandardCharsets.UTF_8));
       assertEquals(expectedFacts, results.getArraySize());
       assertAllPass(results);
     }

@@ -20,7 +20,7 @@ use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
 
-const FOUNDATION_FALLBACK: &str = include_str!("../../implementation/src/std/lib/foundation.hal");
+const FOUNDATION_FALLBACK: &str = include_str!("../../lib/src/std/lib/foundation.hal");
 
 fn ignore_socket_event(_event: core::SocketEvent) {}
 

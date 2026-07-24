@@ -12,7 +12,7 @@ import org.junit.Test;
 public class HaraExtensionManifestTest {
   @Test
   public void packagedAnswer42ManifestMatchesTheProviderContract() throws Exception {
-    Path descriptor = Path.of("examples/extensions/demo/000-answer-42/hara.extension.edn");
+    Path descriptor = Path.of("lib/examples/extensions/demo/000-answer-42/hara.extension.edn");
     HaraExtensionManifest manifest =
         HaraExtensionManifest.parse(
             Files.readString(descriptor, StandardCharsets.UTF_8), descriptor.toString());

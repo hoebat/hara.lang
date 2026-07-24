@@ -9,7 +9,7 @@ has been reviewed.
 
 | Slice | Status | Notes |
 |---|---|---|
-| Project and namespace loader | complete | Self-contained examples live under `bench/<NUM>-<GROUP>` |
+| Project and namespace loader | complete | Self-contained examples live under `lib/bench/<NUM>-<GROUP>` |
 | Common grammar foundation | complete | Grammar specification, macros, xtalk profiles/system, and aggregate grammar have translated facts |
 | `polis.typed` | pending | Does not include `hara.model` |
 | Common preprocess and emit | in progress | `preprocess-base` is complete; `emit-rewrite` follows the typed slice |
@@ -18,9 +18,9 @@ has been reviewed.
 
 ## Source convention
 
-Polis is a self-contained Hara project under `implementation/`. Production
-namespaces live under `implementation/src/polis`; translated tests live under
-`implementation/test/polis`. Namespace roots are mapped predictably:
+Polis is a self-contained Hara project under `lib/`. Production
+namespaces live under `lib/src/polis`; translated tests live under
+`lib/test/polis`. Namespace roots are mapped predictably:
 
 | Foundation | Polis |
 |---|---|
@@ -85,7 +85,7 @@ considered.
 
 The nearest `project.hal` is discovered by walking upward from the working
 directory. Runnable project fixtures use
-`bench/<NUM>-<GROUP>/{project.hal,src,test}`. A descriptor has this form:
+`lib/bench/<NUM>-<GROUP>/{project.hal,src,test}`. A descriptor has this form:
 
 ```clojure
 (defproject project.name

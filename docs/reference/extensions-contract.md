@@ -233,7 +233,7 @@ This multi-target descriptor is the required packaging contract for Noir. Both t
 registry and browser loader validate it, select their host target, and reject missing or escaping
 assets before worker startup.
 
-The reference package at `examples/extensions/crypto/hash/sha256` is a real, import-free Rust WASM
+The reference package at `lib/examples/extensions/crypto/hash/sha256` is a real, import-free Rust WASM
 extension:
 
 ```hal
@@ -300,7 +300,7 @@ the protocol handshake. Process-backed operations are denied unless `--allow-pro
 
 The import-free WASM demonstration is named `demo.000-answer-42`. Its runnable descriptor
 template lives at
-`examples/extensions/demo/000-answer-42/hara.extension.edn`; an installed bundle places that
+`lib/examples/extensions/demo/000-answer-42/hara.extension.edn`; an installed bundle places that
 descriptor beside `answer-42.wasm` under the same namespace-derived directory. Requiring it
 generates its namespace directly from the declared WASM exports:
 

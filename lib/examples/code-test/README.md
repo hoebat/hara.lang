@@ -3,7 +3,7 @@
 Run the sample with the Truffle runtime:
 
 ```bash
-./hara run examples/code-test/basic.hal
+./hara run lib/examples/code-test/basic.hal
 ```
 
 Each file declares its own namespace. The `fact` forms register test bodies and the final

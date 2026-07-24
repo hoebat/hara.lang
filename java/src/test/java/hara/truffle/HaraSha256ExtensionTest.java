@@ -22,7 +22,7 @@ public class HaraSha256ExtensionTest {
     Path extension = root.resolve("crypto/hash/sha256");
     Files.createDirectories(extension);
     Files.copy(
-        Path.of("examples/extensions/crypto/hash/sha256/hara.extension.edn"),
+        Path.of("lib/examples/extensions/crypto/hash/sha256/hara.extension.edn"),
         extension.resolve("hara.extension.edn"));
     Files.copy(ARTIFACT, extension.resolve("sha256.wasm"));
     String previous = System.getProperty("hara.extensions.path");

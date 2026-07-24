@@ -42,7 +42,7 @@ public class HaraProjectTest {
   @Test
   public void requiresProjectNamespacesByConvention() {
     Path benchmark =
-        Path.of("bench", "001-simple-test").toAbsolutePath().normalize();
+        Path.of("lib", "bench", "001-simple-test").toAbsolutePath().normalize();
     try (Context project =
         Context.newBuilder(HaraLanguage.ID)
             .currentWorkingDirectory(benchmark)

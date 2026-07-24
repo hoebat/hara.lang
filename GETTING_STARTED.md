@@ -44,8 +44,8 @@ documentation. See [`docs/user-guide.md`](docs/user-guide.md) and [`spec/hara/re
 ## 5. Run a file or stdin
 
 ```shell
-./hara run examples/hello.hal
-./hara stdin < examples/hello.hal
+./hara run lib/examples/hello.hal
+./hara stdin < lib/examples/hello.hal
 ```
 
 ## 6. Run tests

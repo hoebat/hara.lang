@@ -149,12 +149,12 @@ jobs:
         mkdir -p target/native-extensions/demo/000-answer-42
         cp rust/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm \
           target/native-extensions/demo/000-answer-42/answer-42.wasm
-        cp examples/extensions/demo/000-answer-42/hara.extension.edn \
+        cp lib/examples/extensions/demo/000-answer-42/hara.extension.edn \
           target/native-extensions/demo/000-answer-42/hara.extension.edn
         mkdir -p target/native-extensions/hara/runtime/wasm
         cp rust/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm \
           target/native-extensions/hara/runtime/wasm/hara.wasm
-        cp examples/extensions/hara/runtime/wasm/hara.extension.edn \
+        cp lib/examples/extensions/hara/runtime/wasm/hara.extension.edn \
           target/native-extensions/hara/runtime/wasm/hara.extension.edn
         test "$(target/hara-truffle conformance)" = "L0 conformance passed: 64 cases"
         test "$(HARA_EXTENSION_PATH="$PWD/target/native-extensions" target/hara-truffle eval '(ns app (:require [demo.000-answer-42 :as answer])) (answer/add 20 22)')" = "42"

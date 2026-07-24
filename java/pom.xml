@@ -119,7 +119,7 @@
 				<directory>src/main/resources</directory>
 			</resource>
 			<resource>
-				<directory>${project.basedir}/../implementation/src</directory>
+				<directory>${project.basedir}/../lib/src</directory>
 				<includes>
 					<include>**/*.hal</include>
 				</includes>
@@ -130,7 +130,7 @@
 				<directory>src/test/resources</directory>
 			</testResource>
 			<testResource>
-				<directory>${project.basedir}/../implementation/test</directory>
+				<directory>${project.basedir}/../lib/test</directory>
 				<includes>
 					<include>**/*.hal</include>
 				</includes>
