@@ -46,7 +46,7 @@ Namespace `std.lib.coroutine` (suggested require alias `co`):
 | `(status co)` | `:suspended` \| `:running` \| `:dead`. Lua's `normal` (this coroutine resumed another) collapses into `:running`. |
 | `(coroutine? x)` | Predicate. |
 | `(close co)` | Mark dead and interrupt the parked thread; the body's `finally` clauses run on the coroutine's own thread. Only valid on a `:suspended` coroutine — throws on `:running` (the coroutine is executing; interrupting a running thread would not stop it deterministically). No-op on `:dead`. (Lua 5.4 `coroutine.close` parity; prevents leaked parked threads.) |
-| `(await p)` | Suspend the coroutine until promise `p` settles; return its value, throw on failure. On the JVM: blocking deref on the coroutine's virtual thread. Outside a coroutine, behaves as a plain deref. |
+| `(await p)` | Suspend the coroutine until promise `p` settles; return its value, throw on failure. On the JVM: a plain blocking deref on the coroutine's virtual thread. Outside a coroutine, behaves as a plain deref. `close` cannot fire during an `await` because the coroutine is `:running` then and `close` throws on `:running`. |
 
 ### Resume contract
 
@@ -115,8 +115,10 @@ Modified files:
 - `spec/hara/xtalk-equivalence.md` — add `x:coroutine-create` / `x:coroutine-resume` /
   `x:coroutine-yield` / `x:coroutine-status` rows (equivalence metadata, per the file's
   existing convention).
-- `spec/hara/wasm-truffle-parity.edn` — record the coroutine parity gap explicitly.
-- `spec/hara/hara-core-symbols.json` — new public symbols.
+- No `wasm-truffle-parity.edn` or `hara-core-symbols.json` changes: the parity file is an
+  executable corpus that must not gain uncovered cases (the Truffle-only status is recorded
+  in `runtime-libraries.md` instead), and the core-symbols inventory covers L0 plus eagerly
+  referred `std.lib.foundation` only — lazy providers like `std.lib.task` are not listed.
 - `docs/reference/` — coroutines documentation page (location confirmed against docs
   layout during implementation).
 
@@ -156,7 +158,7 @@ L0 is unchanged.
 promise and resumes on settlement — a one-shot coroutine. The port adds a `Yield` step
 variant alongside the existing `Wait` step plus guest-facing builtins, implementing the
 same contract above. No Rust code changes are part of this design; the parity gap is
-recorded in `spec/hara/wasm-truffle-parity.edn`.
+recorded in `spec/hara/runtime-libraries.md`.
 
 ### xtalk portability note
 
