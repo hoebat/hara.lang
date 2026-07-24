@@ -14,19 +14,28 @@ arguments. Vectors, maps, sets, strings, numbers, keywords, and `nil` are data v
 
 ## Namespaces and libraries
 
-The core is deliberately small. Load optional libraries explicitly:
+The core is deliberately small. Every namespace receives qualified aliases for the generated
+string, bytes, promise, file, socket, block, and zip libraries:
 
 ```clojure
-(ns app
-  (:require [std.lib.string :as str]
-            [std.lib.bytes :as bytes]
-            [std.lib.promise :as promise]))
+(ns app)
 
 (str/trim "  ready  ")
+(bytes/count (str/encode "ready"))
 ```
 
-The runtime injects only the configured intrinsic library set. `:require` resolves Hara modules and,
-eventually, provider-backed extension namespaces.
+Require project code or opt-in providers explicitly. Aliases are local to the declaring namespace:
+
+```clojure
+(ns app.api
+  (:require [app.worker :as worker]
+            [std.lib.task :as task]))
+```
+
+The loader resolves project modules, packaged HAL, library providers, and extension manifests while
+keeping capability grants separate. Read [Namespaces and modules](namespaces.md), follow the
+[namespace project walkthrough](walkthroughs/service-project.md), or browse the
+[namespace catalog](reference/namespaces.md).
 
 ## Mutable markers
 

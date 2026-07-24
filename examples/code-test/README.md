@@ -3,10 +3,12 @@
 Run the sample with the Truffle runtime:
 
 ```bash
-truffle-hara run examples/code-test/basic.hal
+./hara run examples/code-test/basic.hal
 ```
 
-The `fact` forms register test bodies. The final `(code.test/run)` executes the registered facts and returns structured results.
+Each file declares its own namespace. The `fact` forms register test bodies and the final
+`(code.test/run {:namespace "..."})` call executes only that namespace, returning structured
+results.
 
 `advanced.hal` demonstrates matchers, fixtures, and filtering. `tasks.hal` demonstrates `std.lib.task` and `deftask`.
 

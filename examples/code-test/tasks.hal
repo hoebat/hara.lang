@@ -1,9 +1,9 @@
-; std.lib.task is Java-backed and remains callable from Hara.
-(require 'std.lib.task)
+(ns example.code-test.tasks
+  (:require [std.lib.task :as task]))
 
 (deftask double-task
   {:template :default
    :doc "Doubles each input"
    :main {:fn (fn [value] (* 2 value))}})
 
-(std.lib.task/invoke double-task [1 2 3])
+(task/invoke double-task [1 2 3])

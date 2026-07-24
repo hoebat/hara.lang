@@ -20,6 +20,8 @@ Truffle parser / AST
 ## Start here
 
 - [User guide](docs/user-guide.md) — install, run, evaluate, use the REPL, and write Hara.
+- [Namespaces and modules](docs/namespaces.md) — organize projects, require code, and control aliases.
+- [Namespace catalog](docs/reference/namespaces.md) — discover every shipped namespace family.
 - [Developer guide](docs/development.md) — build, test, debug, and contribute.
 - [Java API and Javadocs](docs/javadocs.md) — public entry points and generated API docs.
 - [Language specification](spec/hara/l0-language.md) — normative L0 behavior.
@@ -27,6 +29,8 @@ Truffle parser / AST
 - [Rust/WASM mapping](spec/hara/rust-runtime.md) — the cross-runtime value, provider, and conformance design.
 - [Extensions](spec/hara/extensions-contract.md) — WASM, manifests, HTA, and capabilities.
 - [REPL UX](spec/hara/repl.md) — history, completion, docs, and slash-command design.
+- [Hara for Emacs](emacs-hara/README.md) — project-aware evaluation, sessions, completion, docs,
+  and a RESP-backed REPL.
 
 ## Quick start
 

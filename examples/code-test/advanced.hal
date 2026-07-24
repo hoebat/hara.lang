@@ -1,5 +1,5 @@
-; Matchers, fixtures, filtering, and metadata in code.test.
-(require 'code.test {:refer [anything contains contains-in throws use-fixtures]})
+(ns example.code-test.advanced
+  (:require [code.test :refer [anything contains contains-in fact throws use-fixtures]]))
 
 (use-fixtures :before (fn [] true))
 
@@ -9,4 +9,4 @@
 (fact "accepts any value" (+ 20 22) => anything)
 (fact "captures failures" (/ 1 0) => (throws))
 
-(code.test/run {:namespace "user"})
+(code.test/run {:namespace "example.code-test.advanced"})

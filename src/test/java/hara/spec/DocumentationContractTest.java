@@ -7,6 +7,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.ServiceLoader;
+import hara.truffle.HaraLibraryProvider;
 import org.junit.Test;
 
 /** Verifies that published examples and mirrored normative documents describe the current slice. */
@@ -46,5 +48,37 @@ public class DocumentationContractTest {
     assertFalse(userGuide.contains("(array:get"));
     assertTrue(Files.exists(Path.of("examples/hello.hal")));
     assertFalse(Files.exists(Path.of("examples/hello.hara")));
+  }
+
+  @Test
+  public void namespaceCatalogTracksEveryRegisteredProvider() throws Exception {
+    String catalog =
+        Files.readString(Path.of("docs/reference/namespaces.md"), StandardCharsets.UTF_8);
+    int providers = 0;
+    for (HaraLibraryProvider provider : ServiceLoader.load(HaraLibraryProvider.class)) {
+      providers++;
+      assertTrue(
+          "Missing provider namespace from catalog: " + provider.namespace(),
+          catalog.contains("`" + provider.namespace() + "`"));
+    }
+    assertTrue("No Hara library providers were discovered", providers > 0);
+  }
+
+  @Test
+  public void currentGuidesUseCurrentNamespaceAndLauncherConventions() throws Exception {
+    List<Path> currentGuides =
+        List.of(
+            Path.of("README.md"),
+            Path.of("GETTING_STARTED.md"),
+            Path.of("docs/namespaces.md"),
+            Path.of("docs/user-guide.md"),
+            Path.of("docs/reference/namespaces.md"),
+            Path.of("examples/code-test/README.md"));
+    for (Path guide : currentGuides) {
+      String content = Files.readString(guide, StandardCharsets.UTF_8);
+      assertFalse("Stale launcher in " + guide, content.contains("truffle-hara"));
+      assertFalse("Stale project descriptor in " + guide, content.contains("project.hara"));
+    }
+    assertTrue(Files.readString(Path.of("hara")).contains("\"$@\""));
   }
 }

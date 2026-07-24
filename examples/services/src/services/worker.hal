@@ -1,0 +1,10 @@
+(ns services.worker)
+
+(def worker-name "background")
+
+(defn process-job
+  "Processes one immutable job value and returns a result map."
+  [job]
+  {:worker worker-name
+   :job job
+   :status :processed})

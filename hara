@@ -10,7 +10,12 @@ fi
 # Resolve the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
-# Run the canonical Hara Truffle launcher using Maven
-# -f points to the pom.xml in the script's directory
-# -q suppresses Maven output
-mvn -q -f "$SCRIPT_DIR/pom.xml" compile exec:java -Dexec.mainClass="hara.truffle.Main" -Dexec.args="$*"
+# Compile and resolve the runtime classpath before handing the original argument array to Java.
+# Passing "$@" directly preserves quoted forms, embedded strings, and whitespace.
+CLASSPATH_FILE="$SCRIPT_DIR/target/hara-runtime-classpath.txt"
+mvn -q -f "$SCRIPT_DIR/pom.xml" compile dependency:build-classpath \
+    -Dmdep.outputFile="$CLASSPATH_FILE" || exit $?
+
+IFS= read -r HARA_RUNTIME_CLASSPATH < "$CLASSPATH_FILE"
+
+exec java -cp "$SCRIPT_DIR/target/classes:$HARA_RUNTIME_CLASSPATH" hara.truffle.Main "$@"

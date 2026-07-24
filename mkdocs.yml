@@ -54,11 +54,17 @@ nav:
   - Learn:
       - User guide: user-guide.md
       - Getting started: getting-started.md
+      - Namespaces and modules: namespaces.md
+  - Walkthroughs:
+      - Namespace project: walkthroughs/service-project.md
+      - Library namespaces: walkthroughs/libraries.md
+      - Testing namespaces: walkthroughs/testing.md
   - Build:
       - Developer guide: development.md
       - Java API: javadocs.md
   - Reference:
       - L0 language: reference/l0-language.md
+      - Namespace catalog: reference/namespaces.md
       - Runtime libraries: reference/runtime-libraries.md
       - Extensions: reference/extensions-contract.md
       - Extension overview: reference/extensions.md

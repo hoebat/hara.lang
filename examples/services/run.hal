@@ -1,0 +1,4 @@
+(require 'services.api)
+
+(str
+ (services.api/dispatch "  /STATUS  " {:id 42 :action :health-check}))

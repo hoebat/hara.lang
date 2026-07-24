@@ -20,7 +20,7 @@ This produces `target/hara-truffle.jar`.
 ## 3. Evaluate a form
 
 ```shell
-java -jar target/hara-truffle.jar eval '(let [x 19] (+ x 23))'
+./hara eval '(let [x 19] (+ x 23))'
 ```
 
 Expected result:
@@ -32,10 +32,10 @@ Expected result:
 ## 4. Start the REPL
 
 ```shell
-java -jar target/hara-truffle.jar
+./hara
 
-# Local single-kernel REPL
-java -jar target/hara-truffle.jar standalone
+# ROOT REPL without a RESP listener
+./hara --offline
 ```
 
 The REPL supports multiline forms, persistent history, symbol and Java completion, and inline
@@ -44,8 +44,8 @@ documentation. See [`docs/user-guide.md`](docs/user-guide.md) and [`spec/hara/re
 ## 5. Run a file or stdin
 
 ```shell
-java -jar target/hara-truffle.jar run examples/hello.hal
-cat examples/hello.hal | java -jar target/hara-truffle.jar stdin
+./hara run examples/hello.hal
+./hara stdin < examples/hello.hal
 ```
 
 ## 6. Run tests
@@ -56,4 +56,5 @@ mvn -q -Ptruffle -Dtest=hara.truffle.HaraL0ConformanceTest test
 ```
 
 For contributor workflows, test slices, native-image builds, and troubleshooting, read the
-[developer guide](docs/development.md).
+[developer guide](docs/development.md). To build a multi-file project, continue with
+[Namespaces and modules](docs/namespaces.md).

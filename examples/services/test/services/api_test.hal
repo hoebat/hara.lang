@@ -1,0 +1,19 @@
+(ns services.api-test
+  (:require [code.test :refer :all]
+            [services.api :as api]
+            [services.worker :refer [worker-name]]))
+
+(fact "normalizes routes through a namespace alias"
+  (api/normalize-route "  /STATUS  ")
+  => "/status")
+
+(fact "refers selected Vars without copying their values"
+  worker-name
+  => "background")
+
+(fact "dispatches persistent data across namespaces"
+  (api/dispatch "/jobs" {:id 42})
+  => {:route "/jobs"
+      :result {:worker "background"
+               :job {:id 42}
+               :status :processed}})

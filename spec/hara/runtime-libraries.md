@@ -12,6 +12,8 @@ Every namespace receives these aliases by default:
 | `bytes/` | `std.lib.bytes` | byte operations |
 | `socket/` | `std.lib.socket` | `x:socket-*` |
 | `file/` | `std.lib.file` | `x:file-*` |
+| `block/` | `std.lib.block` | source-preserving Hara blocks |
+| `zip/` | `std.lib.zip` | persistent tree zipper navigation |
 
 `(ns app)` and `(ns app (:intrinsics :all))` are equivalent. Aliases can be excluded or renamed:
 
@@ -67,3 +69,22 @@ writes use bytes and return promises. Socket v1 follows the callback contract: `
 host, port, a reserved options value, and an `(fn [error connection] ...)` callback; the current
 implementation does not interpret options. `send` accepts bytes and returns the byte count;
 `close` is direct. Receive/framing and HTTP are outside this slice.
+
+Additional provider-backed namespaces are available through ordinary `require` and are not
+automatically aliased:
+
+| Namespace | Purpose |
+| --- | --- |
+| `std.lib.handle` | releases opaque HTA extension handles |
+| `std.lib.context` | context registries, runtime spaces, lifecycles, and pointers |
+| `std.lib.task` | task definitions, invocation, selection, and bulk processing |
+| `code.test` | facts, fixtures, matchers, and structured test execution |
+
+These providers are installed lazily under their canonical public namespace. Their implementation
+classes and helper namespaces are not guest-visible API. Requiring a provider does not grant file,
+network, process, reflection, classpath, or compilation authority.
+
+`std.resp.client` is a separate, explicitly required blocking RESP2 client. It exposes `connect`,
+`call`, `write`, `read`, `pipeline`, `open?`, and `close`; connections require network capability.
+Bulk strings decode as UTF-8 strings by default and can be preserved as bytes with
+`{:decode-bulk :bytes}`.
