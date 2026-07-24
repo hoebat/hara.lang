@@ -1,8 +1,13 @@
 import net from "node:net";
 import { WebSocketServer } from "ws";
 
+class ProtocolError extends Error {}
+
+const MAX_ARGS = 1024;
+const MAX_BULK = 64 * 1024 * 1024;
+
 /** Minimal RESP2 reader: arrays of bulk/simple strings only. */
-function createRespParser(onCommand) {
+function createRespParser(onCommand, onProtocolError) {
   let buffer = Buffer.alloc(0);
   let tail = Promise.resolve();
   return (chunk) => {
@@ -11,7 +16,13 @@ function createRespParser(onCommand) {
     // replying before the next command (e.g. QUIT) touches the socket.
     tail = tail.then(async () => {
       for (;;) {
-        const command = readCommand(buffer);
+        let command;
+        try {
+          command = readCommand(buffer);
+        } catch (error) {
+          if (error instanceof ProtocolError) return onProtocolError();
+          throw error;
+        }
         if (!command) return;
         buffer = buffer.subarray(command.consumed);
         await onCommand(command.args);
@@ -25,6 +36,7 @@ function readCommand(buffer) {
   const lineEnd = buffer.indexOf("\r\n");
   if (lineEnd === -1) return null;
   const count = Number(buffer.subarray(1, lineEnd).toString());
+  if (!Number.isInteger(count) || count < 0 || count > MAX_ARGS) throw new ProtocolError();
   const args = [];
   let cursor = lineEnd + 2;
   for (let i = 0; i < count; i++) {
@@ -32,6 +44,7 @@ function readCommand(buffer) {
     const sizeEnd = buffer.indexOf("\r\n", cursor);
     if (sizeEnd === -1) return null;
     const size = Number(buffer.subarray(cursor + 1, sizeEnd).toString());
+    if (!Number.isInteger(size) || size < 0 || size > MAX_BULK) throw new ProtocolError();
     if (buffer.length < sizeEnd + 2 + size + 2) return null;
     args.push(buffer.subarray(sizeEnd + 2, sizeEnd + 2 + size).toString());
     cursor = sizeEnd + 2 + size + 2;
@@ -80,21 +93,26 @@ export async function startBridge({ respPort = 7355, wsPort = 7356 }) {
     };
     socket.on(
       "data",
-      createRespParser(async (args) => {
-        const command = (args[0] ?? "").toUpperCase();
-        try {
-          switch (command) {
-            case "PING": write.simple("PONG"); break;
-            case "HELLO": write.simple("OK"); break;
-            case "INFO": write.bulk("chrome-hara resp bridge (subset: PING HELLO EVAL INFO QUIT)"); break;
-            case "EVAL": write.bulk(String(await evalInExtension(args[1] ?? ""))); break;
-            case "QUIT": write.simple("OK"); socket.end(); break;
-            default: write.error(`unknown command: ${command}`);
+      createRespParser(
+        async (args) => {
+          const command = (args[0] ?? "").toUpperCase();
+          try {
+            switch (command) {
+              case "PING": write.simple("PONG"); break;
+              case "HELLO": write.simple("OK"); break;
+              case "INFO": write.bulk("chrome-hara resp bridge (subset: PING HELLO EVAL INFO QUIT)"); break;
+              case "EVAL": write.bulk(String(await evalInExtension(args[1] ?? ""))); break;
+              case "QUIT": write.simple("OK"); socket.end(); break;
+              default: write.error(`unknown command: ${command}`);
+            }
+          } catch (error) {
+            write.error(String(error?.message ?? error));
           }
-        } catch (error) {
-          write.error(String(error?.message ?? error));
-        }
-      }),
+        },
+        // Malformed lengths (NaN/negative/absurd) would otherwise loop the
+        // parser forever; end the connection after reporting the error.
+        () => socket.end("-ERR Protocol error\r\n"),
+      ),
     );
   });
 

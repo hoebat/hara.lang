@@ -46,6 +46,10 @@ export function createHostCalls(port) {
     if (ok) entry.resolve(fromPlain(value));
     else entry.reject(new Error(error ?? "host call failed"));
   });
+  port.onDisconnect.addListener(() => {
+    for (const entry of pending.values()) entry.reject(new Error("hara host disconnected"));
+    pending.clear();
+  });
   return new Proxy({}, {
     get: (_target, key) => {
       const text = String(key);

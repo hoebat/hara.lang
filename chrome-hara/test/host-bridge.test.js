@@ -31,6 +31,7 @@ test("createHostCalls routes service/method over the port and decodes replies", 
   const sent = [];
   const port = {
     onMessage: { addListener: (fn) => listeners.push(fn) },
+    onDisconnect: { addListener: () => {} },
     postMessage: (msg) => {
       sent.push(msg);
       queueMicrotask(() =>
@@ -44,4 +45,17 @@ test("createHostCalls routes service/method over the port and decodes replies", 
   assert.equal(sent[0].method, "sendCommand");
   assert.ok(value instanceof Map);
   assert.equal([...value][0][0].name, "echoed");
+});
+
+test("pending host calls reject when the port disconnects", async () => {
+  const disconnectListeners = [];
+  const port = {
+    onMessage: { addListener: () => {} },
+    onDisconnect: { addListener: (fn) => disconnectListeners.push(fn) },
+    postMessage: () => {},
+  };
+  const hostCalls = createHostCalls(port);
+  const call = hostCalls["chrome.debugger/sendCommand"](1, "Page.navigate");
+  disconnectListeners.forEach((fn) => fn());
+  await assert.rejects(call, /hara host disconnected/);
 });

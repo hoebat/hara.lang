@@ -1,4 +1,4 @@
-const debuggerEvents = new Map(); // tabId -> { queue: [{method, params}], waiters: [resolve] }
+const debuggerEvents = new Map(); // tabId -> { queue: [{method, params}], waiters: [{resolve, reject}] }
 
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== "hara-host") return;
@@ -10,14 +10,27 @@ chrome.runtime.onConnect.addListener((port) => {
       port.postMessage({ id, ok: false, error: String(error?.message ?? error) });
     }
   });
+  port.onDisconnect.addListener(() => {
+    for (const entry of debuggerEvents.values()) {
+      for (const waiter of entry.waiters) waiter.reject(new Error("hara host disconnected"));
+      entry.waiters = [];
+    }
+  });
 });
 
 chrome.debugger.onEvent.addListener((source, method, params) => {
   const entry = debuggerEvents.get(source.tabId) ?? { queue: [], waiters: [] };
   const waiter = entry.waiters.shift();
-  if (waiter) waiter({ method, params });
+  if (waiter) waiter.resolve({ method, params });
   else entry.queue.push({ method, params });
   debuggerEvents.set(source.tabId, entry);
+});
+
+chrome.debugger.onDetach.addListener((source) => {
+  const entry = debuggerEvents.get(source.tabId);
+  if (!entry) return;
+  debuggerEvents.delete(source.tabId);
+  for (const waiter of entry.waiters) waiter.reject(new Error("debugger detached"));
 });
 
 async function dispatch(service, method, args) {  if (service === "hara" && method === "echo") return args[0] ?? null;
@@ -66,8 +79,8 @@ async function debuggerCall(method, args) {
       const entry = debuggerEvents.get(tabId) ?? { queue: [], waiters: [] };
       const queued = entry.queue.shift();
       if (queued) return queued;
-      return new Promise((resolve) => {
-        entry.waiters.push(resolve);
+      return new Promise((resolve, reject) => {
+        entry.waiters.push({ resolve, reject });
         debuggerEvents.set(tabId, entry);
       });
     }

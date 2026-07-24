@@ -37,3 +37,12 @@ test("EVAL without a connected extension is an error", async () => {
   assert.ok(reply.startsWith("-ERR hara extension not connected"), reply);
   await bridge.close();
 });
+
+test("malformed bulk size is a protocol error and the bridge stays alive", async () => {
+  const bridge = await startBridge({ respPort: 17359, wsPort: 17360 });
+  const reply = await respClient(17359, `*1\r\n$abc\r\nPING\r\n`);
+  assert.ok(reply.startsWith("-ERR Protocol error"), reply);
+  const pong = await respClient(17359, `*1\r\n${bulk("PING")}*1\r\n${bulk("QUIT")}`);
+  assert.ok(pong.startsWith("+PONG"), pong);
+  await bridge.close();
+});

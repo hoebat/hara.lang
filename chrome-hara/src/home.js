@@ -97,8 +97,14 @@ export async function restoreHome() {
     request.onsuccess = () => resolve(request.result ?? null);
     request.onerror = () => reject(request.error);
   });
-  if (dir && (await dir.queryPermission({ mode: "read" })) !== "granted") {
-    if ((await dir.requestPermission({ mode: "read" })) !== "granted") return null;
+  // requestPermission without a user gesture throws SecurityError; degrade
+  // to "no home" instead of rejecting the caller's top-level await.
+  try {
+    if (dir && (await dir.queryPermission({ mode: "read" })) !== "granted") {
+      if ((await dir.requestPermission({ mode: "read" })) !== "granted") return null;
+    }
+  } catch {
+    return null;
   }
   return dir;
 }
