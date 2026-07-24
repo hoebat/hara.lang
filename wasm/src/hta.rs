@@ -80,6 +80,19 @@ fn encode_bare(value: &Value, output: &mut Vec<u8>) -> Result<(), String> {
                 output.extend_from_slice(&value);
             }
         }
+        Value::OrderedMap(values) => {
+            let mut encoded = values
+                .iter()
+                .map(|(key, value)| Ok((bare(key)?, bare(value)?)))
+                .collect::<Result<Vec<_>, String>>()?;
+            encoded.sort_by(|left, right| left.0.cmp(&right.0));
+            output.push(MAP);
+            encode_len(encoded.len(), output)?;
+            for (key, value) in encoded {
+                output.extend_from_slice(&key);
+                output.extend_from_slice(&value);
+            }
+        }
         Value::Map(values) => {
             let mut encoded = values
                 .iter()

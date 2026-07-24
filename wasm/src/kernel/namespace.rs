@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::kernel::Var;
+use crate::kernel::{Var, VarMetadata, VarOrigin};
 use crate::lang::data::Symbol;
 use crate::lang::protocol::INamespaced;
 
@@ -46,6 +46,39 @@ impl<V> Namespace<V> {
         let var = Var::new(path, value);
         self.mappings.borrow_mut().insert(local, var.clone());
         var
+    }
+    pub fn intern_with_metadata(
+        &self,
+        name: impl AsRef<str>,
+        value: V,
+        metadata: VarMetadata,
+    ) -> Var<V>
+    where
+        V: Clone + 'static,
+    {
+        let local = Symbol::parse(name.as_ref());
+        if let Some(existing) = self.mappings.borrow().get(&local).cloned() {
+            existing.reset_value(value);
+            existing.set_metadata(metadata);
+            return existing;
+        }
+        let path = format!("{}/{}", self.name.as_str(), local.get_name());
+        let var = Var::with_metadata(path, value, metadata);
+        self.mappings.borrow_mut().insert(local, var.clone());
+        var
+    }
+    pub fn intern_with_origin(&self, name: impl AsRef<str>, value: V, origin: VarOrigin) -> Var<V>
+    where
+        V: Clone + 'static,
+    {
+        self.intern_with_metadata(
+            name,
+            value,
+            VarMetadata {
+                origin,
+                ..VarMetadata::default()
+            },
+        )
     }
     pub fn map_var(&self, symbol: Symbol, var: Var<V>) {
         self.mappings.borrow_mut().insert(symbol, var);

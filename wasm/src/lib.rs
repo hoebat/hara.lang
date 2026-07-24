@@ -4,7 +4,13 @@ pub mod extension;
 pub mod hta;
 pub mod kernel;
 pub mod lang;
+#[cfg(not(target_arch = "wasm32"))]
+mod native_extension;
+#[cfg(not(target_arch = "wasm32"))]
+mod process_extension;
 pub mod task;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod wasmtime_provider;
 use crate::kernel::Form;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
@@ -70,6 +76,8 @@ pub struct Runtime {
     loaded_resources: HashSet<String>,
     namespace_registry: kernel::NamespaceRegistry<core::Value>,
     generated_configs: HashMap<String, kernel::GeneratedNamespaceConfig>,
+    #[cfg(not(target_arch = "wasm32"))]
+    extension_roots: Vec<std::path::PathBuf>,
 }
 
 #[wasm_bindgen]
@@ -89,6 +97,8 @@ impl Runtime {
                 "user".into(),
                 kernel::GeneratedNamespaceConfig::defaults(),
             )]),
+            #[cfg(not(target_arch = "wasm32"))]
+            extension_roots: native_extension::configured_roots(),
         }
     }
 
@@ -103,17 +113,27 @@ impl Runtime {
                         Some(Form::Symbol(name)) if !name.contains('/') => name.clone(),
                         _ => return Err("ns expects an unqualified namespace symbol".into()),
                     };
+                    #[cfg(not(target_arch = "wasm32"))]
+                    let roots = self.extension_roots.clone();
                     let config =
                         kernel::GeneratedNamespaceConfig::configure_with(&values[2..], |target| {
-                            self.wasm_extensions.contains_key(target)
+                            if self.wasm_extensions.contains_key(target) {
+                                return true;
+                            }
+                            #[cfg(not(target_arch = "wasm32"))]
+                            {
+                                return native_extension::package_exists(target, &roots);
+                            }
+                            #[cfg(target_arch = "wasm32")]
+                            false
                         })?;
-                    let required_extensions = config
-                        .required_namespaces()
-                        .iter()
-                        .filter(|target| self.wasm_extensions.contains_key(target.as_str()))
-                        .cloned()
-                        .collect::<Vec<_>>();
+                    let required_extensions = config.required_namespaces().to_vec();
                     for target in required_extensions {
+                        if target.starts_with("std.lib.") {
+                            continue;
+                        }
+                        #[cfg(not(target_arch = "wasm32"))]
+                        self.install_discovered_extension(&target)?;
                         self.load_wasm_extension_namespace(&target)?;
                     }
                     self.use_namespace(&name);
@@ -401,6 +421,53 @@ impl Runtime {
 }
 
 impl Runtime {
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn add_extension_root(&mut self, root: impl Into<std::path::PathBuf>) {
+        self.extension_roots.push(root.into());
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn install_discovered_extension(&mut self, namespace: &str) -> Result<(), String> {
+        if self.wasm_extensions.contains_key(namespace) {
+            return Ok(());
+        }
+        let package =
+            native_extension::ExtensionPackage::discover(namespace, &self.extension_roots)?
+                .ok_or_else(|| format!("extension/not-found: {namespace}"))?;
+        if package.manifest.provider == "hta" {
+            let target = package
+                .manifest
+                .targets
+                .get("node")
+                .ok_or_else(|| format!("extension/target-unsupported: node for {namespace}"))?;
+            if target.runtime != "process" {
+                return Err(format!(
+                    "extension/target-unsupported: node for {namespace}"
+                ));
+            }
+            let module = package.resolve(&target.module)?;
+            let provider = process_extension::ProcessExtensionProvider::new(module);
+            return self.install_wasm_extension(
+                &package.source,
+                &package.descriptor.display().to_string(),
+                provider,
+            );
+        }
+        if package.manifest.provider != "wasm" {
+            return Err(format!(
+                "extension/provider-unsupported: {} for {namespace}",
+                package.manifest.provider
+            ));
+        }
+        let bytes = package.module_bytes()?;
+        let provider = wasmtime_provider::WasmtimeExtensionProvider::compile(&bytes)?;
+        self.install_wasm_extension(
+            &package.source,
+            &package.descriptor.display().to_string(),
+            provider,
+        )
+    }
+
     pub fn install_wasm_extension<P: extension::WasmExtensionProvider + 'static>(
         &mut self,
         manifest_source: &str,
@@ -854,7 +921,7 @@ mod tests {
     #[test]
     fn generated_namespace_require_never_falls_back_to_registered_source() {
         let mut runtime = Runtime::new();
-        runtime.register_resource("hara.lib.string", "(def poisoned 42)");
+        runtime.register_resource("std.lib.string", "(def poisoned 42)");
         assert_eq!(
             runtime
                 .eval_text("(ns app (:require [hara.lib.string :as text])) (text/trim \" x \")")
@@ -1278,6 +1345,30 @@ mod tests {
             runtime.eval_text("({} :a :b :c)").unwrap_err(),
             "map invocation expects one or two arguments"
         );
+    }
+
+    #[test]
+    fn fallback_definitions_never_replace_rust_library_vars() {
+        let mut runtime = Runtime::new();
+        let foundation = runtime
+            .namespace_registry
+            .find_or_create("std.lib.foundation");
+        let native = foundation.intern_with_origin(
+            "optimized",
+            core::Value::Number(7),
+            kernel::VarOrigin::RustLibrary,
+        );
+        let identity = native.identity_address();
+        core::with_definition_origin(kernel::VarOrigin::HalFallback, || {
+            runtime.eval_text("(ns std.lib.foundation) (def optimized 9)")
+        })
+        .unwrap();
+        let refreshed = foundation
+            .resolve(&crate::lang::data::Symbol::parse("optimized"))
+            .unwrap();
+        assert_eq!(refreshed.identity_address(), identity);
+        assert_eq!(refreshed.origin(), kernel::VarOrigin::RustLibrary);
+        assert_eq!(refreshed.deref_value().display(), "7");
     }
 
     #[test]

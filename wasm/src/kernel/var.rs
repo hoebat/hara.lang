@@ -11,6 +11,15 @@ thread_local! {
     static DYNAMIC_BINDINGS: RefCell<HashMap<usize, Vec<Box<dyn Any>>>> = RefCell::new(HashMap::new());
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum VarOrigin {
+    #[default]
+    Source,
+    HalFallback,
+    RustLibrary,
+    RuntimePrimitive,
+}
+
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct VarMetadata {
     pub hara: Option<Rc<Metadata>>,
@@ -19,6 +28,7 @@ pub struct VarMetadata {
     pub macro_form: bool,
     pub doc: Option<String>,
     pub arglists: Vec<String>,
+    pub origin: VarOrigin,
     pub extra: HashMap<String, String>,
 }
 
@@ -63,6 +73,12 @@ impl<V> Var<V> {
     }
     pub fn update_metadata(&self, update: impl FnOnce(&mut VarMetadata)) {
         update(&mut self.metadata.borrow_mut());
+    }
+    pub fn origin(&self) -> VarOrigin {
+        self.metadata.borrow().origin
+    }
+    pub fn set_origin(&self, origin: VarOrigin) {
+        self.metadata.borrow_mut().origin = origin;
     }
     pub fn identity_address(&self) -> usize {
         self.identity_key()

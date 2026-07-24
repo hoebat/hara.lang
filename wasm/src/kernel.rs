@@ -16,4 +16,4 @@ pub use generated::GeneratedNamespaceConfig;
 pub use namespace::{Namespace, NamespaceRegistry};
 pub use parser::{parse, parse_forms, read_forms, ParseError, Parser, Span, SpannedForm};
 pub use reader::{Position, Reader};
-pub use var::{Var, VarMetadata};
+pub use var::{Var, VarMetadata, VarOrigin};

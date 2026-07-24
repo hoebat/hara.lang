@@ -16,9 +16,12 @@ const MANIFEST_FIELDS: &[&str] = &[
     "capabilities",
     "host-calls",
     "handles",
+    "targets",
+    "assets",
 ];
 const EXPORT_FIELDS: &[&str] = &["args", "returns", "async"];
 const HANDLE_FIELDS: &[&str] = &["tag"];
+const TARGET_FIELDS: &[&str] = &["module", "runtime"];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WasmAbi {
@@ -34,11 +37,20 @@ pub struct ExtensionExport {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ExtensionTarget {
+    pub module: String,
+    pub runtime: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExtensionManifest {
     pub namespace: String,
     pub version: String,
-    pub module: String,
+    pub provider: String,
+    pub module: Option<String>,
     pub abi: WasmAbi,
+    pub targets: HashMap<String, ExtensionTarget>,
+    pub assets: Vec<String>,
     pub exports: Vec<(String, ExtensionExport)>,
     pub capabilities: Vec<String>,
     pub host_calls: HashMap<String, Vec<String>>,
@@ -59,21 +71,46 @@ impl ExtensionManifest {
             ));
         }
         let version = named_string(entries, "version", origin)?;
-        if named_keyword(entries, "provider", origin)? != "wasm" {
-            return Err(malformed(origin, "provider must be :wasm"));
-        }
-        let module = named_string(entries, "module", origin)?;
-        if module.starts_with('/') || module.contains("..") || !module.ends_with(".wasm") {
-            return Err(malformed(
-                origin,
-                "module must be a safe relative .wasm file",
-            ));
+        let provider = named_keyword(entries, "provider", origin)?;
+        let module = optional(entries, "module")
+            .map(|form| string(form, origin, "module").map(str::to_owned))
+            .transpose()?;
+        let targets = optional(entries, "targets")
+            .map_or_else(|| Ok(HashMap::new()), |form| parse_targets(form, origin))?;
+        let assets = optional(entries, "assets")
+            .map_or_else(|| Ok(Vec::new()), |form| parse_assets(form, origin))?;
+        match provider.as_str() {
+            "wasm" if module.is_some() && targets.is_empty() => {
+                safe_relative(module.as_deref().unwrap(), Some(".wasm"), origin, "module")?;
+            }
+            "hta" if module.is_none() && !targets.is_empty() => {}
+            "wasm" => {
+                return Err(malformed(
+                    origin,
+                    "WASM providers require :module and cannot declare :targets",
+                ))
+            }
+            "hta" => {
+                return Err(malformed(
+                    origin,
+                    "HTA providers require :targets and cannot declare :module",
+                ))
+            }
+            _ => {
+                return Err(malformed(
+                    origin,
+                    format!("unsupported provider :{provider}"),
+                ))
+            }
         }
         let abi = match named_keyword(entries, "abi", origin)?.as_str() {
             "core.v1" => WasmAbi::CoreV1,
             "hta.v1" => WasmAbi::HtaV1,
             value => return Err(malformed(origin, format!("unsupported WASM ABI :{value}"))),
         };
+        if provider == "hta" && abi != WasmAbi::HtaV1 {
+            return Err(malformed(origin, "HTA providers require :abi :hta.v1"));
+        }
         let exports = parse_exports(required(entries, "exports", origin)?, origin)?;
         let capabilities = keyword_vector(
             required(entries, "capabilities", origin)?,
@@ -87,7 +124,10 @@ impl ExtensionManifest {
         Ok(Self {
             namespace,
             version,
+            provider,
             module,
+            targets,
+            assets,
             abi,
             exports,
             capabilities,
@@ -250,6 +290,69 @@ impl WasmExtension {
     }
 }
 
+fn parse_targets(form: &Form, origin: &str) -> Result<HashMap<String, ExtensionTarget>, String> {
+    map(form, origin, "targets")?
+        .iter()
+        .map(|(host, specification)| {
+            let host = keyword(host, origin, "target host")?.to_owned();
+            if host != "node" && host != "browser" {
+                return Err(malformed(origin, format!("unsupported target :{host}")));
+            }
+            let entries = map(specification, origin, "target")?;
+            reject_unknown(entries, TARGET_FIELDS, origin, &format!("target {host}"))?;
+            let module = named_string(entries, "module", origin)?;
+            safe_relative(&module, Some(".mjs"), origin, "target module")?;
+            let runtime = named_keyword(entries, "runtime", origin)?;
+            let compatible = (host == "node" && runtime == "process")
+                || (host == "browser" && runtime == "web-worker");
+            if !compatible {
+                return Err(malformed(
+                    origin,
+                    format!("target {host} has incompatible runtime :{runtime}"),
+                ));
+            }
+            Ok((host, ExtensionTarget { module, runtime }))
+        })
+        .collect()
+}
+
+fn parse_assets(form: &Form, origin: &str) -> Result<Vec<String>, String> {
+    let mut seen = HashSet::new();
+    vector(form, origin, "assets")?
+        .iter()
+        .map(|value| {
+            let value = string(value, origin, "asset")?.to_owned();
+            safe_relative(&value, None, origin, "asset")?;
+            if !seen.insert(value.clone()) {
+                return Err(malformed(origin, format!("duplicate asset {value}")));
+            }
+            Ok(value)
+        })
+        .collect()
+}
+fn safe_relative(
+    value: &str,
+    suffix: Option<&str>,
+    origin: &str,
+    field: &str,
+) -> Result<(), String> {
+    let unsafe_path = value.is_empty()
+        || value.starts_with('/')
+        || value.contains('\\')
+        || value.bytes().any(|byte| byte == 0)
+        || value.contains(':')
+        || value
+            .split('/')
+            .any(|part| part.is_empty() || part == "." || part == "..");
+    if unsafe_path || suffix.is_some_and(|suffix| !value.ends_with(suffix)) {
+        return Err(malformed(
+            origin,
+            format!("{field} must be a safe relative package file"),
+        ));
+    }
+    Ok(())
+}
+
 fn parse_exports(form: &Form, origin: &str) -> Result<Vec<(String, ExtensionExport)>, String> {
     let entries = map(form, origin, "exports")?;
     if entries.is_empty() {
@@ -338,10 +441,7 @@ fn valid_tag(value: &str) -> bool {
 }
 
 fn valid_component(value: &str) -> bool {
-    value
-        .chars()
-        .next()
-        .map_or(false, |first| first.is_ascii_lowercase())
+    !value.is_empty()
         && value
             .chars()
             .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-')

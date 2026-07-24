@@ -3,7 +3,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, HashSet};
 
 pub use crate::kernel::Form;
-use crate::kernel::{NamespaceRegistry, Var as KernelVar};
+use crate::kernel::{NamespaceRegistry, Var as KernelVar, VarOrigin};
 use crate::lang::data::List as PList;
 use crate::lang::data::{
     Atom as PAtom, Cons as PCons, Keyword, Map as PMap, OrderedMap as POrderedMap,
@@ -1079,6 +1079,7 @@ impl ProtocolRegistry {
 thread_local! {
     static ACTIVE_PROTOCOLS: RefCell<Option<ProtocolRegistry>> = const { RefCell::new(None) };
     static ACTIVE_NAMESPACES: RefCell<Option<NamespaceRegistry<Value>>> = const { RefCell::new(None) };
+    static ACTIVE_DEFINITION_ORIGIN: Cell<VarOrigin> = const { Cell::new(VarOrigin::Source) };
     static ACTIVE_PROMISE_PROVIDER: RefCell<Option<Rc<dyn PromiseProvider>>> = const { RefCell::new(None) };
     static ACTIVE_FILE_PROVIDER: RefCell<Option<Rc<dyn FileProvider>>> = const { RefCell::new(None) };
     static ACTIVE_SOCKET_PROVIDER: RefCell<Option<Rc<dyn SocketProvider>>> = const { RefCell::new(None) };
@@ -1096,6 +1097,42 @@ pub fn with_namespace_registry<R>(
         active.replace(previous);
         result
     })
+}
+
+pub fn with_definition_origin<R>(origin: VarOrigin, operation: impl FnOnce() -> R) -> R {
+    ACTIVE_DEFINITION_ORIGIN.with(|active| {
+        let previous = active.replace(origin);
+        let result = operation();
+        active.set(previous);
+        result
+    })
+}
+
+fn definition_origin() -> VarOrigin {
+    ACTIVE_DEFINITION_ORIGIN.with(Cell::get)
+}
+
+fn binding_is_local(var: &KernelVar<Value>) -> bool {
+    namespace_registry()
+        .map(|registry| var.symbol().get_namespace() == Some(registry.current().name().as_str()))
+        .unwrap_or(true)
+}
+
+fn protected_fallback_binding(env: &HashMap<String, Value>, name: &str) -> Option<Value> {
+    if definition_origin() != VarOrigin::HalFallback {
+        return None;
+    }
+    match env.get(name) {
+        Some(Value::Var(var))
+            if matches!(
+                var.origin(),
+                VarOrigin::RustLibrary | VarOrigin::RuntimePrimitive
+            ) =>
+        {
+            Some(var.deref_value())
+        }
+        _ => None,
+    }
 }
 
 fn namespace_registry() -> Result<NamespaceRegistry<Value>, String> {
@@ -1118,6 +1155,10 @@ pub fn save_namespace_environment(
         .collect::<Vec<_>>();
     for (name, value) in locals {
         let path = format!("{namespace_name}/{name}");
+        if matches!(&value, Value::Var(var) if var.symbol().get_namespace().is_some() && var.symbol().get_namespace() != Some(namespace_name.as_str()))
+        {
+            continue;
+        }
         let var = match value {
             Value::Var(var) if var.symbol().as_str() == path => var,
             Value::Var(var) => var.requalify(&path),
@@ -4060,7 +4101,12 @@ fn deref_value(value: Value) -> Value {
 }
 
 fn binding_value(env: &HashMap<String, Value>, name: &str) -> Option<Value> {
-    env.get(name).cloned().map(deref_value)
+    env.get(name).cloned().map(deref_value).or_else(|| {
+        namespace_registry()
+            .ok()?
+            .resolve(&crate::lang::data::Symbol::parse(name))
+            .map(|var| var.deref_value())
+    })
 }
 
 fn binding_var(env: &mut HashMap<String, Value>, name: &str) -> Option<KernelVar<Value>> {
@@ -4107,7 +4153,7 @@ fn call_value(callable: Value, arguments: Vec<Value>) -> Result<Value, String> {
 
 fn call_function(function: &Function, arguments: Vec<Value>) -> Result<Value, String> {
     if let Some(native) = &function.native {
-        if function.params.len() != arguments.len() {
+        if function.variadic.is_none() && function.params.len() != arguments.len() {
             return Err(format!(
                 "function expects {} arguments",
                 function.params.len()
@@ -4725,14 +4771,26 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     return Err("def expects a name and value".into());
                 }
                 let (name, metadata) = binding_symbol(&fs[1], "def name")?;
+                if let Some(value) = protected_fallback_binding(env, &name) {
+                    return Ok(value);
+                }
                 let value = eval(&fs[2], env)?;
                 if let Some(Value::Var(var)) = env.get(&name) {
+                    if !binding_is_local(var) {
+                        let var = KernelVar::new(name.clone(), value.clone());
+                        var.set_origin(definition_origin());
+                        var.set_hara_metadata(metadata);
+                        env.insert(name, Value::Var(var));
+                        return Ok(value);
+                    }
                     var.reset_value(value.clone());
+                    var.set_origin(definition_origin());
                     if metadata.is_some() {
                         var.set_hara_metadata(metadata);
                     }
                 } else {
                     let var = KernelVar::new(name.clone(), value.clone());
+                    var.set_origin(definition_origin());
                     var.set_hara_metadata(metadata);
                     env.insert(name, Value::Var(var));
                 }
@@ -4743,9 +4801,12 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     return Err("defn expects a name, parameters, and a body".into());
                 }
                 let (name, metadata) = binding_symbol(&fs[1], "defn name")?;
+                if let Some(value) = protected_fallback_binding(env, &name) {
+                    return Ok(value);
+                }
                 let (params, variadic) = function_parts(&fs[2])?;
                 let cell = match env.get(&name) {
-                    Some(Value::Var(cell)) => cell.clone(),
+                    Some(Value::Var(cell)) if binding_is_local(cell) => cell.clone(),
                     _ => KernelVar::new(name.clone(), Value::Nil),
                 };
                 if metadata.is_some() {
@@ -4762,6 +4823,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 });
                 let function = Value::Function(function_ref.clone());
                 cell.reset_value(function.clone());
+                cell.set_origin(definition_origin());
                 Ok(function)
             }
             Form::Symbol(n) if n == "do" => {
@@ -4800,6 +4862,15 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     }
                     _ => Err("ns expects a namespace symbol".into()),
                 }
+            }
+            Form::Symbol(n) if matches!(env.get(n), Some(Value::Var(var)) if (binding_is_local(var) || var.origin() == VarOrigin::RustLibrary) && matches!(var.deref_value(), Value::Function(_))) =>
+            {
+                let function = binding_value(env, n).expect("function binding was checked");
+                let arguments = fs[1..]
+                    .iter()
+                    .map(|form| eval(form, env))
+                    .collect::<Result<Vec<_>, _>>()?;
+                call_value(function, arguments)
             }
             Form::Symbol(n) if n == "protocol-call" => {
                 if fs.len() < 4 {

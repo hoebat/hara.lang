@@ -3,11 +3,11 @@ use std::collections::{HashMap, HashSet};
 use super::Form;
 
 const LIBRARIES: &[(&str, &str, &str)] = &[
-    ("string", "hara.lib.string", "str"),
-    ("promise", "hara.lib.promise", "promise"),
-    ("bytes", "hara.lib.bytes", "bytes"),
-    ("socket", "hara.lib.socket", "socket"),
-    ("file", "hara.lib.file", "file"),
+    ("string", "std.lib.string", "str"),
+    ("promise", "std.lib.promise", "promise"),
+    ("bytes", "std.lib.bytes", "bytes"),
+    ("socket", "std.lib.socket", "socket"),
+    ("file", "std.lib.file", "file"),
 ];
 
 #[derive(Debug, Clone, Default)]
@@ -186,11 +186,7 @@ impl GeneratedNamespaceConfig {
             Some(Form::Symbol(target)) => target.as_str(),
             _ => return Err(":require namespace must be a symbol".into()),
         };
-        let target = if target == "core" {
-            "hara.lib.core"
-        } else {
-            target
-        };
+        let target = normalize_namespace(target);
         if !known_namespace(target) && !available(target) {
             return Err(format!(
                 "Cannot require missing generated namespace: {target}"
@@ -319,25 +315,37 @@ fn library(value: &str) -> Result<&str, String> {
         .map(|(library, _, _)| *library)
         .ok_or_else(|| format!("Unknown intrinsic library: {value}"))
 }
+fn normalize_namespace(value: &str) -> &str {
+    match value {
+        "core" | "hara.lib.core" => "std.lib.foundation",
+        "hara.lib.string" => "std.lib.string",
+        "hara.lib.promise" => "std.lib.promise",
+        "hara.lib.bytes" => "std.lib.bytes",
+        "hara.lib.socket" => "std.lib.socket",
+        "hara.lib.file" => "std.lib.file",
+        value => value,
+    }
+}
 fn known_namespace(value: &str) -> bool {
-    value == "hara.lib.core"
+    let value = normalize_namespace(value);
+    value == "std.lib.foundation"
         || LIBRARIES
             .iter()
             .any(|(_, namespace, _)| *namespace == value)
 }
 fn canonical(namespace: &str, method: &str) -> String {
-    match (namespace, method) {
-        ("hara.lib.core", method) => method.into(),
-        ("hara.lib.string", "len") => "str/count".into(),
-        ("hara.lib.string", "to-upper") => "str/upper".into(),
-        ("hara.lib.string", "to-lower") => "str/lower".into(),
-        ("hara.lib.string", method) => format!("str/{method}"),
-        ("hara.lib.promise", "then") => "promise/map".into(),
-        ("hara.lib.promise", "catch") => "promise/recover".into(),
-        ("hara.lib.promise", method) => format!("promise/{method}"),
-        ("hara.lib.bytes", method) => format!("bytes/{method}"),
-        ("hara.lib.socket", method) => format!("socket/{method}"),
-        ("hara.lib.file", method) => format!("file/{method}"),
+    match (normalize_namespace(namespace), method) {
+        ("std.lib.foundation", method) => method.into(),
+        ("std.lib.string", "len") => "str/count".into(),
+        ("std.lib.string", "to-upper") => "str/upper".into(),
+        ("std.lib.string", "to-lower") => "str/lower".into(),
+        ("std.lib.string", method) => format!("str/{method}"),
+        ("std.lib.promise", "then") => "promise/map".into(),
+        ("std.lib.promise", "catch") => "promise/recover".into(),
+        ("std.lib.promise", method) => format!("promise/{method}"),
+        ("std.lib.bytes", method) => format!("bytes/{method}"),
+        ("std.lib.socket", method) => format!("socket/{method}"),
+        ("std.lib.file", method) => format!("file/{method}"),
         (namespace, method) => format!("{namespace}/{method}"),
     }
 }
