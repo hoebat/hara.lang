@@ -2251,7 +2251,7 @@ public final class HaraContext {
     return new HaraPromise(future);
   }
 
-  private <T> T invokeInContext(Supplier<T> operation) {
+  <T> T invokeInContext(Supplier<T> operation) {
     Object previous = environment.getContext().enter(null);
     try {
       return operation.get();
