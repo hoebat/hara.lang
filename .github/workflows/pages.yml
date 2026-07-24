@@ -6,9 +6,7 @@ on:
     paths:
       - "docs/**"
       - "spec/hara/**"
-      - "overrides/**"
-      - "mkdocs.yml"
-      - "requirements-docs.txt"
+      - "website/**"
       - "java/pom.xml"
       - "rust/**"
       - ".github/workflows/pages.yml"

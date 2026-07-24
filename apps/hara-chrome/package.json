@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "bash ../scripts/build-hara-wasm-raw && node scripts/sync-runtime.mjs",
+    "build": "bash ../../scripts/build-hara-wasm-raw && node scripts/sync-runtime.mjs",
     "sync": "node scripts/sync-runtime.mjs",
     "test": "node --test test/*.test.js",
     "test:browser": "xvfb-run -a npx playwright test"

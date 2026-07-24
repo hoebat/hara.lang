@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const repo = path.resolve(root, "..");
+const repo = path.resolve(root, "../..");
 const vendor = path.join(root, "vendor");
 mkdirSync(vendor, { recursive: true });
 
