@@ -6,6 +6,7 @@ import hara.lang.protocol.Constant;
 import hara.lang.protocol.IMetadata;
 
 import java.lang.ref.WeakReference;
+import java.util.Objects;
 
 public class Symbol extends INamespacedType.ObjPersistent implements IStringType {
 
@@ -57,5 +58,17 @@ public class Symbol extends INamespacedType.ObjPersistent implements IStringType
   @Override
   public String display() {
     return pathString();
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    return other instanceof Symbol symbol
+        && Objects.equals(getNamespace(), symbol.getNamespace())
+        && getName().equals(symbol.getName());
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(getNamespace(), getName());
   }
 }

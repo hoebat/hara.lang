@@ -1493,6 +1493,33 @@ public final class HaraContext {
 
   private void installCoreBuiltins(HaraNamespace target) {
     target.define("str", new VariadicBuiltin("str", HaraContext::concatenateStrings));
+    target.define(
+        "pr-str",
+        new UnaryBuiltin(
+            "pr-str",
+            value -> hara.kernel.builtin.BuiltinUtil.prStr(HaraBox.unwrap(value))));
+    target.define(
+        "char?",
+        new UnaryBuiltin("char?", value -> HaraBox.unwrap(value) instanceof Character));
+    target.define(
+        "uuid?",
+        new UnaryBuiltin("uuid?", value -> HaraBox.unwrap(value) instanceof java.util.UUID));
+    target.define(
+        "regexp?",
+        new UnaryBuiltin(
+            "regexp?", value -> HaraBox.unwrap(value) instanceof java.util.regex.Pattern));
+    target.define(
+        "map-entry?",
+        new UnaryBuiltin(
+            "map-entry?",
+            value -> {
+              Object raw = HaraBox.unwrap(value);
+              return raw instanceof hara.lang.protocol.IPair<?, ?>
+                  || raw instanceof java.util.Map.Entry<?, ?>;
+            }));
+    target.define(
+        "list?",
+        new UnaryBuiltin("list?", value -> HaraBox.unwrap(value) instanceof hara.lang.data.List<?>));
     target.define("promise", new UnaryBuiltin("promise", this::promiseRun));
     target.define("bytes", new VariadicBuiltin("bytes", this::createBytes));
     target.define("array", new VariadicBuiltin("array", HaraArray::new));

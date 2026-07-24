@@ -64,6 +64,15 @@ the portable Hara runtime:
 | Symbol-valued `code.test` `:id` metadata | Fact names and `:refer` metadata only | Unquoted metadata symbols are resolved by Hara; the test registry already has stable names |
 | Foundation `Grammer` record | Persistent map tagged with `:polis/type :polis/grammar` | Hara records are structs rather than map values; downstream grammar consumers require keyword lookup and map semantics |
 | Metadata-based operator category ordering | Explicit persistent `+op-categories+` and `+op-order+` vectors | Hara Vars do not provide the Foundation compiler's source-line ordering contract |
+| Recursive lookup over lazy path tails | Materialize the remaining path in `get-in` and `assoc-in` | Hara lazy iterators are one-shot; probing them with `empty?` must not consume the next lookup key |
+| Keyword lookup against sets | Hara keywords now query persistent and Java sets | Foundation argument parsing uses keyword lookup on grammar allow-lists and expects missing members to return `nil` |
+| Metadata-bearing symbol equality | Symbol equality and hashing ignore metadata | Matches Clojure/Foundation value semantics and allows copied metadata assertions to compare unchanged |
+
+Translated `code.test` files are copied from Foundation by default. Namespace
+ownership and unsupported dependency syntax may be translated, but fact
+grouping, inputs, expected values, and metadata remain unchanged. A failing
+copied fact is treated as a source or runtime gap before any test adaptation is
+considered.
 
 ## Project convention
 

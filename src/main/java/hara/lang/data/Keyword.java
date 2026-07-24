@@ -3,6 +3,7 @@ package hara.lang.data;
 import hara.lang.base.Ex;
 import hara.lang.base.primitive.Array;
 import hara.lang.data.types.IStringType;
+import hara.lang.data.types.ISetType;
 import hara.lang.protocol.*;
 
 import java.lang.ref.WeakReference;
@@ -104,6 +105,10 @@ public final class Keyword
     return (obj) -> {
       if (obj instanceof ILookup) {
         return ((ILookup) obj).lookup(this);
+      } else if (obj instanceof ISetType) {
+        return ((ISetType) obj).find(this);
+      } else if (obj instanceof java.util.Set) {
+        return ((java.util.Set) obj).contains(this) ? this : null;
       } else if (obj instanceof java.util.Map) {
         return ((java.util.Map) obj).get(this);
       } else if (obj instanceof IContext) {
@@ -122,6 +127,11 @@ public final class Keyword
     return (obj, arg) -> {
       if (obj instanceof ILookup) {
         return ((ILookup) obj).lookup(this, arg);
+      } else if (obj instanceof ISetType) {
+        Object value = ((ISetType) obj).find(this);
+        return value == null ? arg : value;
+      } else if (obj instanceof java.util.Set) {
+        return ((java.util.Set) obj).contains(this) ? this : arg;
       } else if (obj instanceof java.util.Map) {
         return ((java.util.Map) obj).getOrDefault(this, arg);
       } else if (obj instanceof IContext) {

@@ -156,4 +156,31 @@ public class PolisSourceTest {
       }
     }
   }
+
+  @Test
+  public void runsTranslatedEmitHelperFacts() {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(require 'polis.common.emit-helper-test)");
+      var results =
+          context.eval(
+              HaraLanguage.ID,
+              "(code.test/run {:namespace \"polis.common.emit-helper-test\"})");
+      assertEquals(12, results.getArraySize());
+      for (long i = 0; i < results.getArraySize(); i++) {
+        assertTrue(
+            results.getArrayElement(i).toString(),
+            "PASS".equals(results.getArrayElement(i).getHashValue("status").asString()));
+      }
+      var metadata =
+          context.eval(
+              HaraLanguage.ID,
+              "(let [metadata (meta (var polis.common.emit-helper/emit-typed-args))]"
+                  + " [(:doc metadata) (:added metadata) (count (:arglists metadata))])");
+      assertEquals(
+          "create types args from declarationns",
+          metadata.getArrayElement(0).asString());
+      assertEquals("3.0", metadata.getArrayElement(1).asString());
+      assertEquals(2, metadata.getArrayElement(2).asLong());
+    }
+  }
 }

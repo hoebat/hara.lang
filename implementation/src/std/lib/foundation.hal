@@ -30,15 +30,21 @@
     (if (iter-has? it) it nil)))
 (defn not-empty [value] (if (empty? value) nil value))
 (defn get-in [value keys]
-  (if (empty? keys)
-    value
-    (get-in (get value (first keys)) (rest keys))))
+  (loop [current value
+         remaining (vec keys)]
+    (if (= 0 (count remaining))
+      current
+      (recur (get current (first remaining))
+             (vec (drop 1 remaining))))))
 (defn assoc-in [value keys new-value]
-  (if (empty? keys)
-    new-value
-    (assoc (if (nil? value) {} value)
-           (first keys)
-           (assoc-in (get value (first keys)) (rest keys) new-value))))
+  (let [path (vec keys)]
+    (if (= 0 (count path))
+      new-value
+      (assoc (if (nil? value) {} value)
+             (first path)
+             (assoc-in (get value (first path))
+                       (vec (drop 1 path))
+                       new-value)))))
 (defn update [value key function & args]
   (assoc value key (apply function (concat [(get value key)] args))))
 (defn update-in [value keys function & args]
@@ -99,6 +105,13 @@
   ([function] (map-transform function))
   ([function value & rest]
    (seq (apply iter-map function (concat [value] rest)))))
+(defn mapv [function value]
+  (vec (map function value)))
+(defn juxt [& functions]
+  (fn [& arguments]
+    (mapv (fn [function]
+            (apply function arguments))
+          functions)))
 (defn filter [predicate value] (seq (iter-filter predicate value)))
 (defn take [amount value] (seq (iter-take amount value)))
 (defn drop [amount value] (seq (iter-drop amount value)))

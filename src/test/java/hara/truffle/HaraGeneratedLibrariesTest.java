@@ -168,6 +168,38 @@ public class HaraGeneratedLibrariesTest {
   }
 
   @Test
+  public void prStrUsesReadableHaraNotation() {
+    try (Context context = context()) {
+      assertEquals("\"hara\"", context.eval(HaraLanguage.ID, "(pr-str \"hara\")").asString());
+      assertEquals(
+          "{:a 1}", context.eval(HaraLanguage.ID, "(pr-str {:a 1})").asString());
+    }
+  }
+
+  @Test
+  public void nestedLookupDoesNotConsumeItsPath() {
+    try (Context context = context()) {
+      assertEquals(
+          ",",
+          context
+              .eval(HaraLanguage.ID, "(get-in {:default {:common {:sep \",\"}}} [:default :common :sep])")
+              .asString());
+    }
+  }
+
+  @Test
+  public void emitterTypePredicatesAreAvailable() {
+    try (Context context = context()) {
+      assertTrue(context.eval(HaraLanguage.ID, "(char? \\a)").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(list? '(a b))").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(not (list? '[a b]))").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(map-entry? (first {:a 1}))").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(not (uuid? :a))").asBoolean());
+      assertTrue(context.eval(HaraLanguage.ID, "(not (regexp? :a))").asBoolean());
+    }
+  }
+
+  @Test
   public void intrinsicsCanExcludeAndRenameGeneratedAliases() {
     try (Context context = context()) {
       assertEquals(

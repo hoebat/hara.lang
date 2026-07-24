@@ -70,6 +70,11 @@ public class KeywordTest {
 
     assertNull(k1.getArg1().apply(null));
     assertEquals("default", k2.getArg2().apply(null, "default"));
+
+    Set.Standard<Keyword> set = Set.Standard.from(null, k1);
+    assertSame(k1, k1.getArg1().apply(set));
+    assertNull(k2.getArg1().apply(set));
+    assertEquals("default", k2.getArg2().apply(set, "default"));
   }
 
   @Test
