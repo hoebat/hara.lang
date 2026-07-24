@@ -14,9 +14,9 @@ site/                        static project website
 ## Build and test
 
 ```shell
-mvn -q test
-mvn -q -Ptruffle package
-mvn -q -Ptruffle -Dtest=hara.truffle.HaraL0ConformanceTest test
+mvn -q -f java/pom.xml test
+mvn -q -f java/pom.xml -Ptruffle package
+mvn -q -f java/pom.xml -Ptruffle -Dtest=hara.truffle.HaraL0ConformanceTest test
 ```
 
 When changing a boundary, run the narrow focused suite first and then the full suite. Graal fallback

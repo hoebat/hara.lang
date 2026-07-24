@@ -38,7 +38,7 @@ keywords, and nested values part of the contract.
 
 ## Run one namespace
 
-From `examples/services`:
+From `lib/examples/services`:
 
 ```shell
 ../../hara --allow-file eval \
@@ -68,7 +68,7 @@ you need from `code.test`:
 ```
 
 The maintained matcher, fixture, and task examples live under
-[`examples/code-test`](https://github.com/hoebat/hara.lang/tree/main/examples/code-test).
+[`lib/examples/code-test`](https://github.com/hoebat/hara.lang/tree/main/lib/examples/code-test).
 
 ## Test from the JVM harness
 

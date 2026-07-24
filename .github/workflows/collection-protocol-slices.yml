@@ -45,14 +45,15 @@ jobs:
           java-version: '21'
           distribution: temurin
           cache: maven
+          cache-dependency-path: java/pom.xml
 
       - name: Run test slice
-        run: mvn -B -Ptruffle -DfailIfNoTests=true -Dtest="${{ matrix.tests }}" test
+        run: mvn -B -f java/pom.xml -Ptruffle -DfailIfNoTests=true -Dtest="${{ matrix.tests }}" test
 
       - name: Upload Surefire reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: surefire-${{ matrix.id }}
-          path: target/surefire-reports/
+          path: java/target/surefire-reports/
           if-no-files-found: ignore

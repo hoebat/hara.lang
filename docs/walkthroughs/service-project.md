@@ -1,11 +1,11 @@
 # Walkthrough: a namespace project
 
-This walkthrough uses the executable project in `examples/services`. It separates an API boundary
+This walkthrough uses the executable project in `lib/examples/services`. It separates an API boundary
 from a worker implementation, loads them by namespace, and returns persistent Hara data.
 
 ## 1. Describe the project
 
-`examples/services/project.hal` defines the roots searched by `require`:
+`lib/examples/services/project.hal` defines the roots searched by `require`:
 
 ```clojure
 (defproject services
@@ -58,7 +58,7 @@ into the caller.
 From the repository root:
 
 ```shell
-cd examples/services
+cd lib/examples/services
 ../../hara --allow-file run run.hal
 ```
 
@@ -89,4 +89,4 @@ For each new namespace:
 5. Add a matching `-test` namespace under a test root.
 
 The complete example is maintained as executable source in
-[`examples/services`](https://github.com/hoebat/hara.lang/tree/main/examples/services).
+[`lib/examples/services`](https://github.com/hoebat/hara.lang/tree/main/lib/examples/services).

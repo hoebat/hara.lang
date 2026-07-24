@@ -3,11 +3,11 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DEPENDENCIES="$ROOT/target/truffle-dependencies"
+DEPENDENCIES="$ROOT/java/target/truffle-dependencies"
 
 cd "$ROOT"
 
-mvn -Ptruffle -DskipTests clean compile dependency:copy-dependencies \
+mvn -f "$ROOT/java/pom.xml" -Ptruffle -DskipTests clean compile dependency:copy-dependencies \
   -DincludeScope=runtime \
   -DoutputDirectory="$DEPENDENCIES"
 
@@ -21,7 +21,7 @@ fi
 
 native-image \
   "${NATIVE_IMAGE_OPTIONS[@]}" \
-  -cp "$ROOT/target/classes:$DEPENDENCIES/*" \
+  -cp "$ROOT/java/target/classes:$DEPENDENCIES/*" \
   -H:Class=hara.truffle.Main \
   --initialize-at-build-time=hara.truffle.HaraFunctionGen,hara.truffle.HaraBoxGen,hara.truffle.HaraNullGen,hara.truffle.HaraVarGen,hara.truffle.HaraProtocolGen,hara.truffle.HaraStructGen,hara.truffle.HaraTypeGen,hara.truffle.HaraMemberNamesGen,hara.truffle.HaraHashEntryGen,hara.truffle.HaraMultiFunctionGen,hara.truffle.HaraDecimalGen,hara.truffle.HaraBigIntegerGen,hara.truffle.HaraIteratorGen \
   -o "$ROOT/target/hara-truffle"

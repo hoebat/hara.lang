@@ -17,6 +17,29 @@ Truffle parser / AST
     +--> host capability boundary
 ```
 
+## Repository layout
+
+- [`java/`](java/) — the Java/Truffle runtime (Maven project, CLI, native-image).
+- [`rust/`](rust/) — the Rust/embedding runtime: native CLI, wasm builds, web
+  loader, and in-tree wasm extensions (`rust/extensions/`).
+- [`lib/`](lib/) — hara-language source and workloads: the std foundation and
+  Polis compiler port (`lib/src`, `lib/test`), demo projects
+  ([`lib/examples/`](lib/examples/)), and benchmark suites
+  ([`lib/bench/`](lib/bench/)).
+- [`apps/`](apps/) — editor and browser apps:
+  [`hara-chrome`](apps/hara-chrome/) (Chrome DevTools extension),
+  [`hara-vscode`](apps/hara-vscode/), [`hara-emacs`](apps/hara-emacs/), and the
+  planned [`hara-lsp`](apps/hara-lsp/) language server.
+- [`docs/`](docs/) — documentation content (published via mkdocs).
+- [`website/`](website/) — site infrastructure: mkdocs config, theme
+  overrides, and the landing page.
+- [`spec/`](spec/hara/) — normative language, runtime, and extension specs.
+- [`books/`](books/) — planned book series (*The Little Book of HAL*).
+- [`registry/`](registry/) — planned hara wasm extension registry.
+- [`scripts/`](scripts/) — repo-level build/benchmark scripts.
+- [`archive/`](archive/) — legacy material kept for history (old Clojure
+  reference sources, one-off refactor scripts, C experiments, legacy docs).
+
 ## Start here
 
 - [User guide](docs/user-guide.md) — install, run, evaluate, use the REPL, and write Hara.
@@ -29,7 +52,7 @@ Truffle parser / AST
 - [Rust/WASM mapping](spec/hara/rust-runtime.md) — the cross-runtime value, provider, and conformance design.
 - [Extensions](spec/hara/extensions-contract.md) — WASM, manifests, HTA, and capabilities.
 - [REPL UX](spec/hara/repl.md) — history, completion, docs, and slash-command design.
-- [Hara for Emacs](emacs-hara/README.md) — project-aware evaluation, sessions, completion, docs,
+- [Hara for Emacs](apps/hara-emacs/README.md) — project-aware evaluation, sessions, completion, docs,
   and a RESP-backed REPL.
 
 ## Quick start
@@ -37,7 +60,7 @@ Truffle parser / AST
 Requirements: JDK 21 and Maven.
 
 ```shell
-mvn -Ptruffle package
+mvn -f java/pom.xml -Ptruffle package
 ./hara eval '(+ 19 23)'
 ./hara
 ```
@@ -47,6 +70,14 @@ session through RESP on `127.0.0.1:1311`. Use `--offline` to start without the l
 `headless` for a listener without terminal UI, and `remote HOST:PORT` for a client connection. The CLI also supports `run <file>`, `stdin`, and `help`. For a native-image build, see the
 [developer guide](docs/development.md); native mode intentionally removes dynamic JVM services.
 
+Per-component builds:
+
+```shell
+cargo test --manifest-path rust/Cargo.toml          # Rust runtime
+cd apps/hara-chrome && npm ci && npm run build      # Chrome extension
+cd website && mkdocs build -f mkdocs.yml            # docs site
+```
+
 ## Current runtime boundary
 
 The language does not expose ambient JVM host interop. JVM reflection, compilation, mutable
@@ -54,8 +85,8 @@ classpath access, files, and sockets are explicit capabilities or provider servi
 core portable to future runtimes such as WASM hosts.
 
 The old interpreter/Foundation/TCP architecture is retained as
-[`README.legacy.md`](README.legacy.md) for historical reference only; it is not the current
-language guide.
+[`archive/legacy-docs/README.legacy.md`](archive/legacy-docs/README.legacy.md) for historical
+reference only; it is not the current language guide.
 
 ## Status
 

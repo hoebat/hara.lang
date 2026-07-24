@@ -1,0 +1,386 @@
+{:spec/version "0.1"
+ :spec/status :draft
+ :language "hara-l0"
+ :namespace std.lib.foundation
+
+ ;; This file is the editable design authority for the JVM bootstrap boundary.
+ ;; A symbol is not part of the boundary merely because HaraContext installs it.
+ ;; Conformance cases and implementations should be reconciled with this file.
+ :boundary
+ {:special-forms
+  #{quote
+    if
+    do
+    let
+    loop
+    recur
+    fn
+    def
+    defn
+    ns}
+
+  :macros
+  #{->
+    ->>}
+
+  :reader-literals
+  {:regex
+   {:syntax "#\"...\""
+    :value :hara-regex}}
+
+  :builtin-symbols
+  {:numeric
+   #{+ - * / mod = not= < <= > >=}
+
+   :invocation
+   #{apply}
+
+   :evaluation
+   #{eval
+     read-string}
+
+   :regex
+   #{re-pattern
+     regex?
+     re-find
+     re-matches
+     re-seq
+     re-groups}
+
+   :collections
+   #{count
+     get
+     find
+     has?
+     assoc
+     dissoc
+     conj
+     cons
+     nth
+     empty
+     vec
+     list}
+
+   :iteration
+   #{iter
+     map
+     filter
+     take
+     drop
+     mapcat
+     keep
+     cycle
+     zip
+     partition-pair
+     partition
+     partition-all
+     interpose
+     interleave
+     take-while
+     drop-while
+     range
+     repeat
+     repeatedly
+     iterate
+     concat
+     reduce
+     every?
+     any?}}
+
+  ;; Runtime-backed values expose a deliberately restricted portable surface.
+  ;; These methods do not imply general host interop or JVM member access.
+  :runtime-values
+  {:array
+   {:constructor array
+    :identity :mutable
+    :methods
+    #{get
+      set
+      push-first
+      push-last
+      pop-first
+      pop-last
+      insert
+      remove
+      clone
+      slice
+      map
+      filter
+      fold-left
+      fold-right}}
+
+   :object
+   {:constructor object
+    :identity :mutable
+    :methods
+    #{has?
+      get
+      set
+      delete
+      clone
+      assign
+      keys
+      vals
+      pairs}}}
+
+  ;; Portable libraries backed by runtime facilities that Hara does not expose
+  ;; through general host or implementation-language interop.
+  :runtime-libraries
+  {std.lib.coroutine
+   {:alias co
+    :symbols
+    #{create
+      resume
+      yield
+      status
+      coroutine?
+      close
+      await}}
+
+   std.lib.string
+   {:alias str
+    :symbols
+    #{length
+      blank?
+      includes?
+      starts-with?
+      ends-with?
+      char-at
+      slice
+      index-of
+      last-index-of
+      join
+      split
+      split-lines
+      repeat
+      replace
+      replace-first
+      trim
+      trim-left
+      trim-right
+      upper
+      lower
+      capitalize
+      decapitalize
+      pad-left
+      pad-right
+      reverse
+      encode-utf8
+      decode-utf8}}
+
+   std.lib.bytes
+   {:alias bytes
+    :symbols
+    #{count
+      get
+      set
+      copy
+      slice
+      u8
+      s8}}
+
+   std.lib.promise
+   {:alias promise
+    :symbols
+    #{run
+      new
+      all
+      then
+      catch
+      finally
+      state
+      value
+      cancel
+      native?
+      delay}}}
+
+  ;; These are ordinary Hara definitions built only from the boundary above.
+  :foundation-symbols
+  #{identity
+    inc
+    dec
+    constantly
+    comp
+    complement
+    zero?
+    pos?
+    neg?
+    even?
+    odd?
+    nil?
+    false?
+    true?
+    empty?
+    first
+    second
+    rest
+    not-empty
+    get-in
+    assoc-in
+    update
+    update-in
+    last
+    reverse
+    key
+    val
+    keys
+    vals
+    juxt}}
+
+ :protocols
+ {:IFind
+  {:methods
+   {find {:arglists [[collection key]]
+          :returns :entry-or-nil}
+    has? {:arglists [[collection key]]
+          :returns :boolean}}
+   :invariant
+   "has? distinguishes a missing key from a key whose associated value is nil."}}
+
+ :semantics
+ {:map
+  {:direct
+   {:arglists [[function source]
+               [function source & sources]]
+    :evaluation :eager
+    :output :preserve-first-source-origin
+    :multiple-sources :stop-at-shortest}
+
+   :transform
+   {:arglists [[function]]
+    :evaluation :lazy
+    :returns :iterator-transform
+    :application
+    {:input :iterable-or-iterator
+     :output :iterator}}}
+
+  :iterator-transform
+  {:callable true
+   :composition comp
+   :acquisition :on-demand
+   :one-shot true}
+
+  :materialization
+  {:vector vec
+   :list list
+   :array array}
+
+  :membership
+  {:find :protocol-dispatch
+   :has? :protocol-dispatch
+   :nil-value-distinct-from-missing true}
+
+  :evaluation
+  {:read-string
+   {:arglists [[source]]
+    :returns :form
+    :multiple-forms :error}
+
+   :eval
+   {:arglists [[form]]
+    :namespace :current
+    :returns :value}}
+
+  :string
+  {:index-unit :unicode-code-point
+   :literal-operations
+   #{split replace replace-first}
+   :encoding
+   {:encode-utf8 :string-to-bytes
+    :decode-utf8 :bytes-to-string}}
+
+  :regex
+  {:value :hara-regex
+   :reader-literal "#\"...\""
+   :construction re-pattern
+   :dialect :hara-portable-v1
+   :host-value-exposure false
+   :match-result
+   {:without-captures :string
+    :with-captures :vector
+    :no-match nil}
+   :re-matches :whole-input
+   :re-find :first-match
+   :re-groups :capture-result
+   :re-seq
+   {:evaluation :lazy
+    :returns :iterator}
+   :replacement
+   {:functions true
+    :template-syntax "$n"
+    :host-template-syntax false}
+   :portable-flags
+   #{:case-insensitive
+     :multiline
+     :dotall}}}
+
+ :excluded-symbols
+ #{mapv
+   iter-has?
+   iter-next
+   iter-close
+   iter-map
+   iter-filter
+   iter-take
+   iter-drop
+   iter-mapcat
+   iter-keep
+   iter-cycle
+   iter-zip
+   iter-partition-pair
+   iter-partition
+   iter-partition-all
+   iter-interpose
+   iter-interleave
+   iter-take-while
+   iter-drop-while
+   iter-range
+   iter-constantly
+   iter-repeatedly
+   iter-iterate
+   iter-every?
+   iter-any?}
+
+ :implementation-issues
+ [{:id :evaluation/read-string
+   :current "The JVM exposes eval and read-forms, but no single-form read-string builtin."
+   :required "Expose read-string through the Hara reader, preserve form metadata, and reject trailing non-whitespace forms."}
+
+  {:id :regex/reader-value
+   :current "hara.kernel.base.Parser compiles regex literals directly to java.util.regex.Pattern."
+   :required "Read regex literals into an immutable Hara regex value containing source, flags, and a portable parsed representation."}
+
+  {:id :regex/hir
+   :current "HirArtifact has no opcode for a portable regex value."
+   :required "Add deterministic HIR encoding and decoding for the Hara regex source, flags, and dialect/version."}
+
+  {:id :regex/jvm-adapter
+   :current "regexp? and test matching inspect java.util.regex.Pattern directly."
+   :required "Compile and cache a private JVM Pattern behind the Hara regex value; never expose Pattern or Matcher to guest code."}
+
+  {:id :regex/polis-lowering
+   :current "Polis recognizes a regex token, but its xtalk string operations do not share one regex contract across targets."
+   :required "Lower the Hara regex representation and replacement templates per target, rejecting unsupported portable-v1 constructs explicitly."}
+
+  {:id :regex/lua
+   :current "Lua patterns are not equivalent to JavaScript, Python, R, or JVM regular expressions."
+   :required "Choose a Lua regex runtime/helper or emit an explicit unsupported-feature error; do not silently reinterpret Hara regex as a Lua pattern."}
+
+  {:id :regex/replacement
+   :current "Replacement capture syntax differs across JVM, JavaScript, Python, Lua, and R."
+   :required "Parse Hara $n templates and translate them for each target; function replacements receive the same string/vector match shape everywhere."}
+
+  {:id :string/unicode-indexing
+   :current "JVM length, char, substring, and regex offsets expose UTF-16 code-unit indexes."
+   :required "Implement length, char-at, slice, search offsets, and regex offsets in Unicode code points across JVM and Polis targets."}
+
+  {:id :conformance/regex-parity
+   :current "No shared JVM/Polis regex conformance matrix exists."
+   :required "Add cases for literals, escaping, captures, no-match, repeated matches, flags, replacement templates, Unicode, unsupported constructs, and target parity."}]
+
+ :implementation-notes
+ ["The current JVM implementation does not yet conform to this draft."
+  "Iterator mechanics may remain JVM-backed, but iter-* names are not public language symbols."
+  "Direct map is eager and origin-preserving; the unary map transform is lazy."
+  "mapv is intentionally absent rather than retained as a compatibility alias."
+  "Filesystem loading, namespace reflection, and general host interop are outside this boundary."]}

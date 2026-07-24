@@ -47,8 +47,8 @@ header identifies session `ROOT`, and the right prompt shows live listener statu
 ## 5. Run a file or stdin
 
 ```shell
-./hara run examples/hello.hal
-cat examples/hello.hal | ./hara stdin
+./hara run lib/examples/hello.hal
+cat lib/examples/hello.hal | ./hara stdin
 ```
 
 ## 6. Run tests

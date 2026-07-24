@@ -19,7 +19,7 @@ Truffle language and the specifications are authoritative.
 After the public classes have complete lifecycle and capability Javadocs, generate the site with:
 
 ```shell
-mvn -Pjavadoc javadoc:javadoc
+mvn -f java/pom.xml -Pjavadoc javadoc:javadoc
 ```
 
 The generated output is written under `target/site/apidocs/`. In the published documentation site, the generated API is available at [`/api/java/`](https://hoebat.github.io/hara.lang/api/java/index.html) alongside the Material pages.

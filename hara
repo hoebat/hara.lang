@@ -3,11 +3,11 @@
 # Resolve the directory where this script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
-HARA_RUNTIME_JAR="${HARA_RUNTIME_JAR:-$SCRIPT_DIR/target/hara-truffle.jar}"
+HARA_RUNTIME_JAR="${HARA_RUNTIME_JAR:-$SCRIPT_DIR/java/target/hara-truffle.jar}"
 
 if [[ ! -r "$HARA_RUNTIME_JAR" ]]; then
     echo "Hara runtime JAR not found: $HARA_RUNTIME_JAR" >&2
-    echo "Build it once with: mvn -Ptruffle -DskipTests package" >&2
+    echo "Build it once with: mvn -f java/pom.xml -Ptruffle -DskipTests package" >&2
     exit 1
 fi
 
