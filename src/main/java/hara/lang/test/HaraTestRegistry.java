@@ -1,5 +1,7 @@
 package hara.lang.test;
 
+import hara.lang.data.Keyword;
+import hara.lang.data.types.IMapType;
 import hara.truffle.HaraFunction;
 import java.util.ArrayList;
 import java.util.List;
@@ -10,6 +12,11 @@ import java.util.HashSet;
 import java.util.Set;
 
 public final class HaraTestRegistry {
+  @FunctionalInterface
+  public interface NamespaceRunner {
+    void run(String namespace, Runnable operation);
+  }
+
   private final List<HaraTestCase> tests = new ArrayList<>();
   private final List<HaraTestFixture> fixtures = new ArrayList<>();
   private final Map<String, Object> globals = new LinkedHashMap<>();
@@ -19,10 +26,35 @@ public final class HaraTestRegistry {
 
   public synchronized HaraTestCase register(
       String namespace, String name, Object metadata, HaraFunction body) {
-    tests.removeIf(test -> namespace.equals(test.namespace()) && name.equals(test.name()));
+    Object file = metadataValue(metadata, "file");
+    Object line = metadataValue(metadata, "line");
+    tests.removeIf(
+        test ->
+            namespace.equals(test.namespace())
+                && name.equals(test.name())
+                && sameRegistration(file, line, test.metadata()));
     HaraTestCase test = new HaraTestCase(namespace, name, metadata, body);
     tests.add(test);
     return test;
+  }
+
+  private static boolean sameRegistration(Object file, Object line, Object existingMetadata) {
+    Object existingFile = metadataValue(existingMetadata, "file");
+    Object existingLine = metadataValue(existingMetadata, "line");
+    if (file != null && line != null && existingFile != null && existingLine != null) {
+      return file.equals(existingFile) && line.equals(existingLine);
+    }
+    return file == null && line == null && existingFile == null && existingLine == null;
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private static Object metadataValue(Object metadata, String name) {
+    if (metadata instanceof IMapType map) return map.lookup(Keyword.create(name));
+    if (metadata instanceof Map map) {
+      Object value = map.get(Keyword.create(name));
+      return value == null ? map.get(name) : value;
+    }
+    return null;
   }
 
   public synchronized HaraTestFixture registerFixture(
@@ -152,6 +184,11 @@ public final class HaraTestRegistry {
   }
 
   public List<HaraTestResult> runAll(Predicate<HaraTestCase> selector) {
+    return runAll(selector, (namespace, operation) -> operation.run());
+  }
+
+  public List<HaraTestResult> runAll(
+      Predicate<HaraTestCase> selector, NamespaceRunner namespaceRunner) {
     List<HaraTestResult> result = new ArrayList<>();
     Map<String, List<HaraTestCase>> selected = new LinkedHashMap<>();
     for (HaraTestCase test : tests()) {
@@ -160,32 +197,36 @@ public final class HaraTestRegistry {
       }
     }
     for (Map.Entry<String, List<HaraTestCase>> entry : selected.entrySet()) {
-      Throwable beforeAll = null;
-      try {
-        runFixtures(entry.getKey(), "before-all");
-      } catch (Throwable error) {
-        beforeAll = error;
-      }
-      for (HaraTestCase test : entry.getValue()) {
-        result.add(beforeAll == null ? run(test) : failed(test, beforeAll));
-      }
-      try {
-        runFixtures(entry.getKey(), "after-all");
-      } catch (Throwable error) {
-        if (!result.isEmpty() && beforeAll == null) {
-          // Preserve one result per selected test while surfacing namespace teardown failures.
-          int last = result.size() - 1;
-          HaraTestResult previous = result.get(last);
-          result.set(
-              last,
-              new HaraTestResult(
-                  previous.test(),
-                  HaraTestResult.Status.FAIL,
-                  null,
-                  error,
-                  previous.elapsedMillis()));
-        }
-      }
+      namespaceRunner.run(
+          entry.getKey(),
+          () -> {
+            Throwable beforeAll = null;
+            try {
+              runFixtures(entry.getKey(), "before-all");
+            } catch (Throwable error) {
+              beforeAll = error;
+            }
+            for (HaraTestCase test : entry.getValue()) {
+              result.add(beforeAll == null ? run(test) : failed(test, beforeAll));
+            }
+            try {
+              runFixtures(entry.getKey(), "after-all");
+            } catch (Throwable error) {
+              if (!result.isEmpty() && beforeAll == null) {
+                // Preserve one result per selected test while surfacing namespace teardown failures.
+                int last = result.size() - 1;
+                HaraTestResult previous = result.get(last);
+                result.set(
+                    last,
+                    new HaraTestResult(
+                        previous.test(),
+                        HaraTestResult.Status.FAIL,
+                        null,
+                        error,
+                        previous.elapsedMillis()));
+              }
+            }
+          });
     }
     return result;
   }

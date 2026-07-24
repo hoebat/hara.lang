@@ -67,7 +67,8 @@ public final class CodeTest {
                         && (excludeSelector == null || !testSelector(excludeSelector, test))
                         && metadataMatches(metadataSelector, test.metadata())
                         && (Boolean.TRUE.equals(hidden)
-                            || !metadataFlag(test.metadata(), "hidden")))) {
+                            || !metadataFlag(test.metadata(), "hidden")),
+                context::runInNamespace)) {
       Map<Object, Object> resultMap = new LinkedHashMap<>();
       resultMap.put("status", result.status().name());
       resultMap.put("name", result.test().name());
@@ -480,10 +481,10 @@ public final class CodeTest {
     Object expected = HaraBox.unwrap(values[1]);
     boolean matched;
     if (expected instanceof HaraMatcher matcher) matched = matcher.matches(actual);
-    else if (expected instanceof HaraFunction function) {
+    else if (context.isFunctionValue(expected)) {
       matched =
           Boolean.TRUE.equals(
-              function.callTarget().call(function.callArguments(new Object[] {actual})));
+              HaraBox.unwrap(context.invokeCallable(expected, new Object[] {actual})));
     } else if (expected instanceof Class<?> type) {
       matched = actual != null && type.isInstance(actual);
     } else matched = Eq.eq(actual, expected);
@@ -809,7 +810,7 @@ public final class CodeTest {
   }
 
   private static Object expandFact(List<?> invocation) {
-    if (invocation.count() < 3) throw new HaraException("fact expects a name and body");
+    if (invocation.count() < 2) throw new HaraException("fact expects a name");
     Object name = invocation.nth(1);
     ArrayList<Object> body = new ArrayList<>();
     for (int i = 2; i < invocation.count(); i++) {

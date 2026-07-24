@@ -55,6 +55,39 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 public final class HaraContext {
+  private static final Set<String> SPECIAL_SYMBOLS =
+      Set.of(
+          "quote",
+          "do",
+          "if",
+          "when",
+          "when-not",
+          "cond",
+          "and",
+          "or",
+          "let",
+          "letfn",
+          "binding",
+          "loop",
+          "recur",
+          "throw",
+          "try",
+          "fn",
+          "defn",
+          "defn-",
+          "declare",
+          "defmulti",
+          "defmethod",
+          "def",
+          "var",
+          "deref",
+          "set!",
+          "defstruct",
+          "defprotocol",
+          "extend-type",
+          "defmacro",
+          "new",
+          "ns");
   private static final String INTRINSIC_NAMESPACE = "hara.lang.intrinsic";
   private static final String FOUNDATION_NAMESPACE = "std.lib.foundation";
   private static final Map<String, String> GENERATED_LIBRARIES =
@@ -222,6 +255,16 @@ public final class HaraContext {
 
   String currentNamespaceName() {
     return currentNamespace.name();
+  }
+
+  void runInNamespace(String namespaceName, Runnable operation) {
+    HaraNamespace previous = currentNamespace;
+    try {
+      currentNamespace = namespace(namespaceName);
+      operation.run();
+    } finally {
+      currentNamespace = previous;
+    }
   }
 
   HaraTestRegistry testRegistry() {
@@ -1170,6 +1213,7 @@ public final class HaraContext {
               return unwrapped == null ? null : unwrapped.getClass().getName();
             }));
     target.define("load-string", new UnaryBuiltin("load-string", this::loadString));
+    target.define("eval", new UnaryBuiltin("eval", this::evalForm));
     target.define("load-file", new UnaryBuiltin("load-file", this::loadFile));
     target.define("load-resource", new UnaryBuiltin("load-resource", this::loadResource));
     target.define("read-forms", new VariadicBuiltin("read-forms", this::readForms));
@@ -1202,6 +1246,27 @@ public final class HaraContext {
     target.define("ns-name", new UnaryBuiltin("ns-name", this::namespaceName));
     target.define("ns-publics", new UnaryBuiltin("ns-publics", this::namespacePublics));
     target.define("ns-aliases", new UnaryBuiltin("ns-aliases", this::namespaceAliases));
+    target.define(
+        "resolve",
+        new UnaryBuiltin(
+            "resolve",
+            value -> {
+              Object raw = HaraBox.unwrap(value);
+              if (!(raw instanceof Symbol symbol)) {
+                throw new HaraException("resolve expects a symbol");
+              }
+              return resolve(symbol);
+            }));
+    target.define(
+        "special-symbol?",
+        new UnaryBuiltin(
+            "special-symbol?",
+            value -> {
+              Object raw = HaraBox.unwrap(value);
+              return raw instanceof Symbol symbol
+                  && symbol.getNamespace() == null
+                  && SPECIAL_SYMBOLS.contains(symbol.getName());
+            }));
     target.define(
         "requiring-resolve", new UnaryBuiltin("requiring-resolve", this::requiringResolve));
     target.define(
@@ -2529,6 +2594,11 @@ public final class HaraContext {
     }
   }
 
+  private Object evalForm(Object value) {
+    return parseAndExecute(
+        hara.kernel.builtin.BuiltinUtil.prStr(HaraBox.unwrap(value)), "<eval>");
+  }
+
   private Object loadFile(Object value) {
     if (!(value instanceof String)) {
       throw new HaraException("load-file expects a path string");
@@ -3589,6 +3659,14 @@ public final class HaraContext {
       return new HaraStruct(type, arguments);
     }
     throw new HaraException("value is not callable: " + function);
+  }
+
+  boolean isFunctionValue(Object value) {
+    Object function = HaraBox.unwrap(value);
+    return function instanceof HaraFunction
+        || function instanceof HaraMultiFunction
+        || function instanceof UnaryBuiltin
+        || function instanceof VariadicBuiltin;
   }
 
   private Iterator<?> requireIterator(Object value, String operation) {

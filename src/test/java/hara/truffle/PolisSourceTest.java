@@ -183,4 +183,52 @@ public class PolisSourceTest {
       assertEquals(2, metadata.getArrayElement(2).asLong());
     }
   }
+
+  @Test
+  public void runsJavaBackedStdLibWalkFacts() {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(require 'std.lib.walk-test)");
+      var equality =
+          context.eval(
+              HaraLanguage.ID,
+              "(let [actual (std.lib.walk/keyword-spearify-keys"
+                  + " {\"a_b_c\" [{\"e_f_g\" 1}]})"
+                  + " expected {:a-b-c [{:e-f-g 1}]}]"
+                  + " [(= actual expected)"
+                  + " (= (:a-b-c actual) (:a-b-c expected))"
+                  + " (= (first (:a-b-c actual)) (first (:a-b-c expected)))"
+                  + " (= (:e-f-g (first (:a-b-c actual))) 1)])");
+      assertTrue(equality.toString(), equality.getArrayElement(3).asBoolean());
+      assertTrue(equality.toString(), equality.getArrayElement(2).asBoolean());
+      assertTrue(equality.toString(), equality.getArrayElement(1).asBoolean());
+      assertTrue(equality.toString(), equality.getArrayElement(0).asBoolean());
+      var results =
+          context.eval(
+              HaraLanguage.ID,
+              "(code.test/run {:namespace \"std.lib.walk-test\"})");
+      assertEquals(13, results.getArraySize());
+      for (long i = 0; i < results.getArraySize(); i++) {
+        assertTrue(
+            results.getArrayElement(i).toString(),
+            "PASS".equals(results.getArrayElement(i).getHashValue("status").asString()));
+      }
+    }
+  }
+
+  @Test
+  public void runsTranslatedPreprocessInputFacts() {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(require 'polis.common.preprocess-input-test)");
+      var results =
+          context.eval(
+              HaraLanguage.ID,
+              "(code.test/run {:namespace \"polis.common.preprocess-input-test\"})");
+      assertEquals(3, results.getArraySize());
+      for (long i = 0; i < results.getArraySize(); i++) {
+        assertTrue(
+            results.getArrayElement(i).toString(),
+            "PASS".equals(results.getArrayElement(i).getHashValue("status").asString()));
+      }
+    }
+  }
 }

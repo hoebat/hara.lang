@@ -68,6 +68,9 @@ the portable Hara runtime:
 | Keyword lookup against sets | Hara keywords now query persistent and Java sets | Foundation argument parsing uses keyword lookup on grammar allow-lists and expects missing members to return `nil` |
 | Metadata-bearing symbol equality | Symbol equality and hashing ignore metadata | Matches Clojure/Foundation value semantics and allows copied metadata assertions to compare unchanged |
 | Macro parameter destructuring | Bind the vector parameter and select its first value inside `with:macro-opts` | Hara macro parameters currently support symbols and `&`, so the public call shape remains unchanged while the implementation avoids nested parameter destructuring |
+| `std.lib.walk` | Lazy Java-backed static library over persistent Hara collections | Supplies the Foundation traversal contract without mutable host collections escaping; map/set implementations and metadata are preserved |
+| `volatile!` used as a local traversal flag | Hara `atom`, `reset!`, and `deref` | `polis.common.preprocess-input` needs local mutable state only while checking whether a template expression can be evaluated |
+| Host form `eval` during preprocessing | Core Hara `eval` evaluates the readable Hara form in the active namespace | Preserves persisted template behavior while keeping evaluation inside the Hara runtime rather than invoking Clojure/JVM evaluation |
 
 Translated `code.test` files are copied from Foundation by default. Namespace
 ownership and unsupported dependency syntax may be translated, but fact

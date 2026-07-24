@@ -33,6 +33,19 @@ public class HaraTestIntegrationTest {
   }
 
   @Test
+  public void registersDocumentationOnlyFacts() {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(fact \"documented behavior\")");
+      Value results =
+          context.eval(
+              HaraLanguage.ID,
+              "(code.test/run {:namespace \"user\" :name \"documented behavior\"})");
+      assertEquals(1, results.getArraySize());
+      assertEquals("PASS", results.getArrayElement(0).getHashValue("status").asString());
+    }
+  }
+
+  @Test
   public void supportsMatchersFixturesAndFilteredReports() {
     try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
       context.eval(HaraLanguage.ID, "(require 'code.test {:refer [anything contains throws use-fixtures]})");
