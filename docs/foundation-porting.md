@@ -10,7 +10,7 @@ has been reviewed.
 | Slice | Status | Notes |
 |---|---|---|
 | Project and namespace loader | complete | Self-contained examples live under `bench/<NUM>-<GROUP>` |
-| Common grammar foundation | in progress | Faithful sources live under `implementation/src/polis/common` |
+| Common grammar foundation | complete | Grammar specification, macros, xtalk profiles/system, and aggregate grammar have translated facts |
 | `polis.typed` | pending | Does not include `hara.model` |
 | Common preprocess and emit | in progress | `preprocess-base` is complete; `emit-rewrite` follows the typed slice |
 | `polis.lang.book*` | pending | Independent review gate |
@@ -62,6 +62,8 @@ the portable Hara runtime:
 | `std.lib.walk/prewalk` plus volatile accumulators | Explicit pending-node loop with persistent maps and sets | Keeps xtalk scanning portable and prevents mutable host values from escaping |
 | Clojure set union, subset, and membership helpers | Small persistent reductions local to the xtalk system | Hara deliberately does not expose the whole `clojure.set` surface |
 | Symbol-valued `code.test` `:id` metadata | Fact names and `:refer` metadata only | Unquoted metadata symbols are resolved by Hara; the test registry already has stable names |
+| Foundation `Grammer` record | Persistent map tagged with `:polis/type :polis/grammar` | Hara records are structs rather than map values; downstream grammar consumers require keyword lookup and map semantics |
+| Metadata-based operator category ordering | Explicit persistent `+op-categories+` and `+op-order+` vectors | Hara Vars do not provide the Foundation compiler's source-line ordering contract |
 
 ## Project convention
 

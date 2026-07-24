@@ -139,4 +139,21 @@ public class PolisSourceTest {
       }
     }
   }
+
+  @Test
+  public void runsTranslatedGrammarFacts() {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(require 'polis.common.grammar-test)");
+      var results =
+          context.eval(
+              HaraLanguage.ID,
+              "(code.test/run {:namespace \"polis.common.grammar-test\"})");
+      assertEquals(19, results.getArraySize());
+      for (long i = 0; i < results.getArraySize(); i++) {
+        assertTrue(
+            results.getArrayElement(i).toString(),
+            "PASS".equals(results.getArrayElement(i).getHashValue("status").asString()));
+      }
+    }
+  }
 }
