@@ -1,6 +1,7 @@
 import { HtaContext } from "../vendor/hta.js";
 import { createHostCalls } from "./host-bridge.js";
 import { preloadRequires, parseSourcePaths, chooseHome, restoreHome } from "./home.js";
+import { connectResp } from "./resp-client.js";
 
 const params = new URLSearchParams(location.search);
 const tabId = params.has("tabId")
@@ -54,6 +55,8 @@ async function setHome(dir) {
 }
 
 window.hara = { context, evalSource, preload, setHome, tabId };
+
+if (params.has("resp")) connectResp(params.get("resp"), evalSource);
 
 const input = document.getElementById("input");
 const output = document.getElementById("output");
