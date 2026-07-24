@@ -1,6 +1,7 @@
 package hara.truffle;
 
 import hara.lang.data.Keyword;
+import hara.lang.protocol.IDeref;
 import java.util.concurrent.SynchronousQueue;
 import org.graalvm.nativeimage.ImageInfo;
 
@@ -260,5 +261,20 @@ public final class StdLibCoroutine {
       throw new HaraException("coroutine/yield: cannot yield outside a coroutine");
     }
     return coroutine.doYield(pack(values));
+  }
+
+  @HaraExport(
+      name = "await",
+      doc =
+          "Blocks the current (coroutine) thread until the promise settles and returns its"
+              + " value. Rethrows on rejection. Outside a coroutine, behaves as a plain deref.",
+      arglists = {"[p]"})
+  public static Object await(HaraContext context, Object[] values) {
+    requireArity("coroutine/await", values, 1);
+    Object value = HaraBox.unwrap(values[0]);
+    if (!(value instanceof IDeref)) {
+      throw new HaraException("coroutine/await expects a derefable (e.g. a promise)");
+    }
+    return ((IDeref<?>) value).deref();
   }
 }

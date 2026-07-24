@@ -303,4 +303,64 @@ public class StdLibCoroutineTest {
       assertTrue(error.getMessage().contains("running"));
     }
   }
+
+  @Test
+  public void awaitReturnsSettledPromiseValue() {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(require 'std.lib.coroutine)");
+      context.eval(
+          HaraLanguage.ID,
+          "(def c-await (std.lib.coroutine/create"
+              + " (fn [] (std.lib.coroutine/await (promise/delay 50 (fn [] :delayed-value))))))");
+      assertTrue(
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(= :delayed-value (std.lib.coroutine/resume c-await))")
+              .asBoolean());
+      assertTrue(
+          context
+              .eval(HaraLanguage.ID, "(= :dead (std.lib.coroutine/status c-await))")
+              .asBoolean());
+      // Already-settled promise resolves without parking.
+      context.eval(
+          HaraLanguage.ID,
+          "(def c-quick (std.lib.coroutine/create"
+              + " (fn [] (std.lib.coroutine/await (promise/run (fn [] 7))))))");
+      assertEquals(
+          7, context.eval(HaraLanguage.ID, "(std.lib.coroutine/resume c-quick)").asLong());
+    }
+  }
+
+  @Test
+  public void awaitRethrowsPromiseRejection() {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(require 'std.lib.coroutine)");
+      context.eval(
+          HaraLanguage.ID,
+          "(def c-reject (std.lib.coroutine/create"
+              + " (fn [] (std.lib.coroutine/await (promise/run (fn [] (/ 1 0)))))))");
+      PolyglotException error =
+          assertThrows(
+              PolyglotException.class,
+              () -> context.eval(HaraLanguage.ID, "(std.lib.coroutine/resume c-reject)"));
+      assertTrue(error.getMessage().contains("Promise rejected"));
+      assertTrue(
+          context
+              .eval(HaraLanguage.ID, "(= :dead (std.lib.coroutine/status c-reject))")
+              .asBoolean());
+    }
+  }
+
+  @Test
+  public void awaitRejectsNonDerefable() {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(require 'std.lib.coroutine)");
+      PolyglotException error =
+          assertThrows(
+              PolyglotException.class,
+              () -> context.eval(HaraLanguage.ID, "(std.lib.coroutine/await 42)"));
+      assertTrue(error.getMessage().contains("derefable"));
+    }
+  }
 }
