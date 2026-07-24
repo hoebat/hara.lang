@@ -17,6 +17,11 @@ function evalSource(source) {
   return context.call("eval", [source]);
 }
 
+const apiSource = await (
+  await fetch(chrome.runtime.getURL("src/hara/api.hal"))
+).text();
+await context.call("register-resource", ["chrome.api", apiSource]);
+
 window.hara = { context, evalSource, tabId };
 
 const input = document.getElementById("input");
