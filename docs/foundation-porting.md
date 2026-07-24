@@ -12,7 +12,7 @@ has been reviewed.
 | Project and namespace loader | complete | Self-contained examples live under `bench/<NUM>-<GROUP>` |
 | Common grammar foundation | in progress | Faithful sources live under `implementation/src/polis/common` |
 | `polis.typed` | pending | Does not include `hara.model` |
-| Common preprocess and emit | pending | `emit-rewrite` follows the typed slice |
+| Common preprocess and emit | in progress | `preprocess-base` is complete; `emit-rewrite` follows the typed slice |
 | `polis.lang.book*` | pending | Independent review gate |
 | Remaining `polis.lang` | pending | Split by library, rewrite, compiler, and runtime layers |
 
@@ -56,6 +56,9 @@ the portable Hara runtime:
 | Arbitrary `eval` in grammar mixins | Qualified symbol resolution plus a narrow form evaluator | Portable HAL code must not depend on host evaluation |
 | Clojure `seq?` as a list/form predicate | Dispatch after the supported symbol and map mixin cases | Hara's `seq?` specifically identifies lazy `HaraSeq` values |
 | Runtime `macroexpand-1` for `->` and `->>` data | Explicit thread-first/thread-last form transformation | Hara expands these forms during analysis; quoted transpiler data is transformed portably in HAL |
+| Macros imported by an `ns` declaration | `:refer-macros` in the generated `:require` specification | Hara runtime `require` supported macro references, but source namespace declarations did not |
+| Nested macro argument destructuring | Bind the vector as one macro argument and emit a runtime `first` | Hara macro parameters are symbols, while the public call shape remains unchanged |
+| Clojure `integer?` in index-offset folding | Hara `number?` | Target grammar offsets are numeric indices and Hara currently exposes the broader numeric predicate |
 
 ## Project convention
 

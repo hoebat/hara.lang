@@ -88,4 +88,38 @@ public class PolisSourceTest {
       }
     }
   }
+
+  @Test
+  public void runsTranslatedPreprocessBaseFacts() {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(require 'polis.common.preprocess-base-test)");
+      var results =
+          context.eval(
+              HaraLanguage.ID,
+              "(code.test/run {:namespace \"polis.common.preprocess-base-test\"})");
+      assertEquals(4, results.getArraySize());
+      for (long i = 0; i < results.getArraySize(); i++) {
+        assertTrue(
+            results.getArrayElement(i).toString(),
+            "PASS".equals(results.getArrayElement(i).getHashValue("status").asString()));
+      }
+    }
+  }
+
+  @Test
+  public void runsTranslatedGrammarXtalkFacts() {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(require 'polis.common.grammar-xtalk-test)");
+      var results =
+          context.eval(
+              HaraLanguage.ID,
+              "(code.test/run {:namespace \"polis.common.grammar-xtalk-test\"})");
+      assertEquals(49, results.getArraySize());
+      for (long i = 0; i < results.getArraySize(); i++) {
+        assertTrue(
+            results.getArrayElement(i).toString(),
+            "PASS".equals(results.getArrayElement(i).getHashValue("status").asString()));
+      }
+    }
+  }
 }

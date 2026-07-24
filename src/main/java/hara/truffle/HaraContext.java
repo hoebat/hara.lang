@@ -513,6 +513,25 @@ public final class HaraContext {
             currentNamespace.refer(name, variable);
           }
         }
+      } else if ("refer-macros".equals(option)) {
+        if (!(value instanceof ILinearType<?>)) {
+          throw new HaraException(":require :refer-macros expects a vector of symbols");
+        }
+        Map<String, HaraMacro> targetMacros = macros.get(target);
+        for (Object referred : (ILinearType<?>) value) {
+          if (!(referred instanceof Symbol) || ((Symbol) referred).getNamespace() != null) {
+            throw new HaraException(":require :refer-macros expects unqualified symbols");
+          }
+          String name = ((Symbol) referred).getName();
+          HaraMacro macro = targetMacros == null ? null : targetMacros.get(name);
+          if (macro == null) {
+            throw new HaraException("Cannot refer missing macro " + name + " from " + target);
+          }
+          macros
+              .computeIfAbsent(
+                  currentNamespace.name(), ignored -> new ConcurrentHashMap<>())
+              .put(name, macro);
+        }
       } else {
         throw new HaraException("Unsupported :require option: :" + option);
       }
