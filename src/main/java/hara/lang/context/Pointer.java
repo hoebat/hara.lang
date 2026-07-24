@@ -1,18 +1,23 @@
 package hara.lang.context;
 
+import hara.lang.data.Keyword;
 import hara.lang.protocol.Constant;
 import hara.lang.protocol.IApplicable;
 import hara.lang.protocol.IContext;
 import hara.lang.protocol.IDeref;
+import hara.lang.protocol.ILookup;
 import hara.lang.protocol.IMetadata;
 import hara.lang.protocol.IObjType;
 import hara.lang.protocol.IPointer;
+import java.util.AbstractMap.SimpleImmutableEntry;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.function.Function;
 
 /** A context-qualified value that can be invoked or transformed by its runtime. */
-public final class Pointer implements IPointer, IApplicable, IDeref<Object>, IObjType {
+public final class Pointer
+    implements IPointer, IApplicable, IDeref<Object>, ILookup<Object, Object>, IObjType {
   private final Object context;
   private final Map<?, ?> values;
   private final Function<Object, IContext> resolver;
@@ -52,7 +57,44 @@ public final class Pointer implements IPointer, IApplicable, IDeref<Object>, IOb
 
   @Override
   public Object ptrVal(Object key) {
-    return values.get(key);
+    return lookup(key);
+  }
+
+  @Override
+  public Object lookup(Object key) {
+    Object value = values.get(key);
+    if (value == null && key instanceof Keyword) {
+      value = values.get(((Keyword) key).getName());
+    }
+    return value;
+  }
+
+  @Override
+  public Object lookup(Object key, Object notFound) {
+    Object value = lookup(key);
+    return value == null && !containsKey(key) ? notFound : value;
+  }
+
+  @Override
+  public Map.Entry<Object, Object> find(Object key) {
+    return containsKey(key) ? new SimpleImmutableEntry<>(key, lookup(key)) : null;
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public Iterator<Object> keys() {
+    return (Iterator<Object>) (Iterator<?>) values.keySet().iterator();
+  }
+
+  @Override
+  @SuppressWarnings("unchecked")
+  public Iterator<Object> vals() {
+    return (Iterator<Object>) (Iterator<?>) values.values().iterator();
+  }
+
+  private boolean containsKey(Object key) {
+    return values.containsKey(key)
+        || (key instanceof Keyword && values.containsKey(((Keyword) key).getName()));
   }
 
   @Override
