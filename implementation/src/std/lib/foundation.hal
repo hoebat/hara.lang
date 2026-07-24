@@ -1,5 +1,7 @@
 ; The first language-level bootstrap substrate for Hara L0.
 ; Keep this layer free of host interop and Java-specific values.
+(ns std.lib.foundation)
+
 (defn identity [value] value)
 (defn inc [value] (+ value 1))
 (defn dec [value] (- value 1))
@@ -70,17 +72,29 @@
 (defn iterate [function seed] (seq (iter-iterate function seed)))
 (defn take-while [predicate value] (seq (iter-take-while predicate value)))
 (defn drop-while [predicate value] (seq (iter-drop-while predicate value)))
-(defn partition-all [amount value] (seq (iter-partition-all amount value)))
-(defn partition [amount value] (seq (iter-partition amount value)))
+(defn partition-all-transform [amount]
+  (fn [value]
+    (if (array? value)
+      (apply array (iter-partition-all amount value))
+      (vec (iter-partition-all amount value)))))
+(defn partition-all
+  ([amount] (partition-all-transform amount))
+  ([amount value] (seq (iter-partition-all amount value))))
+(defn partition-transform [amount]
+  (fn [value]
+    (if (array? value)
+      (apply array (iter-partition amount value))
+      (vec (iter-partition amount value)))))
+(defn partition
+  ([amount] (partition-transform amount))
+  ([amount value] (seq (iter-partition amount value))))
 (defn interpose [separator value] (seq (iter-interpose separator value)))
 (defn interleave [value & rest] (seq (apply iter-interleave value rest)))
 (defn map-transform [function]
   (fn [value & rest]
-    (if (seq? value)
-      (seq (apply iter-map function (concat [value] rest)))
-      (if (iter? value)
-        (seq (apply iter-map function (concat [value] rest)))
-        (apply array (apply iter-map function (concat [value] rest)))))))
+    (if (array? value)
+      (apply array (apply iter-map function (concat [value] rest)))
+      (vec (apply iter-map function (concat [value] rest))))))
 (defn map
   ([function] (map-transform function))
   ([function value & rest]

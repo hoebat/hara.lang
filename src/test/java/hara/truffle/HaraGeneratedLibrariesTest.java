@@ -58,8 +58,8 @@ public class HaraGeneratedLibrariesTest {
           context
               .eval(
                   HaraLanguage.ID,
-                  "(. (deref (promise/all "
-                      + "[(promise/run (fn [] 1)) (promise/run (fn [] 3))])) (get 1))")
+                  "(nth (deref (promise/all "
+                      + "[(promise/run (fn [] 1)) (promise/run (fn [] 3))])) 1)")
               .asLong());
       assertEquals(
           9,
@@ -138,7 +138,7 @@ public class HaraGeneratedLibrariesTest {
       assertTrue(context.eval(HaraLanguage.ID, "(str/ends-with? \"hara\" \"ra\")").asBoolean());
       assertEquals("a", context.eval(HaraLanguage.ID, "(str/char \"hara\" 1)").asString());
       assertEquals(
-          "b", context.eval(HaraLanguage.ID, "(. (str/split \"a,b\" \",\") (get 1))").asString());
+          "b", context.eval(HaraLanguage.ID, "(nth (str/split \"a,b\" \",\") 1)").asString());
       assertEquals(
           "a,b", context.eval(HaraLanguage.ID, "(str/join \",\" [\"a\" \"b\"])").asString());
       assertEquals(3, context.eval(HaraLanguage.ID, "(str/index-of \"ababa\" \"ba\" 2)").asLong());
@@ -196,26 +196,27 @@ public class HaraGeneratedLibrariesTest {
               .eval(
                   HaraLanguage.ID,
                   "(ns app (:intrinsics {:exclude [string]}) "
-                      + "(:require [hara.lib.string :as text :refer [trim]])) "
+                      + "(:require [std.lib.string :as text :refer [trim]])) "
                       + "(trim (text/trim \" x \"))")
               .asString());
     }
   }
 
   @Test
-  public void coreNamespaceIsSmallAndNormallyRequireable() {
+  public void foundationNamespaceCombinesJavaAndHalSymbols() {
     try (Context context = context()) {
       assertEquals(
           -1,
           context
               .eval(
-                  HaraLanguage.ID, "(ns app (:require [hara.lib.core :as core])) (core/bit-not 0)")
+                  HaraLanguage.ID, "(ns app (:require [std.lib.foundation :as core])) (core/bit-not 0)")
               .asLong());
-      PolyglotException missing =
-          assertThrows(
-              PolyglotException.class,
-              () -> context.eval(HaraLanguage.ID, "(hara.lib.core/count [1])"));
-      assertTrue(missing.getMessage().contains("Unbound symbol: hara.lib.core/count"));
+      assertEquals(
+          1,
+          context.eval(HaraLanguage.ID, "(std.lib.foundation/count [1])").asLong());
+      assertEquals(
+          42,
+          context.eval(HaraLanguage.ID, "((std.lib.foundation/comp2 inc inc) 40)").asLong());
     }
   }
 

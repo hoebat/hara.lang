@@ -70,8 +70,8 @@ impl ExtensionManifest {
             ));
         }
         let abi = match named_keyword(entries, "abi", origin)?.as_str() {
-            "core-v1" => WasmAbi::CoreV1,
-            "hta-v1" => WasmAbi::HtaV1,
+            "core.v1" => WasmAbi::CoreV1,
+            "hta.v1" => WasmAbi::HtaV1,
             value => return Err(malformed(origin, format!("unsupported WASM ABI :{value}"))),
         };
         let exports = parse_exports(required(entries, "exports", origin)?, origin)?;
@@ -449,7 +449,7 @@ mod tests {
        :version "0.1.0"
        :provider :wasm
        :module "hash.wasm"
-       :abi :hta-v1
+       :abi :hta.v1
        :exports {"digest" {:args [:bytes] :returns :bytes :async true}}
        :host-calls {"crypto.random" ["fill"]}
        :handles {"digest" {:tag crypto}}
@@ -472,7 +472,7 @@ mod tests {
             MANIFEST.replace(":capabilities [:random]", ":capabilities [] :extra true"),
             MANIFEST.replace(":version \"0.1.0\"", ":version \"0.1.0\" :version \"2\""),
             MANIFEST.replace("hash.wasm", "../hash.wasm"),
-            MANIFEST.replace(":hta-v1", ":unknown-v1"),
+            MANIFEST.replace(":hta.v1", ":unknown-v1"),
         ] {
             assert!(ExtensionManifest::parse(&source, "fixture")
                 .unwrap_err()

@@ -260,7 +260,7 @@ use_namespace("user") -> user bindings
 
 ## Core collection helpers
 
-The Rust evaluator includes the host-neutral bootstrap operations used by `hara/l0-core`: `not`, numeric comparisons, `mod`, `first`, `rest`, `last`, and `empty?`. They operate over persistent collections, byte buffers, marker arrays, and iterators without invoking host APIs.
+The Rust evaluator includes the host-neutral bootstrap operations used by `std/lib/foundation`: `not`, numeric comparisons, `mod`, `first`, `rest`, `last`, and `empty?`. They operate over persistent collections, byte buffers, marker arrays, and iterators without invoking host APIs.
 
 ## Iterator aliases and combinators
 

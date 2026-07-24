@@ -1,0 +1,47 @@
+package hara.truffle;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
+
+import hara.lang.data.types.IMapType;
+import hara.lang.data.types.ISequentialType;
+import hara.lang.data.types.ISetType;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.Map;
+import org.junit.Test;
+
+public class HaraPersistentValuesTest {
+  @Test
+  public void recursivelyCopiesMutableHostCollectionsIntoPersistentHaraValues() {
+    ArrayList<Object> nested = new ArrayList<>();
+    nested.add("first");
+    LinkedHashSet<Object> tags = new LinkedHashSet<>();
+    tags.add("stable");
+    Map<String, Object> source = new LinkedHashMap<>();
+    source.put("items", nested);
+    source.put("tags", tags);
+    source.put("array", new Object[] {1L, 2L});
+
+    Object normalized = HaraPersistentValues.normalize(source);
+    assertTrue(normalized instanceof IMapType<?, ?>);
+    @SuppressWarnings("unchecked")
+    IMapType<Object, Object> result = (IMapType<Object, Object>) normalized;
+    assertTrue(result.lookup("items") instanceof ISequentialType<?>);
+    assertTrue(result.lookup("tags") instanceof ISetType<?>);
+    assertTrue(result.lookup("array") instanceof ISequentialType<?>);
+
+    nested.add("mutable-after-copy");
+    tags.add("changed");
+    assertEquals(1L, ((ISequentialType<?>) result.lookup("items")).count());
+    assertEquals(1L, ((ISetType<?>) result.lookup("tags")).count());
+  }
+
+  @Test
+  public void preservesBinaryArraysAsTheHaraBytesRepresentation() {
+    byte[] bytes = new byte[] {1, 2, 3};
+    assertSame(bytes, HaraPersistentValues.normalize(bytes));
+  }
+}

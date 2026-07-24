@@ -66,7 +66,7 @@ public class HaraLanguageTest {
       assertEquals(
           42,
           context
-              .eval(HaraLanguage.ID, "(load-resource \"hara/l0-core.hal\") ((comp2 inc inc) 40)")
+              .eval(HaraLanguage.ID, "(load-resource \"std/lib/foundation.hal\") ((comp2 inc inc) 40)")
               .asLong());
       assertEquals(42, context.eval(HaraLanguage.ID, "((comp3 inc inc inc) 39)").asLong());
       assertTrue(context.eval(HaraLanguage.ID, "((complement (fn [x] (= x 1))) 2)").asBoolean());
@@ -167,7 +167,7 @@ public class HaraLanguageTest {
   @Test
   public void supportsLazySeqBoundariesAndSourceAwareTransforms() {
     try (Context context = context()) {
-      context.eval(HaraLanguage.ID, "(load-resource \"hara/l0-core.hal\")");
+      context.eval(HaraLanguage.ID, "(load-resource \"std/lib/foundation.hal\")");
       assertTrue(context.eval(HaraLanguage.ID, "(seq? (map inc [1 2 3]))").asBoolean());
       assertEquals(2, context.eval(HaraLanguage.ID, "(first (map inc [1 2 3]))").asLong());
       assertEquals(2, context.eval(HaraLanguage.ID, "(first ((map inc) [1 2 3]))").asLong());
@@ -191,16 +191,16 @@ public class HaraLanguageTest {
       assertEquals(
           42,
           context
-              .eval(HaraLanguage.ID, "(require \"hara/l0-core.hal\") ((comp2 inc inc) 40)")
+              .eval(HaraLanguage.ID, "(require \"std/lib/foundation.hal\") ((comp2 inc inc) 40)")
               .asLong());
       assertEquals(42, context.eval(HaraLanguage.ID, "((comp3 inc inc inc) 39)").asLong());
       assertEquals(
-          1, context.eval(HaraLanguage.ID, "(module-revision \"hara/l0-core.hal\")").asLong());
-      context.eval(HaraLanguage.ID, "(require \"hara/l0-core.hal\" {:reload true})");
+          1, context.eval(HaraLanguage.ID, "(module-revision \"std/lib/foundation.hal\")").asLong());
+      context.eval(HaraLanguage.ID, "(require \"std/lib/foundation.hal\" {:reload true})");
       assertEquals(
           2,
           context
-              .eval(HaraLanguage.ID, "(module-revision \"classpath:hara/l0-core.hal\")")
+              .eval(HaraLanguage.ID, "(module-revision \"classpath:std/lib/foundation.hal\")")
               .asLong());
     }
   }
@@ -566,11 +566,8 @@ public class HaraLanguageTest {
     try (Context context = context()) {
       assertEquals(5, context.eval(HaraLanguage.ID, "(let [x 2 y 3] (+ x y))").asLong());
       assertEquals(2, context.eval(HaraLanguage.ID, "(let [x 1] (let [x 2] x))").asLong());
-
-      PolyglotException error =
-          assertThrows(
-              PolyglotException.class, () -> context.eval(HaraLanguage.ID, "(let [x 1 y x] y)"));
-      assertTrue(error.getMessage().contains("Unbound symbol: x"));
+      assertEquals(1, context.eval(HaraLanguage.ID, "(let [x 1 y x] y)").asLong());
+      assertEquals(2, context.eval(HaraLanguage.ID, "(let [x 1 x (+ x 1)] x)").asLong());
     }
   }
 

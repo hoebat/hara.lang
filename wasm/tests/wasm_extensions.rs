@@ -9,7 +9,7 @@ const CORE_MANIFEST: &str = r#"
  :version "1.0.0"
  :provider :wasm
  :module "math.wasm"
- :abi :core-v1
+ :abi :core.v1
  :exports {"add" {:args [:integer :integer] :returns :integer :async false}}
  :capabilities []}"#;
 
@@ -18,7 +18,7 @@ const ASYNC_MANIFEST: &str = r#"
  :version "1.0.0"
  :provider :wasm
  :module "async.wasm"
- :abi :hta-v1
+ :abi :hta.v1
  :exports {"later" {:args [:integer] :returns :integer :async true}}
  :capabilities [:clock]}"#;
 

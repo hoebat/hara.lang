@@ -34,11 +34,17 @@ final class HaraStaticLibrary {
       switch (export.kind()) {
         case FUNCTION:
           context.defineLibraryFunction(
-              namespace, export.name(), values -> invoke(method, context, values), metadata);
+              namespace,
+              export.name(),
+              values -> HaraPersistentValues.normalize(invoke(method, context, values)),
+              metadata);
           break;
         case VALUE:
           context.defineLibraryValue(
-              namespace, export.name(), invoke(method, context), metadata);
+              namespace,
+              export.name(),
+              HaraPersistentValues.normalize(invoke(method, context)),
+              metadata);
           break;
         case MACRO:
           context.defineLibraryMacro(

@@ -621,7 +621,12 @@ public final class StdLibTask {
     java.util.List<Map<String, Object>> maps = new ArrayList<>();
     for (Object item : asObjects(value)) {
       Map<String, Object> converted = new LinkedHashMap<>();
-      if (item instanceof Map<?, ?> map) {
+      if (item instanceof IMapType<?, ?> haraMap) {
+        for (Object entryObject : haraMap) {
+          Map.Entry<?, ?> entry = (Map.Entry<?, ?>) entryObject;
+          converted.put(keyName(entry.getKey()), entry.getValue());
+        }
+      } else if (item instanceof Map<?, ?> map) {
         map.forEach((key, nested) -> converted.put(keyName(key), nested));
       } else if (item instanceof ILinearType<?> pair && pair.count() == 2) {
         Object result = pair.nth(1);

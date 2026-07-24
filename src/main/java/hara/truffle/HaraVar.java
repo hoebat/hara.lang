@@ -20,27 +20,48 @@ import java.util.Deque;
 @ExportLibrary(InteropLibrary.class)
 public final class HaraVar
     implements TruffleObject, IDeref<Object>, IReset<Object>, IVarType, IObjType {
+  enum Origin {
+    SOURCE,
+    HAL_FALLBACK,
+    JAVA_LIBRARY,
+    RUNTIME_PRIMITIVE
+  }
+
   private final String namespace;
   private final String name;
-  private final IMetadata metadata;
+  private volatile IMetadata metadata;
   private volatile Object value;
+  private volatile Origin origin;
   private final ThreadLocal<Deque<Object>> dynamicBindings =
       ThreadLocal.withInitial(ArrayDeque::new);
   private static final Object NIL_BINDING = new Object();
 
   HaraVar(String namespace, String name, Object value) {
-    this(namespace, name, value, Map.Standard.EMPTY);
+    this(namespace, name, value, Map.Standard.EMPTY, Origin.SOURCE);
   }
 
   HaraVar(String namespace, String name, Object value, IMetadata metadata) {
+    this(namespace, name, value, metadata, Origin.SOURCE);
+  }
+
+  HaraVar(String namespace, String name, Object value, IMetadata metadata, Origin origin) {
     this.namespace = namespace;
     this.name = name;
     this.metadata = metadata == null ? Map.Standard.EMPTY : metadata;
     this.value = value;
+    this.origin = origin == null ? Origin.SOURCE : origin;
   }
 
   public Object get() {
     return value;
+  }
+
+  String namespaceName() {
+    return namespace;
+  }
+
+  String symbolName() {
+    return name;
   }
 
   @TruffleBoundary
@@ -78,7 +99,7 @@ public final class HaraVar
 
   @Override
   public HaraVar withMeta(IMetadata metadata) {
-    return new HaraVar(namespace, name, value, metadata);
+    return new HaraVar(namespace, name, value, metadata, origin);
   }
 
   @Override
@@ -114,6 +135,18 @@ public final class HaraVar
 
   void set(Object value) {
     this.value = value;
+  }
+
+  void setMetadata(IMetadata metadata) {
+    this.metadata = metadata == null ? Map.Standard.EMPTY : metadata;
+  }
+
+  Origin origin() {
+    return origin;
+  }
+
+  void setOrigin(Origin origin) {
+    this.origin = origin == null ? Origin.SOURCE : origin;
   }
 
   @ExportMessage

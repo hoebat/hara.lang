@@ -37,6 +37,7 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
@@ -55,14 +56,14 @@ import java.util.function.Supplier;
 
 public final class HaraContext {
   private static final String INTRINSIC_NAMESPACE = "hara.lang.intrinsic";
-  private static final String CORE_NAMESPACE = "hara.lib.core";
+  private static final String FOUNDATION_NAMESPACE = "std.lib.foundation";
   private static final Map<String, String> GENERATED_LIBRARIES =
       Map.of(
-          "string", "hara.lib.string",
-          "promise", "hara.lib.promise",
-          "bytes", "hara.lib.bytes",
-          "socket", "hara.lib.socket",
-          "file", "hara.lib.file",
+          "string", "std.lib.string",
+          "promise", "std.lib.promise",
+          "bytes", "std.lib.bytes",
+          "socket", "std.lib.socket",
+          "file", "std.lib.file",
           "block", "std.lib.block",
           "zip", "std.lib.zip");
   private static final Map<String, String> DEFAULT_LIBRARY_ALIASES =
@@ -107,7 +108,12 @@ public final class HaraContext {
   private final HaraExtensionRegistry extensionRegistry =
       new HaraExtensionRegistry(HaraContext.class.getClassLoader());
   private final HaraLibraryLoader libraryLoader = new HaraLibraryLoader();
-  private final Map<String, HaraWasmExtension> loadedExtensions = new ConcurrentHashMap<>();
+  private HaraVar.Origin definitionOrigin = HaraVar.Origin.SOURCE;
+  private boolean eagerFallbacksLoading;
+  private boolean eagerFallbacksLoaded;
+  private volatile HaraProject project;
+  private volatile boolean projectDiscovered;
+  private final Map<String, HaraExtensionRuntime> loadedExtensions = new ConcurrentHashMap<>();
   private final Map<String, ModuleRecord> modules = new ConcurrentHashMap<>();
   private final Map<String, Set<String>> moduleDependencies = new ConcurrentHashMap<>();
   private final Map<String, Object> libraryStates = new ConcurrentHashMap<>();
@@ -123,12 +129,19 @@ public final class HaraContext {
     Map<String, Integer> ifnMethods = new LinkedHashMap<>();
     ifnMethods.put("invoke", -1);
     ifnProtocol = new HaraProtocol("IFn", ifnMethods);
-    currentNamespace.define("IFn", ifnProtocol);
-    HaraJavaAdapters.install(this);
-    installNumericBuiltins(currentNamespace);
-    installCoreBuiltins(namespace(CORE_NAMESPACE));
-    installGeneratedLibraries();
+    currentNamespace.define(
+        "IFn", ifnProtocol, null, HaraVar.Origin.RUNTIME_PRIMITIVE);
+    withDefinitionOrigin(
+        HaraVar.Origin.RUNTIME_PRIMITIVE,
+        () -> {
+          HaraJavaAdapters.install(this);
+          installNumericBuiltins(currentNamespace);
+          installCoreBuiltins(namespace(FOUNDATION_NAMESPACE));
+        });
+    installProjectMacro();
+    installRecordMacro();
     installNativeLibraries();
+    libraryLoader.installEagerJava(this);
     currentNamespace = namespace("user");
     initializeUserNamespace(currentNamespace);
   }
@@ -138,7 +151,7 @@ public final class HaraContext {
   }
 
   void closeExtensions() {
-    for (HaraWasmExtension extension : loadedExtensions.values()) {
+    for (HaraExtensionRuntime extension : loadedExtensions.values()) {
       extension.close();
     }
     loadedExtensions.clear();
@@ -146,6 +159,27 @@ public final class HaraContext {
 
   private HaraNamespace namespace(String name) {
     return namespaces.computeIfAbsent(name, HaraNamespace::new);
+  }
+
+  private void withDefinitionOrigin(HaraVar.Origin origin, Runnable action) {
+    HaraVar.Origin previous = definitionOrigin;
+    definitionOrigin = origin;
+    try {
+      action.run();
+    } finally {
+      definitionOrigin = previous;
+    }
+  }
+
+  synchronized void ensureEagerFallbacks() {
+    if (eagerFallbacksLoaded || eagerFallbacksLoading) return;
+    eagerFallbacksLoading = true;
+    try {
+      libraryLoader.installEagerFallbacks(this);
+      eagerFallbacksLoaded = true;
+    } finally {
+      eagerFallbacksLoading = false;
+    }
   }
 
   void defineLibraryFunction(
@@ -157,12 +191,14 @@ public final class HaraContext {
         .define(
             symbolName,
             new VariadicBuiltin(namespaceName + "/" + symbolName, implementation),
-            metadata);
+            metadata,
+            HaraVar.Origin.JAVA_LIBRARY);
   }
 
   void defineLibraryValue(
       String namespaceName, String symbolName, Object value, IMetadata metadata) {
-    namespace(namespaceName).define(symbolName, value, metadata);
+    namespace(namespaceName)
+        .define(symbolName, value, metadata, HaraVar.Origin.JAVA_LIBRARY);
   }
 
   void defineLibraryMacro(
@@ -172,7 +208,8 @@ public final class HaraContext {
       IMetadata metadata,
       boolean intrinsic) {
     HaraMacro macro = HaraMacro.nativeMacro(Symbol.create(symbolName), expander);
-    namespace(namespaceName).define(symbolName, macro, metadata);
+    namespace(namespaceName)
+        .define(symbolName, macro, metadata, HaraVar.Origin.JAVA_LIBRARY);
     macros
         .computeIfAbsent(namespaceName, ignored -> new ConcurrentHashMap<>())
         .put(symbolName, macro);
@@ -289,7 +326,7 @@ public final class HaraContext {
     for (Map.Entry<String, HaraVar> entry : intrinsic.vars.entrySet()) {
       if (target.lookup(entry.getKey()) == null) target.refer(entry.getKey(), entry.getValue());
     }
-    HaraNamespace core = namespace(CORE_NAMESPACE);
+    HaraNamespace core = namespace(FOUNDATION_NAMESPACE);
     for (Map.Entry<String, HaraVar> entry : core.vars.entrySet()) {
       if (target.lookup(entry.getKey()) == null) target.refer(entry.getKey(), entry.getValue());
     }
@@ -486,14 +523,124 @@ public final class HaraContext {
     libraryLoader.ensure(this, target);
     HaraNamespace existing = namespaces.get(target);
     if (existing != null) return existing;
-    HaraExtensionPackage extensionPackage = extensionRegistry.discover(target);
+    HaraNamespace sourceNamespace = requireSourceNamespace(target);
+    if (sourceNamespace != null) return sourceNamespace;
+    Path extensionRoot = null;
+    if (environment.isFileIOAllowed()) {
+      HaraProject currentProject = project();
+      extensionRoot = currentProject == null ? null : currentProject.extensionRoot();
+    }
+    HaraExtensionPackage extensionPackage = extensionRegistry.discover(target, extensionRoot);
     if (extensionPackage == null) return null;
     return installExtension(extensionPackage);
   }
 
+  void loadLibraryFallback(String namespaceName, String resourceName, boolean reload) {
+    String previousNamespace = currentNamespace.name();
+    HaraVar.Origin previousOrigin = definitionOrigin;
+    ContextSnapshot snapshot = snapshot();
+    currentNamespace = namespace(namespaceName);
+    definitionOrigin = HaraVar.Origin.HAL_FALLBACK;
+    try {
+      requireModule(
+          reload
+              ? new Object[] {
+                "classpath:" + resourceName,
+                hara.lang.data.Map.Standard.from(
+                    null, Keyword.create("reload"), Boolean.TRUE)
+              }
+              : new Object[] {"classpath:" + resourceName});
+      ModuleRecord loaded = modules.get("classpath:" + resourceName);
+      if (loaded != null && !namespaceName.equals(loaded.namespace)) {
+        throw new HaraException(
+            "Library fallback "
+                + resourceName
+                + " loaded namespace "
+                + loaded.namespace
+                + " instead of "
+                + namespaceName);
+      }
+    } catch (RuntimeException error) {
+      restore(snapshot);
+      throw error;
+    } finally {
+      definitionOrigin = previousOrigin;
+      currentNamespace = namespace(previousNamespace);
+      initializeUserNamespace(currentNamespace);
+    }
+  }
+
+  private HaraNamespace requireSourceNamespace(String target) {
+    return requireSourceNamespace(target, false);
+  }
+
+  private HaraNamespace requireSourceNamespace(String target, boolean reload) {
+    String resourceName = namespaceResource(target);
+    if (environment.isFileIOAllowed()) {
+      HaraProject currentProject = project();
+      Path source =
+          currentProject == null
+              ? null
+              : currentProject.resolve(target, target.endsWith("-test"));
+      if (source != null) {
+        requireResolvedSource(source.toString(), reload);
+        return loadedSourceNamespace(target, source.toString());
+      }
+    }
+    if (getResource(resourceName) != null) {
+      requireResolvedSource("classpath:" + resourceName, reload);
+      return loadedSourceNamespace(target, "classpath:" + resourceName);
+    }
+    return null;
+  }
+
+  private void requireResolvedSource(String source, boolean reload) {
+    if (!reload) {
+      requireModule(new Object[] {source});
+      return;
+    }
+    requireModule(
+        new Object[] {
+          source,
+          hara.lang.data.Map.Standard.from(
+              null, Keyword.create("reload"), Boolean.TRUE)
+        });
+  }
+
+  private HaraNamespace loadedSourceNamespace(String target, String source) {
+    HaraNamespace loaded = namespaces.get(target);
+    if (loaded == null) {
+      throw new HaraException(
+          "Namespace source " + source + " did not declare requested namespace " + target);
+    }
+    return loaded;
+  }
+
+  private HaraProject project() {
+    if (!projectDiscovered) {
+      synchronized (this) {
+        if (!projectDiscovered) {
+          String workingDirectory =
+              environment.getPublicTruffleFile(".").getAbsoluteFile().normalize().getPath();
+          project = HaraProject.discover(Path.of(workingDirectory));
+          projectDiscovered = true;
+        }
+      }
+    }
+    return project;
+  }
+
+  private static String namespaceResource(String namespace) {
+    return namespace.replace('.', '/').replace('-', '_') + ".hal";
+  }
+
   private HaraNamespace installExtension(HaraExtensionPackage extensionPackage) {
     HaraExtensionManifest manifest = extensionPackage.manifest();
-    HaraWasmExtension extension = new HaraWasmExtension(extensionPackage);
+    HaraExtensionRuntime extension =
+        "wasm".equals(manifest.provider())
+            ? new HaraWasmExtension(extensionPackage)
+            : new HaraProcessExtension(
+                extensionPackage, environment.isCreateProcessAllowed());
     HaraNamespace generated = namespace(manifest.namespace());
     for (Map.Entry<String, HaraExtensionManifest.Export> export : manifest.exports().entrySet()) {
       String name = export.getKey();
@@ -508,11 +655,11 @@ public final class HaraContext {
   }
 
   private Object invokeExtension(
-      HaraWasmExtension extension,
+      HaraExtensionRuntime extension,
       String name,
       HaraExtensionManifest.Export export,
       Object[] values) {
-    if (extension.isHta()) return new HaraPromise(extension.invokeAsync(name, values));
+    if (extension.asynchronous()) return new HaraPromise(extension.invokeAsync(name, values));
     if (!export.async()) return extension.invoke(name, values);
     return new HaraPromise(CompletableFuture.supplyAsync(() -> extension.invoke(name, values)));
   }
@@ -525,10 +672,29 @@ public final class HaraContext {
           aliases
               .getOrDefault(currentNamespace.name(), Map.of())
               .getOrDefault(namespaceName, namespaceName);
+      if (!namespaces.containsKey(namespaceName) && libraryLoader.provides(namespaceName)) {
+        libraryLoader.ensure(this, namespaceName);
+      }
     }
     HaraNamespace namespace =
         namespaceName == null ? currentNamespace : namespaces.get(namespaceName);
     return namespace == null ? null : namespace.lookup(symbol.getName());
+  }
+
+  Symbol canonicalSymbol(Symbol symbol) {
+    HaraVar variable = resolve(symbol);
+    if (variable != null) {
+      return Symbol.create(variable.namespaceName(), variable.symbolName());
+    }
+    return symbol;
+  }
+
+  void declareCurrent(Symbol symbol) {
+    HaraVar existing = currentNamespace.lookup(symbol.getName());
+    if (existing == null || !currentNamespace.name().equals(existing.namespaceName())) {
+      currentNamespace.define(
+          symbol.getName(), null, symbol.meta(), definitionOrigin);
+    }
   }
 
   /** Names visible in the current namespace, used by interactive tooling. */
@@ -556,6 +722,9 @@ public final class HaraContext {
         });
     for (Map.Entry<String, String> alias :
         aliases.getOrDefault(currentNamespace.name(), Map.of()).entrySet()) {
+      if (!namespaces.containsKey(alias.getValue()) && libraryLoader.provides(alias.getValue())) {
+        libraryLoader.ensure(this, alias.getValue());
+      }
       HaraNamespace target = namespaces.get(alias.getValue());
       if (target == null) continue;
       for (String name : target.symbolNames()) names.add(alias.getKey() + "/" + name);
@@ -616,7 +785,7 @@ public final class HaraContext {
       }
       if (!entries.isEmpty()) metadata = hara.lang.data.Map.Standard.from(null, entries.toArray());
     }
-    return currentNamespace.define(symbol.getName(), value, metadata);
+    return currentNamespace.define(symbol.getName(), value, metadata, definitionOrigin);
   }
 
   public HaraProtocol ifnProtocol() {
@@ -625,7 +794,7 @@ public final class HaraContext {
 
   HaraProtocol defineProtocol(String name, Map<String, Integer> methodArities) {
     HaraProtocol protocol = new HaraProtocol(name, methodArities);
-    currentNamespace.define(name, protocol);
+    currentNamespace.define(name, protocol, null, definitionOrigin);
     return protocol;
   }
 
@@ -742,6 +911,13 @@ public final class HaraContext {
     if (symbol.getNamespace() != null) {
       throw new HaraException("defmacro name must not be qualified");
     }
+    HaraVar existing = currentNamespace.lookup(symbol.getName());
+    if (definitionOrigin == HaraVar.Origin.HAL_FALLBACK
+        && existing != null
+        && (existing.origin() == HaraVar.Origin.JAVA_LIBRARY
+            || existing.origin() == HaraVar.Origin.RUNTIME_PRIMITIVE)) {
+      return;
+    }
     macros
         .computeIfAbsent(currentNamespace.name(), ignored -> new ConcurrentHashMap<>())
         .put(symbol.getName(), macro);
@@ -755,6 +931,82 @@ public final class HaraContext {
     } finally {
       currentNamespace = previous;
     }
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private void installProjectMacro() {
+    defineIntrinsicMacro(
+        Symbol.create("defproject"),
+        HaraMacro.nativeMacro(
+            Symbol.create("defproject"),
+            invocation -> {
+              if (invocation.count() != 3
+                  || !(invocation.nth(1) instanceof Symbol name)
+                  || name.getNamespace() != null
+                  || !(invocation.nth(2) instanceof IMapType<?, ?> options)) {
+                throw new HaraException(
+                    "defproject expects an unqualified project name and options map");
+              }
+              IMapType descriptor =
+                  (IMapType)
+                      ((IMapType) options)
+                          .assoc(
+                              Keyword.create("name"),
+                              List.Standard.from(null, Symbol.create("quote"), name));
+              return List.Standard.from(
+                  null, Symbol.create("def"), Symbol.create("project"), descriptor);
+            }));
+  }
+
+  private void installRecordMacro() {
+    defineIntrinsicMacro(
+        Symbol.create("defrecord"),
+        HaraMacro.nativeMacro(
+            Symbol.create("defrecord"),
+            invocation -> {
+              if (invocation.count() != 3
+                  || !(invocation.nth(1) instanceof Symbol name)
+                  || name.getNamespace() != null
+                  || !(invocation.nth(2) instanceof ILinearType<?> fields)) {
+                throw new HaraException(
+                    "defrecord expects an unqualified name and field vector");
+              }
+              ArrayList<Object> positional = new ArrayList<>();
+              positional.add(Symbol.create(name.getName()));
+              ArrayList<Object> mapArguments = new ArrayList<>();
+              for (Object value : fields) {
+                if (!(value instanceof Symbol field) || field.getNamespace() != null) {
+                  throw new HaraException(
+                      "defrecord field names must be unqualified symbols");
+                }
+                mapArguments.add(
+                    List.Standard.from(
+                        null,
+                        Symbol.create("get"),
+                        Symbol.create("record-map"),
+                        Keyword.create(field.getName())));
+              }
+              positional.addAll(mapArguments);
+              Object mapConstructor =
+                  List.Standard.from(
+                      null,
+                      Symbol.create("defn"),
+                      Symbol.create("map->" + name.getName()),
+                      hara.lang.data.Vector.Standard.from(
+                          null, Symbol.create("record-map")),
+                      List.Standard.from(null, positional.toArray()));
+              return List.Standard.from(
+                  null,
+                  Symbol.create("do"),
+                  List.Standard.from(
+                      null, Symbol.create("defstruct"), name, fields),
+                  List.Standard.from(
+                      null,
+                      Symbol.create("def"),
+                      Symbol.create("->" + name.getName()),
+                      name),
+                  mapConstructor);
+            }));
   }
 
   private void installNumericBuiltins(HaraNamespace target) {
@@ -774,9 +1026,133 @@ public final class HaraContext {
     target.define("double", new UnaryBuiltin("double", HaraNumericConversions::toDouble));
     target.define(
         "not", new UnaryBuiltin("not", value -> value == null || Boolean.FALSE.equals(value)));
+    target.define(
+        "nil?",
+        new UnaryBuiltin(
+            "nil?",
+            value -> {
+              Object unwrapped = HaraBox.unwrap(value);
+              return unwrapped == null || unwrapped == HaraNull.SINGLETON;
+            }));
+    target.define(
+        "empty?",
+        new UnaryBuiltin(
+            "empty?", value -> !Boolean.TRUE.equals(iterHasNext(iterValue(value)))));
+    target.define("vec", new UnaryBuiltin("vec", this::toVector));
+    target.define(
+        "array?",
+        new UnaryBuiltin("array?", value -> HaraBox.unwrap(value) instanceof HaraArray));
+    target.define("reverse", new UnaryBuiltin("reverse", this::reverseValue));
+    target.define(
+        "map?",
+        new UnaryBuiltin("map?", value -> HaraBox.unwrap(value) instanceof IMapType<?, ?>));
+    target.define(
+        "set?",
+        new UnaryBuiltin(
+            "set?",
+            value -> HaraBox.unwrap(value) instanceof hara.lang.data.types.ISetType<?>));
+    target.define(
+        "vector?",
+        new UnaryBuiltin(
+            "vector?",
+            value ->
+                HaraBox.unwrap(value) instanceof hara.lang.data.Vector<?>
+                    || HaraBox.unwrap(value) instanceof hara.lang.data.Tuple.Tup0
+                    || HaraBox.unwrap(value) instanceof hara.lang.data.Tuple.Tup1<?>));
+    target.define(
+        "symbol?",
+        new UnaryBuiltin("symbol?", value -> HaraBox.unwrap(value) instanceof Symbol));
+    target.define(
+        "keyword?",
+        new UnaryBuiltin("keyword?", value -> HaraBox.unwrap(value) instanceof Keyword));
+    target.define(
+        "string?",
+        new UnaryBuiltin("string?", value -> HaraBox.unwrap(value) instanceof String));
+    target.define(
+        "number?",
+        new UnaryBuiltin("number?", value -> HaraBox.unwrap(value) instanceof Number));
+    target.define(
+        "symbol",
+        new VariadicBuiltin(
+            "symbol",
+            values -> {
+              if (values.length == 1) {
+                Object value = HaraBox.unwrap(values[0]);
+                if (value instanceof Symbol) return value;
+                if (value instanceof Keyword keyword) {
+                  return Symbol.create(keyword.display().substring(1));
+                }
+                if (value instanceof String text) return Symbol.create(text);
+              } else if (values.length == 2) {
+                return Symbol.create(
+                    String.valueOf(HaraBox.unwrap(values[0])),
+                    String.valueOf(HaraBox.unwrap(values[1])));
+              }
+              throw new HaraException("symbol expects a name or namespace and name");
+            }));
+    target.define(
+        "keyword",
+        new UnaryBuiltin(
+            "keyword",
+            value -> {
+              Object unwrapped = HaraBox.unwrap(value);
+              if (unwrapped instanceof Keyword) return unwrapped;
+              if (unwrapped instanceof Symbol symbol) return Keyword.create(symbol.display());
+              if (unwrapped instanceof String text) return Keyword.create(text);
+              throw new HaraException("keyword expects a name");
+            }));
+    target.define(
+        "ex-info",
+        new VariadicBuiltin(
+            "ex-info",
+            values -> {
+              if (values.length < 2
+                  || values.length > 3
+                  || !(HaraBox.unwrap(values[0]) instanceof String)
+                  || !(HaraBox.unwrap(values[1]) instanceof IMetadata)) {
+                throw new HaraException("ex-info expects a message, metadata map, and optional cause");
+              }
+              Throwable cause =
+                  values.length == 3 && HaraBox.unwrap(values[2]) instanceof Throwable
+                      ? (Throwable) HaraBox.unwrap(values[2])
+                      : null;
+              return new hara.lang.base.Ex.Info(
+                  (String) HaraBox.unwrap(values[0]),
+                  (IMetadata) HaraBox.unwrap(values[1]),
+                  cause);
+            }));
+    target.define(
+        "ex-data",
+        new UnaryBuiltin(
+            "ex-data",
+            value -> {
+              Object unwrapped = HaraBox.unwrap(value);
+              return unwrapped instanceof hara.lang.protocol.IExInfo
+                  ? ((hara.lang.protocol.IExInfo) unwrapped).getData()
+                  : null;
+            }));
+    target.define(
+        "ex-message",
+        new UnaryBuiltin(
+            "ex-message",
+            value -> {
+              Object unwrapped = HaraBox.unwrap(value);
+              return unwrapped instanceof Throwable
+                  ? ((Throwable) unwrapped).getMessage()
+                  : String.valueOf(unwrapped);
+            }));
+    target.define(
+        "ex-class",
+        new UnaryBuiltin(
+            "ex-class",
+            value -> {
+              Object unwrapped = HaraBox.unwrap(value);
+              return unwrapped == null ? null : unwrapped.getClass().getName();
+            }));
     target.define("load-string", new UnaryBuiltin("load-string", this::loadString));
     target.define("load-file", new UnaryBuiltin("load-file", this::loadFile));
     target.define("load-resource", new UnaryBuiltin("load-resource", this::loadResource));
+    target.define("read-forms", new VariadicBuiltin("read-forms", this::readForms));
     target.define("require", new VariadicBuiltin("require", this::requireModule));
     target.define("refer", new UnaryBuiltin("refer", this::referNamespace));
     target.define(
@@ -792,7 +1168,22 @@ public final class HaraContext {
               }
               return null;
             }));
+    target.define(
+        "name",
+        new UnaryBuiltin(
+            "name", value -> protocolCall("INamespaced", "name", new Object[] {value})));
+    target.define(
+        "namespace",
+        new UnaryBuiltin(
+            "namespace",
+            value -> protocolCall("INamespaced", "namespace", new Object[] {value})));
     target.define("in-ns", new UnaryBuiltin("in-ns", this::inNamespace));
+    target.define("the-ns", new UnaryBuiltin("the-ns", this::theNamespace));
+    target.define("ns-name", new UnaryBuiltin("ns-name", this::namespaceName));
+    target.define("ns-publics", new UnaryBuiltin("ns-publics", this::namespacePublics));
+    target.define("ns-aliases", new UnaryBuiltin("ns-aliases", this::namespaceAliases));
+    target.define(
+        "requiring-resolve", new UnaryBuiltin("requiring-resolve", this::requiringResolve));
     target.define(
         "current-namespace",
         new VariadicBuiltin(
@@ -828,7 +1219,6 @@ public final class HaraContext {
     target.define("iter-interleave", new VariadicBuiltin("iter-interleave", this::iterInterleave));
     target.define("iter-every?", new VariadicBuiltin("iter-every?", this::iterEvery));
     target.define("iter-any?", new VariadicBuiltin("iter-any?", this::iterAny));
-    target.define("reduce", new VariadicBuiltin("reduce", this::reduceIterator));
     target.define("iter-take", new VariadicBuiltin("iter-take", this::iterTake));
     target.define("iter-drop", new VariadicBuiltin("iter-drop", this::iterDrop));
     target.define("iter-zip", new VariadicBuiltin("iter-zip", this::iterZip));
@@ -856,7 +1246,7 @@ public final class HaraContext {
     target.define(
         "get", new VariadicBuiltin("get", values -> protocolCall("ILookup", "lookup", values)));
     target.define(
-        "assoc", new VariadicBuiltin("assoc", values -> protocolCall("IAssoc", "assoc", values)));
+        "assoc", new VariadicBuiltin("assoc", this::associateValues));
     target.define("conj", new VariadicBuiltin("conj", this::conjoin));
     target.define(
         "cons",
@@ -918,6 +1308,150 @@ public final class HaraContext {
     }
     for (int i = firstValue; i < values.length; i++) {
       result = protocolCall("IConj", "conj", new Object[] {result, values[i]});
+    }
+    return result;
+  }
+
+  private Object associateValues(Object[] values) {
+    if (values.length < 3 || values.length % 2 == 0) {
+      throw new HaraException("assoc expects a collection and key/value pairs");
+    }
+    Object result = values[0];
+    for (int i = 1; i < values.length; i += 2) {
+      result = protocolCall("IAssoc", "assoc", new Object[] {result, values[i], values[i + 1]});
+    }
+    return result;
+  }
+
+  private Object toVector(Object value) {
+    ArrayList<Object> elements = new ArrayList<>();
+    Iterator<?> iterator = (Iterator<?>) iterValue(value);
+    while (iterator.hasNext()) elements.add(iterator.next());
+    return hara.lang.data.Vector.Standard.from(null, elements.toArray());
+  }
+
+  private Object reverseValue(Object value) {
+    ArrayList<Object> elements = new ArrayList<>();
+    Iterator<?> iterator = (Iterator<?>) iterValue(value);
+    while (iterator.hasNext()) elements.add(iterator.next());
+    java.util.Collections.reverse(elements);
+    return hara.lang.data.Vector.Standard.from(null, elements.toArray());
+  }
+
+  Object mapValues(Object[] values) {
+    if (values.length == 1) {
+      Object function = values[0];
+      return new VariadicBuiltin(
+          "map-transform",
+          inputs -> {
+            if (inputs.length == 0) {
+              throw new HaraException("map transform expects at least one collection");
+            }
+            Object[] arguments = new Object[inputs.length + 1];
+            arguments[0] = function;
+            System.arraycopy(inputs, 0, arguments, 1, inputs.length);
+            Object mapped = iterMap(arguments);
+            ArrayList<Object> output = new ArrayList<>();
+            Iterator<?> iterator = (Iterator<?>) mapped;
+            while (iterator.hasNext()) output.add(iterator.next());
+            return inputs[0] instanceof HaraArray
+                ? new HaraArray(output.toArray())
+                : hara.lang.data.Vector.Standard.from(null, output.toArray());
+          });
+    }
+    if (values.length < 2) throw new HaraException("map expects a function and collections");
+    return seqValue(
+        new Object[] {
+          iterMap(values)
+        });
+  }
+
+  Object partitionValues(Object[] values, boolean includePartial) {
+    if (values.length == 1) {
+      Object amount = values[0];
+      return new UnaryBuiltin(
+          includePartial ? "partition-all-transform" : "partition-transform",
+          input -> {
+            Object partitioned = iterPartition(new Object[] {amount, input}, includePartial);
+            ArrayList<Object> output = new ArrayList<>();
+            Iterator<?> iterator = (Iterator<?>) partitioned;
+            while (iterator.hasNext()) output.add(iterator.next());
+            return input instanceof HaraArray
+                ? new HaraArray(output.toArray())
+                : hara.lang.data.Vector.Standard.from(null, output.toArray());
+          });
+    }
+    requireMethodArity(includePartial ? "partition-all" : "partition", values, 2);
+    return seqValue(new Object[] {iterPartition(values, includePartial)});
+  }
+
+  Object removeValues(Object[] values) {
+    requireMethodArity("remove", values, 2);
+    Object predicate = values[0];
+    Iterator<?> iterator = (Iterator<?>) iterValue(values[1]);
+    ArrayList<Object> kept = new ArrayList<>();
+    while (iterator.hasNext()) {
+      Object item = iterator.next();
+      Object result = invokeCallable(predicate, new Object[] {item});
+      if (result == null || Boolean.FALSE.equals(result)) kept.add(item);
+    }
+    return hara.lang.data.Vector.Standard.from(null, kept.toArray());
+  }
+
+  Object reduceKeyValues(Object[] values) {
+    requireMethodArity("reduce-kv", values, 3);
+    Object result = values[1];
+    Iterator<?> iterator = (Iterator<?>) iterValue(values[2]);
+    while (iterator.hasNext()) {
+      Object entry = iterator.next();
+      Object key;
+      Object value;
+      if (entry instanceof java.util.Map.Entry<?, ?> mapEntry) {
+        key = mapEntry.getKey();
+        value = mapEntry.getValue();
+      } else if (entry instanceof hara.lang.protocol.IPair<?, ?> pair) {
+        key = pair.getKey();
+        value = pair.getValue();
+      } else {
+        key = protocolCall("INth", "nth", new Object[] {entry, 0L});
+        value = protocolCall("INth", "nth", new Object[] {entry, 1L});
+      }
+      result = HaraBox.unwrap(invokeCallable(values[0], new Object[] {result, key, value}));
+    }
+    return result;
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  Object mergeMaps(Object[] values) {
+    IMapType result = hara.lang.data.Map.Standard.EMPTY;
+    for (Object raw : values) {
+      Object value = HaraBox.unwrap(raw);
+      if (value == null || value == HaraNull.SINGLETON) continue;
+      if (!(value instanceof IMapType<?, ?> map)) {
+        throw new HaraException("merge expects maps");
+      }
+      for (Object entryObject : map) {
+        java.util.Map.Entry<?, ?> entry = (java.util.Map.Entry<?, ?>) entryObject;
+        result = (IMapType) result.assoc(entry.getKey(), entry.getValue());
+      }
+    }
+    return result;
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  Object selectKeys(Object[] values) {
+    requireMethodArity("select-keys", values, 2);
+    Object raw = HaraBox.unwrap(values[0]);
+    if (!(raw instanceof IMapType<?, ?> map)) {
+      throw new HaraException("select-keys expects a map and keys");
+    }
+    IMapType result = hara.lang.data.Map.Standard.EMPTY;
+    Iterator<?> keys = (Iterator<?>) iterValue(values[1]);
+    while (keys.hasNext()) {
+      Object key = keys.next();
+      if (((IMapType) map).has(key)) {
+        result = (IMapType) result.assoc(key, ((IMapType) map).lookup(key));
+      }
     }
     return result;
   }
@@ -1065,8 +1599,12 @@ public final class HaraContext {
             }));
   }
 
-  private void installGeneratedLibraries() {
-    HaraNamespace string = namespace("hara.lib.string");
+  void installStringLibrary() {
+    withDefinitionOrigin(HaraVar.Origin.JAVA_LIBRARY, this::defineStringLibrary);
+  }
+
+  private void defineStringLibrary() {
+    HaraNamespace string = namespace("std.lib.string");
     string.define(
         "len", new UnaryBuiltin("str/len", value -> (long) stringValue(value, "str/len").length()));
     string.define("comp", new VariadicBuiltin("str/comp", this::stringCompare));
@@ -1131,8 +1669,14 @@ public final class HaraContext {
         new UnaryBuiltin(
             "str/decode",
             value -> new String(bytesValue(value, "str/decode"), StandardCharsets.UTF_8)));
+  }
 
-    HaraNamespace bytes = namespace("hara.lib.bytes");
+  void installBytesLibrary() {
+    withDefinitionOrigin(HaraVar.Origin.JAVA_LIBRARY, this::defineBytesLibrary);
+  }
+
+  private void defineBytesLibrary() {
+    HaraNamespace bytes = namespace("std.lib.bytes");
     bytes.define(
         "count",
         new UnaryBuiltin("bytes/count", value -> (long) bytesValue(value, "bytes/count").length));
@@ -1145,8 +1689,14 @@ public final class HaraContext {
         "u8", new UnaryBuiltin("bytes/u8", value -> (long) (byteNumber(value, "bytes/u8") & 0xff)));
     bytes.define(
         "s8", new UnaryBuiltin("bytes/s8", value -> (long) (byte) byteNumber(value, "bytes/s8")));
+  }
 
-    HaraNamespace promise = namespace("hara.lib.promise");
+  void installPromiseLibrary() {
+    withDefinitionOrigin(HaraVar.Origin.JAVA_LIBRARY, this::definePromiseLibrary);
+  }
+
+  private void definePromiseLibrary() {
+    HaraNamespace promise = namespace("std.lib.promise");
     promise.define("run", new UnaryBuiltin("promise/run", this::promiseRun));
     promise.define("new", new UnaryBuiltin("promise/new", this::promiseNew));
     promise.define("all", new UnaryBuiltin("promise/all", this::promiseAll));
@@ -1169,8 +1719,14 @@ public final class HaraContext {
         "native?",
         new UnaryBuiltin("promise/native?", value -> HaraBox.unwrap(value) instanceof HaraPromise));
     promise.define("delay", new VariadicBuiltin("promise/delay", this::promiseDelay));
+  }
 
-    HaraNamespace handle = namespace("hara.lib.handle");
+  void installHandleLibrary() {
+    withDefinitionOrigin(HaraVar.Origin.JAVA_LIBRARY, this::defineHandleLibrary);
+  }
+
+  private void defineHandleLibrary() {
+    HaraNamespace handle = namespace("std.lib.handle");
     handle.define(
         "release",
         new UnaryBuiltin(
@@ -1182,13 +1738,25 @@ public final class HaraContext {
               ((HtaHandle) input).close();
               return HaraNull.SINGLETON;
             }));
+  }
 
-    HaraNamespace file = namespace("hara.lib.file");
+  void installFileLibrary() {
+    withDefinitionOrigin(HaraVar.Origin.JAVA_LIBRARY, this::defineFileLibrary);
+  }
+
+  private void defineFileLibrary() {
+    HaraNamespace file = namespace("std.lib.file");
     file.define("resolve", new VariadicBuiltin("file/resolve", this::fileResolve));
     file.define("read", new UnaryBuiltin("file/read", this::fileRead));
     file.define("write", new VariadicBuiltin("file/write", this::fileWrite));
+  }
 
-    HaraNamespace socket = namespace("hara.lib.socket");
+  void installSocketLibrary() {
+    withDefinitionOrigin(HaraVar.Origin.JAVA_LIBRARY, this::defineSocketLibrary);
+  }
+
+  private void defineSocketLibrary() {
+    HaraNamespace socket = namespace("std.lib.socket");
     socket.define("connect", new VariadicBuiltin("socket/connect", this::socketConnect));
     socket.define("send", new VariadicBuiltin("socket/send", this::socketSend));
     socket.define("close", new UnaryBuiltin("socket/close", this::socketClose));
@@ -1269,7 +1837,7 @@ public final class HaraContext {
   private Object stringSplit(Object[] values) {
     String[] pair = stringPair(values, "str/split");
     String[] parts = pair[0].split(java.util.regex.Pattern.quote(pair[1]), -1);
-    return new HaraArray(parts);
+    return hara.lang.data.Vector.Standard.from(null, (Object[]) parts);
   }
 
   private Object stringJoin(Object[] values) {
@@ -1450,7 +2018,12 @@ public final class HaraContext {
     CompletableFuture<Object> result =
         CompletableFuture.allOf(futures)
             .thenApply(
-                ignored -> new HaraArray(promises.stream().map(CompletableFuture::join).toArray()));
+                ignored ->
+                    hara.lang.data.Vector.Standard.from(
+                        null,
+                        promises.stream()
+                            .map(promise -> HaraPersistentValues.normalize(promise.join()))
+                            .toArray()));
     return new HaraPromise(result);
   }
 
@@ -1786,7 +2359,7 @@ public final class HaraContext {
     }
   }
 
-  private static void requireMethodArity(String method, Object[] arguments, int expected) {
+  static void requireMethodArity(String method, Object[] arguments, int expected) {
     if (arguments.length != expected) {
       throw new HaraException(method + " expects " + expected + " arguments");
     }
@@ -1933,6 +2506,87 @@ public final class HaraContext {
   }
 
   @TruffleBoundary
+  private Object readForms(Object[] values) {
+    requireMethodArity("read-forms", values, 1);
+    Object value = HaraBox.unwrap(values[0]);
+    if (!(value instanceof String)) {
+      throw new HaraException("read-forms expects a path string");
+    }
+    requireHalPath((String) value, "read-forms");
+    requireFileIO("read-forms");
+    String path = canonicalPath((String) value);
+    try {
+      String source =
+          new String(
+              environment.getPublicTruffleFile(path).readAllBytes(), StandardCharsets.UTF_8);
+      return hara.lang.data.Vector.Standard.from(null, HaraLanguage.readAll(source, path));
+    } catch (IOException | RuntimeException error) {
+      if (error instanceof HaraException) throw (HaraException) error;
+      throw new HaraException(
+          "Unable to read Hara forms: " + value + " (" + error.getMessage() + ")");
+    }
+  }
+
+  private String namespaceIdentifier(Object value, String operation) {
+    Object unwrapped = unwrapQuoted(HaraBox.unwrap(value));
+    if (unwrapped instanceof Symbol symbol) return symbol.display();
+    if (unwrapped instanceof String name) return name;
+    throw new HaraException(operation + " expects a namespace symbol or string");
+  }
+
+  private Object theNamespace(Object value) {
+    String name = namespaceIdentifier(value, "the-ns");
+    if (!namespaces.containsKey(name)) return null;
+    return Symbol.create(name);
+  }
+
+  private Object namespaceName(Object value) {
+    String name = namespaceIdentifier(value, "ns-name");
+    if (!namespaces.containsKey(name)) {
+      throw new HaraException("No such namespace: " + name);
+    }
+    return Symbol.create(name);
+  }
+
+  @TruffleBoundary
+  private Object namespacePublics(Object value) {
+    String name = namespaceIdentifier(value, "ns-publics");
+    HaraNamespace target = namespaces.get(name);
+    if (target == null) throw new HaraException("No such namespace: " + name);
+    ArrayList<Object> entries = new ArrayList<>();
+    for (String symbolName : target.sortedSymbolNames()) {
+      entries.add(Symbol.create(symbolName));
+      entries.add(target.lookup(symbolName));
+    }
+    return hara.lang.data.OrderedMap.Standard.from(null, entries.toArray());
+  }
+
+  @TruffleBoundary
+  private Object namespaceAliases(Object value) {
+    String name = namespaceIdentifier(value, "ns-aliases");
+    if (!namespaces.containsKey(name)) throw new HaraException("No such namespace: " + name);
+    ArrayList<Object> entries = new ArrayList<>();
+    aliases.getOrDefault(name, Map.of()).entrySet().stream()
+        .sorted(Map.Entry.comparingByKey())
+        .forEach(
+            entry -> {
+              entries.add(Symbol.create(entry.getKey()));
+              entries.add(Symbol.create(entry.getValue()));
+            });
+    return hara.lang.data.OrderedMap.Standard.from(null, entries.toArray());
+  }
+
+  private Object requiringResolve(Object value) {
+    Object unwrapped = unwrapQuoted(HaraBox.unwrap(value));
+    if (!(unwrapped instanceof Symbol symbol) || symbol.getNamespace() == null) {
+      throw new HaraException("requiring-resolve expects a qualified symbol");
+    }
+    HaraNamespace target = requiredNamespace(symbol.getNamespace());
+    if (target == null) return null;
+    return target.lookup(symbol.getName());
+  }
+
+  @TruffleBoundary
   private Object loadResource(Object value) {
     if (!(value instanceof String) || ((String) value).isEmpty()) {
       throw new HaraException("load-resource expects a non-empty resource name");
@@ -2019,7 +2673,14 @@ public final class HaraContext {
       throw new HaraException("require expects an unqualified namespace symbol");
     }
     String target = symbol.display();
-    HaraNamespace required = requiredNamespace(target);
+    boolean reload = options != null && Boolean.TRUE.equals(requireOption(options, "reload"));
+    HaraNamespace required;
+    if (reload && libraryLoader.provides(target)) {
+      libraryLoader.reload(this, target);
+      required = namespaces.get(target);
+    } else {
+      required = reload ? requireSourceNamespace(target, true) : requiredNamespace(target);
+    }
     if (required == null) {
       throw new HaraException("Cannot require missing namespace: " + target);
     }
@@ -2235,7 +2896,7 @@ public final class HaraContext {
   }
 
   @TruffleBoundary
-  private Object seqValue(Object[] values) {
+  Object seqValue(Object[] values) {
     if (values.length != 1 && values.length != 2) {
       throw new HaraException("seq expects a source, or a transform and source");
     }
@@ -2244,12 +2905,16 @@ public final class HaraContext {
         HaraBox.unwrap(source) instanceof HaraSeq
             ? HaraBox.unwrap(source)
             : new HaraSeq((Iterator<?>) snapshotOrIterator(source));
-    if (values.length == 1) return lazySource;
+    if (values.length == 1) {
+      return ((HaraSeq) lazySource).hasNext() ? lazySource : null;
+    }
     Object result = invokeCallable(values[0], new Object[] {lazySource});
     Object unwrapped = HaraBox.unwrap(result);
-    return unwrapped instanceof HaraSeq
-        ? unwrapped
-        : new HaraSeq((Iterator<?>) iterValue(unwrapped));
+    HaraSeq sequence =
+        unwrapped instanceof HaraSeq
+            ? (HaraSeq) unwrapped
+            : new HaraSeq((Iterator<?>) iterValue(unwrapped));
+    return sequence.hasNext() ? sequence : null;
   }
 
   @TruffleBoundary
@@ -2302,11 +2967,15 @@ public final class HaraContext {
     Object function = values[0];
     Object[] sourceValues = java.util.Arrays.copyOfRange(values, 1, values.length);
     Iterator zipped = iterZipArrays(sourceValues);
-    return closeable(Iter.map(zipped, value -> invokeCallable(function, (Object[]) value)), zipped);
+    return closeable(
+        Iter.map(
+            zipped,
+            value -> HaraBox.unwrap(invokeCallable(function, (Object[]) value))),
+        zipped);
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})
-  private Object iterFilter(Object[] values) {
+  Object iterFilter(Object[] values) {
     requireIteratorArity(values, 2, "iter-filter");
     Iterator source = (Iterator) iterValue(values[1]);
     Object function = values[0];
@@ -2580,7 +3249,7 @@ public final class HaraContext {
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})
-  private Object reduceIterator(Object[] values) {
+  Object reduceIterator(Object[] values) {
     if (values.length != 2 && values.length != 3) {
       throw new HaraException(
           "reduce expects a function and collection, optionally with an initial value");
@@ -2608,14 +3277,14 @@ public final class HaraContext {
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})
-  private Object iterTake(Object[] values) {
+  Object iterTake(Object[] values) {
     requireIteratorArity(values, 2, "iter-take");
     Iterator source = (Iterator) iterValue(values[1]);
     return closeable(Iter.take(source, iterationCount(values[0], "iter-take")), source);
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})
-  private Object iterDrop(Object[] values) {
+  Object iterDrop(Object[] values) {
     requireIteratorArity(values, 2, "iter-drop");
     Iterator source = (Iterator) iterValue(values[1]);
     return closeable(Iter.drop(source, iterationCount(values[0], "iter-drop")), source);
@@ -2674,7 +3343,7 @@ public final class HaraContext {
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})
-  private Object iterCycle(Object value) {
+  Object iterCycle(Object value) {
     return Iter.cycle(() -> (Iterator) iterValue(value));
   }
 
@@ -2877,6 +3546,9 @@ public final class HaraContext {
 
   private Iterator<?> requireIterator(Object value, String operation) {
     Object target = HaraBox.unwrap(value);
+    if (target == null || target == HaraNull.SINGLETON) {
+      return Iter.emptyIterator();
+    }
     if (!(target instanceof Iterator<?>)) {
       throw new HaraException(operation + " expects an iterator");
     }
@@ -2913,15 +3585,23 @@ public final class HaraContext {
   private ContextSnapshot snapshot() {
     Map<String, Map<String, Object>> values = new LinkedHashMap<>();
     Map<String, Map<String, HaraVar>> bindings = new LinkedHashMap<>();
+    Map<String, Map<String, IMetadata>> metadata = new LinkedHashMap<>();
+    Map<String, Map<String, HaraVar.Origin>> origins = new LinkedHashMap<>();
     for (Map.Entry<String, HaraNamespace> namespace : namespaces.entrySet()) {
       Map<String, Object> namespaceValues = new LinkedHashMap<>();
       Map<String, HaraVar> namespaceBindings = new LinkedHashMap<>();
+      Map<String, IMetadata> namespaceMetadata = new LinkedHashMap<>();
+      Map<String, HaraVar.Origin> namespaceOrigins = new LinkedHashMap<>();
       for (Map.Entry<String, HaraVar> var : namespace.getValue().vars.entrySet()) {
         namespaceValues.put(var.getKey(), var.getValue().get());
         namespaceBindings.put(var.getKey(), var.getValue());
+        namespaceMetadata.put(var.getKey(), var.getValue().meta());
+        namespaceOrigins.put(var.getKey(), var.getValue().origin());
       }
       values.put(namespace.getKey(), namespaceValues);
       bindings.put(namespace.getKey(), namespaceBindings);
+      metadata.put(namespace.getKey(), namespaceMetadata);
+      origins.put(namespace.getKey(), namespaceOrigins);
     }
     Map<String, Map<String, HaraMacro>> macroValues = new LinkedHashMap<>();
     for (Map.Entry<String, Map<String, HaraMacro>> entry : macros.entrySet()) {
@@ -2939,6 +3619,8 @@ public final class HaraContext {
         currentNamespace.name(),
         values,
         bindings,
+        metadata,
+        origins,
         macroValues,
         aliasValues,
         new LinkedHashMap<>(modules),
@@ -2956,6 +3638,8 @@ public final class HaraContext {
           namespace.define(value.getKey(), value.getValue());
         } else {
           binding.set(value.getValue());
+          binding.setMetadata(snapshot.metadata.get(entry.getKey()).get(value.getKey()));
+          binding.setOrigin(snapshot.origins.get(entry.getKey()).get(value.getKey()));
           namespace.refer(value.getKey(), binding);
         }
       }
@@ -2982,6 +3666,8 @@ public final class HaraContext {
     private final String currentNamespace;
     private final Map<String, Map<String, Object>> values;
     private final Map<String, Map<String, HaraVar>> bindings;
+    private final Map<String, Map<String, IMetadata>> metadata;
+    private final Map<String, Map<String, HaraVar.Origin>> origins;
     private final Map<String, Map<String, HaraMacro>> macros;
     private final Map<String, Map<String, String>> aliases;
     private final Map<String, ModuleRecord> modules;
@@ -2991,6 +3677,8 @@ public final class HaraContext {
         String currentNamespace,
         Map<String, Map<String, Object>> values,
         Map<String, Map<String, HaraVar>> bindings,
+        Map<String, Map<String, IMetadata>> metadata,
+        Map<String, Map<String, HaraVar.Origin>> origins,
         Map<String, Map<String, HaraMacro>> macros,
         Map<String, Map<String, String>> aliases,
         Map<String, ModuleRecord> modules,
@@ -2998,6 +3686,8 @@ public final class HaraContext {
       this.currentNamespace = currentNamespace;
       this.values = values;
       this.bindings = bindings;
+      this.metadata = metadata;
+      this.origins = origins;
       this.macros = macros;
       this.aliases = aliases;
       this.modules = modules;
@@ -3126,7 +3816,7 @@ public final class HaraContext {
     @Override
     public Object deref() {
       try {
-        return future.join();
+        return HaraPersistentValues.normalize(future.join());
       } catch (CompletionException error) {
         Throwable cause = error.getCause() == null ? error : error.getCause();
         if (cause instanceof HaraException) throw (HaraException) cause;
@@ -3139,7 +3829,7 @@ public final class HaraContext {
     @Override
     public Object derefTimeout(long milliseconds, Object timeoutValue) {
       try {
-        return future.get(milliseconds, TimeUnit.MILLISECONDS);
+        return HaraPersistentValues.normalize(future.get(milliseconds, TimeUnit.MILLISECONDS));
       } catch (java.util.concurrent.TimeoutException error) {
         return timeoutValue;
       } catch (InterruptedException error) {
@@ -3228,7 +3918,7 @@ public final class HaraContext {
     }
   }
 
-  private static final class HaraNamespace {
+  private final class HaraNamespace {
     private final String name;
     private final Map<String, HaraVar> vars = new ConcurrentHashMap<>();
 
@@ -3248,6 +3938,16 @@ public final class HaraContext {
       return new java.util.ArrayList<>(vars.keySet());
     }
 
+    private java.util.List<String> sortedSymbolNames() {
+      java.util.ArrayList<String> names = new java.util.ArrayList<>();
+      vars.forEach(
+          (symbolName, variable) -> {
+            if (name.equals(variable.namespaceName())) names.add(symbolName);
+          });
+      java.util.Collections.sort(names);
+      return names;
+    }
+
     @TruffleBoundary
     private HaraVar define(String symbolName, Object value) {
       return define(symbolName, value, null);
@@ -3255,13 +3955,30 @@ public final class HaraContext {
 
     @TruffleBoundary
     private HaraVar define(String symbolName, Object value, IMetadata metadata) {
+      return define(symbolName, value, metadata, definitionOrigin);
+    }
+
+    @TruffleBoundary
+    private HaraVar define(
+        String symbolName, Object value, IMetadata metadata, HaraVar.Origin origin) {
       return vars.compute(
           symbolName,
           (ignored, existing) -> {
+            if (origin == HaraVar.Origin.HAL_FALLBACK
+                && existing != null
+                && (existing.origin() == HaraVar.Origin.JAVA_LIBRARY
+                    || existing.origin() == HaraVar.Origin.RUNTIME_PRIMITIVE)) {
+              return existing;
+            }
             if (existing == null) {
-              return new HaraVar(name, symbolName, value, metadata);
+              return new HaraVar(name, symbolName, value, metadata, origin);
+            }
+            if (!name.equals(existing.namespaceName())) {
+              return new HaraVar(name, symbolName, value, metadata, origin);
             }
             existing.set(value);
+            existing.setMetadata(metadata);
+            existing.setOrigin(origin);
             return existing;
           });
     }

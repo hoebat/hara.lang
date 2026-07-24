@@ -1,0 +1,8 @@
+(ns example.answer-42
+  (:require [demo.000-answer-42 :as answer]))
+
+;; Pair the example descriptor with the raw WASM fixture:
+;; cp wasm/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm \
+;;   <extension-root>/demo/000-answer-42/answer-42.wasm
+{:version (answer/version)
+ :answer (answer/add 20 22)}

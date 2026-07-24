@@ -11,16 +11,16 @@ import org.junit.Test;
 
 public class HaraExtensionManifestTest {
   @Test
-  public void packagedNoirProofManifestMatchesTheProviderContract() throws Exception {
-    Path descriptor = Path.of("examples/extensions/blockchain/proof/noir/hara.extension.edn");
+  public void packagedAnswer42ManifestMatchesTheProviderContract() throws Exception {
+    Path descriptor = Path.of("examples/extensions/demo/000-answer-42/hara.extension.edn");
     HaraExtensionManifest manifest =
         HaraExtensionManifest.parse(
             Files.readString(descriptor, StandardCharsets.UTF_8), descriptor.toString());
-    assertEquals("blockchain.proof.noir", manifest.namespace());
+    assertEquals("demo.000-answer-42", manifest.namespace());
     assertEquals("0.1.0", manifest.version());
     assertEquals("wasm", manifest.provider());
-    assertEquals("noir.wasm", manifest.module());
-    assertEquals("core-v1", manifest.abi());
+    assertEquals("answer-42.wasm", manifest.module());
+    assertEquals("core.v1", manifest.abi());
     assertEquals(2, manifest.exports().size());
     assertEquals("i32", manifest.exports().get("version").returns());
     assertEquals(2, manifest.exports().get("add").arguments().size());
@@ -31,7 +31,7 @@ public class HaraExtensionManifestTest {
   public void parsesCompactPublicHandleTags() {
     String source =
         "{:namespace \"math.tensor\" :version \"1\" :provider :wasm "
-            + ":module \"tensor.wasm\" :abi :hta-v1 "
+            + ":module \"tensor.wasm\" :abi :hta.v1 "
             + ":exports {\"open\" {:args [] :returns :value :async true}} "
             + ":handles {\"tensor\" {:tag math}} :capabilities []}";
     HaraExtensionManifest manifest = HaraExtensionManifest.parse(source, "test");
@@ -46,7 +46,7 @@ public class HaraExtensionManifestTest {
   public void malformedManifestsFailBeforeProviderSelection() {
     String base =
         "{:namespace \"demo.extension\" :version \"1\" :provider :wasm "
-            + ":module \"demo.wasm\" :abi :core-v1 "
+            + ":module \"demo.wasm\" :abi :core.v1 "
             + ":exports {\"run\" {:args [] :returns :i32}} "
             + ":capabilities []}";
     assertThrows(

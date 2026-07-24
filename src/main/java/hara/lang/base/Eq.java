@@ -1,6 +1,8 @@
 package hara.lang.base;
 
 import hara.lang.base.primitive.Num;
+import hara.lang.data.types.IMapType;
+import hara.lang.data.types.ISequentialType;
 import hara.lang.protocol.IEquality;
 
 import java.util.Iterator;
@@ -18,6 +20,19 @@ public interface Eq {
       return Num.eq(a, b);
     } else if (a instanceof byte[] && b instanceof byte[]) {
       return java.util.Arrays.equals((byte[]) a, (byte[]) b);
+    } else if (a instanceof IMapType<?, ?> left && b instanceof IMapType<?, ?> right) {
+      if (left.count() != right.count()) return false;
+      for (Object value : left) {
+        java.util.Map.Entry<?, ?> entry = (java.util.Map.Entry<?, ?>) value;
+        Object matching = ((IMapType) right).find(entry.getKey());
+        if (!(matching instanceof java.util.Map.Entry<?, ?> other)
+            || !eq(entry.getValue(), other.getValue())) return false;
+      }
+      return true;
+    } else if (a instanceof ISequentialType<?> left
+        && b instanceof ISequentialType<?> right) {
+      return left.count() == right.count()
+          && eqIterator((Iterator<Object>) left.iterator(), (Iterator<Object>) right.iterator());
     } else if (a instanceof IEquality) {
       return ((IEquality) a).equality(b);
     } else if (b instanceof IEquality) {

@@ -13,12 +13,14 @@ import com.oracle.truffle.api.library.ExportLibrary;
 import com.oracle.truffle.api.library.ExportMessage;
 import hara.lang.data.types.ILinearType;
 import hara.lang.data.types.ISetType;
+import hara.lang.base.Eq;
 import hara.lang.base.primitive.Cast;
 import hara.lang.protocol.ICount;
 import hara.lang.protocol.IFind;
 import hara.lang.protocol.IFn;
 import hara.lang.protocol.ILookup;
 import hara.lang.protocol.IDisplay;
+import hara.lang.protocol.IEquality;
 import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -29,7 +31,7 @@ import java.util.function.Function;
 
 /** Truffle boundary value for Java-backed Hara values. */
 @ExportLibrary(InteropLibrary.class)
-public final class HaraBox implements TruffleObject {
+public final class HaraBox implements TruffleObject, IEquality {
   private final Object value;
   private final String display;
 
@@ -67,6 +69,11 @@ public final class HaraBox implements TruffleObject {
       return value;
     }
     return new HaraBox(value);
+  }
+
+  @Override
+  public boolean equality(Object other) {
+    return Eq.eq(value, unwrap(other));
   }
 
   @TruffleBoundary

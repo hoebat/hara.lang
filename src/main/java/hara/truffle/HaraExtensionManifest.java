@@ -8,6 +8,7 @@ import hara.lang.data.types.IMapType;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -16,7 +17,7 @@ import java.util.regex.Pattern;
 
 /** Strict metadata for a provider-generated namespace loaded through {@code :require}. */
 public final class HaraExtensionManifest {
-  private static final Pattern NAMESPACE = Pattern.compile("[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+");
+  private static final Pattern NAMESPACE = Pattern.compile("[a-z][a-z0-9-]*(\\.[a-z0-9][a-z0-9-]*)+");
   private static final Pattern HANDLE_TAG =
       Pattern.compile("[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)*");
   private static final Pattern HANDLE_TYPE = Pattern.compile("[a-z][a-z0-9-]*");
@@ -30,9 +31,11 @@ public final class HaraExtensionManifest {
           "exports",
           "capabilities",
           "host-calls",
-          "handles");
+          "handles",
+          "targets",
+          "assets");
   private static final Set<String> REQUIRED_FIELDS =
-      Set.of("namespace", "version", "provider", "module", "abi", "exports", "capabilities");
+      Set.of("namespace", "version", "provider", "abi", "exports", "capabilities");
   private static final Set<String> EXPORT_FIELDS = Set.of("args", "returns", "async");
 
   private static final Set<String> HANDLE_FIELDS = Set.of("tag");
@@ -41,6 +44,8 @@ public final class HaraExtensionManifest {
   private final String provider;
   private final String module;
   private final String abi;
+  private final Map<String, Target> targets;
+  private final java.util.List<String> assets;
   private final Map<String, Export> exports;
   private final java.util.List<String> capabilities;
   private final Map<String, java.util.List<String>> hostCalls;
@@ -52,6 +57,8 @@ public final class HaraExtensionManifest {
       String provider,
       String module,
       String abi,
+      Map<String, Target> targets,
+      java.util.List<String> assets,
       Map<String, Export> exports,
       java.util.List<String> capabilities,
       Map<String, java.util.List<String>> hostCalls,
@@ -61,6 +68,8 @@ public final class HaraExtensionManifest {
     this.provider = provider;
     this.module = module;
     this.abi = abi;
+    this.targets = Collections.unmodifiableMap(new LinkedHashMap<>(targets));
+    this.assets = Collections.unmodifiableList(new ArrayList<>(assets));
     this.exports = Collections.unmodifiableMap(new LinkedHashMap<>(exports));
     this.capabilities = Collections.unmodifiableList(new ArrayList<>(capabilities));
     LinkedHashMap<String, java.util.List<String>> copiedHostCalls = new LinkedHashMap<>();
@@ -88,11 +97,23 @@ public final class HaraExtensionManifest {
     }
     String version = requireString(map, "version", origin);
     String provider = requireKeyword(map, "provider", origin);
-    String module = requireString(map, "module", origin);
-    if (module.startsWith("/") || module.contains("..") || !module.endsWith(".wasm")) {
-      throw invalid(origin, "module must be a relative .wasm file");
-    }
     String abi = requireKeyword(map, "abi", origin);
+    Object moduleValue = lookup(map, "module");
+    String module = moduleValue == null ? null : requireString(map, "module", origin);
+    Map<String, Target> targets = parseTargets(lookup(map, "targets"), origin);
+    java.util.List<String> assets = parseAssetPaths(lookup(map, "assets"), origin);
+    if ("wasm".equals(provider)) {
+      if (module == null || !targets.isEmpty()) {
+        throw invalid(origin, "WASM providers require :module and cannot declare :targets");
+      }
+      requireRelativePath(module, ".wasm", origin, "module");
+    } else if ("hta".equals(provider)) {
+      if (module != null || targets.isEmpty() || !"hta.v1".equals(abi)) {
+        throw invalid(origin, "HTA providers require :abi :hta.v1 and :targets, without :module");
+      }
+    } else {
+      throw invalid(origin, "unsupported provider :" + provider);
+    }
     Map<String, Export> exports = parseExports(lookup(map, "exports"), origin);
     java.util.List<String> capabilities =
         parseKeywords(lookup(map, "capabilities"), origin, "capabilities");
@@ -100,7 +121,7 @@ public final class HaraExtensionManifest {
         parseHostCalls(lookup(map, "host-calls"), origin);
     Map<String, String> handleTags = parseHandleTags(lookup(map, "handles"), origin);
     return new HaraExtensionManifest(
-        namespace, version, provider, module, abi, exports, capabilities, hostCalls, handleTags);
+        namespace, version, provider, module, abi, targets, assets, exports, capabilities, hostCalls, handleTags);
   }
 
   public String namespace() {
@@ -123,6 +144,18 @@ public final class HaraExtensionManifest {
     return abi;
   }
 
+  public Map<String, Target> targets() {
+    return targets;
+  }
+
+  public java.util.List<String> assets() {
+    return assets;
+  }
+
+  public Target target(String host) {
+    return targets.get(host);
+  }
+
   public Map<String, Export> exports() {
     return exports;
   }
@@ -141,6 +174,65 @@ public final class HaraExtensionManifest {
 
   public boolean permitsHostCall(String service, String method) {
     return hostCalls.getOrDefault(service, java.util.List.of()).contains(method);
+  }
+
+  private static Map<String, Target> parseTargets(Object value, String origin) {
+    if (value == null) return Map.of();
+    if (!(value instanceof IMapType<?, ?>)) throw invalid(origin, "targets must be a map");
+    LinkedHashMap<String, Target> result = new LinkedHashMap<>();
+    Iterator<?> iterator = ((IMapType<?, ?>) value).iterator();
+    while (iterator.hasNext()) {
+      Map.Entry<?, ?> entry = (Map.Entry<?, ?>) iterator.next();
+      if (!(entry.getKey() instanceof Keyword) || !(entry.getValue() instanceof IMapType<?, ?>)) {
+        throw invalid(origin, "targets must map host keywords to target maps");
+      }
+      String host = ((Keyword) entry.getKey()).getName();
+      if (!"node".equals(host) && !"browser".equals(host)) {
+        throw invalid(origin, "unsupported target :" + host);
+      }
+      IMapType<?, ?> target = (IMapType<?, ?>) entry.getValue();
+      rejectUnknownKeys(target, Set.of("module", "runtime"), origin, "target " + host);
+      String targetModule = requireString(target, "module", origin);
+      requireRelativePath(targetModule, ".mjs", origin, "target module");
+      String runtime = requireKeyword(target, "runtime", origin);
+      if (("node".equals(host) && !"process".equals(runtime))
+          || ("browser".equals(host) && !"web-worker".equals(runtime))) {
+        throw invalid(origin, "target " + host + " has incompatible runtime :" + runtime);
+      }
+      result.put(host, new Target(targetModule, runtime));
+    }
+    return result;
+  }
+
+  private static java.util.List<String> parseAssetPaths(Object value, String origin) {
+    if (value == null) return java.util.List.of();
+    if (!(value instanceof ILinearType<?>)) throw invalid(origin, "assets must be a vector");
+    ArrayList<String> result = new ArrayList<>();
+    for (Object item : (ILinearType<?>) value) {
+      if (!(item instanceof String)) throw invalid(origin, "assets must contain strings");
+      String asset = (String) item;
+      requireRelativePath(asset, null, origin, "asset");
+      if (result.contains(asset)) throw invalid(origin, "duplicate asset " + asset);
+      result.add(asset);
+    }
+    return result;
+  }
+
+  private static void requireRelativePath(
+      String value, String suffix, String origin, String field) {
+    Path path;
+    try {
+      path = Path.of(value);
+    } catch (RuntimeException error) {
+      throw invalid(origin, field + " has an invalid path", error);
+    }
+    if (path.isAbsolute()
+        || path.normalize().startsWith("..")
+        || value.contains(":")
+        || (suffix != null && !value.endsWith(suffix))) {
+      throw invalid(
+          origin, field + " must be a relative " + (suffix == null ? "package" : suffix) + " file");
+    }
   }
 
   private static Map<String, String> parseHandleTags(Object value, String origin) {
@@ -280,6 +372,19 @@ public final class HaraExtensionManifest {
   private static IllegalArgumentException invalid(
       String origin, String message, RuntimeException cause) {
     return new IllegalArgumentException("extension/malformed " + origin + ": " + message, cause);
+  }
+
+  public static final class Target {
+    private final String module;
+    private final String runtime;
+
+    private Target(String module, String runtime) {
+      this.module = module;
+      this.runtime = runtime;
+    }
+
+    public String module() { return module; }
+    public String runtime() { return runtime; }
   }
 
   public static final class Export {

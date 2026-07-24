@@ -61,7 +61,7 @@ variadic fallback. `apply` spreads the final sequential argument into the
 call. Invocation supports Hara functions, protocol `IFn` implementations,
 multifunctions, and `defstruct` constructors.
 
-The packaged `hara/l0-core.hal` bootstrap defines `nil?`, `false?`, `true?`,
+The packaged `std/lib/foundation.hal` bootstrap defines `nil?`, `false?`, `true?`,
 `empty?`, `first`, `second`, `rest`, and `not-empty` using ordinary L0 forms
 and iterator operations. `rest` returns a lazy `Seq`, or nil when no values
 remain. There is no separate `next` operation.
@@ -173,7 +173,7 @@ semantics and are not specified as thread-safe.
 
 Bytes are an ordinary value category constructed with `(bytes ...)`. Elements
 use signed-byte storage and accept the checked `-128..255` input domain.
-Operations live in `hara.lib.bytes`: `bytes/count`, `bytes/get`, `bytes/set`,
+Operations live in `std.lib.bytes`: `bytes/count`, `bytes/get`, `bytes/set`,
 `bytes/copy`, `bytes/slice`, `bytes/u8`, and `bytes/s8`. `bytes/get` returns an
 unsigned element in the range `0..255` and accepts an optional fallback for an
 invalid index; without a fallback it reports a bounds error. Protocol
@@ -266,7 +266,7 @@ Already compiled Truffle call targets are immutable; a newly compiled source
 observes a reloaded macro/module definition.
 
 The packaged L0 bootstrap is intentionally small and language-level: its
-current functions are defined in `hara/l0-core.hal`. The complete Foundation
+current functions are defined in `std/lib/foundation.hal`. The complete Foundation
 stdlib and KMI/L1 port are later migration work, not hidden Java semantics.
 
 ## 9. Host and Native Image boundary

@@ -6,6 +6,10 @@ import com.oracle.truffle.api.source.Source;
 import com.oracle.truffle.api.source.SourceSection;
 import hara.kernel.base.Parser;
 import hara.kernel.base.Reader;
+import hara.lang.data.Keyword;
+import hara.lang.data.Map;
+import hara.lang.protocol.IMetadata;
+import hara.lang.protocol.IObjType;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -41,6 +45,7 @@ public final class HaraLanguage extends TruffleLanguage<HaraContext> {
 
   @Override
   protected CallTarget parse(ParsingRequest request) {
+    currentContext().ensureEagerFallbacks();
     Source source = request.getSource();
     SourceSection sourceSection =
         source.getLength() == 0
@@ -48,7 +53,7 @@ public final class HaraLanguage extends TruffleLanguage<HaraContext> {
             : source.createSection(0, source.getLength());
     Object[] forms;
     try {
-      forms = readAll(source.getCharacters().toString());
+      forms = readAll(source.getCharacters().toString(), source.getName());
     } catch (hara.kernel.base.Parser.LispReader.ReaderException error) {
       Throwable cause = error.getCause();
       String detail = cause == null ? error.getMessage() : cause.getMessage();
@@ -65,7 +70,7 @@ public final class HaraLanguage extends TruffleLanguage<HaraContext> {
     return HaraAnalyzer.compile(this, forms, sourceSection, currentContext());
   }
 
-  private static Object[] readAll(String source) {
+  static Object[] readAll(String source, String sourceName) {
     Reader reader = new Reader(source);
     Object eof = new Object();
     List<Object> forms = new ArrayList<>();
@@ -73,9 +78,23 @@ public final class HaraLanguage extends TruffleLanguage<HaraContext> {
     do {
       form = Parser.LispReader.read(reader, false, eof, false, null);
       if (form != eof) {
-        forms.add(form);
+        forms.add(withSourceName(form, sourceName));
       }
     } while (form != eof);
     return forms.toArray();
+  }
+
+  @SuppressWarnings({"rawtypes", "unchecked"})
+  private static Object withSourceName(Object form, String sourceName) {
+    if (!(form instanceof IObjType) || sourceName == null) return form;
+    IObjType object = (IObjType) form;
+    IMetadata metadata = object.meta();
+    hara.lang.data.types.IMapType updated =
+        metadata instanceof hara.lang.data.types.IMapType
+            ? (hara.lang.data.types.IMapType)
+                ((hara.lang.data.types.IMapType) metadata)
+                    .assoc(Keyword.create("file"), sourceName)
+            : Map.Standard.from(null, Keyword.create("file"), sourceName);
+    return object.withMeta(updated);
   }
 }

@@ -111,7 +111,7 @@ final class HaraAnalyzer {
           }
           return new HaraNodes.ReadLocal(slot);
         }
-        return new HaraNodes.ReadGlobal(symbol);
+        return new HaraNodes.ReadGlobal(context.canonicalSymbol(symbol));
       }
       return new HaraNodes.ReadLocal(slot);
     }
@@ -405,14 +405,25 @@ final class HaraAnalyzer {
     ArrayList<int[]> patternSlots = new ArrayList<>();
     ArrayList<HaraExpressionNode[]> patternInitializers = new ArrayList<>();
     Map<Symbol, Integer> bodyLocals = new HashMap<>(locals);
-    Map<Symbol, Integer> introducedLocals = new HashMap<>();
     for (int i = 0; i < bindingCount; i++) {
       Object pattern = bindings.nth(i * 2L);
-      initializers[i] = analyze(bindings.nth(i * 2L + 1));
+      HaraAnalyzer initializerAnalyzer =
+          new HaraAnalyzer(
+              language,
+              sourceSection,
+              context,
+              frames,
+              bodyLocals,
+              enclosingLocals,
+              Map.of(),
+              Map.of(),
+              recurTarget);
+      initializers[i] = initializerAnalyzer.analyze(bindings.nth(i * 2L + 1));
       rawSlots[i] =
           frames.addSlot(FrameSlotKind.Object, Symbol.create(null, "__hara_let_" + i), null);
       ArrayList<Integer> slots = new ArrayList<>();
       ArrayList<HaraExpressionNode> values = new ArrayList<>();
+      Map<Symbol, Integer> introducedLocals = new HashMap<>();
       addPatternBindings(
           pattern, new HaraNodes.ReadLocal(rawSlots[i]), frames, introducedLocals, slots, values);
       bodyLocals.putAll(introducedLocals);
@@ -434,8 +445,11 @@ final class HaraAnalyzer {
     HaraExpressionNode body = bodyAnalyzer.analyzeDo(form, 2);
     for (int i = bindingCount - 1; i >= 0; i--) {
       body = new HaraNodes.Let(patternSlots.get(i), patternInitializers.get(i), body);
+      body =
+          new HaraNodes.Let(
+              new int[] {rawSlots[i]}, new HaraExpressionNode[] {initializers[i]}, body);
     }
-    return new HaraNodes.Let(rawSlots, initializers, body);
+    return body;
   }
 
   private HaraExpressionNode analyzeLetFn(List<?> form) {
@@ -555,7 +569,7 @@ final class HaraAnalyzer {
     for (int i = 0; i < parameters.count(); i++) {
       Object parameter = parameters.nth(i);
       if (parameter instanceof Symbol && "&".equals(((Symbol) parameter).getName())) {
-        if (restIndex >= 0 || i == 0 || i + 2 != parameters.count()) {
+        if (restIndex >= 0 || i + 2 != parameters.count()) {
           throw error("& must appear once before the final variadic binding");
         }
         restIndex = i;
@@ -656,6 +670,7 @@ final class HaraAnalyzer {
     if (symbol.getNamespace() != null) {
       throw error("defn name must not be qualified");
     }
+    context.declareCurrent(symbol);
 
     int parametersIndex = 2;
     String docstring = null;
@@ -1192,6 +1207,7 @@ final class HaraAnalyzer {
     if (symbol.getNamespace() != null) {
       throw error("def name must not be qualified");
     }
+    context.declareCurrent(symbol);
     return new HaraNodes.DefineGlobal(symbol, analyze(form.nth(2)));
   }
 
@@ -1485,6 +1501,7 @@ final class HaraAnalyzer {
     }
     Object[] clauses = new Object[(int) form.count() - 2];
     for (int i = 2; i < form.count(); i++) clauses[i - 2] = form.nth(i);
+    context.setCurrentNamespace((Symbol) name, clauses);
     return new HaraNodes.SetNamespace((Symbol) name, clauses);
   }
 

@@ -19,7 +19,7 @@ import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.io.ByteSequence;
 
 /** Generic, import-free core-WASM extension instance. */
-final class HaraWasmExtension implements AutoCloseable {
+final class HaraWasmExtension implements HaraExtensionRuntime {
   private final HaraExtensionManifest manifest;
   private final Context context;
   private final Map<String, Value> exports;
@@ -47,7 +47,7 @@ final class HaraWasmExtension implements AutoCloseable {
               + " for "
               + manifest.namespace());
     }
-    if (!"core-v1".equals(manifest.abi()) && !"hta-v1".equals(manifest.abi())) {
+    if (!"core.v1".equals(manifest.abi()) && !"hta.v1".equals(manifest.abi())) {
       throw new HaraException(
           "extension/abi-unsupported: " + manifest.abi() + " for " + manifest.namespace());
     }
@@ -74,7 +74,7 @@ final class HaraWasmExtension implements AutoCloseable {
       Value members = instance.hasMember("exports") ? instance.getMember("exports") : instance;
       Value memoryValue = members.hasMember("memory") ? members.getMember("memory") : null;
       Value allocatorValue = members.hasMember("alloc") ? members.getMember("alloc") : null;
-      boolean isHta = "hta-v1".equals(manifest.abi());
+      boolean isHta = "hta.v1".equals(manifest.abi());
       LinkedHashMap<String, Value> declared = new LinkedHashMap<>();
       if (!isHta) {
         for (String name : manifest.exports().keySet()) {
@@ -134,7 +134,12 @@ final class HaraWasmExtension implements AutoCloseable {
     return hta;
   }
 
-  CompletableFuture<Object> invokeAsync(String name, Object[] values) {
+
+  public boolean asynchronous() {
+    return hta;
+  }
+
+  public CompletableFuture<Object> invokeAsync(String name, Object[] values) {
     HaraExtensionManifest.Export spec = manifest.exports().get(name);
     if (spec == null) throw new HaraException("extension/export-missing: " + name);
     if (values.length != spec.arguments().size()) {
@@ -151,8 +156,8 @@ final class HaraWasmExtension implements AutoCloseable {
     return result;
   }
 
-  synchronized Object invoke(String name, Object[] values) {
-    if (hta) throw new HaraException("hta-v1 exports are asynchronous");
+  public synchronized Object invoke(String name, Object[] values) {
+    if (hta) throw new HaraException("hta.v1 exports are asynchronous");
     HaraExtensionManifest.Export spec = manifest.exports().get(name);
     if (spec == null) throw new HaraException("extension/export-missing: " + name);
     if (values.length != spec.arguments().size()) {

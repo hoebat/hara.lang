@@ -1,0 +1,3 @@
+(defproject testing.simple-test
+  {:source-paths ["src"]
+   :test-paths ["test"]})

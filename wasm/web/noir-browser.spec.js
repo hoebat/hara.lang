@@ -1,0 +1,13 @@
+import { test, expect } from "@playwright/test";
+
+test("descriptor-selected browser worker compiles, proves, and verifies Noir", async ({ page }) => {
+  test.setTimeout(60_000);
+  await page.goto("/wasm/web/noir-browser.html");
+  const result = await page.evaluate(() => window.noirSmoke);
+  expect(result).toEqual({
+    artifact: "hara.noir.artifact/v1",
+    proof: "hara.noir.proof/v1",
+    verified: true
+  });
+  await page.evaluate(() => window.noirContext.close());
+});

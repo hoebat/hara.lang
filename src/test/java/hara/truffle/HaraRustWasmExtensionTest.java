@@ -24,7 +24,7 @@ public class HaraRustWasmExtensionTest {
     Files.writeString(
         extension.resolve("hara.extension.edn"),
         "{:namespace \"test.rust.core\" :version \"0.1.0\" :provider :wasm "
-            + ":module \"hara.wasm\" :abi :core-v1 "
+            + ":module \"hara.wasm\" :abi :core.v1 "
             + ":exports {\"add\" {:args [:i32 :i32] :returns :i32} "
             + "\"version\" {:args [] :returns :i32} "
             + "\"eval_i64\" {:args [:utf8] :returns :i64}} :capabilities []}");

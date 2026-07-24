@@ -187,14 +187,37 @@ public class StdLibraryProviderTest {
 
   @Test
   public void providersDeclareCanonicalNamespacesAndStableOrder() {
+    HaraLibraryProvider foundation = new StdLibFoundationLibraryProvider();
+    HaraLibraryProvider string = new StdLibStringLibraryProvider();
+    HaraLibraryProvider bytes = new StdLibBytesLibraryProvider();
+    HaraLibraryProvider promise = new StdLibPromiseLibraryProvider();
+    HaraLibraryProvider handle = new StdLibHandleLibraryProvider();
+    HaraLibraryProvider file = new StdLibFileLibraryProvider();
+    HaraLibraryProvider socket = new StdLibSocketLibraryProvider();
     HaraLibraryProvider block = new StdBlockLibraryProvider();
     HaraLibraryProvider zip = new StdZipLibraryProvider();
     HaraLibraryProvider context = new StdLibContextLibraryProvider();
     HaraLibraryProvider task = new StdLibTaskLibraryProvider();
+    assertEquals("std.lib.foundation", foundation.namespace());
+    assertEquals("std/lib/foundation.hal", foundation.fallbackResource());
+    assertTrue(foundation.eager());
+    assertEquals("std.lib.string", string.namespace());
+    assertEquals("std.lib.bytes", bytes.namespace());
+    assertEquals("std.lib.promise", promise.namespace());
+    assertEquals("std.lib.handle", handle.namespace());
+    assertEquals("std.lib.file", file.namespace());
+    assertEquals("std.lib.socket", socket.namespace());
     assertEquals("std.lib.block", block.namespace());
     assertEquals("std.lib.zip", zip.namespace());
     assertEquals("std.lib.context", context.namespace());
     assertEquals("std.lib.task", task.namespace());
+    assertEquals(5, foundation.order());
+    assertEquals(20, string.order());
+    assertEquals(20, bytes.order());
+    assertEquals(20, promise.order());
+    assertEquals(20, handle.order());
+    assertEquals(20, file.order());
+    assertEquals(20, socket.order());
     assertEquals(20, block.order());
     assertEquals(20, zip.order());
     assertEquals(20, context.order());

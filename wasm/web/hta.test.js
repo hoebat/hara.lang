@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { BrowserPromiseProvider, decodeHta, encodeHta, HtaContext, HtaHandle, HtaKeyword, loadHtaExtension, parseHtaManifest } from "./hta.js";
 
-const tensorDescriptor='{:namespace "math.tensor" :version "1" :provider :wasm :module "tensor.wasm" :abi :hta-v1 :exports {"open" {:args [] :returns :value :async true}} :handles {"tensor" {:tag math}} :capabilities []}';
+const tensorDescriptor='{:namespace "math.tensor" :version "1" :provider :wasm :module "tensor.wasm" :abi :hta.v1 :exports {"open" {:args [] :returns :value :async true}} :handles {"tensor" {:tag math}} :capabilities []}';
 
 test("HTA1 browser codec matches the Java/Rust golden vector",()=>{assert.deepEqual([...encodeHta(["x",42,true])],[72,84,65,49,9,0,0,0,3,4,0,0,0,1,120,3,0,0,0,0,0,0,0,42,2]);assert.deepEqual(decodeHta(encodeHta(["x",42,true])),["x",42,true]);});
 test("opaque handles round trip canonically",()=>{const value=new HtaHandle("runtime","cursor",42n);const decoded=decodeHta(encodeHta(value));assert.equal(decoded.owner,"runtime");assert.equal(decoded.type,"cursor");assert.equal(decoded.id,42n);assert.equal(decoded.toString(),"#ht[:handle 42]");});

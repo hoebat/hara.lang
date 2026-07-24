@@ -37,5 +37,9 @@ public class ReplConfigTest {
     assertTrue(config.banner("Truffle", "polyglot").contains("HELLO HARA"));
     assertTrue(config.banner("Truffle", "polyglot").contains("\u001b["));
     assertEquals("quiet", config.withSplash("quiet").splash());
+    String tagline = config.tagline("JOURNEY WITHIN");
+    assertTrue(tagline.contains("\u001b[38;2;"));
+    assertFalse(tagline.contains("\u001b[48;"));
+    assertEquals("JOURNEY WITHIN", config.withColor(false).tagline("JOURNEY WITHIN"));
   }
 }

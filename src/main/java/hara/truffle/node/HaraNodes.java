@@ -1667,7 +1667,7 @@ public final class HaraNodes {
 
   @TruffleBoundary
   private static boolean eqValues(Object left, Object right) {
-    return Eq.eq(left, right);
+    return Eq.eq(HaraBox.unwrap(left), HaraBox.unwrap(right));
   }
 
   @TruffleBoundary

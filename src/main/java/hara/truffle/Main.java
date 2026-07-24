@@ -113,6 +113,13 @@ public final class Main {
     if ("conformance".equals(args[0])) {
       return runConformance(output, error);
     }
+    if ("extension".equals(args[0])) {
+      return HaraExtensionTool.run(
+          java.util.Arrays.copyOfRange(args, 1, args.length),
+          capabilities.process,
+          output,
+          error);
+    }
 
     try {
       String source;
@@ -141,7 +148,6 @@ public final class Main {
       }
 
       try (Context context = context(capabilities)) {
-        context.eval(HaraLanguage.ID, "(load-resource \"hara/l0-core.hal\")");
         Value result = context.eval(HaraLanguage.ID, source);
         output.println(display(result));
       }
@@ -161,7 +167,8 @@ public final class Main {
       return 2;
     }
     try (HaraSessionBroker broker =
-            new HaraSessionBroker(capabilities.file, capabilities.network);
+            new HaraSessionBroker(
+            capabilities.file, capabilities.network, capabilities.process);
         HaraServer server =
             new HaraServer(
                 broker, capabilities.host, capabilities.port, capabilities.logRequests)) {
@@ -334,7 +341,8 @@ public final class Main {
       Capabilities capabilities,
       boolean enableResp) {
     try (HaraSessionBroker broker =
-        new HaraSessionBroker(capabilities.file, capabilities.network)) {
+        new HaraSessionBroker(
+            capabilities.file, capabilities.network, capabilities.process)) {
       RespController resp =
           new RespController(
               broker, capabilities.host, capabilities.port, capabilities.logRequests);
@@ -398,13 +406,17 @@ public final class Main {
             .allowHostFileAccess(capabilities.file)
             .allowHostSocketAccess(capabilities.network)
             .build();
-    return Context.newBuilder(HaraLanguage.ID).allowIO(access).build();
+    return Context.newBuilder(HaraLanguage.ID)
+        .allowCreateProcess(capabilities.process)
+        .allowIO(access)
+        .build();
   }
 
   private static Capabilities parseCapabilities(String[] arguments) {
     ArrayList<String> positional = new ArrayList<>();
     boolean file = false;
     boolean network = false;
+    boolean process = false;
     boolean offline = false;
     boolean logRequests = false;
     boolean noHistory = false;
@@ -420,6 +432,7 @@ public final class Main {
         options = false;
       } else if (options && "--allow-file".equals(argument)) file = true;
       else if (options && "--allow-net".equals(argument)) network = true;
+      else if (options && "--allow-process".equals(argument)) process = true;
       else if (options && "--offline".equals(argument)) offline = true;
       else if (options && "--log-requests".equals(argument)) logRequests = true;
       else if (options && "--no-history".equals(argument)) noHistory = true;
@@ -444,6 +457,7 @@ public final class Main {
     return new Capabilities(
         file,
         network,
+        process,
         offline,
         host,
         port,
@@ -479,6 +493,7 @@ public final class Main {
   private static final class Capabilities {
     private final boolean file;
     private final boolean network;
+    private final boolean process;
     private final boolean offline;
     private final String host;
     private final int port;
@@ -492,6 +507,7 @@ public final class Main {
     private Capabilities(
         boolean file,
         boolean network,
+        boolean process,
         boolean offline,
         String host,
         int port,
@@ -503,6 +519,7 @@ public final class Main {
         String[] arguments) {
       this.file = file;
       this.network = network;
+      this.process = process;
       this.offline = offline;
       this.host = host;
       this.port = port;
@@ -537,6 +554,8 @@ public final class Main {
               .terminal(terminal)
               .parser(new LispLineParser())
               .highlighter(new SlashCommandHighlighter())
+              .option(LineReader.Option.AUTO_LIST, true)
+              .option(LineReader.Option.AUTO_MENU, true)
               .completer(new HaraCompleter(session));
       if (!capabilities.noHistory) {
         builder
@@ -568,19 +587,29 @@ public final class Main {
       StringBuilder source = new StringBuilder();
       long lastElapsedNanos = -1L;
       String namespace = session.currentNamespace();
+      int walkthroughStep = 0;
       while (true) {
         try {
           String prompt =
               source.length() == 0
                   ? config.sessionPrompt(namespace)
                   : config.continuationPrompt();
-          String line = reader.readLine(prompt, resp.rightPrompt(), (Character) null, null);
+          String line = reader.readLine(prompt, "", (Character) null, null);
           if (source.length() == 0) {
             String command = line.strip();
             if ("/quit".equals(command) || "/exit".equals(command) || ":quit".equals(command))
               return 0;
             if ("/help".equals(command) || ":help".equals(command)) {
               printInteractiveHelp(terminal);
+              continue;
+            }
+            if (command.equals("/docs") || command.startsWith("/docs ")) {
+              printDocs(terminal, command.length() == 5 ? "" : command.substring(6).strip());
+              continue;
+            }
+            if (command.equals("/walkthrough") || command.startsWith("/walkthrough ")) {
+              String action = command.length() == 12 ? "" : command.substring(13).strip();
+              walkthroughStep = printWalkthrough(terminal, action, walkthroughStep);
               continue;
             }
             if (command.startsWith("/history") || command.startsWith(":history")) {
@@ -676,22 +705,53 @@ public final class Main {
       terminal.writer().println();
     }
     terminal.writer().println("HARA · TRUFFLE                                      SESSION ROOT");
-    terminal.writer().println("Journey Within");
+    terminal.writer().println(config.tagline("JOURNEY WITHIN"));
     terminal.writer().println("────────────────────────────────────────────────────────────────");
     terminal.writer().println();
     terminal
         .writer()
-        .println("  /help  Help       /history  History      /status  Status");
+        .println("  /docs  Docs       /walkthrough  Tour");
     terminal
         .writer()
-        .println("  /resp  Listener   /clear    Clear        /quit    Exit");
+        .println("  /help  Help       /history      History");
+    terminal
+        .writer()
+        .println("  /status Status    /resp         Listener");
+    terminal
+        .writer()
+        .println("  /clear Clear      /quit         Exit");
     terminal.writer().println();
     terminal.writer().println("RESP  " + resp.status());
     terminal.writer().println();
     terminal.writer().flush();
   }
 
+  private static final String[][] DOC_TOPICS = {
+    {"language", "forms, literals, and evaluation"},
+    {"collections", "vectors, maps, sets, and sequences"},
+    {"functions", "bindings, functions, and metadata"},
+    {"namespaces", ".hal files, :require, and :import"},
+    {"interop", "platform-neutral member access"},
+    {"repl", "discovery and terminal commands"}
+  };
+
+  private static final String[][] WALKTHROUGH_ACTIONS = {
+    {"next", "continue to the next page"},
+    {"prev", "return to the previous page"},
+    {"1", "expressions"}, {"2", "data"}, {"3", "bindings and functions"},
+    {"4", "namespaces and packages"}, {"5", "discover and connect"},
+    {"stop", "close the walkthrough"}
+  };
+
+  private static final String[][] RESP_ACTIONS = {
+    {"start", "start the listener"},
+    {"stop", "stop the listener and keep ROOT"},
+    {"restart", "restart, optionally at HOST:PORT"}
+  };
+
   private static final String[][] REPL_COMMANDS = {
+    {"/docs", "browse built-in language documentation"},
+    {"/walkthrough", "start the guided Hara walkthrough"},
     {"/help", "show REPL commands"},
     {"/history", "show persistent input history"},
     {"/clear", "clear the terminal and redraw the header"},
@@ -779,10 +839,163 @@ public final class Main {
     }
   }
 
+  private static final String[][] WALKTHROUGH = {
+    {
+      "Expressions",
+      "Hara evaluates data-shaped expressions from the inside out.",
+      "Try: (+ 1 2 3)"
+    },
+    {
+      "Data",
+      "Vectors, maps, sets, keywords, strings, and numbers are literal values.",
+      "Try: (get {:name \"Hara\" :kind :language} :name)"
+    },
+    {
+      "Bindings and functions",
+      "Use let for local names and fn for reusable behavior.",
+      "Try: (let [double (fn [x] (* x 2))] (double 21))"
+    },
+    {
+      "Namespaces and packages",
+      "Hara source files use .hal; ns :require loads packaged interfaces.",
+      "Example: (ns app.core (:require [demo.000-answer-42 :as answer]))"
+    },
+    {
+      "Discover and connect",
+      "Use /doc SYMBOL and /apropos QUERY to explore; /resp controls the listener.",
+      "Try: /doc map"
+    }
+  };
+
+  private static void printDocs(Terminal terminal, String requestedTopic) {
+    String topic = requestedTopic.toLowerCase(java.util.Locale.ROOT);
+    terminal.writer().println();
+    switch (topic) {
+      case "":
+        terminal.writer().println("HARA DOCS");
+        terminal.writer().println("  /docs language      forms, literals, and evaluation");
+        terminal.writer().println("  /docs collections   vectors, maps, sets, and sequences");
+        terminal.writer().println("  /docs functions     bindings, functions, and metadata");
+        terminal.writer().println("  /docs namespaces    .hal files, ns, :require, and :import");
+        terminal.writer().println("  /docs interop       platform-neutral member access");
+        terminal.writer().println("  /docs repl          discovery and terminal commands");
+        terminal.writer().println();
+        terminal.writer().println("Use /doc SYMBOL for live API metadata or /walkthrough to learn by doing.");
+        break;
+      case "language":
+      case "basics":
+        printDocSection(
+            terminal,
+            "LANGUAGE",
+            "Lists are calls: (+ 1 2) evaluates to 3.",
+            "Literal data includes nil, booleans, numbers, strings, keywords, vectors, maps, and sets.",
+            "Core forms include quote, if, do, let, fn, def, and ns.");
+        break;
+      case "collections":
+        printDocSection(
+            terminal,
+            "COLLECTIONS",
+            "Vectors: [1 2 3]    Maps: {:name \"Hara\"}    Sets: #{:a :b}",
+            "Use get, assoc, dissoc, conj, count, first, rest, map, filter, and reduce.",
+            "Collections are persistent values; updates return a new value.");
+        break;
+      case "functions":
+        printDocSection(
+            terminal,
+            "FUNCTIONS",
+            "Anonymous: (fn [x] (* x x))",
+            "Named: (def square (fn [x] (* x x)))",
+            "Functions support fixed and variadic parameter lists; /doc shows arglists and metadata.");
+        break;
+      case "namespaces":
+      case "packages":
+        printDocSection(
+            terminal,
+            "NAMESPACES · PACKAGES",
+            "Hara source files use the .hal extension.",
+            "Declare dependencies in ns with :require and aliases with :as.",
+            "JVM-specific capabilities belong behind packaged modules and explicit :import declarations.");
+        break;
+      case "interop":
+        printDocSection(
+            terminal,
+            "INTEROP",
+            "The . form is the platform-neutral member operation.",
+            "(. value member args...) invokes a member; (. value field field) reads a field.",
+            "The active runtime decides how those operations map onto JVM, Truffle, or packaged values.");
+        break;
+      case "repl":
+      case "terminal":
+        printDocSection(
+            terminal,
+            "REPL",
+            "Tab completes slash commands and visible symbols at the cursor.",
+            "Use /doc SYMBOL, /apropos QUERY, /history, /time, /status, and /resp.",
+            "Use /walkthrough next and /walkthrough prev to navigate the guided tour.");
+        break;
+      default:
+        terminal.writer().println("Unknown docs topic: " + requestedTopic);
+        terminal.writer().println("Try /docs for the topic index.");
+    }
+    terminal.writer().println();
+    terminal.writer().flush();
+  }
+
+  private static void printDocSection(Terminal terminal, String title, String... lines) {
+    terminal.writer().println(title);
+    for (String line : lines) terminal.writer().println("  " + line);
+  }
+
+  private static int printWalkthrough(Terminal terminal, String action, int currentStep) {
+    String value = action.toLowerCase(java.util.Locale.ROOT);
+    if ("stop".equals(value) || "exit".equals(value)) {
+      terminal.writer().println();
+      terminal.writer().println("Walkthrough closed. Use /walkthrough to begin again.");
+      terminal.writer().println();
+      terminal.writer().flush();
+      return 0;
+    }
+    int step;
+    if (value.isEmpty() || "start".equals(value)) step = 1;
+    else if ("next".equals(value)) step = Math.min(WALKTHROUGH.length, Math.max(1, currentStep + 1));
+    else if ("prev".equals(value) || "previous".equals(value))
+      step = Math.max(1, currentStep <= 1 ? 1 : currentStep - 1);
+    else {
+      try {
+        step = Integer.parseInt(value);
+      } catch (NumberFormatException error) {
+        terminal.writer().println("Usage: /walkthrough [next|prev|1-5|stop]");
+        terminal.writer().println();
+        terminal.writer().flush();
+        return currentStep;
+      }
+      if (step < 1 || step > WALKTHROUGH.length) {
+        terminal.writer().println("Walkthrough step must be between 1 and " + WALKTHROUGH.length + ".");
+        terminal.writer().println();
+        terminal.writer().flush();
+        return currentStep;
+      }
+    }
+    String[] page = WALKTHROUGH[step - 1];
+    terminal.writer().println();
+    terminal.writer().println("WALKTHROUGH " + step + "/" + WALKTHROUGH.length + " · " + page[0]);
+    terminal.writer().println("  " + page[1]);
+    terminal.writer().println("  " + page[2]);
+    terminal.writer().println();
+    if (step < WALKTHROUGH.length) terminal.writer().println("  Continue: /walkthrough next");
+    else terminal.writer().println("  Complete. Use /docs to keep exploring.");
+    terminal.writer().println("  Navigate: /walkthrough prev · /walkthrough 1-5 · /walkthrough stop");
+    terminal.writer().println();
+    terminal.writer().flush();
+    return step;
+  }
+
   private static void printInteractiveHelp(Terminal terminal) {
     terminal.writer().println();
     terminal.writer().println("REPL");
     printHelpEntry(terminal, "/help", "show this command guide");
+    printHelpEntry(terminal, "/docs [TOPIC]", "browse built-in Hara documentation");
+    printHelpEntry(terminal, "/walkthrough [next|prev|1-5|stop]", "navigate the guided tour");
     printHelpEntry(terminal, "/history [QUERY]", "search persistent input history");
     printHelpEntry(terminal, "/clear", "clear the terminal and redraw the menu");
     printHelpEntry(terminal, "/splash", "redraw the splash and menu");
@@ -869,11 +1082,12 @@ public final class Main {
     output.println("hara [--allow-file] [--allow-net] run <file>");
     output.println("hara [--allow-file] [--allow-net] stdin");
     output.println("hara conformance");
+    output.println("hara extension [check|build|install|test] ...");
     output.println();
     output.println("Options:");
     output.println("  --host HOST, --host=HOST");
     output.println("  --port PORT, --port=PORT");
-    output.println("  --offline  --log-requests  --allow-file  --allow-net");
+    output.println("  --offline  --log-requests  --allow-file  --allow-net  --allow-process");
     output.println("  --history PATH  --no-history  --no-splash  --no-color");
   }
 
@@ -920,10 +1134,6 @@ public final class Main {
 
     synchronized String status() {
       return isRunning() ? "● " + endpoint() : "○ offline";
-    }
-
-    synchronized String rightPrompt() {
-      return "RESP " + status();
     }
 
     synchronized String command(String line) {
@@ -983,10 +1193,11 @@ public final class Main {
   }
 
   private static final class SlashCommandHighlighter implements Highlighter {
-    @Override
+
     public AttributedString highlight(LineReader reader, String buffer) {
-      String suggestion = "";
-      if (reader.getBuffer().cursor() == buffer.length()
+      String suggestion = argumentHint(buffer);
+      if (suggestion.isEmpty()
+          && reader.getBuffer().cursor() == buffer.length()
           && buffer.startsWith("/")
           && buffer.indexOf(' ') < 0) {
         for (String[] command : REPL_COMMANDS) {
@@ -997,7 +1208,52 @@ public final class Main {
         }
       }
       reader.setTailTip(suggestion);
-      return new AttributedString(buffer);
+      if (!buffer.startsWith("/")) return new AttributedString(buffer);
+      int separator = buffer.indexOf(' ');
+      String command = separator < 0 ? buffer : buffer.substring(0, separator);
+      boolean known = false;
+      for (String[] candidate : REPL_COMMANDS) {
+        if (candidate[0].equals(command)
+            || (separator < 0 && candidate[0].startsWith(command))) {
+          known = true;
+          break;
+        }
+      }
+      String color = known ? "\u001b[36;1m" : "\u001b[31;1m";
+      if (separator < 0) return AttributedString.fromAnsi(color + buffer + "\u001b[0m");
+      return AttributedString.fromAnsi(
+          color
+              + command
+              + "\u001b[0m"
+              + buffer.substring(command.length(), separator + 1)
+              + "\u001b[35m"
+              + buffer.substring(separator + 1)
+              + "\u001b[0m");
+    }
+
+    private String argumentHint(String buffer) {
+      if ("/docs".equals(buffer))
+        return "  [language · collections · functions · namespaces · interop · repl]";
+      if ("/walkthrough".equals(buffer)) return "  [next · prev · 1-5 · stop]";
+      if ("/resp".equals(buffer)) return "  [start · stop · restart]";
+      if ("/doc".equals(buffer)) return "  SYMBOL";
+      if ("/apropos".equals(buffer)) return "  QUERY";
+      if ("/history".equals(buffer)) return "  [QUERY]";
+      String hint = matchingHint(buffer, "/docs ", DOC_TOPICS);
+      if (!hint.isEmpty()) return hint;
+      hint = matchingHint(buffer, "/walkthrough ", WALKTHROUGH_ACTIONS);
+      if (!hint.isEmpty()) return hint;
+      return matchingHint(buffer, "/resp ", RESP_ACTIONS);
+    }
+
+    private String matchingHint(String buffer, String command, String[][] choices) {
+      if (!buffer.startsWith(command)) return "";
+      String prefix = buffer.substring(command.length());
+      for (String[] choice : choices) {
+        if (choice[0].startsWith(prefix))
+          return choice[0].substring(prefix.length()) + "  — " + choice[1];
+      }
+      return "";
     }
 
     @Override
@@ -1036,6 +1292,14 @@ public final class Main {
       int cursor = Math.min(line.cursor(), buffer.length());
       int start = wordStart(buffer, cursor);
       String prefix = buffer.substring(start, cursor);
+      if (buffer.startsWith("/docs ")) {
+        addValueCandidates(prefix, DOC_TOPICS, "Documentation topics", candidates);
+        return;
+      }
+      if (buffer.startsWith("/walkthrough ")) {
+        addValueCandidates(prefix, WALKTHROUGH_ACTIONS, "Walkthrough navigation", candidates);
+        return;
+      }
       if (prefix.startsWith("/")) {
         addCommandCandidates(prefix, candidates);
         return;
@@ -1061,12 +1325,37 @@ public final class Main {
       }
     }
 
+    private void addValueCandidates(
+        String prefix, String[][] values, String group, List<Candidate> candidates) {
+      for (String[] value : values) {
+        if (fuzzyScore(prefix, value[0]) != Integer.MAX_VALUE)
+          candidates.add(
+              new Candidate(value[0], value[0], group, value[1], null, null, true));
+      }
+    }
+
     private void addCommandCandidates(String prefix, List<Candidate> candidates) {
       for (String[] command : REPL_COMMANDS) {
         if (fuzzyScore(prefix, command[0]) != Integer.MAX_VALUE)
           candidates.add(
-              new Candidate(command[0], command[0], "REPL commands", command[1], null, null, true));
+              new Candidate(
+                  command[0],
+                  command[0],
+                  "REPL commands",
+                  command[1],
+                  commandTakesArgument(command[0]) ? " " : null,
+                  null,
+                  !commandTakesArgument(command[0])));
       }
+    }
+
+    private boolean commandTakesArgument(String command) {
+      return "/docs".equals(command)
+          || "/walkthrough".equals(command)
+          || "/resp".equals(command)
+          || "/doc".equals(command)
+          || "/apropos".equals(command)
+          || "/history".equals(command);
     }
 
     private String describe(String name) {

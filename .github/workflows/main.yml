@@ -61,6 +61,7 @@ jobs:
       working-directory: wasm/web
       run: |
         npm run test:hta
+        npm run test:noir
         npm run test:browser
     - name: Set up JDK 21
       uses: actions/setup-java@v4
@@ -114,6 +115,17 @@ jobs:
         targets: wasm32-unknown-unknown
     - name: Build raw Rust WASM extension artifact
       run: ./scripts/build-hara-wasm-raw
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: npm
+        cache-dependency-path: wasm/web/package-lock.json
+    - name: Build packaged Noir extension
+      working-directory: wasm/web
+      run: |
+        npm ci
+        npm run build:noir
     - name: Set up GraalVM
       uses: graalvm/setup-graalvm@v1
       with:
@@ -133,18 +145,19 @@ jobs:
         } 2>&1 | tee target/native-image-metrics.txt
     - name: Run a Native Image smoke test
       run: |
-        mkdir -p target/native-extensions/blockchain/proof/noir
+        mkdir -p target/native-extensions/demo/000-answer-42
         cp wasm/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm \
-          target/native-extensions/blockchain/proof/noir/noir.wasm
-        cp examples/extensions/blockchain/proof/noir/hara.extension.edn \
-          target/native-extensions/blockchain/proof/noir/hara.extension.edn
+          target/native-extensions/demo/000-answer-42/answer-42.wasm
+        cp examples/extensions/demo/000-answer-42/hara.extension.edn \
+          target/native-extensions/demo/000-answer-42/hara.extension.edn
         mkdir -p target/native-extensions/hara/runtime/wasm
         cp wasm/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm \
           target/native-extensions/hara/runtime/wasm/hara.wasm
         cp examples/extensions/hara/runtime/wasm/hara.extension.edn \
           target/native-extensions/hara/runtime/wasm/hara.extension.edn
         test "$(target/hara-truffle conformance)" = "L0 conformance passed: 64 cases"
-        test "$(HARA_EXTENSION_PATH="$PWD/target/native-extensions" target/hara-truffle eval '(ns app (:require [blockchain.proof.noir :as noir])) (noir/add 20 22)')" = "42"
+        test "$(HARA_EXTENSION_PATH="$PWD/target/native-extensions" target/hara-truffle eval '(ns app (:require [demo.000-answer-42 :as answer])) (answer/add 20 22)')" = "42"
+        test "$(HARA_EXTENSION_PATH="$PWD/wasm/web/dist/extensions" target/hara-truffle --allow-process eval '(ns app (:require [blockchain.proof.noir :as noir])) (get (deref (noir/compile {:name "native_smoke" :source "fn main(x: pub Field) { assert(x == 42); }"})) :format)')" = "hara.noir.artifact/v1"
         test "$(HARA_EXTENSION_PATH="$PWD/target/native-extensions" target/hara-truffle eval '(ns app (:require [hara.runtime.wasm :as runtime])) (deref (runtime/eval "(+ 10 (count (deref (host/call \"crypto.hash.sha256\" \"digest\" (bytes 97 98 99)))))"))')" = "42"
         test "$(target/hara-truffle eval '(+ 19 23)')" = "42"
         test "$(target/hara-truffle eval '(bytes/u8 -1)')" = "255"

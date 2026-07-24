@@ -34,7 +34,7 @@ Hara is a small, runtime-neutral language for live systems.
 
 ```clojure
 (ns live.system
-  (:require [hara.lib.promise :as promise]))
+  (:require [std.lib.promise :as promise]))
 
 (promise/then (promise/run discover) render)
 ```

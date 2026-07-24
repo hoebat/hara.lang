@@ -14,12 +14,18 @@ import org.graalvm.polyglot.io.IOAccess;
 final class HaraSessionBroker implements AutoCloseable {
   private final boolean allowFile;
   private final boolean allowNetwork;
+  private final boolean allowProcess;
   private final ConcurrentHashMap<String, HaraSession> sessions = new ConcurrentHashMap<>();
 
   HaraSessionBroker(boolean allowFile, boolean allowNetwork) {
+    this(allowFile, allowNetwork, false);
+  }
+
+  HaraSessionBroker(boolean allowFile, boolean allowNetwork, boolean allowProcess) {
     this.allowFile = allowFile;
     this.allowNetwork = allowNetwork;
-    sessions.put("ROOT", new HaraSession("ROOT", allowFile, allowNetwork));
+    this.allowProcess = allowProcess;
+    sessions.put("ROOT", new HaraSession("ROOT", allowFile, allowNetwork, allowProcess));
   }
 
   HaraSession root() {
@@ -35,7 +41,7 @@ final class HaraSessionBroker implements AutoCloseable {
   synchronized HaraSession create(String value) {
     String name = normalizeName(value);
     if (sessions.containsKey(name)) throw new IllegalArgumentException("SESSION_EXISTS " + name);
-    HaraSession session = new HaraSession(name, allowFile, allowNetwork);
+    HaraSession session = new HaraSession(name, allowFile, allowNetwork, allowProcess);
     sessions.put(name, session);
     return session;
   }
@@ -72,17 +78,18 @@ final class HaraSessionBroker implements AutoCloseable {
     private final String name;
     private final Context context;
 
-    private HaraSession(String name, boolean allowFile, boolean allowNetwork) {
+    private HaraSession(
+        String name, boolean allowFile, boolean allowNetwork, boolean allowProcess) {
       this.name = name;
       context =
           Context.newBuilder(HaraLanguage.ID)
+              .allowCreateProcess(allowProcess)
               .allowIO(
                   IOAccess.newBuilder()
                       .allowHostFileAccess(allowFile)
                       .allowHostSocketAccess(allowNetwork)
                       .build())
               .build();
-      context.eval(HaraLanguage.ID, "(load-resource \"hara/l0-core.hal\")");
     }
 
     String name() {

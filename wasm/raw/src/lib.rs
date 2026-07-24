@@ -415,7 +415,7 @@ pub extern "C" fn eval_i64(source_ptr: *const u8, source_len: usize) -> i64 {
     }
 }
 
-/// Returns zero for a successful evaluation, otherwise a stable core-v1 error code.
+/// Returns zero for a successful evaluation, otherwise a stable core.v1 error code.
 #[no_mangle]
 pub extern "C" fn eval_error_code(source_ptr: *const u8, source_len: usize) -> i32 {
     match source_text(source_ptr, source_len) {

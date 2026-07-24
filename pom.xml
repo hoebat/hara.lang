@@ -118,7 +118,24 @@
 			<resource>
 				<directory>src/main/resources</directory>
 			</resource>
+			<resource>
+				<directory>implementation/src</directory>
+				<includes>
+					<include>**/*.hal</include>
+				</includes>
+			</resource>
 		</resources>
+		<testResources>
+			<testResource>
+				<directory>src/test/resources</directory>
+			</testResource>
+			<testResource>
+				<directory>implementation/test</directory>
+				<includes>
+					<include>**/*.hal</include>
+				</includes>
+			</testResource>
+		</testResources>
 		<plugins>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>

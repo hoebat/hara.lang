@@ -1,8 +1,0 @@
-(ns example.noir-proof
-  (:require [blockchain.proof.noir :as noir]))
-
-;; The example descriptor can be paired with the raw WASM fixture:
-;; cp wasm/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm \
-;;   <extension-root>/blockchain/proof/noir/noir.wasm
-{:version (noir/version)
- :answer (noir/add 20 22)}

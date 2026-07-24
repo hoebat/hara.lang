@@ -65,11 +65,27 @@ export function parseHtaManifest(source) {
   const value = reader.value();
   reader.space();
   if (reader.cursor !== source.length || !(value instanceof Map)) throw new Error("hta/manifest-malformed: expected one EDN map");
-  const namespace = manifestField(value,"namespace"), provider = manifestField(value,"provider"), module = manifestField(value,"module"), abi = manifestField(value,"abi");
-  if (typeof namespace !== "string" || !/^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$/.test(namespace)) throw new Error("hta/manifest-malformed: invalid namespace");
-  if (!(provider instanceof HtaKeyword) || provider.name !== "wasm") throw new Error("hta/manifest-malformed: provider must be :wasm");
-  if (typeof module !== "string" || module.startsWith("/") || module.includes("..") || !module.endsWith(".wasm")) throw new Error("hta/manifest-malformed: invalid module");
-  if (!(abi instanceof HtaKeyword)) throw new Error("hta/manifest-malformed: abi must be a keyword");
+  const namespace = manifestField(value,"namespace"), providerValue = manifestField(value,"provider"), module = manifestField(value,"module"), abiValue = manifestField(value,"abi");
+  if (typeof namespace !== "string" || !/^[a-z][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)+$/.test(namespace)) throw new Error("hta/manifest-malformed: invalid namespace");
+  if (!(providerValue instanceof HtaKeyword) || !["wasm","hta"].includes(providerValue.name)) throw new Error("hta/manifest-malformed: provider must be :wasm or :hta");
+  if (!(abiValue instanceof HtaKeyword)) throw new Error("hta/manifest-malformed: abi must be a keyword");
+  const provider=providerValue.name,abi=abiValue.name;
+  let browserTarget;
+  if (provider === "wasm") {
+    if (!validPackagePath(module,".wasm")) throw new Error("hta/manifest-malformed: invalid module");
+  } else {
+    if (module !== undefined || abi !== "hta.v1") throw new Error("hta/manifest-malformed: HTA targets require :abi :hta.v1 without :module");
+    const targets=manifestField(value,"targets"),browser=targets instanceof Map?manifestField(targets,"browser"):undefined;
+    const browserModule=browser instanceof Map?manifestField(browser,"module"):undefined;
+    const runtime=browser instanceof Map?manifestField(browser,"runtime"):undefined;
+    if (!validPackagePath(browserModule,".mjs") || !(runtime instanceof HtaKeyword) || runtime.name !== "web-worker") throw new Error("hta/manifest-malformed: missing :browser web-worker target");
+    browserTarget=Object.freeze({module:browserModule,runtime:runtime.name});
+  }
+  const assetsValue=manifestField(value,"assets"),assets=[];
+  if (assetsValue !== undefined) {
+    if (!Array.isArray(assetsValue) || assetsValue.some(asset=>!validPackagePath(asset))) throw new Error("hta/manifest-malformed: invalid assets");
+    assets.push(...assetsValue);
+  }
   const handleTags = {}, handles = manifestField(value,"handles");
   if (handles !== undefined) {
     if (!(handles instanceof Map)) throw new Error("hta/manifest-malformed: handles must be a map");
@@ -79,7 +95,11 @@ export function parseHtaManifest(source) {
       handleTags[type] = tag.name;
     }
   }
-  return Object.freeze({namespace,module,abi:abi.name,handleTags:Object.freeze(handleTags)});
+  return Object.freeze({namespace,provider,module,abi,browserTarget,assets:Object.freeze(assets),handleTags:Object.freeze(handleTags)});
+}
+
+function validPackagePath(value,suffix) {
+  return typeof value === "string" && value.length>0 && !value.startsWith("/") && !value.split("/").includes("..") && !value.includes(":") && (!suffix || value.endsWith(suffix));
 }
 
 export async function loadHtaExtension({worker,descriptor,descriptorUrl,packageUrl,moduleBytes,hostCalls={}}) {
@@ -90,12 +110,17 @@ export async function loadHtaExtension({worker,descriptor,descriptorUrl,packageU
     descriptor = await response.text();
   }
   const manifest = parseHtaManifest(descriptor);
+  const base = packageUrl ?? descriptorUrl;
   let moduleUrl;
-  if (moduleBytes === undefined) {
-    const base = packageUrl ?? descriptorUrl;
+  if (manifest.provider === "wasm" && moduleBytes === undefined) {
     if (!base) throw new Error("hta/manifest-missing: packageUrl is required with inline descriptors");
     moduleUrl = new URL(manifest.module,base).toString();
   }
+  if (manifest.provider === "hta" && !worker) {
+    if (!base) throw new Error("hta/manifest-missing: packageUrl is required with inline descriptors");
+    worker = new Worker(new URL(manifest.browserTarget.module,base),{type:"module",name:`hara-${manifest.namespace}`});
+  }
+  if (!worker) throw new Error("hta/worker-missing: worker is required for WASM providers");
   const context = new HtaContext({worker,moduleUrl,moduleBytes,hostCalls,handleTags:manifest.handleTags});
   context.manifest = manifest;
   return context;

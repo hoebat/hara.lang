@@ -1,3 +1,10 @@
+hara.truffle.StdLibFoundationLibraryProvider
+hara.truffle.StdLibStringLibraryProvider
+hara.truffle.StdLibBytesLibraryProvider
+hara.truffle.StdLibPromiseLibraryProvider
+hara.truffle.StdLibHandleLibraryProvider
+hara.truffle.StdLibFileLibraryProvider
+hara.truffle.StdLibSocketLibraryProvider
 hara.truffle.CodeTestLibraryProvider
 hara.truffle.StdBlockLibraryProvider
 hara.truffle.StdZipLibraryProvider

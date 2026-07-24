@@ -665,11 +665,7 @@ public interface Parser {
       @Override
       public ILinearType apply(Reader r, Map opts) {
         ArrayList list = readDelimitedList(']', r, true, opts);
-        if (list.size() > 5) {
-          return vector(list);
-        } else {
-          return tuple(list.toArray());
-        }
+        return vector(list);
       }
     }
 

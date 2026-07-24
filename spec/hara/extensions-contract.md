@@ -37,7 +37,7 @@ An extension package contains a `hara.extension.edn` manifest beside its provide
  :version "0.1.0"
  :provider :wasm
  :module "math.wasm"
- :abi :core-v1
+ :abi :core.v1
  :exports {"add" {:args [:i32 :i32] :returns :i32 :async true}}
  :capabilities []}
 ```
@@ -94,7 +94,7 @@ provider invoke(request-id, function, args)
 ```
 
 WASM providers use a host engine. Compilation, instantiation, export calls, and memory access
-remain behind the provider boundary. `:core-v1` is the direct scalar ABI. `:hta-v1` is the Hara
+remain behind the provider boundary. `:core.v1` is the direct scalar ABI. `:hta.v1` is the Hara
 Transport Adaptor for stateful, promise-returning modules.
 
 ## HTA v1
@@ -138,6 +138,97 @@ They are denied unless the descriptor contains, for example,
 stack traces are not transported. A rejected settlement realizes the corresponding Hara promise
 exceptionally; it is not a Rust panic or a Java exception thrown through WASM.
 
+## Multi-target HTA packages
+
+Extensions implemented by an external toolchain are distributed as built artifacts. The
+development checkout may require package-manager dependencies to produce those artifacts, but a
+Hara project must not require the development dependency tree at runtime.
+
+For Noir, the current build produces deployable JavaScript and WASM assets:
+
+```text
+noir-loader.js              ~5 MB
+noir-wasm.mjs              ~16 MB
+barretenberg*.js            ~4 MB each
+assets/*.worker.js
+```
+
+Although the development checkout needs `node_modules` to build these files, an installed Hara
+project contains only the built result:
+
+```text
+project.hal
+extensions/
+  blockchain/proof/noir/
+    hara.extension.edn
+    node/
+      worker.mjs
+    browser/
+      worker.mjs
+    assets/
+      noir-wasm.mjs
+      barretenberg.js
+      barretenberg-threads.js
+      main.worker.js
+      thread.worker.js
+```
+
+A multi-target descriptor declares target-specific entry points and the shared assets required by
+those entry points:
+
+```clojure
+{:namespace "blockchain.proof.noir"
+ :version "0.1.0"
+ :provider :hta
+ :abi :hta.v1
+
+ :targets
+ {:node
+  {:module "node/worker.mjs"
+   :runtime :process}
+
+  :browser
+  {:module "browser/worker.mjs"
+   :runtime :web-worker}}
+
+ :assets
+ ["assets/noir-wasm.mjs"
+  "assets/barretenberg.js"
+  "assets/barretenberg-threads.js"
+  "assets/main.worker.js"
+  "assets/thread.worker.js"]
+
+ :exports
+ {"compile" {:args [:value] :returns :value :async true}
+  "prove"   {:args [:value :map] :returns :value :async true}
+  "verify"  {:args [:value :value] :returns :boolean :async true}}
+
+ :capabilities []}
+```
+
+The host selects the target. Hara source does not branch on its host environment:
+
+```text
+hara JVM/native image
+        -> :node target
+        -> managed Node subprocess
+        -> HTA over stdin/stdout
+
+Hara in browser
+        -> :browser target
+        -> Web Worker
+        -> HTA over postMessage
+```
+
+Both workers implement the same request operations, values, errors, promises, and artifact
+formats. Only the transport differs. Target modules and every path in `:assets` are package-relative
+paths and must remain inside the extension directory. The runtime validates the selected target
+and all declared assets before starting the worker.
+
+This multi-target descriptor is the required packaging contract for Noir. Both the JVM/native
+registry and browser loader validate it, select their host target, and reject missing or escaping
+assets before worker startup.
+
 The reference package at `examples/extensions/crypto/hash/sha256` is a real, import-free Rust WASM
 extension:
 
@@ -169,28 +260,61 @@ denied capabilities, crashes, timeouts, cancellation, and remote failures. The H
 backed by a capability-checked WASM provider without exposing the engine or HTA mailbox at the
 call site.
 
-## Packaged Noir proof provider
+## Project installation and build workflow
 
-The extension is named `blockchain.proof.noir`. A runnable descriptor template lives at
-`examples/extensions/blockchain/proof/noir/hara.extension.edn`; an installed bundle places that
-descriptor beside `noir.wasm` under the same namespace-derived directory. Requiring the extension
+The nearest `project.hal` fixes the project extension root at `extensions/`. A namespace maps to a
+package directory by replacing dots with path separators, so `blockchain.proof.noir` is discovered
+at `extensions/blockchain/proof/noir/hara.extension.edn`. `hara.extensions.path` and
+`HARA_EXTENSION_PATH` remain explicit additional roots for launchers and test harnesses.
+
+Source checkouts may carry a `hara.build.edn`; installed packages do not. The canonical command
+adapter is explicit and contains no shell interpolation:
+
+```clojure
+{:adapter :command
+ :command ["npm" "run" "build:noir"]
+ :working-directory "../../web"
+ :output "../../web/dist/extensions/blockchain/proof/noir"}
+```
+
+The packaging commands are:
+
+```text
+hara extension check BUILT-PACKAGE
+hara --allow-process extension build SOURCE-PACKAGE
+hara extension install BUILT-PACKAGE
+hara --allow-process extension test BUILT-PACKAGE
+```
+
+`check` validates the descriptor and every declared file. `build` runs the declared adapter and
+validates its output. `install` finds the nearest project, atomically copies only the descriptor,
+target modules, and declared assets, and records SHA-256 hashes in `hara.install.edn`; it refuses to
+overwrite an installed namespace. `test` validates the package and, for a Node HTA target, performs
+the protocol handshake. Process-backed operations are denied unless `--allow-process` is present.
+
+## Packaged answer-42 demonstration
+
+The import-free WASM demonstration is named `demo.000-answer-42`. Its runnable descriptor
+template lives at
+`examples/extensions/demo/000-answer-42/hara.extension.edn`; an installed bundle places that
+descriptor beside `answer-42.wasm` under the same namespace-derived directory. Requiring it
 generates its namespace directly from the declared WASM exports:
 
 ```hal
 (ns proof.example
-  (:require [blockchain.proof.noir :as noir]))
+  (:require [demo.000-answer-42 :as answer]))
 
-(noir/add 20 22)
+(answer/add 20 22)
 ```
 
-No `noir/*` alias or `hara.lib.noir` adapter is installed implicitly. Applications opt into the
-WASM surface through `:require`. Runtime bundles can also be installed under an explicit root in
-`hara.extensions.path` or `HARA_EXTENSION_PATH`, using the same namespace-derived directory layout.
+Applications opt into the WASM surface through `:require`. Runtime bundles can be installed under
+an explicit root in `hara.extensions.path` or `HARA_EXTENSION_PATH`, using the same
+namespace-derived directory layout.
 
-The template works with the repository's raw Rust fixture copied as `noir.wasm`. The initial
-`:core-v1` ABI supports import-free core-WASM functions using `:i32`, `:i64`, `:f32`, `:f64`,
-`:boolean`, and `:void`. Noir compile/prove/verify still needs a standalone artifact implementing a
-future memory-based ABI; its existing JavaScript/worker bundle is not treated as that artifact.
+The template works with the repository's raw Rust fixture copied as `answer-42.wasm`. The initial
+`:core.v1` ABI supports import-free core-WASM functions using `:i32`, `:i64`, `:f32`, `:f64`,
+`:boolean`, and `:void`. The demonstration is deliberately separate from Noir, leaving
+`blockchain.proof.noir` available for the compiler, prover, and verifier integration.
 
 Classpath discovery rejects duplicate namespace packages, malformed manifests, unknown providers,
 unknown modules, and denied capability requests before installing any exported vars.

@@ -7,11 +7,11 @@ Every namespace receives these aliases by default:
 
 | Alias | Generated namespace | Xtalk family |
 | --- | --- | --- |
-| `str/` | `hara.lib.string` | `x:str-*` |
-| `promise/` | `hara.lib.promise` | `x:promise-*`, `x:with-delay` |
-| `bytes/` | `hara.lib.bytes` | byte operations |
-| `socket/` | `hara.lib.socket` | `x:socket-*` |
-| `file/` | `hara.lib.file` | `x:file-*` |
+| `str/` | `std.lib.string` | `x:str-*` |
+| `promise/` | `std.lib.promise` | `x:promise-*`, `x:with-delay` |
+| `bytes/` | `std.lib.bytes` | byte operations |
+| `socket/` | `std.lib.socket` | `x:socket-*` |
+| `file/` | `std.lib.file` | `x:file-*` |
 
 `(ns app)` and `(ns app (:intrinsics :all))` are equivalent. Aliases can be excluded or renamed:
 
@@ -29,7 +29,7 @@ Generated namespaces also work with ordinary namespace clauses:
 ```clojure
 (ns app
   (:intrinsics {:exclude [string]})
-  (:require [hara.lib.string :as text :refer [trim]]))
+  (:require [std.lib.string :as text :refer [trim]]))
 ```
 
 The core constructors are `str`, `promise`, `bytes`, `array`, and `object`. Core also provides

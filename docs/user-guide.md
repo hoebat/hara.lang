@@ -18,9 +18,9 @@ The core is deliberately small. Load optional libraries explicitly:
 
 ```clojure
 (ns app
-  (:require [hara.lib.string :as str]
-            [hara.lib.bytes :as bytes]
-            [hara.lib.promise :as promise]))
+  (:require [std.lib.string :as str]
+            [std.lib.bytes :as bytes]
+            [std.lib.promise :as promise]))
 
 (str/trim "  ready  ")
 ```

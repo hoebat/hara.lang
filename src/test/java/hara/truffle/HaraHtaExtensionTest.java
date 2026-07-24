@@ -85,7 +85,7 @@ public class HaraHtaExtensionTest {
     Files.writeString(
         extension.resolve("hara.extension.edn"),
         "{:namespace \"hara.runtime.wasm\" :version \"0.1.0\" :provider :wasm "
-            + ":module \"hara.wasm\" :abi :hta-v1 "
+            + ":module \"hara.wasm\" :abi :hta.v1 "
             + ":exports {\"eval\" {:args [:value] :returns :value :async true}} "
             + ":capabilities [] "
             + hostCalls

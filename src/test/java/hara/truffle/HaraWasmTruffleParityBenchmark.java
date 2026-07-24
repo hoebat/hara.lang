@@ -41,7 +41,7 @@ public final class HaraWasmTruffleParityBenchmark {
     Files.writeString(
         extension.resolve("hara.extension.edn"),
         "{:namespace \"test.rust.parity\" :version \"0.2.0\" :provider :wasm "
-            + ":module \"hara.wasm\" :abi :core-v1 "
+            + ":module \"hara.wasm\" :abi :core.v1 "
             + ":exports {\"eval_i64\" {:args [:utf8] :returns :i64} "
             + "\"eval_error_code\" {:args [:utf8] :returns :i32}} :capabilities []}");
     Files.copy(ARTIFACT, extension.resolve("hara.wasm"));

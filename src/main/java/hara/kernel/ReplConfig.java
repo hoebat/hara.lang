@@ -153,6 +153,31 @@ public final class ReplConfig {
     return out.toString();
   }
 
+  public String tagline(String text) {
+    if (!color || text.isEmpty()) return text;
+    int[][] stops = {
+      {100, 245, 255}, {45, 145, 255}, {125, 75, 235}, {220, 90, 205}
+    };
+    StringBuilder out = new StringBuilder();
+    for (int index = 0; index < text.length(); index++) {
+      char character = text.charAt(index);
+      if (Character.isWhitespace(character)) {
+        out.append(character);
+        continue;
+      }
+      int[] shade = gradient(index / (double) Math.max(1, text.length() - 1), stops);
+      out.append("\u001b[38;2;")
+          .append(shade[0])
+          .append(';')
+          .append(shade[1])
+          .append(';')
+          .append(shade[2])
+          .append('m')
+          .append(character);
+    }
+    return out.append("\u001b[0m").toString();
+  }
+
   public String prompt(String namespace) {
     return paint("36;1", "hara") + paint("2", "[" + namespace + "] ");
   }
