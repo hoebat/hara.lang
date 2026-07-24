@@ -18,7 +18,7 @@ equivalence metadata for a future `hara.polyglot` adapter, not part of the Hara 
 | array dot methods | matching `x:arr-*` operations |
 | object dot methods | matching `x:obj-*` operations |
 | `bit-and`, `bit-or`, `bit-xor`, `bit-not`, `bit-shift-left`, `bit-shift-right` | matching `x:bit-*` operations |
-| `coroutine/create`, `coroutine/resume`, `coroutine/yield`, `coroutine/status` | `x:coroutine-create`, `x:coroutine-resume`, `x:coroutine-yield`, `x:coroutine-status` |
+| `coroutine/create`, `coroutine/resume`, `coroutine/yield`, `coroutine/status`, `coroutine/close`, `coroutine/await` | `x:coroutine-create`, `x:coroutine-resume`, `x:coroutine-yield`, `x:coroutine-status`, `x:coroutine-close`, `x:coroutine-await` |
 
 `array` and `object` are explicit mutable markers. Their dot-method syntax hides the xtalk
 operation names while preserving mutation returns and callback contracts. `socket/connect` is

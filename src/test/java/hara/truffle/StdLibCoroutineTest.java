@@ -104,6 +104,55 @@ public class StdLibCoroutineTest {
   }
 
   @Test
+  public void multiArgResumeDeliversVectorToYield() {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(require 'std.lib.coroutine)");
+      context.eval(
+          HaraLanguage.ID,
+          "(def c-args (std.lib.coroutine/create"
+              + " (fn [] (let [v (std.lib.coroutine/yield :first)] v))))");
+      assertTrue(
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(= :first (std.lib.coroutine/resume c-args))")
+              .asBoolean());
+      assertEquals(
+          "[9 8]",
+          context.eval(HaraLanguage.ID, "(std.lib.coroutine/resume c-args 9 8)").toString());
+      assertTrue(
+          context
+              .eval(HaraLanguage.ID, "(= :dead (std.lib.coroutine/status c-args))")
+              .asBoolean());
+    }
+  }
+
+  @Test
+  public void closeOnNeverResumedCoroutine() {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(require 'std.lib.coroutine)");
+      context.eval(
+          HaraLanguage.ID,
+          "(def c-unstarted (std.lib.coroutine/create (fn [] :never-runs)))");
+      assertTrue(
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(std.lib.coroutine/coroutine? (std.lib.coroutine/close c-unstarted))")
+              .asBoolean());
+      assertTrue(
+          context
+              .eval(HaraLanguage.ID, "(= :dead (std.lib.coroutine/status c-unstarted))")
+              .asBoolean());
+      PolyglotException error =
+          assertThrows(
+              PolyglotException.class,
+              () -> context.eval(HaraLanguage.ID, "(std.lib.coroutine/resume c-unstarted)"));
+      assertTrue(error.getMessage().contains("dead"));
+    }
+  }
+
+  @Test
   public void multiYieldPacksVectorAndZeroYieldsNil() {
     try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
       context.eval(HaraLanguage.ID, "(require 'std.lib.coroutine)");

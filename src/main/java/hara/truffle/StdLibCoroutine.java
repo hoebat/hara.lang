@@ -85,7 +85,11 @@ public final class StdLibCoroutine {
       }
       Transfer transfer = takeOutput();
       if (transfer.error != null) {
+        if (transfer.error instanceof CoroutineClosed) {
+          throw new HaraException("coroutine/resume: coroutine closed during resume");
+        }
         if (transfer.error instanceof RuntimeException) throw (RuntimeException) transfer.error;
+        if (transfer.error instanceof Error) throw (Error) transfer.error;
         throw new HaraException("coroutine failed: " + transfer.error);
       }
       return transfer.value;
@@ -116,6 +120,8 @@ public final class StdLibCoroutine {
         putOutput(new Transfer(result, null));
       } catch (CoroutineClosed closed) {
         // Closed while parked: the unwinding already ran the body's finally clauses.
+        // Best-effort release of a resumer blocked in takeOutput(); a no-op when none waits.
+        output.offer(new Transfer(null, closed));
         Thread.currentThread().interrupt();
       } catch (Throwable error) {
         status = STATUS_DEAD;
@@ -130,6 +136,9 @@ public final class StdLibCoroutine {
         input.put(value == null ? NIL : value);
       } catch (InterruptedException error) {
         Thread.currentThread().interrupt();
+        status = STATUS_DEAD;
+        Thread parked = thread;
+        if (parked != null) parked.interrupt();
         throw new HaraException("coroutine/resume: interrupted while resuming");
       }
     }
@@ -143,7 +152,7 @@ public final class StdLibCoroutine {
       }
     }
 
-    Object takeInput() {
+    private Object takeInput() {
       try {
         Object value = input.take();
         return value == NIL ? null : value;
@@ -158,6 +167,9 @@ public final class StdLibCoroutine {
         return output.take();
       } catch (InterruptedException error) {
         Thread.currentThread().interrupt();
+        status = STATUS_DEAD;
+        Thread parked = thread;
+        if (parked != null) parked.interrupt();
         throw new HaraException("coroutine/resume: interrupted while waiting for the coroutine");
       }
     }

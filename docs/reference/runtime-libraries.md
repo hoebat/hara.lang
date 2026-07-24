@@ -92,6 +92,8 @@ resume's arguments; `status` reports `:suspended`, `:running`, or `:dead`. With 
 `yield` and resume arguments pack into vectors (single values pass through as-is). Errors inside
 a body rethrow at the resume site and leave the coroutine `:dead`. `close` unwinds a suspended
 coroutine, running its `finally` clauses. `await` blocks the coroutine until a promise settles.
+A single coroutine is not safe for concurrent `resume`/`close` calls from multiple threads;
+resume is synchronous and single-resumer by design.
 Var bindings established around a `resume` do not propagate into the coroutine body. Coroutines
 are currently Truffle-only; the Rust runtime does not implement them yet.
 
