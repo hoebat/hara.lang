@@ -27,6 +27,7 @@ can be excluded or renamed without removing their underlying provider namespaces
 | `std.lib.handle` | `(require 'std.lib.handle)` | Release opaque HTA extension handles | `release` |
 | `std.lib.context` | `(require 'std.lib.context)` | Context registries, spaces, runtime lifecycles, and pointers | `space`, `pointer`, `pointer-deref`, `registry-list` |
 | `std.lib.task` | `(require 'std.lib.task)` | Task definitions, invocation, selection, bulk processing, and summaries | `task`, `invoke`, `bulk`, `bulk-summary` |
+| `std.lib.coroutine` | `(require 'std.lib.coroutine)` | Lua-style coroutines with bidirectional yield and promise await | `create`, `resume`, `yield`, `status`, `close`, `await` |
 | `code.test` | `(require 'code.test)` | Facts, fixtures, matchers, registry inspection, and structured test execution | `fact`, `run`, `contains`, `throws`, `use-fixtures` |
 | `std.resp.client` | explicit `require` | Capability-gated blocking RESP2 connections and pipelines | `connect`, `call`, `pipeline`, `close` |
 
