@@ -78,7 +78,7 @@ public class HaraHtaExtensionTest {
   }
 
   private static void withExtension(String hostCalls, CheckedConsumer operation) throws Exception {
-    assertTrue("build wasm/raw before HTA tests: " + ARTIFACT, Files.isRegularFile(ARTIFACT));
+    assertTrue("build rust/raw before HTA tests: " + ARTIFACT, Files.isRegularFile(ARTIFACT));
     Path root = Files.createTempDirectory("hara-hta-extension-");
     Path extension = root.resolve("hara/runtime/wasm");
     Files.createDirectories(extension);

@@ -12,7 +12,7 @@ mvn -version
 ## 2. Build the Truffle runtime
 
 ```shell
-mvn -Ptruffle package
+mvn -f java/pom.xml -Ptruffle package
 ```
 
 This produces `target/hara-truffle.jar`.
@@ -51,8 +51,8 @@ documentation. See [`docs/user-guide.md`](docs/user-guide.md) and [`spec/hara/re
 ## 6. Run tests
 
 ```shell
-mvn -q test
-mvn -q -Ptruffle -Dtest=hara.truffle.HaraL0ConformanceTest test
+mvn -q -f java/pom.xml test
+mvn -q -f java/pom.xml -Ptruffle -Dtest=hara.truffle.HaraL0ConformanceTest test
 ```
 
 For contributor workflows, test slices, native-image builds, and troubleshooting, read the

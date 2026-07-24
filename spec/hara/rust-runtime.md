@@ -7,10 +7,10 @@ evaluator, protocols, persistent data structures, and provider traits as the bro
 only the host adapters differ.
 
 ```text
-$ cargo run --manifest-path wasm/Cargo.toml --bin hara -- eval '(+ 19 23)'
+$ cargo run --manifest-path rust/Cargo.toml --bin hara -- eval '(+ 19 23)'
 42
 
-$ cargo run --manifest-path wasm/Cargo.toml --bin hara -- --file program.hal
+$ cargo run --manifest-path rust/Cargo.toml --bin hara -- --file program.hal
 ```
 
 With no `eval` or `--file` argument, the executable reads forms from standard input as a small
@@ -54,7 +54,7 @@ operations use providers and return the same stable Hara errors as the Truffle r
 ## Value and ownership model
 
 Persistent values are Hara-owned implementations, split by data structure under
-`wasm/src/lang/data/`. The vector uses a 32-way persistent trie, maps use a native HAMT, sorted
+`rust/src/lang/data/`. The vector uses a 32-way persistent trie, maps use a native HAMT, sorted
 maps use a persistent balanced tree, and the list, queue, ordered collections, sets, trie, tuples,
 symbols, and keywords retain their Java protocol shapes. Structural sharing uses `Rc`; no tracing
 garbage collector or third-party immutable-collection crate is required.
@@ -139,7 +139,7 @@ authority.
 The main workflow verifies all three runtime profiles:
 
 ```text
-native  cargo test --manifest-path wasm/Cargo.toml
+native  cargo test --manifest-path rust/Cargo.toml
 browser cargo build --target wasm32-unknown-unknown --release --lib
         npm run test:hta && npm run test:browser
 wasi    cargo build --target wasm32-wasip1 --release --lib

@@ -22,10 +22,10 @@ Before installing the extension, ensure you have:
 
 #### Step 1: Install Dependencies
 
-Navigate to the `vscode-hara` directory and install the required npm packages:
+Navigate to the `apps/hara-vscode` directory and install the required npm packages:
 
 ```bash
-cd vscode-hara
+cd apps/hara-vscode
 npm install
 ```
 
@@ -45,7 +45,7 @@ You have two options:
 
 **Option A: Development Mode (Recommended for testing)**
 
-1. Open the `vscode-hara` folder in VS Code
+1. Open the `apps/hara-vscode` folder in VS Code
 2. Press `F5` to launch a new VS Code window with the extension loaded
 3. The extension will be active in the Extension Development Host window
 
@@ -288,7 +288,7 @@ For faster workflow, you can add custom keybindings:
 **Solution:**
 - Reload VS Code window (Command Palette → "Developer: Reload Window")
 - Check that the extension is enabled in the Extensions panel
-- If running in development mode, ensure you pressed `F5` from the `vscode-hara` folder
+- If running in development mode, ensure you pressed `F5` from the `apps/hara-vscode` folder
 
 ## Development
 
@@ -308,7 +308,7 @@ npm run watch
 ### Project Structure
 
 ```
-vscode-hara/
+hara-vscode/
 ├── src/
 │   └── extension.ts    # Main extension code
 ├── out/                # Compiled JavaScript (generated)

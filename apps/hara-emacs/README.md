@@ -5,7 +5,7 @@ completion, Xref navigation, Imenu, sessions, project-aware server startup, and 
 uses built-in Emacs APIs; the optional documentation popup uses `eldoc-box`.
 
 ```elisp
-(add-to-list 'load-path "/path/to/hara.lang/emacs-hara")
+(add-to-list 'load-path "/path/to/hara.lang/apps/hara-emacs")
 (require 'hara-mode)
 ```
 
@@ -34,6 +34,6 @@ ElDoc stays silent until the current buffer has explicitly connected to Hara.
 Run tests with:
 
 ```sh
-emacs -Q --batch -L emacs-hara -L emacs-hara/test \
+emacs -Q --batch -L apps/hara-emacs -L apps/hara-emacs/test \
   -l hara-mode-test.el -f ert-run-tests-batch-and-exit
 ```

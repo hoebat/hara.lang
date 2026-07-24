@@ -33,7 +33,7 @@ public class HaraWasmTruffleParityTest {
   @SuppressWarnings({"rawtypes", "unchecked"})
   @Test
   public void sharedCorpusMatchesRustWasmAndTruffle() throws Exception {
-    assertTrue("build wasm/raw before parity tests: " + ARTIFACT, Files.isRegularFile(ARTIFACT));
+    assertTrue("build rust/raw before parity tests: " + ARTIFACT, Files.isRegularFile(ARTIFACT));
     IMapType manifest = readManifest();
     ILinearType<?> cases = requireCases(manifest);
     assertEquals(1024, cases.count());

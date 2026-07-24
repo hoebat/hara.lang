@@ -1,4 +1,4 @@
-# chrome-hara
+# hara-chrome
 
 Chrome (MV3) extension embedding the hara wasm runtime in a DevTools panel.
 

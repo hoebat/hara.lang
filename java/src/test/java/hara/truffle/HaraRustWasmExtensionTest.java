@@ -16,7 +16,7 @@ public class HaraRustWasmExtensionTest {
         Path.of("rust/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm")
             .toAbsolutePath();
     assertTrue(
-        "build wasm/raw before running this integration test: " + artifact,
+        "build rust/raw before running this integration test: " + artifact,
         Files.isRegularFile(artifact));
     Path root = Files.createTempDirectory("hara-rust-wasm-extension-");
     Path extension = root.resolve("test/rust/core");
