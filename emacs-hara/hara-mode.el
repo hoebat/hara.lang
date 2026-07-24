@@ -36,8 +36,19 @@
   "When non-nil, `hara-connect' launches a server if discovery fails."
   :type 'boolean)
 
+(defcustom hara-auto-jack-in-projects t
+  "When non-nil, automatically jack in for files beneath a project.hal.
+Standalone Hara files do not trigger a connection."
+  :type 'boolean)
+
 (defcustom hara-connect-timeout 3.0
   "Seconds allowed for endpoint negotiation and server startup."
+  :type 'number)
+
+(defcustom hara-server-start-timeout 15.0
+  "Seconds allowed for a newly launched Hara server to publish its endpoint.
+This is longer than `hara-connect-timeout' because a changed runtime may
+need one incremental Maven build before its first startup."
   :type 'number)
 
 (defcustom hara-cache-directory
@@ -93,6 +104,7 @@ Set this to nil to retain results until the next edit or evaluation."
 (defvar-local hara--fringe-overlay nil)
 (defvar-local hara--result-timer nil)
 (defvar-local hara--eldoc-generation 0)
+(defvar-local hara--auto-jack-in-timer nil)
 
 (defun hara--line-end (data start)
   (or (string-match "\r\n" data start)
@@ -198,7 +210,10 @@ Return (VALUE . NEXT-OFFSET), or signal `hara-resp-incomplete'."
            (when-let ((failure (plist-get pending :failure)))
              (funcall failure (string-trim event))))
          (hara-connection-pending connection))
-        (clrhash (hara-connection-pending connection))))))
+        (clrhash (hara-connection-pending connection))
+        (when (eq (gethash (hara-connection-root connection) hara--connections)
+                  connection)
+          (remhash (hara-connection-root connection) hara--connections))))))
 
 (defun hara--handle-frame (process frame)
   (if (not (process-get process 'hara-negotiated))
@@ -233,6 +248,48 @@ Return (VALUE . NEXT-OFFSET), or signal `hara-resp-incomplete'."
         (when-let ((project (project-current nil)))
           (project-root project))
         default-directory))))
+
+(defun hara--project-file-root ()
+  "Return the nearest project.hal root for the current local file."
+  (when (and buffer-file-name
+             (not (file-remote-p buffer-file-name)))
+    (when-let ((root (locate-dominating-file
+                      (file-name-directory buffer-file-name)
+                      "project.hal")))
+      (file-name-as-directory (file-truename root)))))
+
+(defun hara--auto-jack-in ()
+  (setq hara--auto-jack-in-timer nil)
+  (when (and hara-auto-jack-in-projects
+             (derived-mode-p 'hara-mode)
+             (not (and hara--connection
+                       (process-live-p
+                        (hara-connection-process hara--connection))))
+             (hara--project-file-root))
+    (condition-case error
+        (hara-jack-in)
+      (error
+       (display-warning
+        'hara
+        (format "Automatic Hara jack-in failed: %s"
+                (error-message-string error))
+        :warning)))))
+
+(defun hara--schedule-auto-jack-in ()
+  (when (and hara-auto-jack-in-projects
+             (hara--project-file-root)
+             (not (and hara--connection
+                       (process-live-p
+                        (hara-connection-process hara--connection))))
+             (not (timerp hara--auto-jack-in-timer)))
+    (let ((buffer (current-buffer)))
+      (setq hara--auto-jack-in-timer
+            (run-at-time
+             0 nil
+             (lambda ()
+               (when (buffer-live-p buffer)
+                 (with-current-buffer buffer
+                   (hara--auto-jack-in)))))))))
 
 (defun hara--cache-file (root)
   (expand-file-name
@@ -315,10 +372,25 @@ Return (VALUE . NEXT-OFFSET), or signal `hara-resp-incomplete'."
       (hara--open-endpoint root host port instance)
     (error nil)))
 
+(defun hara--server-process-filter (server output)
+  "Collect SERVER output and detect an endpoint across chunk boundaries."
+  (when-let ((buffer (process-buffer server)))
+    (with-current-buffer buffer
+      (goto-char (point-max))
+      (insert output)
+      (save-excursion
+        (goto-char (point-min))
+        (when (re-search-forward
+               "HARA RESP \\([^:\n]+\\):\\([0-9]+\\)" nil t)
+          (process-put server 'hara-endpoint
+                       (cons (match-string 1)
+                             (string-to-number (match-string 2)))))))))
+
 (defun hara--start-server (root)
   (let* ((buffer (get-buffer-create
                   (format " *hara-server %s*" (file-name-nondirectory
                                                 (directory-file-name root)))))
+         (_ (with-current-buffer buffer (erase-buffer)))
          (default-directory root)
          (process
           (make-process
@@ -330,18 +402,8 @@ Return (VALUE . NEXT-OFFSET), or signal `hara-resp-incomplete'."
            :coding 'utf-8 :noquery t
            :connection-type 'pipe))
          endpoint)
-    (set-process-filter
-     process
-     (lambda (server output)
-       (with-current-buffer (process-buffer server)
-         (goto-char (point-max))
-         (insert output))
-       (when (string-match
-              "HARA RESP \\([^:\n]+\\):\\([0-9]+\\)" output)
-         (process-put server 'hara-endpoint
-                      (cons (match-string 1 output)
-                            (string-to-number (match-string 2 output)))))))
-    (let ((deadline (+ (float-time) hara-connect-timeout)))
+    (set-process-filter process #'hara--server-process-filter)
+    (let ((deadline (+ (float-time) hara-server-start-timeout)))
       (while (and (not (setq endpoint (process-get process 'hara-endpoint)))
                   (process-live-p process)
                   (< (float-time) deadline))
@@ -357,7 +419,12 @@ Return (VALUE . NEXT-OFFSET), or signal `hara-resp-incomplete'."
        (signal (car error) (cdr error))))))
 
 (defun hara--discover-connection (root)
-  (or (gethash root hara--connections)
+  (let ((existing (gethash root hara--connections)))
+    (unless (and existing
+                 (process-live-p (hara-connection-process existing)))
+      (when existing (remhash root hara--connections))
+      (setq existing nil))
+    (or existing
       (let* ((cache (hara--read-cache root))
              (cached
               (and cache
@@ -374,7 +441,7 @@ Return (VALUE . NEXT-OFFSET), or signal `hara-resp-incomplete'."
           (error "No Hara server found for %s" root))
         (puthash root connection hara--connections)
         (hara--write-cache connection)
-        connection)))
+        connection))))
 
 ;;;###autoload
 (defun hara-connect ()
@@ -419,6 +486,9 @@ Return (VALUE . NEXT-OFFSET), or signal `hara-resp-incomplete'."
     (message "Hara disconnected")))
 
 (defun hara--connection ()
+  (unless (and hara--connection
+               (process-live-p (hara-connection-process hara--connection)))
+    (setq-local hara--connection nil))
   (or hara--connection (hara-connect)))
 
 (defun hara--next-id (connection)
@@ -510,6 +580,18 @@ Return (VALUE . NEXT-OFFSET), or signal `hara-resp-incomplete'."
     (put-text-property 0 1 'cursor 0 display)
     display))
 
+(defun hara--result-face (type)
+  "Return the result face for TYPE, preferring CIDER's themed faces."
+  (pcase type
+    ('error
+     (if (facep 'cider-error-overlay-face)
+         'cider-error-overlay-face
+       'hara-inline-error-face))
+    (_
+     (if (facep 'cider-result-overlay-face)
+         'cider-result-overlay-face
+       'hara-inline-result-face))))
+
 (defun hara--display-inline (marker value face)
   (when (and (markerp marker) (marker-buffer marker))
     (with-current-buffer (marker-buffer marker)
@@ -533,7 +615,9 @@ Return (VALUE . NEXT-OFFSET), or signal `hara-resp-incomplete'."
              fringe 'before-string
              (propertize " " 'display
                          `(left-fringe empty-line
-                                       ,(if (eq face 'hara-inline-error-face)
+                                       ,(if (memq face
+                                                  '(hara-inline-error-face
+                                                    cider-error-overlay-face))
                                             'hara-inline-error-fringe-face
                                           'hara-inline-fringe-face))))
             (setq hara--result-overlay overlay
@@ -552,7 +636,7 @@ Return (VALUE . NEXT-OFFSET), or signal `hara-resp-incomplete'."
 (defun hara--display-result (connection value &optional marker)
   (message "=> %s" value)
   (when marker
-    (hara--display-inline marker value 'hara-inline-result-face))
+    (hara--display-inline marker value (hara--result-face 'result)))
   (when-let ((buffer (get-buffer "*Hara REPL*")))
     (with-current-buffer buffer
       (when (eq hara--repl-connection connection)
@@ -582,7 +666,7 @@ Return (VALUE . NEXT-OFFSET), or signal `hara-resp-incomplete'."
                      (hara--show-error error)
                      (hara--display-inline
                       marker (format "%s: %s" (car error) (cadr error))
-                      'hara-inline-error-face)
+                      (hara--result-face 'error))
                      (when (markerp marker) (set-marker marker nil))))))
 
 ;;;###autoload
@@ -616,16 +700,23 @@ Return (VALUE . NEXT-OFFSET), or signal `hara-resp-incomplete'."
       (hara-eval-region (point) end))))
 
 (defun hara-completion-at-point ()
-  (when-let ((connection hara--connection))
-    (let ((end (point))
-          (start (save-excursion
-                   (skip-syntax-backward "w_./*+!?<>=:-")
-                   (point))))
-      (list start end
-            (hara--request-sync
-             connection "COMPLETE"
-             (list (buffer-substring-no-properties start end)))
-            :exclusive 'no))))
+  (when-let ((connection
+              (and hara--connection
+                   (process-live-p (hara-connection-process hara--connection))
+                   hara--connection)))
+    (condition-case error
+        (let ((end (point))
+              (start (save-excursion
+                       (skip-syntax-backward "w_./*+!?<>=:-")
+                       (point))))
+          (list start end
+                (hara--request-sync
+                 connection "COMPLETE"
+                 (list (buffer-substring-no-properties start end)))
+                :exclusive 'no))
+      (error
+       (message "Hara completion unavailable: %s" (error-message-string error))
+       nil))))
 
 (defun hara--symbol-at-point ()
   (let ((start (save-excursion
@@ -884,7 +975,8 @@ Return (VALUE . NEXT-OFFSET), or signal `hara-resp-incomplete'."
   (add-hook 'eldoc-documentation-functions #'hara-eldoc-function nil t)
   (add-hook 'xref-backend-functions #'hara--xref-backend nil t)
   (add-hook 'after-change-functions #'hara--clear-result-overlay nil t)
-  (eldoc-mode 1))
+  (eldoc-mode 1)
+  (hara--schedule-auto-jack-in))
 
 (define-minor-mode hara-connected-mode
   "Show and manage the current Hara project connection."

@@ -13,7 +13,7 @@
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<mainclass>hara.kernel.Main</mainclass>
-		<graalvm.version>23.1.2</graalvm.version>
+		<graalvm.version>25.0.3</graalvm.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -154,6 +154,27 @@
 				</configuration>
 			</plugin>
 			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>exec-maven-plugin</artifactId>
+				<version>3.5.0</version>
+				<executions>
+					<execution>
+						<id>compile-foundation-hir</id>
+						<phase>compile</phase>
+						<goals><goal>java</goal></goals>
+						<configuration>
+							<mainClass>hara.truffle.Main</mainClass>
+							<arguments>
+								<argument>compile-hir</argument>
+								<argument>${project.basedir}/implementation/src/std/lib/foundation.hal</argument>
+								<argument>--output</argument>
+								<argument>${project.build.outputDirectory}/std/lib/foundation.hir</argument>
+							</arguments>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-jar-plugin</artifactId>
 				<version>2.4</version>
@@ -285,7 +306,7 @@
 									<goal>shade</goal>
 								</goals>
 								<configuration>
-									<finalName>hara-truffle</finalName>
+									<outputFile>${project.build.directory}/hara-truffle.jar</outputFile>
 									<createDependencyReducedPom>false</createDependencyReducedPom>
 									<transformers>
 										<transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />

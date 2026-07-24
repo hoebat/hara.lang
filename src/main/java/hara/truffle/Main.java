@@ -57,6 +57,14 @@ public final class Main {
   }
 
   static int run(String[] args, InputStream input, PrintStream output, PrintStream error) {
+    if (args.length > 0 && "compile-hir".equals(args[0])) {
+      return HirCompiler.run(
+          java.util.Arrays.copyOfRange(args, 1, args.length), output, error);
+    }
+    if (args.length > 0 && "foundation-hir-benchmark".equals(args[0])) {
+      return FoundationHirBenchmark.run(
+          java.util.Arrays.copyOfRange(args, 1, args.length), output, error);
+    }
     Capabilities capabilities;
     try {
       capabilities = parseCapabilities(args);
@@ -112,6 +120,10 @@ public final class Main {
     }
     if ("conformance".equals(args[0])) {
       return runConformance(output, error);
+    }
+    if ("benchmark".equals(args[0])) {
+      return HaraRuntimeBenchmark.run(
+          java.util.Arrays.copyOfRange(args, 1, args.length), output, error);
     }
     if ("extension".equals(args[0])) {
       return HaraExtensionTool.run(
@@ -388,7 +400,7 @@ public final class Main {
             if (!isComplete(source)) continue;
             history.add(source.toString().stripTrailing());
             try {
-              output.println(display(broker.root().eval(source.toString())));
+              output.println("=> " + display(broker.root().eval(source.toString())));
             } catch (RuntimeException exception) {
               error.println(exception.getMessage());
             }
@@ -686,7 +698,7 @@ public final class Main {
           if (!isComplete(source)) continue;
           long started = System.nanoTime();
           try {
-            output.println(display(session.eval(source.toString())));
+            output.println("=> " + display(session.eval(source.toString())));
             output.println();
             namespace = session.currentNamespace();
           } catch (RuntimeException exception) {
@@ -1035,7 +1047,7 @@ public final class Main {
     terminal.writer().printf("  %-36s %s%n", command, description);
   }
 
-  private static String display(Value result) {
+  static String display(Value result) {
     if (result.isNull()) return "nil";
     if (result.isHostObject() && result.asHostObject() instanceof Iterator<?>) {
       return "#<lazy-iterator>";

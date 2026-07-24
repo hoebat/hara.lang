@@ -13,6 +13,17 @@ Open a `.hal` file and run `M-x hara-jack-in` or press `C-c C-j`. The client fir
 validated project endpoint, then checks `hara-host`/`hara-port`, and finally starts
 `hara --port 0 headless`. Emacs-owned servers stop on `M-x hara-disconnect`.
 
+By default, opening a local `.hal` file beneath a directory containing `project.hal` schedules
+`hara-jack-in` automatically. Standalone and remote files remain disconnected. Customize
+`hara-auto-jack-in-projects` to disable this behavior.
+
+The `hara` launcher executes the prebuilt `target/hara-truffle.jar`; it never invokes Maven during
+jack-in. Build or refresh that executable fat JAR explicitly with
+`mvn -Ptruffle -DskipTests package`. Override its location with `HARA_RUNTIME_JAR` when using an
+installed artifact. New-server endpoint publication may wait up to `hara-server-start-timeout`
+(15 seconds by default), while normal endpoint negotiation retains the shorter
+`hara-connect-timeout`.
+
 Common commands:
 
 - `C-c C-e`: evaluate the preceding form

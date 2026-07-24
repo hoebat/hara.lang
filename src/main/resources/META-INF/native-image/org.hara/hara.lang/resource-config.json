@@ -8,6 +8,9 @@
         "pattern": "std/.*\\.hal"
       },
       {
+        "pattern": "std/.*\\.hir"
+      },
+      {
         "pattern": "spec/hara/.*\\.edn"
       },
       {

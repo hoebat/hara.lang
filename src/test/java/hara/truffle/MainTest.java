@@ -9,6 +9,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Base64;
 import org.junit.Test;
 
 public class MainTest {
@@ -145,7 +146,7 @@ public class MainTest {
             new PrintStream(error, true, StandardCharsets.UTF_8));
 
     assertEquals(0, status);
-    assertTrue(output.toString(StandardCharsets.UTF_8).contains("#'user/answer\n42\n3\n"));
+    assertTrue(output.toString(StandardCharsets.UTF_8).contains("=> #'user/answer\n=> 42\n=> 3\n"));
     assertEquals("", error.toString(StandardCharsets.UTF_8));
   }
 
@@ -164,7 +165,7 @@ public class MainTest {
             new PrintStream(error, true, StandardCharsets.UTF_8));
 
     assertEquals(0, status);
-    assertTrue(output.toString(StandardCharsets.UTF_8).contains("42\n"));
+    assertTrue(output.toString(StandardCharsets.UTF_8).contains("=> 42\n"));
     assertEquals("Unbound symbol: missing\n", error.toString(StandardCharsets.UTF_8));
   }
 
@@ -225,6 +226,28 @@ public class MainTest {
             new PrintStream(error, true, StandardCharsets.UTF_8));
     assertEquals(2, invalid);
     assertTrue(error.toString(StandardCharsets.UTF_8).contains("between 0 and 65535"));
+  }
+
+  @Test
+  public void benchmarkCommandEmitsValidatedMachineReadableSamples() {
+    ByteArrayOutputStream output = new ByteArrayOutputStream();
+    ByteArrayOutputStream error = new ByteArrayOutputStream();
+    String source =
+        Base64.getUrlEncoder()
+            .withoutPadding()
+            .encodeToString("(+ 19 23)".getBytes(StandardCharsets.UTF_8));
+    int status =
+        Main.run(
+            new String[] {"benchmark", "test", "arithmetic", source, "42", "2", "1"},
+            new PrintStream(output, true, StandardCharsets.UTF_8),
+            new PrintStream(error, true, StandardCharsets.UTF_8));
+    String json = output.toString(StandardCharsets.UTF_8);
+    assertEquals(error.toString(StandardCharsets.UTF_8), 0, status);
+    assertTrue(json.contains("\"runtime\":\"test\""));
+    assertTrue(json.contains("\"workload\":\"arithmetic\""));
+    assertTrue(json.contains("\"first_ns\":"));
+    assertTrue(json.contains("\"samples_ns\":["));
+    assertEquals(2, json.substring(json.indexOf('[') + 1, json.indexOf(']')).split(",").length);
   }
 
 }

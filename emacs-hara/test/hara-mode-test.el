@@ -47,6 +47,21 @@
             (should-not (gethash "R1" (hara-connection-pending connection))))
         (delete-process process)))))
 
+(ert-deftest hara-server-filter-detects-fragmented-endpoint ()
+  (let* ((buffer (generate-new-buffer " *hara-server-filter-test*"))
+         (process (make-pipe-process :name "hara-server-filter-test"
+                                     :buffer buffer :command '("cat")
+                                     :noquery t)))
+    (unwind-protect
+        (progn
+          (hara--server-process-filter process "HARA RE")
+          (should-not (process-get process 'hara-endpoint))
+          (hara--server-process-filter process "SP 127.0.0.1:4567\n")
+          (should (equal (process-get process 'hara-endpoint)
+                         '("127.0.0.1" . 4567))))
+      (delete-process process)
+      (kill-buffer buffer))))
+
 (ert-deftest hara-project-and-cache-are-keyed-by-canonical-root ()
   (let* ((root (make-temp-file "hara-project-" t))
          (nested (expand-file-name "src/deep" root))
@@ -73,6 +88,41 @@
             (should-not (hara--read-cache (hara-connection-root connection)))))
       (delete-directory root t)
       (delete-directory hara-cache-directory t))))
+
+(ert-deftest hara-mode-auto-jacks-in-only-for-project-files ()
+  (let* ((root (make-temp-file "hara-auto-project-" t))
+         (standalone-root (make-temp-file "hara-standalone-" t))
+         (source-directory (expand-file-name "src" root))
+         (source-file (expand-file-name "sample.hal" source-directory))
+         jack-in-called)
+    (unwind-protect
+        (progn
+          (make-directory source-directory)
+          (with-temp-file (expand-file-name "project.hal" root)
+            (insert "(defproject auto {})"))
+          (with-temp-buffer
+            (setq-local buffer-file-name source-file)
+            (cl-letf (((symbol-function 'run-at-time)
+                       (lambda (_seconds _repeat function &rest arguments)
+                         (apply function arguments)
+                         'fake-timer))
+                      ((symbol-function 'hara-jack-in)
+                       (lambda () (setq jack-in-called t))))
+              (hara-mode)
+              (should jack-in-called)
+              (should (equal (hara--project-file-root)
+                             (file-name-as-directory (file-truename root))))))
+          (setq jack-in-called nil)
+          (with-temp-buffer
+            (setq-local buffer-file-name
+                        (expand-file-name "standalone.hal"
+                                          standalone-root))
+            (cl-letf (((symbol-function 'hara-jack-in)
+                       (lambda () (setq jack-in-called t))))
+              (hara-mode)
+              (should-not jack-in-called))))
+      (delete-directory root t)
+      (delete-directory standalone-root t))))
 
 (ert-deftest hara-mode-installs-built-in-editing-hooks ()
   (with-temp-buffer
@@ -103,6 +153,22 @@
     (let (called)
       (should-not (hara-eldoc-function (lambda (&rest _) (setq called t))))
       (should-not called))))
+
+(ert-deftest hara-completion-failure-does-not-break-company ()
+  (with-temp-buffer
+    (hara-mode)
+    (insert "neg")
+    (let* ((process (make-pipe-process :name "hara-capf-test"
+                                       :command '("cat") :noquery t))
+           (hara--connection
+            (hara--make-connection :process process
+                                   :pending (make-hash-table :test #'equal))))
+      (unwind-protect
+          (cl-letf (((symbol-function 'hara--request-sync)
+                     (lambda (&rest _)
+                       (error "stale runtime"))))
+            (should-not (hara-completion-at-point)))
+        (delete-process process)))))
 
 (ert-deftest hara-inline-result-appears-after-form-and-clears-on-edit ()
   (with-temp-buffer
@@ -148,7 +214,9 @@
 (ert-deftest hara-xref-builds-source-location-from-doc-response ()
   (let ((hara--connection
          (hara--make-connection :root "/tmp/" :pending (make-hash-table))))
-    (cl-letf (((symbol-function 'hara--request-sync)
+    (cl-letf (((symbol-function 'hara--connection)
+               (lambda () hara--connection))
+              ((symbol-function 'hara--request-sync)
                (lambda (&rest _)
                  '("SYMBOL" "sample/add"
                    "DOC" nil

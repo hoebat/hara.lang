@@ -38,6 +38,10 @@ public final class HaraLanguage extends TruffleLanguage<HaraContext> {
     return getCurrentContext(HaraLanguage.class);
   }
 
+  static HaraLanguage currentLanguage() {
+    return getCurrentLanguage(HaraLanguage.class);
+  }
+
   @Override
   protected boolean isThreadAccessAllowed(Thread thread, boolean singleThreaded) {
     return true;
@@ -68,6 +72,10 @@ public final class HaraLanguage extends TruffleLanguage<HaraContext> {
               + detail);
     }
     return HaraAnalyzer.compile(this, forms, sourceSection, currentContext());
+  }
+
+  static CallTarget compileHir(Object[] forms, String sourceName) {
+    return FoundationHirLowerer.compile(currentLanguage(), currentContext(), forms);
   }
 
   static Object[] readAll(String source, String sourceName) {
