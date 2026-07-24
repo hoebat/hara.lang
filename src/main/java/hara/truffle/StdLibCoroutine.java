@@ -53,6 +53,20 @@ public final class StdLibCoroutine {
       return status;
     }
 
+    Object close() {
+      Thread toInterrupt;
+      synchronized (this) {
+        if (status == STATUS_DEAD) return this;
+        if (status == STATUS_RUNNING) {
+          throw new HaraException("coroutine/close: cannot close a running coroutine");
+        }
+        status = STATUS_DEAD;
+        toInterrupt = thread;
+      }
+      if (toInterrupt != null) toInterrupt.interrupt();
+      return this;
+    }
+
     Object resume(Object[] args) {
       synchronized (this) {
         if (status == STATUS_DEAD) {
@@ -205,6 +219,17 @@ public final class StdLibCoroutine {
   public static Object status(HaraContext context, Object[] values) {
     requireArity("coroutine/status", values, 1);
     return requireCoroutine("coroutine/status", values[0]).status();
+  }
+
+  @HaraExport(
+      name = "close",
+      doc =
+          "Closes a suspended coroutine: marks it dead and unwinds it, running finally clauses."
+              + " No-op on a dead coroutine. Throws on a running coroutine.",
+      arglists = {"[co]"})
+  public static Object close(HaraContext context, Object[] values) {
+    requireArity("coroutine/close", values, 1);
+    return requireCoroutine("coroutine/close", values[0]).close();
   }
 
   @HaraExport(

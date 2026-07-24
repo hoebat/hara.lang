@@ -239,4 +239,68 @@ public class StdLibCoroutineTest {
               .asBoolean());
     }
   }
+
+  @Test
+  public void closeRunsFinallyAndKillsCoroutine() throws InterruptedException {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(require 'std.lib.coroutine)");
+      context.eval(HaraLanguage.ID, "(def close-log (atom :init))");
+      context.eval(
+          HaraLanguage.ID,
+          "(def c-close (std.lib.coroutine/create"
+              + " (fn [] (try (std.lib.coroutine/yield :parked)"
+              + "             (finally (reset! close-log :ran))))))");
+      assertTrue(
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(= :parked (std.lib.coroutine/resume c-close))")
+              .asBoolean());
+      context.eval(HaraLanguage.ID, "(std.lib.coroutine/close c-close)");
+      // Wait for the coroutine thread to unwind (close is asynchronous with the interrupt).
+      long deadline = System.currentTimeMillis() + 5000;
+      while (System.currentTimeMillis() < deadline) {
+        if (context
+            .eval(HaraLanguage.ID, "(= :ran (deref close-log))")
+            .asBoolean()) {
+          break;
+        }
+        Thread.sleep(20);
+      }
+      assertTrue(
+          context.eval(HaraLanguage.ID, "(= :ran (deref close-log))").asBoolean());
+      assertTrue(
+          context
+              .eval(HaraLanguage.ID, "(= :dead (std.lib.coroutine/status c-close))")
+              .asBoolean());
+      PolyglotException error =
+          assertThrows(
+              PolyglotException.class,
+              () -> context.eval(HaraLanguage.ID, "(std.lib.coroutine/resume c-close)"));
+      assertTrue(error.getMessage().contains("dead"));
+    }
+  }
+
+  @Test
+  public void closeOnDeadIsNoOpAndCloseOnRunningThrows() {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(require 'std.lib.coroutine)");
+      context.eval(HaraLanguage.ID, "(def c-done (std.lib.coroutine/create (fn [] 1)))");
+      context.eval(HaraLanguage.ID, "(std.lib.coroutine/resume c-done)");
+      assertTrue(
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(std.lib.coroutine/coroutine? (std.lib.coroutine/close c-done))")
+              .asBoolean());
+      context.eval(
+          HaraLanguage.ID,
+          "(def c-self (std.lib.coroutine/create (fn [] (std.lib.coroutine/close c-self))))");
+      PolyglotException error =
+          assertThrows(
+              PolyglotException.class,
+              () -> context.eval(HaraLanguage.ID, "(std.lib.coroutine/resume c-self)"));
+      assertTrue(error.getMessage().contains("running"));
+    }
+  }
 }
