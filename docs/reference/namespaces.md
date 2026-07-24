@@ -15,6 +15,7 @@ Var metadata and the REPL for exact documentation and arglists.
 | `std.lib.socket` | `socket/` | Capability-gated callback socket operations | `connect`, `send`, `close` |
 | `std.lib.block` | `block/` | Source-preserving Hara block parsing | `parse`, `parse-root`, `parse-first` |
 | `std.lib.zip` | `zip/` | Persistent tree zipper navigation | `zipper`, `step-left`, `step-right`, `step-inside`, `step-outside` |
+| `std.lib.walk` | explicit `require` | Persistent recursive traversal and key transformation | `walk`, `prewalk`, `postwalk`, `keywordize-keys` |
 
 `(ns app)` and `(ns app (:intrinsics :all))` install the same default aliases. Intrinsic aliases
 can be excluded or renamed without removing their underlying provider namespaces.

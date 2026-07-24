@@ -114,7 +114,7 @@ public class PolisSourceTest {
           context.eval(
               HaraLanguage.ID,
               "(code.test/run {:namespace \"polis.common.grammar-xtalk-test\"})");
-      assertEquals(49, results.getArraySize());
+      assertEquals(52, results.getArraySize());
       for (long i = 0; i < results.getArraySize(); i++) {
         assertTrue(
             results.getArrayElement(i).toString(),

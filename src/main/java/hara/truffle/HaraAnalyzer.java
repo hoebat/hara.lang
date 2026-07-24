@@ -617,6 +617,13 @@ final class HaraAnalyzer {
 
     Map<Symbol, Integer> captureSlots = new LinkedHashMap<>();
     Map<Symbol, Integer> captureSources = new LinkedHashMap<>();
+    for (Map.Entry<Symbol, Integer> entry : locals.entrySet()) {
+      if (functionLocals.containsKey(entry.getKey())) continue;
+      int slot = functionFrames.addSlot(FrameSlotKind.Object, entry.getKey(), null);
+      functionLocals.put(entry.getKey(), slot);
+      captureSlots.put(entry.getKey(), slot);
+      captureSources.put(entry.getKey(), entry.getValue());
+    }
     HaraAnalyzer functionAnalyzer =
         new HaraAnalyzer(
             language,

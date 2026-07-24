@@ -1109,6 +1109,14 @@ public class HaraLanguageTest {
       assertEquals(42, adder.execute(1).asLong());
       assertEquals(
           42, context.eval(HaraLanguage.ID, "(((fn [x] (fn [y] (+ x y))) 40) 2)").asLong());
+      assertEquals(
+          42,
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(let [x 40]"
+                      + " ((fn [y] ((fn [z] (+ x y z)) 1)) 1))")
+              .asLong());
     }
   }
 

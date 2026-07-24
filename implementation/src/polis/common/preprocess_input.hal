@@ -49,7 +49,7 @@
             :else
             (apply list
                    '!:decorate
-                   (apply vector (rest tag))
+                   (vec (rest tag))
                    input
                    more)))
 
@@ -85,17 +85,18 @@
 
           (and preprocess-base/*macro-splice*
                (or (vector? x) (list? x))
-               (some splice? x))
+               (reduce (fn [found child]
+                         (or found (splice? child)))
+                       false
+                       x))
           (with-meta
-            (into
+            (reduce
+             (fn [acc child]
+               (if (splice? child)
+                 (apply conj acc (eval (second child)))
+                 (conj acc child)))
              (empty x)
-             (reduce
-              (fn [acc child]
-                (if (splice? child)
-                  (apply conj acc (eval (second child)))
-                  (conj acc child)))
-              (empty x)
-              x))
+             x)
             (meta x))
 
           (list? x)

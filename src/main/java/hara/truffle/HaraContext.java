@@ -1233,6 +1233,16 @@ public final class HaraContext {
               return null;
             }));
     target.define(
+        "with-meta",
+        new VariadicBuiltin(
+            "with-meta",
+            values -> {
+              if (values.length != 2) {
+                throw new HaraException("with-meta expects a value and metadata");
+              }
+              return protocolCall("IObjType", "with-meta", values);
+            }));
+    target.define(
         "name",
         new UnaryBuiltin(
             "name", value -> protocolCall("INamespaced", "name", new Object[] {value})));
@@ -1559,6 +1569,24 @@ public final class HaraContext {
 
   private void installCoreBuiltins(HaraNamespace target) {
     target.define("str", new VariadicBuiltin("str", HaraContext::concatenateStrings));
+    target.define(
+        "list",
+        new VariadicBuiltin(
+            "list", values -> hara.lang.data.List.Standard.from(null, values)));
+    target.define(
+        "atom",
+        new UnaryBuiltin(
+            "atom", value -> new hara.lang.data.Atom.Standard<>(HaraBox.unwrap(value))));
+    target.define(
+        "reset!",
+        new VariadicBuiltin(
+            "reset!",
+            values -> {
+              if (values.length != 2) {
+                throw new HaraException("reset! expects a reference and value");
+              }
+              return protocolCall("IReset", "reset", values);
+            }));
     target.define(
         "pr-str",
         new UnaryBuiltin(
