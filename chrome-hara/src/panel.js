@@ -1,5 +1,6 @@
 import { HtaContext } from "../vendor/hta.js";
 import { createHostCalls } from "./host-bridge.js";
+import { preloadRequires, parseSourcePaths, chooseHome, restoreHome } from "./home.js";
 
 const params = new URLSearchParams(location.search);
 const tabId = params.has("tabId")
@@ -22,7 +23,37 @@ const apiSource = await (
 ).text();
 await context.call("register-resource", ["chrome.api", apiSource]);
 
-window.hara = { context, evalSource, tabId };
+let homeDir = null;
+let homeSourcePaths = ["."];
+const loadedResources = new Set(["chrome.api"]);
+const register = (ns, text) => context.call("register-resource", [ns, text]);
+
+async function preload(source) {
+  if (!homeDir) return;
+  await preloadRequires(source, {
+    dir: homeDir,
+    sourcePaths: homeSourcePaths,
+    register,
+    loaded: loadedResources,
+  });
+}
+
+const homeLabel = document.getElementById("home-label");
+async function setHome(dir) {
+  homeDir = dir;
+  homeLabel.textContent = dir ? `home: ${dir.name}` : "no home";
+  homeSourcePaths = ["."];
+  if (dir) {
+    try {
+      const projectHal = await (
+        await (await dir.getFileHandle("project.hal")).getFile()
+      ).text();
+      homeSourcePaths = parseSourcePaths(projectHal);
+    } catch { /* no project.hal — default paths */ }
+  }
+}
+
+window.hara = { context, evalSource, preload, setHome, tabId };
 
 const input = document.getElementById("input");
 const output = document.getElementById("output");
@@ -37,8 +68,27 @@ input.addEventListener("keydown", async (event) => {
   input.value = "";
   print(`hara=> ${source}`);
   try {
+    await preload(source);
     print(String(await evalSource(source)));
   } catch (error) {
     print(`error: ${error?.message ?? error}`);
   }
 });
+
+document.getElementById("home-button").addEventListener("click", async () => {
+  try { setHome(await chooseHome()); } catch { /* picker cancelled */ }
+});
+document.getElementById("run-file-button").addEventListener("click", async () => {
+  try {
+    const [fileHandle] = await showOpenFilePicker({
+      types: [{ description: "hara", accept: { "text/plain": [".hal"] } }],
+    });
+    const source = await (await fileHandle.getFile()).text();
+    await preload(source);
+    print(`hara=> ${fileHandle.name}`);
+    print(String(await evalSource(source)));
+  } catch (error) {
+    if (error?.name !== "AbortError") print(`error: ${error?.message ?? error}`);
+  }
+});
+setHome(await restoreHome());
