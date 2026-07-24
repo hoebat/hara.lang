@@ -259,7 +259,9 @@ fn list(v: Vec<Form>, env: Rc<RefCell<HashMap<String, Value>>>, k: Cont) -> Step
             )
         }
         Some("def") | Some("set!") | Some("var/set") => bind_form(v, env, k),
-        Some("fn") | Some("defn") | Some("var") | Some("ns") => sync(Form::List(v), env, k),
+        Some("fn") | Some("defn") | Some("var") | Some("ns") | Some("require") => {
+            sync(Form::List(v), env, k)
+        }
         _ => application(v, env, k),
     }
 }
