@@ -71,4 +71,21 @@ public class PolisSourceTest {
       }
     }
   }
+
+  @Test
+  public void runsTranslatedGrammarMacroFacts() {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(require 'polis.common.grammar-macro-test)");
+      var results =
+          context.eval(
+              HaraLanguage.ID,
+              "(code.test/run {:namespace \"polis.common.grammar-macro-test\"})");
+      assertEquals(13, results.getArraySize());
+      for (long i = 0; i < results.getArraySize(); i++) {
+        assertTrue(
+            results.getArrayElement(i).toString(),
+            "PASS".equals(results.getArrayElement(i).getHashValue("status").asString()));
+      }
+    }
+  }
 }

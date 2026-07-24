@@ -55,6 +55,7 @@ the portable Hara runtime:
 | Dynamic values consumed by lazy transforms | Materialize inside the dynamic binding | Deferred iteration must not escape the binding extent |
 | Arbitrary `eval` in grammar mixins | Qualified symbol resolution plus a narrow form evaluator | Portable HAL code must not depend on host evaluation |
 | Clojure `seq?` as a list/form predicate | Dispatch after the supported symbol and map mixin cases | Hara's `seq?` specifically identifies lazy `HaraSeq` values |
+| Runtime `macroexpand-1` for `->` and `->>` data | Explicit thread-first/thread-last form transformation | Hara expands these forms during analysis; quoted transpiler data is transformed portably in HAL |
 
 ## Project convention
 
