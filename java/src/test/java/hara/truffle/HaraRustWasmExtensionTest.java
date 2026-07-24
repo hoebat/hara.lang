@@ -13,7 +13,7 @@ public class HaraRustWasmExtensionTest {
   @Test
   public void rawRustCoreCompilesAndLoadsThroughTruffle() throws Exception {
     Path artifact =
-        Path.of("wasm/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm")
+        Path.of("rust/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm")
             .toAbsolutePath();
     assertTrue(
         "build wasm/raw before running this integration test: " + artifact,

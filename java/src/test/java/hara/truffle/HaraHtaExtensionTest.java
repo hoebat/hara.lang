@@ -11,7 +11,7 @@ import org.junit.Test;
 
 public class HaraHtaExtensionTest {
   private static final Path ARTIFACT =
-      Path.of("wasm/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm");
+      Path.of("rust/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm");
 
   @Test
   public void htaActorEvaluatesAndSettlesTasks() throws Exception {

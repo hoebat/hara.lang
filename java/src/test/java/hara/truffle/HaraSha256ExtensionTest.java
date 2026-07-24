@@ -12,7 +12,7 @@ import org.junit.Test;
 public class HaraSha256ExtensionTest {
   private static final Path ARTIFACT =
       Path.of(
-          "wasm/extensions/crypto-hash-sha256/target/wasm32-unknown-unknown/release/"
+          "rust/extensions/crypto-hash-sha256/target/wasm32-unknown-unknown/release/"
               + "hara_crypto_hash_sha256.wasm");
 
   @Test

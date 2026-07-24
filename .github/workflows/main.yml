@@ -69,14 +69,15 @@ jobs:
         java-version: '21'
         distribution: 'temurin'
         cache: maven
+        cache-dependency-path: java/pom.xml
     - name: Build and test with Maven
-      run: mvn -B -Ptruffle package --file pom.xml
+      run: mvn -B -Ptruffle package --file java/pom.xml
 
     - name: Run JVM L0 conformance corpus
-      run: mvn -B -Ptruffle -Dtest=hara.truffle.HaraL0ConformanceTest test
+      run: mvn -B -Ptruffle -Dtest=hara.truffle.HaraL0ConformanceTest test --file java/pom.xml
 
     - name: Run Rust WASM and Truffle parity corpus
-      run: mvn -B -Ptruffle -Dtest=hara.truffle.HaraWasmTruffleParityTest test
+      run: mvn -B -Ptruffle -Dtest=hara.truffle.HaraWasmTruffleParityTest test --file java/pom.xml
 
     - name: Benchmark Rust WASM and Truffle parity corpus
       run: ./scripts/run-wasm-truffle-parity-benchmark 3 100 1000 target/wasm-truffle-parity-speed.csv
@@ -100,7 +101,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: jacoco-report
-        path: target/site/jacoco/
+        path: java/target/site/jacoco/
 
   native-image-smoke:
     runs-on: ubuntu-latest
@@ -141,7 +142,7 @@ jobs:
           echo "native_runtime_mode=fallback"
           echo "binary_bytes=$(stat -c '%s' target/hara-truffle)"
           /usr/bin/time -f 'startup_seconds=%e' target/hara-truffle eval 'nil' >/dev/null
-          echo "reachability_manifest=$(find target/classes/META-INF/native-image -type f -print | sort | tr '\n' ',')"
+          echo "reachability_manifest=$(find java/target/classes/META-INF/native-image -type f -print | sort | tr '\n' ',')"
         } 2>&1 | tee target/native-image-metrics.txt
     - name: Run a Native Image smoke test
       run: |

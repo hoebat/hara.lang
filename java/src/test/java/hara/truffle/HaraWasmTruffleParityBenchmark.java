@@ -16,7 +16,7 @@ import org.graalvm.polyglot.Context;
 public final class HaraWasmTruffleParityBenchmark {
   private static final Path CORPUS = Path.of("spec/hara/wasm-truffle-parity.edn");
   private static final Path ARTIFACT =
-      Path.of("wasm/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm");
+      Path.of("rust/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm");
   private static final String NAMESPACE = "test.rust.parity";
   private static final String REQUIRE = "(ns app (:require [test.rust.parity :as rust]))";
 

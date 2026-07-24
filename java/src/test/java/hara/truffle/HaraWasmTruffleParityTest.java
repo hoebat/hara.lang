@@ -24,7 +24,7 @@ import org.junit.Test;
 public class HaraWasmTruffleParityTest {
   private static final Path CORPUS = Path.of("spec/hara/wasm-truffle-parity.edn");
   private static final Path ARTIFACT =
-      Path.of("wasm/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm");
+      Path.of("rust/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm");
 
   private static Keyword key(String name) {
     return Keyword.create(null, name);

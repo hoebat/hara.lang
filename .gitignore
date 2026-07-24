@@ -23,6 +23,7 @@
 hs_err_pid*
 
 /target/
+java/target/
 /log
 node_modules
 *.js.map
@@ -50,3 +51,9 @@ form-init*
 *.~undo-tree~
 parse_jacoco.py
 /.tmp/.worktrees/
+
+# IDE state (user-local)
+.idea/
+.settings/
+.classpath
+.project

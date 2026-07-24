@@ -12,10 +12,10 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
 
 # Compile and resolve the runtime classpath before handing the original argument array to Java.
 # Passing "$@" directly preserves quoted forms, embedded strings, and whitespace.
-CLASSPATH_FILE="$SCRIPT_DIR/target/hara-runtime-classpath.txt"
-mvn -q -f "$SCRIPT_DIR/pom.xml" compile dependency:build-classpath \
+CLASSPATH_FILE="$SCRIPT_DIR/java/target/hara-runtime-classpath.txt"
+mvn -q -f "$SCRIPT_DIR/java/pom.xml" compile dependency:build-classpath \
     -Dmdep.outputFile="$CLASSPATH_FILE" || exit $?
 
 IFS= read -r HARA_RUNTIME_CLASSPATH < "$CLASSPATH_FILE"
 
-exec java -cp "$SCRIPT_DIR/target/classes:$HARA_RUNTIME_CLASSPATH" hara.truffle.Main "$@"
+exec java -cp "$SCRIPT_DIR/java/target/classes:$HARA_RUNTIME_CLASSPATH" hara.truffle.Main "$@"
