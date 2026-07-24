@@ -1,1 +1,273 @@
-:root{--hara-cyan:#41f5e4;--hara-violet:#9c7bff;--hara-amber:#ffbd68;--hara-bg:#05070d;--hara-panel:#0b101b;--hara-muted:#8b9bad}body{background:var(--hara-bg)}.md-header{background:rgba(5,7,13,.86);backdrop-filter:blur(14px);border-bottom:1px solid rgba(65,245,228,.16)}.md-tabs{background:rgba(5,7,13,.7)}.md-main{background:linear-gradient(rgba(65,245,228,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(65,245,228,.035) 1px,transparent 1px);background-size:64px 64px}.md-content__inner{max-width:980px}.md-typeset h1,.md-typeset h2{letter-spacing:-.045em}.md-typeset h1{color:var(--hara-cyan)}.md-typeset a{color:var(--hara-cyan)}.md-button{border-color:rgba(65,245,228,.42);border-radius:0}.md-button--primary{background:var(--hara-cyan);color:#041011!important}.md-typeset code{border-radius:2px}.hara-home{max-width:1180px;margin:0 auto;padding:9vh 0 5vh}.hara-home-hero{position:relative;min-height:480px;display:grid;place-items:center;text-align:center;overflow:hidden}.hara-home-hero:before{content:'';position:absolute;width:480px;height:480px;border:1px solid rgba(65,245,228,.3);border-radius:50%;box-shadow:0 0 100px rgba(65,245,228,.13),inset 0 0 70px rgba(65,245,228,.08);animation:hara-pulse 4s ease-in-out infinite}.hara-home-hero:after{content:'H';position:absolute;font-size:130px;font-weight:700;color:var(--hara-cyan);text-shadow:0 0 40px var(--hara-cyan);opacity:.9}.hara-home-hero-content{position:relative;z-index:1}.hara-home-kicker{font:11px monospace;letter-spacing:.18em;color:var(--hara-cyan)}.hara-home h1{font-size:clamp(3.5rem,9vw,7.5rem);line-height:.9;letter-spacing:-.08em;margin:28px 0;color:#edf6ff}.hara-home h1 em{color:var(--hara-cyan);font-style:normal}.hara-home-lede{max-width:620px;margin:0 auto;color:var(--hara-muted);font-size:1.1rem;line-height:1.7}.hara-home-actions{display:flex;justify-content:center;gap:12px;margin:35px 0 70px}.hara-home-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.hara-home-card{display:flex;flex-direction:column;gap:18px;padding:25px;color:inherit!important;text-decoration:none!important;border:1px solid rgba(65,245,228,.2);background:linear-gradient(135deg,rgba(12,24,37,.9),rgba(7,12,20,.8));transition:transform .2s,border-color .2s,box-shadow .2s}.hara-home-card:hover{transform:translateY(-5px);border-color:var(--hara-cyan);box-shadow:0 0 30px rgba(65,245,228,.12)}.hara-card-index{font:10px monospace;color:var(--hara-cyan);letter-spacing:.15em}.hara-home-card strong{font-size:1.5rem;line-height:1}.hara-home-card strong em{color:var(--hara-cyan);font-style:normal}.hara-home-card span:last-child{color:var(--hara-muted);font-size:.9rem;line-height:1.6}@keyframes hara-pulse{50%{transform:scale(1.04);box-shadow:0 0 150px rgba(65,245,228,.2),inset 0 0 90px rgba(65,245,228,.12)}}@media(max-width:700px){.hara-home{padding-top:3vh}.hara-home-hero{min-height:390px}.hara-home-hero:before{width:330px;height:330px}.hara-home-hero:after{font-size:90px}.hara-home-grid{grid-template-columns:1fr}.hara-home-actions{flex-direction:column;align-items:center}.hara-home-actions .md-button{width:220px;text-align:center}}
+:root {
+  --hara-cyan: #41f5e4;
+  --hara-violet: #9c7bff;
+  --hara-amber: #ffbd68;
+  --hara-bg: #05070d;
+  --hara-panel: #0b101b;
+  --hara-muted: #8b9bad;
+}
+
+body {
+  background: var(--hara-bg);
+}
+
+.md-header {
+  background: rgba(5, 7, 13, .86);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid rgba(65, 245, 228, .16);
+}
+
+.md-tabs {
+  background: rgba(5, 7, 13, .7);
+}
+
+.md-main {
+  background: linear-gradient(rgba(65, 245, 228, .035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(65, 245, 228, .035) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+.md-content__inner {
+  max-width: 980px;
+}
+
+.md-typeset h1,
+.md-typeset h2 {
+  letter-spacing: -.045em;
+}
+
+.md-typeset h1 {
+  color: var(--hara-cyan);
+}
+
+.md-typeset a {
+  color: var(--hara-cyan);
+}
+
+.md-button {
+  border-color: rgba(65, 245, 228, .42);
+  border-radius: 0;
+}
+
+.md-button--primary {
+  background: var(--hara-cyan);
+  color: #041011 !important;
+}
+
+.md-typeset code {
+  border-radius: 2px;
+}
+
+/* Landing page */
+
+.hara-home {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 0 0 5vh;
+}
+
+/* Animated moon scenescape hero (parallax layers, see hara.js) */
+
+.hara-scene {
+  position: relative;
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  height: 72vh;
+  min-height: 430px;
+  overflow: hidden;
+  background: var(--hara-bg);
+}
+
+.hara-scene-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Fade the scene into the page background below */
+.hara-scene::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 32%;
+  background: linear-gradient(transparent, var(--hara-bg));
+  pointer-events: none;
+}
+
+/* Larger --hara-depth = farther away = moves less */
+.hara-scene__layer {
+  transform: translate3d(
+    calc(var(--hara-mx, 0) * (10 - var(--hara-depth)) * -5px),
+    calc(var(--hara-my, 0) * (10 - var(--hara-depth)) * -3.5px + var(--hara-scroll, 0) * (10 - var(--hara-depth)) * 12px),
+    0);
+  will-change: transform;
+}
+
+.hara-twinkle-a {
+  animation: hara-twinkle 3.6s ease-in-out infinite;
+}
+
+.hara-twinkle-b {
+  animation: hara-twinkle 5.2s ease-in-out -1.4s infinite;
+}
+
+.hara-twinkle-c {
+  animation: hara-twinkle 4.4s ease-in-out -2.6s infinite;
+}
+
+@keyframes hara-twinkle {
+  50% {
+    opacity: .25;
+  }
+}
+
+.hara-moon-halo {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: hara-halo 7s ease-in-out infinite alternate;
+}
+
+@keyframes hara-halo {
+  to {
+    opacity: .65;
+    transform: scale(1.045);
+  }
+}
+
+.hara-haze {
+  animation: hara-drift 28s ease-in-out infinite alternate;
+}
+
+@keyframes hara-drift {
+  to {
+    transform: translateX(36px);
+  }
+}
+
+/* Hero text, below the scene */
+
+.hara-home-intro {
+  text-align: center;
+  padding: 8vh 0 2vh;
+}
+
+.hara-home-kicker {
+  font: 11px monospace;
+  letter-spacing: .18em;
+  color: var(--hara-cyan);
+}
+
+.hara-home h1 {
+  font-size: clamp(3.5rem, 9vw, 7.5rem);
+  line-height: .9;
+  letter-spacing: -.08em;
+  margin: 28px 0;
+  color: #edf6ff;
+}
+
+.hara-home h1 em {
+  color: var(--hara-cyan);
+  font-style: normal;
+}
+
+.hara-home-lede {
+  max-width: 620px;
+  margin: 0 auto;
+  color: var(--hara-muted);
+  font-size: 1.1rem;
+  line-height: 1.7;
+}
+
+.hara-home-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  margin: 35px 0 70px;
+}
+
+.hara-home-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.hara-home-card {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 25px;
+  color: inherit !important;
+  text-decoration: none !important;
+  border: 1px solid rgba(65, 245, 228, .2);
+  background: linear-gradient(135deg, rgba(12, 24, 37, .9), rgba(7, 12, 20, .8));
+  transition: transform .2s, border-color .2s, box-shadow .2s;
+}
+
+.hara-home-card:hover {
+  transform: translateY(-5px);
+  border-color: var(--hara-cyan);
+  box-shadow: 0 0 30px rgba(65, 245, 228, .12);
+}
+
+.hara-card-index {
+  font: 10px monospace;
+  color: var(--hara-cyan);
+  letter-spacing: .15em;
+}
+
+.hara-home-card strong {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.hara-home-card strong em {
+  color: var(--hara-cyan);
+  font-style: normal;
+}
+
+.hara-home-card span:last-child {
+  color: var(--hara-muted);
+  font-size: .9rem;
+  line-height: 1.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hara-scene__layer {
+    transform: none;
+  }
+
+  .hara-twinkle-a,
+  .hara-twinkle-b,
+  .hara-twinkle-c,
+  .hara-moon-halo,
+  .hara-haze {
+    animation: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .hara-scene {
+    height: 56vh;
+    min-height: 330px;
+  }
+
+  .hara-home-intro {
+    padding-top: 5vh;
+  }
+
+  .hara-home-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hara-home-actions {
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .hara-home-actions .md-button {
+    width: 220px;
+    text-align: center;
+  }
+}

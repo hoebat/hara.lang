@@ -49,3 +49,4 @@ form-init*
 *_temp
 *.~undo-tree~
 parse_jacoco.py
+/.tmp/
