@@ -1,12 +1,12 @@
-(ns polis.lang.book-entry-test
+(ns polis.common.book-entry-test
   (:require [code.test :refer :all]
-            [polis.lang.book-entry :refer :all]))
+            [polis.common.book-entry :refer :all]))
 
-^{:refer polis.lang.book-entry/book-entry? :added "4.0"}
+^{:refer polis.common.book-entry/book-entry? :added "4.0"}
 (fact "checks if object is a book entry"
   (book-entry? (book-entry {})) => true)
 
-^{:refer polis.lang.book-entry/book-entry :added "4.0"}
+^{:refer polis.common.book-entry/book-entry :added "4.0"}
 (fact "creates a book entry"
 
   ;;

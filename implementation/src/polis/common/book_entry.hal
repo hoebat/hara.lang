@@ -1,4 +1,4 @@
-(ns polis.lang.book-entry
+(ns polis.common.book-entry
   (:require [polis.common.util :as ut]))
 
 (defn- filter-values

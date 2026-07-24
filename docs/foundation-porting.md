@@ -13,7 +13,7 @@ has been reviewed.
 | Common grammar foundation | complete | Grammar specification, macros, xtalk profiles/system, and aggregate grammar have translated facts |
 | `polis.typed` | pending | Does not include `hara.model` |
 | Common preprocess and emit | in progress | `preprocess-base` is complete; `emit-rewrite` follows the typed slice |
-| `polis.lang.book*` | in progress | `book-entry` is the first dependency-complete record slice |
+| `polis.common.book*` | in progress | `book-entry` and `book-meta` are dependency-complete record slices |
 | Remaining `polis.lang` | pending | Split by library, rewrite, compiler, and runtime layers |
 
 ## Source convention
@@ -26,6 +26,7 @@ namespaces live under `implementation/src/polis`; translated tests live under
 |---|---|
 | `hara.common.*` | `polis.common.*` |
 | `hara.typed.*` | `polis.typed.*` |
+| `hara.lang.book*` | `polis.common.book*` |
 | transpiler-focused `hara.lang.*` | `polis.lang.*` |
 
 Benchmarks consume these packaged namespaces and do not contain substitute
@@ -72,6 +73,7 @@ the portable Hara runtime:
 | `volatile!` used as a local traversal flag | Hara `atom`, `reset!`, and `deref` | `polis.common.preprocess-input` needs local mutable state only while checking whether a template expression can be evaluated |
 | Host form `eval` during preprocessing | Core Hara `eval` evaluates the readable Hara form in the active namespace | Preserves persisted template behavior while keeping evaluation inside the Hara runtime rather than invoking Clojure/JVM evaluation |
 | Foundation `std.lib.impl/defimpl` for `BookEntry` | Native Hara `defrecord` with the same fields and constructors | Preserves lookup, construction, and type checks without introducing an implementation-only compatibility namespace; custom Foundation record printing remains unavailable |
+| `std.lib.template/$` in copied record-construction facts | Explicit persistent target forms assembled with `list` | Hara does not ship the Foundation template namespace; the test functions retain the same generated forms without adding a compatibility-only public namespace |
 
 Translated `code.test` files are copied from Foundation by default. Namespace
 ownership and unsupported dependency syntax may be translated, but fact
