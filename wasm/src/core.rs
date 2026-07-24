@@ -4093,6 +4093,62 @@ fn function_parts(form: &Form) -> Result<(Vec<String>, Option<String>), String> 
     Ok((params, variadic))
 }
 
+fn multi_arity_function(
+    name: &str,
+    clauses: &[Form],
+    captured: &HashMap<String, Value>,
+) -> Result<Value, String> {
+    let mut functions = Vec::with_capacity(clauses.len());
+    for clause in clauses {
+        let parts = match clause {
+            Form::List(parts) if parts.len() >= 2 => parts,
+            _ => return Err("defn arity must contain parameters and a body".into()),
+        };
+        let (params, variadic) = function_parts(&parts[0])?;
+        functions.push(Rc::new(Function {
+            params,
+            variadic,
+            body: parts[1..].to_vec(),
+            captured: Rc::new(RefCell::new(captured.clone())),
+            name: Some(name.into()),
+            native: None,
+        }));
+    }
+    if functions.is_empty() {
+        return Err("defn expects at least one arity".into());
+    }
+    let dispatch_name = name.to_owned();
+    Ok(Value::Function(Rc::new(Function {
+        params: Vec::new(),
+        variadic: Some("arguments".into()),
+        body: Vec::new(),
+        captured: Rc::new(RefCell::new(HashMap::new())),
+        name: Some(dispatch_name.clone()),
+        native: Some(Rc::new(move |arguments| {
+            let function = functions
+                .iter()
+                .find(|function| {
+                    function.variadic.is_none() && function.params.len() == arguments.len()
+                })
+                .or_else(|| {
+                    functions
+                        .iter()
+                        .filter(|function| {
+                            function.variadic.is_some() && arguments.len() >= function.params.len()
+                        })
+                        .max_by_key(|function| function.params.len())
+                })
+                .ok_or_else(|| {
+                    format!(
+                        "{dispatch_name} has no arity accepting {} arguments",
+                        arguments.len()
+                    )
+                })?;
+            call_function(function, arguments)
+        })),
+    })))
+}
+
 fn deref_value(value: Value) -> Value {
     match value {
         Value::Var(var) => var.deref_value(),
@@ -4655,7 +4711,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 match target {
                     Value::Var(value) => Ok(value.deref_value()),
                     Value::Atom(value) => Ok(value.deref_value()),
-                    Value::Promise(promise) => match promise.state() {
+                    Value::Promise(promise) => match promise.wait_state() {
                         PromiseState::Fulfilled(value) => Ok(value),
                         PromiseState::Rejected(error) => Err(error),
                         PromiseState::Pending => Err(
@@ -4804,7 +4860,6 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                 if let Some(value) = protected_fallback_binding(env, &name) {
                     return Ok(value);
                 }
-                let (params, variadic) = function_parts(&fs[2])?;
                 let cell = match env.get(&name) {
                     Some(Value::Var(cell)) if binding_is_local(cell) => cell.clone(),
                     _ => KernelVar::new(name.clone(), Value::Nil),
@@ -4813,15 +4868,19 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     cell.set_hara_metadata(metadata);
                 }
                 env.insert(name.clone(), Value::Var(cell.clone()));
-                let function_ref = Rc::new(Function {
-                    params,
-                    variadic,
-                    body: fs[3..].to_vec(),
-                    captured: Rc::new(RefCell::new(env.clone())),
-                    name: Some(name.clone()),
-                    native: None,
-                });
-                let function = Value::Function(function_ref.clone());
+                let function = if matches!(&fs[2], Form::Vector(_)) {
+                    let (params, variadic) = function_parts(&fs[2])?;
+                    Value::Function(Rc::new(Function {
+                        params,
+                        variadic,
+                        body: fs[3..].to_vec(),
+                        captured: Rc::new(RefCell::new(env.clone())),
+                        name: Some(name.clone()),
+                        native: None,
+                    }))
+                } else {
+                    multi_arity_function(&name, &fs[2..], env)?
+                };
                 cell.reset_value(function.clone());
                 cell.set_origin(definition_origin());
                 Ok(function)
@@ -5032,7 +5091,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     return Err("promise/cancel expects a promise".into());
                 }
                 let promise = promise_value(&eval(&fs[1], env)?, n)?;
-                if !promise.reject("cancelled") {
+                if !promise.cancel() {
                     return Err("promise is already settled".into());
                 }
                 Ok(Value::Promise(promise))

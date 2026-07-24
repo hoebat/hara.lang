@@ -8,6 +8,7 @@ use crate::kernel::{parse, Form};
 
 const MANIFEST_FIELDS: &[&str] = &[
     "namespace",
+    "identity",
     "version",
     "provider",
     "module",
@@ -45,6 +46,7 @@ pub struct ExtensionTarget {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExtensionManifest {
     pub namespace: String,
+    pub identity: Option<String>,
     pub version: String,
     pub provider: String,
     pub module: Option<String>,
@@ -68,6 +70,18 @@ impl ExtensionManifest {
             return Err(malformed(
                 origin,
                 "namespace must be a qualified lower-case symbol",
+            ));
+        }
+        let identity = optional(entries, "identity")
+            .map(|form| string(form, origin, "identity").map(str::to_owned))
+            .transpose()?;
+        if identity
+            .as_deref()
+            .is_some_and(|value| !valid_identity(value))
+        {
+            return Err(malformed(
+                origin,
+                "identity must be an owner/name coordinate",
             ));
         }
         let version = named_string(entries, "version", origin)?;
@@ -123,6 +137,7 @@ impl ExtensionManifest {
             .map_or_else(|| Ok(HashMap::new()), |form| parse_handles(form, origin))?;
         Ok(Self {
             namespace,
+            identity,
             version,
             provider,
             module,
@@ -432,6 +447,12 @@ fn parse_handles(form: &Form, origin: &str) -> Result<HashMap<String, String>, S
         .collect()
 }
 
+fn valid_identity(value: &str) -> bool {
+    value
+        .split_once("/")
+        .is_some_and(|(owner, name)| valid_component(owner) && valid_tag(name))
+}
+
 fn valid_namespace(value: &str) -> bool {
     value.contains('.') && value.split('.').all(valid_component)
 }
@@ -546,6 +567,7 @@ mod tests {
 
     const MANIFEST: &str = r#"
       {:namespace "crypto.hash"
+       :identity "hara/crypto.hash"
        :version "0.1.0"
        :provider :wasm
        :module "hash.wasm"
@@ -559,6 +581,7 @@ mod tests {
     fn parses_the_wasm_manifest_contract() {
         let manifest = ExtensionManifest::parse(MANIFEST, "fixture").unwrap();
         assert_eq!(manifest.namespace, "crypto.hash");
+        assert_eq!(manifest.identity.as_deref(), Some("hara/crypto.hash"));
         assert_eq!(manifest.abi, WasmAbi::HtaV1);
         assert!(manifest.exports[0].1.asynchronous);
         assert!(manifest.permits_host_call("crypto.random", "fill"));

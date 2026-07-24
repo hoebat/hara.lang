@@ -11,11 +11,19 @@ pub enum PromiseState {
     Rejected(String),
 }
 
+#[derive(Default)]
+struct PromiseHooks {
+    poller: Option<Rc<dyn Fn()>>,
+    waiter: Option<Rc<dyn Fn()>>,
+    cancel: Option<Rc<dyn Fn()>>,
+}
+
 #[derive(Clone)]
 pub struct Promise {
     pub(crate) state: Rc<RefCell<PromiseState>>,
     continuations: Rc<RefCell<Vec<Rc<dyn Fn(PromiseState)>>>>,
     deferred: Rc<RefCell<Option<(Instant, Rc<dyn Fn() -> Result<Value, String>>)>>>,
+    hooks: Rc<RefCell<PromiseHooks>>,
 }
 
 impl std::fmt::Debug for Promise {
@@ -39,11 +47,16 @@ impl Promise {
             state: Rc::new(RefCell::new(PromiseState::Pending)),
             continuations: Rc::new(RefCell::new(Vec::new())),
             deferred: Rc::new(RefCell::new(None)),
+            hooks: Rc::new(RefCell::new(PromiseHooks::default())),
         }
     }
 
     pub fn state(&self) -> PromiseState {
         self.run_deferred_if_ready();
+        let poller = self.hooks.borrow().poller.clone();
+        if let Some(poller) = poller {
+            poller();
+        }
         self.state.borrow().clone()
     }
 
@@ -60,6 +73,41 @@ impl Promise {
         if let Some(task) = task {
             settle_result(self, task());
         }
+    }
+
+    pub fn set_poller(&self, poller: Rc<dyn Fn()>) {
+        self.hooks.borrow_mut().poller = Some(poller);
+    }
+
+    pub fn set_waiter(&self, waiter: Rc<dyn Fn()>) {
+        self.hooks.borrow_mut().waiter = Some(waiter);
+    }
+
+    pub fn set_cancel_hook(&self, cancel: Rc<dyn Fn()>) {
+        self.hooks.borrow_mut().cancel = Some(cancel);
+    }
+
+    pub fn wait_state(&self) -> PromiseState {
+        let waiter = self.hooks.borrow().waiter.clone();
+        if let Some(waiter) = waiter {
+            waiter();
+        }
+        self.state()
+    }
+
+    pub(crate) fn notify_cancel(&self) {
+        let cancel = self.hooks.borrow().cancel.clone();
+        if let Some(cancel) = cancel {
+            cancel();
+        }
+    }
+
+    pub fn cancel(&self) -> bool {
+        if !matches!(*self.state.borrow(), PromiseState::Pending) {
+            return false;
+        }
+        self.notify_cancel();
+        self.reject("cancelled")
     }
 
     pub fn schedule(&self, delay: Duration, task: Rc<dyn Fn() -> Result<Value, String>>) {
@@ -88,6 +136,7 @@ impl Promise {
             *state = next.clone();
             std::mem::take(&mut *self.continuations.borrow_mut())
         };
+        *self.hooks.borrow_mut() = PromiseHooks::default();
         for continuation in continuations {
             continuation(next.clone());
         }

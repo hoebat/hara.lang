@@ -14,6 +14,8 @@ wasm-bindgen = "0.2"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 wasmtime = { version = "18.0.0", default-features = false, features = ["cranelift", "runtime"] }
+rustyline = "14.0.0"
+home = "=0.5.9"
 
 [dev-dependencies]
 

@@ -5,9 +5,13 @@ pub mod hta;
 pub mod kernel;
 pub mod lang;
 #[cfg(not(target_arch = "wasm32"))]
+pub mod native_cli;
+#[cfg(not(target_arch = "wasm32"))]
 mod native_extension;
 #[cfg(not(target_arch = "wasm32"))]
 mod process_extension;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod resp;
 pub mod task;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod wasmtime_provider;
@@ -15,6 +19,8 @@ use crate::kernel::Form;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 use wasm_bindgen::prelude::*;
+
+const FOUNDATION_FALLBACK: &str = include_str!("../../implementation/src/std/lib/foundation.hal");
 
 fn ignore_socket_event(_event: core::SocketEvent) {}
 
@@ -84,7 +90,7 @@ pub struct Runtime {
 impl Runtime {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Runtime {
-        Runtime {
+        let mut runtime = Runtime {
             env: HashMap::new(),
             protocols: core::ProtocolRegistry::core(),
             extensions: core::ExtensionRegistry::new(),
@@ -99,7 +105,35 @@ impl Runtime {
             )]),
             #[cfg(not(target_arch = "wasm32"))]
             extension_roots: native_extension::configured_roots(),
+        };
+        runtime
+            .bootstrap_foundation()
+            .expect("embedded std.lib.foundation fallback must be valid");
+        runtime
+    }
+
+    fn refer_foundation_into(&mut self, namespace: &str) {
+        if namespace == "std.lib.foundation" {
+            return;
         }
+        let Some(foundation) = self.namespace_registry.find("std.lib.foundation") else {
+            return;
+        };
+        let target = self.namespace_registry.find_or_create(namespace);
+        for (name, var) in foundation.mappings() {
+            if target.resolve(&name).is_none() {
+                target.map_var(name, var);
+            }
+        }
+    }
+
+    fn bootstrap_foundation(&mut self) -> Result<(), String> {
+        core::with_definition_origin(kernel::VarOrigin::HalFallback, || {
+            self.eval_text(FOUNDATION_FALLBACK)
+        })?;
+        self.refer_foundation_into("user");
+        self.use_namespace("user");
+        Ok(())
     }
 
     fn eval_text_mode(&mut self, source: &str, traced: bool) -> Result<String, String> {
@@ -200,8 +234,13 @@ impl Runtime {
         if name.is_empty() {
             return false;
         }
+        self.refer_foundation_into(name);
         core::select_namespace_environment(&self.namespace_registry, &mut self.env, name);
         true
+    }
+
+    pub fn visible_symbols(&self) -> Vec<String> {
+        self.namespace_registry.visible_symbol_names()
     }
 
     pub fn current_namespace(&self) -> String {
@@ -1348,6 +1387,49 @@ mod tests {
     }
 
     #[test]
+    fn foundation_fallback_is_eager_canonical_and_shadowable() {
+        let mut runtime = Runtime::new();
+        let foundation = runtime
+            .namespace_registry
+            .find("std.lib.foundation")
+            .expect("foundation is bootstrapped");
+        let canonical = foundation
+            .resolve(&crate::lang::data::Symbol::parse("identity"))
+            .expect("identity fallback is installed");
+        assert_eq!(canonical.origin(), kernel::VarOrigin::HalFallback);
+        let referred = runtime
+            .namespace_registry
+            .find("user")
+            .unwrap()
+            .resolve(&crate::lang::data::Symbol::parse("identity"))
+            .unwrap();
+        assert!(canonical.same_identity(&referred));
+        assert_eq!(runtime.eval_text("(identity 42)").unwrap(), "42");
+        assert_eq!(runtime.eval_text("(first (range 3))").unwrap(), "0");
+        assert_eq!(runtime.eval_text("(first (range 2 5))").unwrap(), "2");
+
+        assert_eq!(
+            runtime
+                .eval_text("(ns project.app) (def identity (fn [value] 7)) (identity 42)")
+                .unwrap(),
+            "7"
+        );
+        let local = runtime
+            .namespace_registry
+            .find("project.app")
+            .unwrap()
+            .resolve(&crate::lang::data::Symbol::parse("identity"))
+            .unwrap();
+        assert!(!canonical.same_identity(&local));
+        assert_eq!(
+            runtime
+                .eval_text("(std.lib.foundation/identity 42)")
+                .unwrap(),
+            "42"
+        );
+    }
+
+    #[test]
     fn fallback_definitions_never_replace_rust_library_vars() {
         let mut runtime = Runtime::new();
         let foundation = runtime
@@ -1392,7 +1474,7 @@ mod tests {
                 .unwrap(),
             "42"
         );
-        assert_eq!(runtime.eval_text("(count (ns:list))").unwrap(), "2");
+        assert_eq!(runtime.eval_text("(count (ns:list))").unwrap(), "3");
         assert_eq!(
             runtime.eval_text("(ns:find (quote missing.lib))").unwrap(),
             "nil"

@@ -334,6 +334,9 @@ fn known_namespace(value: &str) -> bool {
             .any(|(_, namespace, _)| *namespace == value)
 }
 fn canonical(namespace: &str, method: &str) -> String {
+    if namespace == "std.lib.foundation" {
+        return format!("std.lib.foundation/{method}");
+    }
     match (normalize_namespace(namespace), method) {
         ("std.lib.foundation", method) => method.into(),
         ("std.lib.string", "len") => "str/count".into(),
