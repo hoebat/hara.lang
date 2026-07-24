@@ -30,6 +30,23 @@ public class HaraMigrationPrimitivesTest {
   }
 
   @Test
+  public void instancePredicateIsRestrictedToHaraStructTypes() {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      Value result =
+          context.eval(
+              HaraLanguage.ID,
+              "(defrecord Point [x y]) "
+                  + "(defrecord Other [x y]) "
+                  + "[(instance? Point (->Point 1 2)) "
+                  + " (instance? Other (->Point 1 2)) "
+                  + " (instance? Point {:x 1 :y 2})]");
+      assertTrue(result.getArrayElement(0).asBoolean());
+      assertFalse(result.getArrayElement(1).asBoolean());
+      assertFalse(result.getArrayElement(2).asBoolean());
+    }
+  }
+
+  @Test
   public void namespaceIntrospectionIsNarrowAndDeterministic() {
     try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
       Value result =

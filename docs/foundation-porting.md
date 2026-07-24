@@ -13,7 +13,7 @@ has been reviewed.
 | Common grammar foundation | complete | Grammar specification, macros, xtalk profiles/system, and aggregate grammar have translated facts |
 | `polis.typed` | pending | Does not include `hara.model` |
 | Common preprocess and emit | in progress | `preprocess-base` is complete; `emit-rewrite` follows the typed slice |
-| `polis.lang.book*` | pending | Independent review gate |
+| `polis.lang.book*` | in progress | `book-entry` is the first dependency-complete record slice |
 | Remaining `polis.lang` | pending | Split by library, rewrite, compiler, and runtime layers |
 
 ## Source convention
@@ -71,6 +71,7 @@ the portable Hara runtime:
 | `std.lib.walk` | Lazy Java-backed static library over persistent Hara collections | Supplies the Foundation traversal contract without mutable host collections escaping; map/set implementations and metadata are preserved |
 | `volatile!` used as a local traversal flag | Hara `atom`, `reset!`, and `deref` | `polis.common.preprocess-input` needs local mutable state only while checking whether a template expression can be evaluated |
 | Host form `eval` during preprocessing | Core Hara `eval` evaluates the readable Hara form in the active namespace | Preserves persisted template behavior while keeping evaluation inside the Hara runtime rather than invoking Clojure/JVM evaluation |
+| Foundation `std.lib.impl/defimpl` for `BookEntry` | Native Hara `defrecord` with the same fields and constructors | Preserves lookup, construction, and type checks without introducing an implementation-only compatibility namespace; custom Foundation record printing remains unavailable |
 
 Translated `code.test` files are copied from Foundation by default. Namespace
 ownership and unsupported dependency syntax may be translated, but fact

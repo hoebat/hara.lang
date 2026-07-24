@@ -1135,6 +1135,21 @@ public final class HaraContext {
         "number?",
         new UnaryBuiltin("number?", value -> HaraBox.unwrap(value) instanceof Number));
     target.define(
+        "instance?",
+        new VariadicBuiltin(
+            "instance?",
+            values -> {
+              if (values.length != 2) {
+                throw new HaraException("instance? expects a Hara type and value");
+              }
+              Object type = HaraBox.unwrap(values[0]);
+              Object value = HaraBox.unwrap(values[1]);
+              if (!(type instanceof HaraType)) {
+                throw new HaraException("instance? expects a Hara type");
+              }
+              return value instanceof HaraStruct struct && struct.type() == type;
+            }));
+    target.define(
         "symbol",
         new VariadicBuiltin(
             "symbol",
