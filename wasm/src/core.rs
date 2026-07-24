@@ -77,6 +77,8 @@ pub struct Function {
     captured: Rc<RefCell<HashMap<String, Value>>>,
     pub name: Option<String>,
     native: Option<Rc<dyn Fn(Vec<Value>) -> Result<Value, String>>>,
+    /// Arity clauses for multi-arity `defn`/`fn` dispatchers; empty otherwise.
+    clauses: Vec<Rc<Function>>,
 }
 
 impl std::fmt::Debug for Function {
@@ -196,6 +198,7 @@ pub(crate) fn native_function(
         captured: Rc::new(RefCell::new(HashMap::new())),
         name: Some(name.into()),
         native: Some(Rc::new(callback)),
+        clauses: Vec::new(),
     }))
 }
 
@@ -4074,6 +4077,7 @@ fn generated_function(
         captured: Rc::new(RefCell::new(captured)),
         name: None,
         native: None,
+        clauses: Vec::new(),
     }))
 }
 
@@ -4107,6 +4111,23 @@ fn function_parts(form: &Form) -> Result<(Vec<String>, Option<String>), String> 
     Ok((params, variadic))
 }
 
+fn select_clause(functions: &[Rc<Function>], argument_count: usize) -> Option<Rc<Function>> {
+    functions
+        .iter()
+        .find(|function| {
+            function.variadic.is_none() && function.params.len() == argument_count
+        })
+        .or_else(|| {
+            functions
+                .iter()
+                .filter(|function| {
+                    function.variadic.is_some() && argument_count >= function.params.len()
+                })
+                .max_by_key(|function| function.params.len())
+        })
+        .cloned()
+}
+
 fn multi_arity_function(
     name: &str,
     clauses: &[Form],
@@ -4126,39 +4147,29 @@ fn multi_arity_function(
             captured: Rc::new(RefCell::new(captured.clone())),
             name: Some(name.into()),
             native: None,
+            clauses: Vec::new(),
         }));
     }
     if functions.is_empty() {
         return Err("defn expects at least one arity".into());
     }
     let dispatch_name = name.to_owned();
+    let clauses = functions.clone();
     Ok(Value::Function(Rc::new(Function {
         params: Vec::new(),
         variadic: Some("arguments".into()),
         body: Vec::new(),
         captured: Rc::new(RefCell::new(HashMap::new())),
         name: Some(dispatch_name.clone()),
+        clauses,
         native: Some(Rc::new(move |arguments| {
-            let function = functions
-                .iter()
-                .find(|function| {
-                    function.variadic.is_none() && function.params.len() == arguments.len()
-                })
-                .or_else(|| {
-                    functions
-                        .iter()
-                        .filter(|function| {
-                            function.variadic.is_some() && arguments.len() >= function.params.len()
-                        })
-                        .max_by_key(|function| function.params.len())
-                })
-                .ok_or_else(|| {
-                    format!(
-                        "{dispatch_name} has no arity accepting {} arguments",
-                        arguments.len()
-                    )
-                })?;
-            call_function(function, arguments)
+            let function = select_clause(&functions, arguments.len()).ok_or_else(|| {
+                format!(
+                    "{dispatch_name} has no arity accepting {} arguments",
+                    arguments.len()
+                )
+            })?;
+            call_function(&function, arguments)
         })),
     })))
 }
@@ -4779,6 +4790,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     captured: Rc::new(RefCell::new(env.clone())),
                     name: None,
                     native: None,
+                    clauses: Vec::new(),
                 })))
             }
             Form::Symbol(n) if n == "eval" => {
@@ -4999,6 +5011,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                         captured: Rc::new(RefCell::new(env.clone())),
                         name: Some(name.clone()),
                         native: None,
+                        clauses: Vec::new(),
                     }))
                 } else {
                     multi_arity_function(&name, &fs[2..], env)?
@@ -6051,6 +6064,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     captured: Rc::new(RefCell::new(captured)),
                     name: None,
                     native: None,
+                    clauses: Vec::new(),
                 })))
             }
             Form::Symbol(n) if n == "complement" => {
