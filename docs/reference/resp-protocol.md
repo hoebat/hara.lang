@@ -10,13 +10,16 @@ listener is only one way to reach them. The local JLine REPL and RESP clients sh
 session independently, and multiple clients may attach to the same session. Requests within one
 session are serialized.
 
+Protocol 4 is negotiated with `["HELLO", "4", "CLIENT", CLIENT-NAME]`. Every subsequent request
+uses `[OPERATION, REQUEST-ID, ...ARGUMENTS]`, including session operations:
+
 ```text
-["SESSION", "NEW", "APP"]
-["SESSION", "LIST"]
-["SESSION", "ATTACH", "APP"]
-["SESSION", "DETACH"]
-["SESSION", "INFO"]
-["SESSION", "CLOSE", "APP"]
+["SESSION", "REQ-1", "NEW", "APP"]
+["SESSION", "REQ-2", "LIST"]
+["SESSION", "REQ-3", "ATTACH", "APP"]
+["SESSION", "REQ-4", "DETACH"]
+["SESSION", "REQ-5", "INFO"]
+["SESSION", "REQ-6", "CLOSE", "APP"]
 ```
 
 `ROOT` is created automatically and remains alive when the listener is stopped or restarted. Other
@@ -24,23 +27,57 @@ sessions remain alive until explicitly closed or the Hara process exits.
 
 ## Evaluation
 
-After `SESSION ATTACH`, requests identify an operation and request ID:
+After `SESSION ATTACH`, evaluation requests use the attached session:
 
 ```text
-["EVAL", "REQ-1", "(+ 1 2)"]
-["DOC", "REQ-2", "str/join"]
-["COMPLETE", "REQ-3", "(ma", 3]
+["EVAL", "REQ-7", "(+ 1 2)"]
+["DOC", "REQ-8", "str/join"]
+["COMPLETE", "REQ-9", "ma"]
 ```
+
+Editors may append source context to `EVAL` or `LOAD`. This preserves definition and error
+locations when evaluating a form or region instead of a complete file:
+
+```text
+["EVAL", "REQ-10", "(defn add [x y] (+ x y))",
+ "FILE", "/project/src/sample.hal", "LINE", "12", "COLUMN", "3"]
+```
+
+`DOC` returns a flat, keyed array so RESP clients do not need to parse printed Hara values:
+
+```text
+["SYMBOL", "sample/add",
+ "DOC", "Adds two values.",
+ "ARGLISTS", [["x", "y"]],
+ "FILE", "/project/src/sample.hal",
+ "LINE", 12,
+ "COLUMN", 3]
+```
+
+Documentation and arglists may be null. Runtime and Java-backed symbols may also omit source
+location fields.
 
 Responses are streamed as RESP arrays:
 
 ```text
-["RESULT", "REQ-1", 3]
-["DONE", "REQ-1", "OK"]
+["RESULT", "REQ-7", "3"]
+["DONE", "REQ-7", "OK"]
 ```
 
-Errors use `ERROR`, followed by the request ID, error code, and message. Clients that omit
-`HELLO` remain supported in legacy mode and may use `EVAL SESSION SOURCE`.
+Failures emit `["ERROR", ID, CODE, MESSAGE]` followed by `["DONE", ID, "ERROR"]`. Stable codes
+include `BAD_REQUEST`, `UNKNOWN_OP`, `NO_SESSION`, `EVAL_ERROR`, `UNSUPPORTED`, and
+`INTERNAL_ERROR`. `HELLO` and `INFO` include an instance ID and canonical project root for endpoint
+validation. `COMMANDS` is derived from the installed operation-handler registry.
+
+Protocol 3 and clients that omit `HELLO` remain supported. Protocol-3 clients retain the previous
+mixed request shapes; legacy clients may use `EVAL SESSION SOURCE`.
+
+## Client libraries
+
+The JVM RESP2 transport is public under `std.lib.resp`. Hara programs with network capability can
+use `std.resp.client/connect`, `call`, `write`, `read`, `pipeline`, `open?`, and `close`. The client
+is blocking; `connect` accepts `:connect-timeout-ms`, `:read-timeout-ms`, and
+`:decode-bulk :string|:bytes` options.
 
 ## Runtime modes
 

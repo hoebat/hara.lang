@@ -1,17 +1,21 @@
 package hara.truffle;
 
-import hara.kernel.Conn;
+import std.lib.resp.RespConnection;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -23,7 +27,7 @@ public final class HaraServer implements AutoCloseable {
   public static final String DEFAULT_HOST = "127.0.0.1";
   public static final int DEFAULT_PORT = 1311;
 
-  private static final List<String> COMMANDS =
+  private static final List<String> LEGACY_COMMANDS =
       List.of(
           "HELLO",
           "AUTH",
@@ -45,6 +49,9 @@ public final class HaraServer implements AutoCloseable {
   private final boolean logRequests;
   private final HaraSessionBroker broker;
   private final boolean ownsBroker;
+  private final String instanceId = UUID.randomUUID().toString();
+  private final String projectRoot;
+  private final Map<String, Handler> handlers = new LinkedHashMap<>();
   private ExecutorService clients;
 
   private final AtomicBoolean running = new AtomicBoolean();
@@ -60,20 +67,284 @@ public final class HaraServer implements AutoCloseable {
   }
 
   public HaraServer(String host, int port, boolean logRequests, boolean allowNetwork) {
-    this(new HaraSessionBroker(false, allowNetwork), host, port, logRequests, true);
+    this(new HaraSessionBroker(false, allowNetwork), host, port, logRequests, true, null);
   }
 
   HaraServer(HaraSessionBroker broker, String host, int port, boolean logRequests) {
-    this(broker, host, port, logRequests, false);
+    this(broker, host, port, logRequests, null);
+  }
+
+  HaraServer(
+      HaraSessionBroker broker, String host, int port, boolean logRequests, Path projectRoot) {
+    this(broker, host, port, logRequests, false, projectRoot);
   }
 
   private HaraServer(
-      HaraSessionBroker broker, String host, int port, boolean logRequests, boolean ownsBroker) {
+      HaraSessionBroker broker,
+      String host,
+      int port,
+      boolean logRequests,
+      boolean ownsBroker,
+      Path projectRoot) {
     this.broker = broker;
     this.host = host;
     this.requestedPort = port;
     this.logRequests = logRequests;
     this.ownsBroker = ownsBroker;
+    this.projectRoot =
+        projectRoot == null ? null : projectRoot.toAbsolutePath().normalize().toString();
+    registerCoreHandlers();
+  }
+
+  /** A protocol-4 operation. Additional handlers may be registered before the server starts. */
+  public interface Handler {
+    String operation();
+
+    void handle(Request request, Responder responder) throws Exception;
+  }
+
+  /** Protocol-4 request context exposed to operation handlers. */
+  public static final class Request {
+    private final HaraServer server;
+    private final ConnectionState state;
+    private final String operation;
+    private final String id;
+    private final List<Object> arguments;
+
+    private Request(
+        HaraServer server,
+        ConnectionState state,
+        String operation,
+        String id,
+        List<Object> arguments) {
+      this.server = server;
+      this.state = state;
+      this.operation = operation;
+      this.id = id;
+      this.arguments = List.copyOf(arguments);
+    }
+
+    public String operation() {
+      return operation;
+    }
+
+    public String id() {
+      return id;
+    }
+
+    public List<Object> arguments() {
+      return arguments;
+    }
+
+    public String argument(int index) {
+      if (index < 0 || index >= arguments.size()) {
+        throw new IllegalArgumentException("WRONG_NUMBER_OF_ARGUMENTS");
+      }
+      return text(arguments.get(index));
+    }
+
+    public String connectionId() {
+      return state.connectionId;
+    }
+
+    public String session() {
+      return requireSessionName(state.attached);
+    }
+
+    public void attach(String name) {
+      String target = HaraSessionBroker.normalizeName(name);
+      server.requireSession(target);
+      state.attached = target;
+    }
+
+    public void detach() {
+      state.attached = null;
+    }
+
+    public Object eval(String source) {
+      return eval(source, null, 1, 1);
+    }
+
+    public Object eval(String source, String file, int line, int column) {
+      try {
+        return server.requireSession(session()).eval(source, file, line, column);
+      } catch (RuntimeException error) {
+        throw new EvaluationException(error.getMessage(), error);
+      }
+    }
+
+    public Set<String> sessionNames() {
+      return server.broker.sessionNames();
+    }
+  }
+
+  /** Writes values for one protocol-4 request. Completion is added by the server. */
+  public interface Responder {
+    void result(Object value) throws IOException;
+  }
+
+  /** Registers or replaces a protocol-4 operation before the listener starts. */
+  public synchronized void registerHandler(Handler handler) {
+    if (running.get()) throw new IllegalStateException("Cannot register RESP handlers after start");
+    String operation = handler.operation().toUpperCase(Locale.ROOT);
+    if (operation.isBlank() || "HELLO".equals(operation)) {
+      throw new IllegalArgumentException("Invalid RESP handler operation: " + operation);
+    }
+    handlers.put(operation, handler);
+  }
+
+  private static final class ConnectionState {
+    private final String connectionId;
+    private String attached = "ROOT";
+    private int protocol;
+    private boolean closeAfterResponse;
+
+    private ConnectionState(String connectionId) {
+      this.connectionId = connectionId;
+    }
+  }
+
+  @FunctionalInterface
+  private interface Operation {
+    void handle(Request request, Responder responder) throws Exception;
+  }
+
+  private void register(String operation, Operation implementation) {
+    registerHandler(
+        new Handler() {
+          @Override
+          public String operation() {
+            return operation;
+          }
+
+          @Override
+          public void handle(Request request, Responder responder) throws Exception {
+            implementation.handle(request, responder);
+          }
+        });
+  }
+
+  private void registerCoreHandlers() {
+    register("PING", (request, responder) -> responder.result("PONG"));
+    register("ECHO", (request, responder) -> responder.result(request.arguments()));
+    register(
+        "COMMANDS",
+        (request, responder) -> {
+          ArrayList<String> commands = new ArrayList<>(handlers.keySet());
+          commands.add("HELLO");
+          Collections.sort(commands);
+          responder.result(commands);
+        });
+    register(
+        "INFO",
+        (request, responder) ->
+            responder.result(info(request.connectionId(), request.state.attached, 4)));
+    register(
+        "STATUS",
+        (request, responder) ->
+            responder.result(info(request.connectionId(), request.state.attached, 4)));
+    register("SESSION", this::handleSessionV4);
+    register("EVAL", this::handleEvaluationV4);
+    register("LOAD", this::handleEvaluationV4);
+    register(
+        "DOC",
+        (request, responder) ->
+            responder.result(valueAsWire(evaluateDocumentation(request, request.argument(0)))));
+    register(
+        "COMPLETE",
+        (request, responder) ->
+            responder.result(completions(request.session(), request.argument(0))));
+    register(
+        "INTERRUPT",
+        (request, responder) -> {
+          throw new UnsupportedOperationException("INTERRUPT_UNSUPPORTED");
+        });
+    register(
+        "QUIT",
+        (request, responder) -> {
+          responder.result("BYE");
+          request.state.closeAfterResponse = true;
+        });
+  }
+
+  private void handleEvaluationV4(Request request, Responder responder) throws IOException {
+    String source = request.argument(0);
+    String file = null;
+    int line = 1;
+    int column = 1;
+    if (request.arguments().size() > 1) {
+      if ((request.arguments().size() & 1) == 0) {
+        throw new IllegalArgumentException("EVAL_OPTIONS_EXPECT_KEY_VALUE_PAIRS");
+      }
+      for (int index = 1; index < request.arguments().size(); index += 2) {
+        String key = request.argument(index).toUpperCase(Locale.ROOT);
+        String value = request.argument(index + 1);
+        switch (key) {
+          case "FILE":
+            file = value;
+            break;
+          case "LINE":
+            line = positiveInteger(value, "LINE");
+            break;
+          case "COLUMN":
+            column = positiveInteger(value, "COLUMN");
+            break;
+          default:
+            throw new IllegalArgumentException("UNKNOWN_EVAL_OPTION " + key);
+        }
+      }
+    }
+    responder.result(display(request.eval(source, file, line, column)));
+  }
+
+  private static int positiveInteger(String value, String option) {
+    try {
+      int parsed = Integer.parseInt(value);
+      if (parsed < 1) throw new NumberFormatException();
+      return parsed;
+    } catch (NumberFormatException error) {
+      throw new IllegalArgumentException(option + "_EXPECTS_POSITIVE_INTEGER");
+    }
+  }
+
+  private void handleSessionV4(Request request, Responder responder) throws IOException {
+    String sub = request.argument(0).toUpperCase(Locale.ROOT);
+    switch (sub) {
+      case "NEW":
+        String created = HaraSessionBroker.normalizeName(request.argument(1));
+        broker.create(created);
+        responder.result(created);
+        break;
+      case "LIST":
+        ArrayList<String> names = new ArrayList<>(broker.sessionNames());
+        Collections.sort(names);
+        responder.result(names);
+        break;
+      case "ATTACH":
+        request.attach(request.argument(1));
+        responder.result(request.session());
+        break;
+      case "DETACH":
+        request.detach();
+        responder.result("DETACHED");
+        break;
+      case "INFO":
+        String target =
+            request.arguments().size() > 1
+                ? HaraSessionBroker.normalizeName(request.argument(1))
+                : request.session();
+        responder.result(requireSession(target).info());
+        break;
+      case "CLOSE":
+      case "KILL":
+        String closed = HaraSessionBroker.normalizeName(request.argument(1));
+        broker.closeSession(closed);
+        if (closed.equals(request.state.attached)) request.detach();
+        responder.result(true);
+        break;
+      default:
+        throw new IllegalArgumentException("UNKNOWN_SESSION_COMMAND " + sub);
+    }
   }
 
 
@@ -133,41 +404,47 @@ public final class HaraServer implements AutoCloseable {
   }
 
   private void handle(Socket client) {
-    String connection = Integer.toHexString(System.identityHashCode(client));
-    String attached = "ROOT";
-    boolean negotiated = false;
+    ConnectionState state =
+        new ConnectionState(Integer.toHexString(System.identityHashCode(client)));
     try (Socket ignored = client;
-        Conn conn = new Conn(client)) {
+        RespConnection conn = new RespConnection(client)) {
       while (!client.isClosed()) {
         Object raw = conn.read();
         if (raw == null) return;
-        List<String> request = strings(raw);
-        if (request.isEmpty()) {
+        List<Object> values = values(raw);
+        if (values.isEmpty()) {
           conn.write(new RuntimeException("EMPTY_COMMAND"));
           continue;
         }
-        if (logRequests) System.err.println("REQUEST " + connection + " " + request);
-        String command = request.get(0).toUpperCase(java.util.Locale.ROOT);
+        List<String> request = strings(raw);
+        if (logRequests) System.err.println("REQUEST " + state.connectionId + " " + request);
+        String command = text(values.get(0)).toUpperCase(Locale.ROOT);
         try {
           if ("HELLO".equals(command)) {
-            negotiated = true;
-            conn.write(hello(connection));
+            int requested = values.size() > 1 ? protocol(text(values.get(1))) : 3;
+            state.protocol = Math.min(requested, 4);
+            conn.write(hello(state.connectionId, state.protocol));
+          } else if (state.protocol == 4) {
+            handleV4(conn, state, command, values);
+            if (state.closeAfterResponse) return;
           } else if ("PING".equals(command)) {
             conn.writeString("PONG");
           } else if ("ECHO".equals(command)) {
             conn.write(request.subList(1, request.size()));
           } else if ("COMMANDS".equals(command) || "HELP".equals(command)) {
-            conn.write(COMMANDS);
+            conn.write(LEGACY_COMMANDS);
           } else if ("INFO".equals(command) || "STATUS".equals(command)) {
-            conn.write(info(connection, attached));
+            conn.write(info(state.connectionId, state.attached, state.protocol));
           } else if ("SESSION".equals(command)) {
-            attached = sessionCommand(conn, request, attached, negotiated);
+            state.attached =
+                sessionCommand(conn, request, state.attached, state.protocol == 3);
           } else if ("EVAL".equals(command) || "LOAD".equals(command)) {
-            attached = evaluate(conn, request, attached, negotiated, command);
+            state.attached =
+                evaluate(conn, request, state.attached, state.protocol == 3, command);
           } else if ("DOC".equals(command)) {
-            evaluateDoc(conn, request, attached, negotiated);
+            evaluateDoc(conn, request, state.attached, state.protocol == 3);
           } else if ("COMPLETE".equals(command)) {
-            evaluateComplete(conn, request, attached, negotiated);
+            evaluateComplete(conn, request, state.attached, state.protocol == 3);
           } else if ("QUIT".equals(command)) {
             conn.writeString("BYE");
             return;
@@ -177,30 +454,58 @@ public final class HaraServer implements AutoCloseable {
             conn.write(new RuntimeException("UNKNOWN_COMMAND " + command));
           }
         } catch (Throwable error) {
-          writeError(conn, request, negotiated, error);
+          if (state.protocol == 4) writeErrorV4(conn, values, error);
+          else writeError(conn, request, state.protocol == 3, error);
         }
       }
     } catch (IOException ignored) {
     }
   }
 
-  private List<Object> hello(String connection) {
+  private void handleV4(
+      RespConnection conn, ConnectionState state, String command, List<Object> values)
+      throws Exception {
+    if (values.size() < 2) throw new IllegalArgumentException("MISSING_REQUEST_ID");
+    String id = text(values.get(1));
+    if (id.isBlank()) throw new IllegalArgumentException("MISSING_REQUEST_ID");
+    Handler handler = handlers.get(command);
+    if (handler == null) throw new UnknownOperationException(command);
+    Request request =
+        new Request(this, state, command, id, values.subList(2, values.size()));
+    handler.handle(
+        request,
+        value -> conn.write(Arrays.asList("RESULT", id, valueAsWire(value))));
+    conn.write(Arrays.asList("DONE", id, "OK"));
+  }
+
+  private List<Object> hello(String connection, int protocol) {
     return Arrays.asList(
         "SERVER",
         "HARA",
         "VERSION",
         "0.1.0",
         "PROTO",
-        3L,
+        (long) protocol,
         "RUNTIME",
         "TRUFFLE",
         "CONNECTION",
         connection,
+        "INSTANCE",
+        instanceId,
+        "PROJECT",
+        projectRoot,
         "CAPABILITIES",
-        COMMANDS);
+        commands());
   }
 
-  private List<Object> info(String connection, String attached) {
+  private List<String> commands() {
+    ArrayList<String> result = new ArrayList<>(handlers.keySet());
+    result.add("HELLO");
+    Collections.sort(result);
+    return result;
+  }
+
+  private List<Object> info(String connection, String attached, int protocol) {
     return Arrays.asList(
         "SERVER",
         "HARA",
@@ -210,6 +515,12 @@ public final class HaraServer implements AutoCloseable {
         (long) port(),
         "CONNECTION",
         connection,
+        "PROTO",
+        (long) protocol,
+        "INSTANCE",
+        instanceId,
+        "PROJECT",
+        projectRoot,
         "SESSION",
         attached,
         "SESSIONS",
@@ -217,7 +528,7 @@ public final class HaraServer implements AutoCloseable {
   }
 
   private String sessionCommand(
-      Conn conn, List<String> request, String attached, boolean negotiated) throws IOException {
+      RespConnection conn, List<String> request, String attached, boolean negotiated) throws IOException {
     require(request, 2);
     String sub = request.get(1).toUpperCase(java.util.Locale.ROOT);
     switch (sub) {
@@ -259,7 +570,7 @@ public final class HaraServer implements AutoCloseable {
   }
 
   private String evaluate(
-      Conn conn, List<String> request, String attached, boolean negotiated, String command)
+      RespConnection conn, List<String> request, String attached, boolean negotiated, String command)
       throws IOException {
     String requestId = negotiated ? requireValue(request, 1) : "";
     String sessionName;
@@ -282,29 +593,56 @@ public final class HaraServer implements AutoCloseable {
     return attached;
   }
 
-  private void evaluateDoc(Conn conn, List<String> request, String attached, boolean negotiated)
+  private void evaluateDoc(
+      RespConnection conn, List<String> request, String attached, boolean negotiated)
       throws IOException {
     String requestId = negotiated ? requireValue(request, 1) : "";
     String symbol = negotiated ? requireValue(request, 2) : requireValue(request, 1);
-    validateSymbol(symbol);
-    Object result =
-        requireSession(requireSessionName(attached))
-            .eval(
-                "(object :symbol \""
-                    + symbol
-                    + "\" :doc (get (meta #'"
-                    + symbol
-                    + ") :doc) :arglists (get (meta #'"
-                    + symbol
-                    + ") :arglists))");
+    Object result = evaluateDocumentation(requireSessionName(attached), symbol);
     respond(conn, negotiated, request, result, requestId);
   }
 
   private void evaluateComplete(
-      Conn conn, List<String> request, String attached, boolean negotiated) throws IOException {
+      RespConnection conn, List<String> request, String attached, boolean negotiated)
+      throws IOException {
     String requestId = negotiated ? requireValue(request, 1) : "";
     String prefix = negotiated ? requireValue(request, 2) : requireValue(request, 1);
-    Object result = requireSession(requireSessionName(attached)).eval("(current-symbols)");
+    respond(
+        conn,
+        negotiated,
+        request,
+        completions(requireSessionName(attached), prefix),
+        requestId);
+  }
+
+  private Object evaluateDocumentation(Request request, String symbol) {
+    validateSymbol(symbol);
+    return request.eval(documentationSource(symbol));
+  }
+
+  private Object evaluateDocumentation(String session, String symbol) {
+    validateSymbol(symbol);
+    return requireSession(session).eval(documentationSource(symbol));
+  }
+
+  private static String documentationSource(String symbol) {
+    return "[\"SYMBOL\" \""
+        + symbol
+        + "\" \"DOC\" (get (meta #'"
+        + symbol
+        + ") :doc) \"ARGLISTS\" (get (meta #'"
+        + symbol
+        + ") :arglists) \"FILE\" (get (meta #'"
+        + symbol
+        + ") :file) \"LINE\" (get (meta #'"
+        + symbol
+        + ") :line) \"COLUMN\" (get (meta #'"
+        + symbol
+        + ") :column)]";
+  }
+
+  private List<String> completions(String session, String prefix) {
+    Object result = requireSession(session).eval("(current-symbols)");
     List<String> matches = new ArrayList<>();
     if (result instanceof Value) {
       Value values = (Value) result;
@@ -315,21 +653,23 @@ public final class HaraServer implements AutoCloseable {
       }
     }
     Collections.sort(matches);
-    respond(conn, negotiated, request, matches, requestId);
+    return matches;
   }
 
-  private void respond(Conn conn, boolean negotiated, List<String> request, Object value)
+  private void respond(RespConnection conn, boolean negotiated, List<String> request, Object value)
       throws IOException {
     respond(conn, negotiated, request, value, negotiated ? requireValue(request, 1) : "");
   }
 
-  private void respond(Conn conn, boolean negotiated, List<String> request, Object value, String id)
+  private void respond(
+      RespConnection conn, boolean negotiated, List<String> request, Object value, String id)
       throws IOException {
     if (negotiated) conn.write(Arrays.asList("RESULT", id, valueAsWire(value)));
     else conn.write(valueAsWire(value));
   }
 
-  private void writeError(Conn conn, List<String> request, boolean negotiated, Throwable error)
+  private void writeError(
+      RespConnection conn, List<String> request, boolean negotiated, Throwable error)
       throws IOException {
     String message = error.getMessage() == null ? error.toString() : error.getMessage();
     if (negotiated) {
@@ -341,9 +681,47 @@ public final class HaraServer implements AutoCloseable {
     }
   }
 
+  private void writeErrorV4(RespConnection conn, List<Object> request, Throwable error)
+      throws IOException {
+    String id = request.size() > 1 ? text(request.get(1)) : "";
+    String message = error.getMessage() == null ? error.toString() : error.getMessage();
+    conn.write(Arrays.asList("ERROR", id, errorCode(error, message), message));
+    conn.write(Arrays.asList("DONE", id, "ERROR"));
+  }
+
+  private static String errorCode(Throwable error, String message) {
+    if (error instanceof UnknownOperationException) return "UNKNOWN_OP";
+    if (error instanceof UnsupportedOperationException) return "UNSUPPORTED";
+    if (error instanceof EvaluationException) return "EVAL_ERROR";
+    if (message.startsWith("NO_SESSION") || message.startsWith("NO_SESSION_ATTACHED")) {
+      return "NO_SESSION";
+    }
+    if (error instanceof IllegalArgumentException) {
+      if (message.contains("Unbound") || message.contains("Syntax") || message.contains("parse")) {
+        return "EVAL_ERROR";
+      }
+      return "BAD_REQUEST";
+    }
+    return "INTERNAL_ERROR";
+  }
+
   private static Object valueAsWire(Object value) {
     if (value == null) return null;
-    if (value instanceof Value) return display(value);
+    if (value instanceof Value) {
+      Value guest = (Value) value;
+      if (guest.isNull()) return null;
+      if (guest.hasArrayElements()) {
+        List<Object> result = new ArrayList<>();
+        for (long index = 0; index < guest.getArraySize(); index++)
+          result.add(valueAsWire(guest.getArrayElement(index)));
+        return result;
+      }
+      if (guest.isBoolean()) return guest.asBoolean();
+      if (guest.isString()) return guest.asString();
+      if (guest.fitsInLong()) return guest.asLong();
+      if (guest.fitsInDouble()) return java.lang.Double.toString(guest.asDouble());
+      return guest.toString();
+    }
     if (value instanceof Map<?, ?>) {
       List<Object> result = new ArrayList<>();
       for (Map.Entry<?, ?> entry : ((Map<?, ?>) value).entrySet())
@@ -399,6 +777,37 @@ public final class HaraServer implements AutoCloseable {
       else result.add(String.valueOf(item));
     }
     return result;
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<Object> values(Object value) {
+    if (value instanceof List<?>) return (List<Object>) value;
+    return List.of(value);
+  }
+
+  private static String text(Object value) {
+    if (value instanceof byte[]) return new String((byte[]) value, StandardCharsets.UTF_8);
+    return String.valueOf(value);
+  }
+
+  private static int protocol(String value) {
+    try {
+      return Integer.parseInt(value) >= 4 ? 4 : 3;
+    } catch (NumberFormatException error) {
+      throw new IllegalArgumentException("INVALID_PROTOCOL " + value);
+    }
+  }
+
+  private static final class UnknownOperationException extends IllegalArgumentException {
+    private UnknownOperationException(String operation) {
+      super("UNKNOWN_COMMAND " + operation);
+    }
+  }
+
+  private static final class EvaluationException extends RuntimeException {
+    private EvaluationException(String message, Throwable cause) {
+      super(message, cause);
+    }
   }
 
 }

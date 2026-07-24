@@ -2130,7 +2130,7 @@ public final class HaraContext {
     }
   }
 
-  private void requireSocketIO(String operation) {
+  void requireSocketIO(String operation) {
     if (!environment.isSocketIOAllowed()) {
       throw new HaraException(operation + " is unsupported or network access is denied");
     }

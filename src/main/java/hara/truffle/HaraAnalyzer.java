@@ -666,7 +666,7 @@ final class HaraAnalyzer {
     if (!(name instanceof Symbol)) {
       throw error("defn name must be a symbol");
     }
-    Symbol symbol = (Symbol) name;
+    Symbol symbol = definitionSymbol((Symbol) name, form);
     if (symbol.getNamespace() != null) {
       throw error("defn name must not be qualified");
     }
@@ -1203,12 +1203,29 @@ final class HaraAnalyzer {
     if (!(name instanceof Symbol)) {
       throw error("def name must be a symbol");
     }
-    Symbol symbol = (Symbol) name;
+    Symbol symbol = definitionSymbol((Symbol) name, form);
     if (symbol.getNamespace() != null) {
       throw error("def name must not be qualified");
     }
     context.declareCurrent(symbol);
     return new HaraNodes.DefineGlobal(symbol, analyze(form.nth(2)));
+  }
+
+  @SuppressWarnings("unchecked")
+  private Symbol definitionSymbol(Symbol symbol, List<?> form) {
+    IMapType<Object, Object> metadata =
+        symbol.meta() instanceof IMapType<?, ?>
+            ? (IMapType<Object, Object>) symbol.meta()
+            : hara.lang.data.Map.Standard.EMPTY;
+    if (!(form.meta() instanceof IMapType<?, ?>)) return symbol.withMeta(metadata);
+    IMapType<Object, Object> source = (IMapType<Object, Object>) form.meta();
+    String[] keys = {"file", "line", "column", "end-line", "end-column"};
+    for (String key : keys) {
+      Keyword keyword = Keyword.create(key);
+      Object value = source.lookup(keyword);
+      if (value != null) metadata = (IMapType<Object, Object>) metadata.assoc(keyword, value);
+    }
+    return symbol.withMeta(metadata);
   }
 
   private HaraExpressionNode analyzeVar(List<?> form) {

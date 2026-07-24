@@ -10,3 +10,4 @@ hara.truffle.StdBlockLibraryProvider
 hara.truffle.StdZipLibraryProvider
 hara.truffle.StdLibTaskLibraryProvider
 hara.truffle.StdLibContextLibraryProvider
+hara.truffle.StdRespClientLibraryProvider

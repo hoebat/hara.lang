@@ -1,5 +1,6 @@
 package hara.truffle;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -7,6 +8,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
+import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.io.IOAccess;
 
@@ -97,8 +99,23 @@ final class HaraSessionBroker implements AutoCloseable {
     }
 
     synchronized Value eval(String source) {
+      return eval(source, null, 1, 1);
+    }
+
+    synchronized Value eval(String source, String file, int line, int column) {
       try {
-        return context.eval(HaraLanguage.ID, source);
+        if (file == null || file.isBlank()) return context.eval(HaraLanguage.ID, source);
+        int safeLine = Math.max(1, line);
+        int safeColumn = Math.max(1, column);
+        StringBuilder contextual = new StringBuilder(source.length() + safeLine + safeColumn);
+        contextual.append("\n".repeat(safeLine - 1));
+        contextual.append(" ".repeat(safeColumn - 1));
+        contextual.append(source);
+        Source contextualSource =
+            Source.newBuilder(HaraLanguage.ID, contextual.toString(), file).build();
+        return context.eval(contextualSource);
+      } catch (IOException error) {
+        throw new IllegalArgumentException("Unable to construct Hara source: " + error.getMessage(), error);
       } catch (PolyglotException error) {
         throw new IllegalArgumentException(error.getMessage(), error);
       }

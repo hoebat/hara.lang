@@ -198,6 +198,7 @@ public class StdLibraryProviderTest {
     HaraLibraryProvider zip = new StdZipLibraryProvider();
     HaraLibraryProvider context = new StdLibContextLibraryProvider();
     HaraLibraryProvider task = new StdLibTaskLibraryProvider();
+    HaraLibraryProvider resp = new StdRespClientLibraryProvider();
     assertEquals("std.lib.foundation", foundation.namespace());
     assertEquals("std/lib/foundation.hal", foundation.fallbackResource());
     assertTrue(foundation.eager());
@@ -211,6 +212,7 @@ public class StdLibraryProviderTest {
     assertEquals("std.lib.zip", zip.namespace());
     assertEquals("std.lib.context", context.namespace());
     assertEquals("std.lib.task", task.namespace());
+    assertEquals("std.resp.client", resp.namespace());
     assertEquals(5, foundation.order());
     assertEquals(20, string.order());
     assertEquals(20, bytes.order());
@@ -222,6 +224,7 @@ public class StdLibraryProviderTest {
     assertEquals(20, zip.order());
     assertEquals(20, context.order());
     assertEquals(20, task.order());
+    assertEquals(20, resp.order());
   }
 
   @Test

@@ -40,7 +40,7 @@ import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.io.IOAccess;
-import hara.kernel.Conn;
+import std.lib.resp.RespConnection;
 
 public final class Main {
   private Main() {}
@@ -171,7 +171,11 @@ public final class Main {
             capabilities.file, capabilities.network, capabilities.process);
         HaraServer server =
             new HaraServer(
-                broker, capabilities.host, capabilities.port, capabilities.logRequests)) {
+                broker,
+                capabilities.host,
+                capabilities.port,
+                capabilities.logRequests,
+                currentProjectRoot())) {
       server.start();
       output.println("HARA RESP " + capabilities.host + ":" + server.port() + " · session ROOT");
       output.flush();
@@ -199,7 +203,7 @@ public final class Main {
     }
     String host = endpoint.substring(0, separator);
     try (Socket socket = new Socket(host, Integer.parseInt(endpoint.substring(separator + 1)))) {
-      Conn conn = new Conn(socket);
+      RespConnection conn = new RespConnection(socket);
       conn.write("HELLO", "3", "CLIENT", "HARA-REMOTE");
       output.println(remoteText(conn.read()));
       java.io.BufferedReader reader =
@@ -253,6 +257,11 @@ public final class Main {
       return result.append(']').toString();
     }
     return String.valueOf(value);
+  }
+
+  private static Path currentProjectRoot() {
+    HaraProject project = HaraProject.discover(Path.of("."));
+    return project == null ? null : project.root();
   }
 
   @SuppressWarnings({"rawtypes", "unchecked"})
