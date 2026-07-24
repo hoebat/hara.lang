@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 
 const web = import.meta.dirname;
 const repository = resolve(web, "../..");
-const source = resolve(repository, "wasm/extensions/ledger-noir");
+const source = resolve(repository, "rust/extensions/ledger-noir");
 const output = resolve(web, "dist/extensions/ledger/noir");
 const assets = resolve(output, "assets");
 

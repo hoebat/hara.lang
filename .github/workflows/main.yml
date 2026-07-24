@@ -18,26 +18,26 @@ jobs:
         targets: wasm32-unknown-unknown,wasm32-wasip1
         components: clippy
     - name: Check Rust module layout
-      run: bash wasm/scripts/check-layout.sh
+      run: bash rust/scripts/check-layout.sh
     - name: Run Rust Clippy
-      run: cargo clippy --manifest-path wasm/Cargo.toml --all-targets -- -D clippy::too_many_lines
+      run: cargo clippy --manifest-path rust/Cargo.toml --all-targets -- -D clippy::too_many_lines
     - name: Run Rust native tests
-      run: cargo test --manifest-path wasm/Cargo.toml
+      run: cargo test --manifest-path rust/Cargo.toml
     - name: Verify generated parity corpus
       run: ./scripts/generate-wasm-truffle-parity && git diff --exit-code -- spec/hara/wasm-truffle-parity.edn
     - name: Build raw Rust WASM extension artifact
       run: ./scripts/build-hara-wasm-raw
     - name: Build browser and WASI Rust runtime artifacts
       run: |
-        cargo build --manifest-path wasm/Cargo.toml --release --target wasm32-unknown-unknown --lib
-        cargo build --manifest-path wasm/Cargo.toml --release --target wasm32-wasip1 --lib
+        cargo build --manifest-path rust/Cargo.toml --release --target wasm32-unknown-unknown --lib
+        cargo build --manifest-path rust/Cargo.toml --release --target wasm32-wasip1 --lib
     - name: Record Rust runtime artifact sizes
       run: |
         mkdir -p target
         {
-          stat -c "browser_wasm_bytes=%s" wasm/target/wasm32-unknown-unknown/release/hara_wasm.wasm
-          stat -c "wasi_wasm_bytes=%s" wasm/target/wasm32-wasip1/release/hara_wasm.wasm
-          stat -c "raw_extension_wasm_bytes=%s" wasm/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm
+          stat -c "browser_wasm_bytes=%s" rust/target/wasm32-unknown-unknown/release/hara_wasm.wasm
+          stat -c "wasi_wasm_bytes=%s" rust/target/wasm32-wasip1/release/hara_wasm.wasm
+          stat -c "raw_extension_wasm_bytes=%s" rust/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm
         } | tee target/rust-wasm-artifact-sizes.txt
     - name: Upload Rust runtime artifact sizes
       uses: actions/upload-artifact@v4
@@ -51,14 +51,14 @@ jobs:
       with:
         node-version: '22'
         cache: npm
-        cache-dependency-path: wasm/web/package-lock.json
+        cache-dependency-path: rust/web/package-lock.json
     - name: Install browser test dependencies
-      working-directory: wasm/web
+      working-directory: rust/web
       run: |
         npm ci
         npx playwright install --with-deps chromium
     - name: Run HTA Node and real-browser conformance
-      working-directory: wasm/web
+      working-directory: rust/web
       run: |
         npm run test:hta
         npm run test:noir
@@ -120,9 +120,9 @@ jobs:
       with:
         node-version: '22'
         cache: npm
-        cache-dependency-path: wasm/web/package-lock.json
+        cache-dependency-path: rust/web/package-lock.json
     - name: Build packaged Noir extension
-      working-directory: wasm/web
+      working-directory: rust/web
       run: |
         npm ci
         npm run build:noir
@@ -146,18 +146,18 @@ jobs:
     - name: Run a Native Image smoke test
       run: |
         mkdir -p target/native-extensions/demo/000-answer-42
-        cp wasm/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm \
+        cp rust/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm \
           target/native-extensions/demo/000-answer-42/answer-42.wasm
         cp examples/extensions/demo/000-answer-42/hara.extension.edn \
           target/native-extensions/demo/000-answer-42/hara.extension.edn
         mkdir -p target/native-extensions/hara/runtime/wasm
-        cp wasm/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm \
+        cp rust/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm \
           target/native-extensions/hara/runtime/wasm/hara.wasm
         cp examples/extensions/hara/runtime/wasm/hara.extension.edn \
           target/native-extensions/hara/runtime/wasm/hara.extension.edn
         test "$(target/hara-truffle conformance)" = "L0 conformance passed: 64 cases"
         test "$(HARA_EXTENSION_PATH="$PWD/target/native-extensions" target/hara-truffle eval '(ns app (:require [demo.000-answer-42 :as answer])) (answer/add 20 22)')" = "42"
-        test "$(HARA_EXTENSION_PATH="$PWD/wasm/web/dist/extensions" target/hara-truffle --allow-process eval '(ns app (:require [ledger.noir :as noir])) (get (deref (noir/compile {:name "native_smoke" :source "fn main(x: pub Field) { assert(x == 42); }"})) :format)')" = "hara/ledger.noir/v1"
+        test "$(HARA_EXTENSION_PATH="$PWD/rust/web/dist/extensions" target/hara-truffle --allow-process eval '(ns app (:require [ledger.noir :as noir])) (get (deref (noir/compile {:name "native_smoke" :source "fn main(x: pub Field) { assert(x == 42); }"})) :format)')" = "hara/ledger.noir/v1"
         test "$(HARA_EXTENSION_PATH="$PWD/target/native-extensions" target/hara-truffle eval '(ns app (:require [hara.runtime.wasm :as runtime])) (deref (runtime/eval "(+ 10 (count (deref (host/call \"crypto.hash.sha256\" \"digest\" (bytes 97 98 99)))))"))')" = "42"
         test "$(target/hara-truffle eval '(+ 19 23)')" = "42"
         test "$(target/hara-truffle eval '(bytes/u8 -1)')" = "255"

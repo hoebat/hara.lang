@@ -10,7 +10,7 @@ on:
       - "mkdocs.yml"
       - "requirements-docs.txt"
       - "pom.xml"
-      - "wasm/**"
+      - "rust/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -59,13 +59,13 @@ jobs:
         run: |
           rustup target add wasm32-unknown-unknown
           cargo install wasm-bindgen-cli --version 0.2.126 --locked
-          cargo build --manifest-path wasm/Cargo.toml --target wasm32-unknown-unknown --release --lib
-          npm ci --prefix wasm/web
-          npm run --prefix wasm/web test:noir
+          cargo build --manifest-path rust/Cargo.toml --target wasm32-unknown-unknown --release --lib
+          npm ci --prefix rust/web
+          npm run --prefix rust/web test:noir
           mkdir -p site-build/wasm
-          wasm-bindgen --target web --out-dir site-build/wasm/pkg wasm/target/wasm32-unknown-unknown/release/hara_wasm.wasm
-          cp wasm/web/index.html wasm/web/playground.css wasm/web/playground.js site-build/wasm/
-          cp -R wasm/web/dist/. site-build/wasm/
+          wasm-bindgen --target web --out-dir site-build/rust/pkg rust/target/wasm32-unknown-unknown/release/hara_wasm.wasm
+          cp rust/web/index.html rust/web/playground.css rust/web/playground.js site-build/rust/
+          cp -R rust/web/dist/. site-build/rust/
 
       - name: Add Java API documentation
         run: |

@@ -8,10 +8,10 @@ const vendor = path.join(root, "vendor");
 mkdirSync(vendor, { recursive: true });
 
 const files = [
-  [path.join(repo, "wasm/web/hta.js"), path.join(vendor, "hta.js")],
-  [path.join(repo, "wasm/web/hta-worker.js"), path.join(vendor, "hta-worker.js")],
+  [path.join(repo, "rust/web/hta.js"), path.join(vendor, "hta.js")],
+  [path.join(repo, "rust/web/hta-worker.js"), path.join(vendor, "hta-worker.js")],
   [
-    path.join(repo, "wasm/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm"),
+    path.join(repo, "rust/raw/target/wasm32-unknown-unknown/release/hara_wasm_raw.wasm"),
     path.join(vendor, "hara.wasm"),
   ],
 ];

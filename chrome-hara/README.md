@@ -5,7 +5,7 @@ Chrome (MV3) extension embedding the hara wasm runtime in a DevTools panel.
 ## Build
 
     npm install
-    npm run build   # builds wasm/raw + copies vendor files
+    npm run build   # builds rust/raw + copies vendor files
 
 ## Load
 
