@@ -18,12 +18,15 @@ import java.util.regex.Pattern;
 /** Strict metadata for a provider-generated namespace loaded through {@code :require}. */
 public final class HaraExtensionManifest {
   private static final Pattern NAMESPACE = Pattern.compile("[a-z][a-z0-9-]*(\\.[a-z0-9][a-z0-9-]*)+");
+  private static final Pattern IDENTITY =
+      Pattern.compile("[a-z][a-z0-9-]*/[a-z][a-z0-9-]*(\\.[a-z0-9][a-z0-9-]*)*");
   private static final Pattern HANDLE_TAG =
       Pattern.compile("[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)*");
   private static final Pattern HANDLE_TYPE = Pattern.compile("[a-z][a-z0-9-]*");
   private static final Set<String> FIELDS =
       Set.of(
           "namespace",
+          "identity",
           "version",
           "provider",
           "module",
@@ -40,6 +43,7 @@ public final class HaraExtensionManifest {
 
   private static final Set<String> HANDLE_FIELDS = Set.of("tag");
   private final String namespace;
+  private final String identity;
   private final String version;
   private final String provider;
   private final String module;
@@ -53,6 +57,7 @@ public final class HaraExtensionManifest {
   private final Map<String, String> handleTags;
   private HaraExtensionManifest(
       String namespace,
+      String identity,
       String version,
       String provider,
       String module,
@@ -64,6 +69,7 @@ public final class HaraExtensionManifest {
       Map<String, java.util.List<String>> hostCalls,
       Map<String, String> handleTags) {
     this.namespace = namespace;
+    this.identity = identity;
     this.version = version;
     this.provider = provider;
     this.module = module;
@@ -95,6 +101,11 @@ public final class HaraExtensionManifest {
     if (!NAMESPACE.matcher(namespace).matches()) {
       throw invalid(origin, "namespace must be a qualified lower-case symbol");
     }
+    Object identityValue = lookup(map, "identity");
+    String identity = identityValue == null ? null : requireString(map, "identity", origin);
+    if (identity != null && !IDENTITY.matcher(identity).matches()) {
+      throw invalid(origin, "identity must be a lower-case owner/name coordinate");
+    }
     String version = requireString(map, "version", origin);
     String provider = requireKeyword(map, "provider", origin);
     String abi = requireKeyword(map, "abi", origin);
@@ -121,11 +132,26 @@ public final class HaraExtensionManifest {
         parseHostCalls(lookup(map, "host-calls"), origin);
     Map<String, String> handleTags = parseHandleTags(lookup(map, "handles"), origin);
     return new HaraExtensionManifest(
-        namespace, version, provider, module, abi, targets, assets, exports, capabilities, hostCalls, handleTags);
+        namespace,
+        identity,
+        version,
+        provider,
+        module,
+        abi,
+        targets,
+        assets,
+        exports,
+        capabilities,
+        hostCalls,
+        handleTags);
   }
 
   public String namespace() {
     return namespace;
+  }
+
+  public String identity() {
+    return identity;
   }
 
   public String version() {

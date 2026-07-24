@@ -16,20 +16,20 @@ public class HaraNoirProcessExtensionTest {
 
   @Test
   public void realNoirCompilerProverAndVerifierRunThroughManagedNode() {
-    Assume.assumeTrue(Files.isRegularFile(ROOT.resolve("blockchain/proof/noir/hara.extension.edn")));
+    Assume.assumeTrue(Files.isRegularFile(ROOT.resolve("ledger/noir/hara.extension.edn")));
     String previous = System.getProperty("hara.extensions.path");
     System.setProperty("hara.extensions.path", ROOT.toString());
     try (Context context =
         Context.newBuilder(HaraLanguage.ID).allowCreateProcess(true).build()) {
       context.eval(
           HaraLanguage.ID,
-          "(ns app (:require [blockchain.proof.noir :as noir])) "
+          "(ns app (:require [ledger.noir :as noir])) "
               + "(def artifact (deref (noir/compile "
               + "{:name \"proof_demo\" "
               + ":source \"fn main(secret: Field, expected: pub Field) { "
               + "assert(secret * secret == expected); }\"})))");
       assertEquals(
-          "hara.noir.artifact/v1",
+          "hara/ledger.noir/v1",
           context.eval(HaraLanguage.ID, "(get artifact :format)").asString());
       context.eval(
           HaraLanguage.ID,
@@ -46,7 +46,7 @@ public class HaraNoirProcessExtensionTest {
 
   @Test
   public void processCapabilityIsDeniedBeforeWorkerStartup() {
-    Assume.assumeTrue(Files.isRegularFile(ROOT.resolve("blockchain/proof/noir/hara.extension.edn")));
+    Assume.assumeTrue(Files.isRegularFile(ROOT.resolve("ledger/noir/hara.extension.edn")));
     String previous = System.getProperty("hara.extensions.path");
     System.setProperty("hara.extensions.path", ROOT.toString());
     try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
@@ -56,7 +56,7 @@ public class HaraNoirProcessExtensionTest {
               () ->
                   context.eval(
                       HaraLanguage.ID,
-                      "(ns app (:require [blockchain.proof.noir :as noir]))"));
+                      "(ns app (:require [ledger.noir :as noir]))"));
       assertTrue(error.getMessage().contains("capability-denied"));
     } finally {
       if (previous == null) System.clearProperty("hara.extensions.path");

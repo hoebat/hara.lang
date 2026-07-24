@@ -45,9 +45,15 @@ Loading a manifest does not grant authority. The host applies capability policy 
 limits, preserving distinct errors for unsupported providers, denied capabilities, malformed
 manifests, crashes, timeouts, cancellation, and remote failures.
 
+An official build can separate its source namespace from its registry coordinate: `ledger.noir` is
+required by Hara code while `hara/ledger.noir` identifies the maintained package.
+
 External-toolchain extensions may instead declare host-selected HTA targets and a closed list of
 built assets. The Noir package uses a managed Node process with HTA over stdin/stdout on
 JVM/native-image hosts and a Web Worker with HTA over `postMessage` in browsers. Hara code sees the
-same exports, values, errors, promises, and artifacts on both targets. Installed projects contain
+same exports, values, errors, promises, and artifacts on both targets. Compiled circuits use
+`hara/ledger.noir/v1` as their format identity. Installed projects contain
 the built JavaScript, WASM, and worker assets, but not `node_modules`. See the multi-target HTA
-package contract for the descriptor and directory layout. Package authors can validate and install built artifacts with `hara extension check`, `build`, `install`, and `test`; build and process-backed tests require `--allow-process`.
+package contract for the descriptor and directory layout. Package authors can validate and install
+built artifacts with `hara extension check`, `build`, `install`, and `test`; build and
+process-backed tests require `--allow-process`.

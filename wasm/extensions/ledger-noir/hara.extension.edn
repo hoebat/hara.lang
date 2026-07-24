@@ -1,4 +1,5 @@
-{:namespace "blockchain.proof.noir"
+{:namespace "ledger.noir"
+ :identity "hara/ledger.noir"
  :version "0.1.0"
  :provider :hta
  :abi :hta.v1

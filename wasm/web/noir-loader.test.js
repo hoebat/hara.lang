@@ -29,7 +29,7 @@ test("the browser WASM compiler produces and caches ACIR", async () => {
   const artifact = await loader.compile(program);
   const cached = await loader.compile(program);
 
-  assert.equal(artifact.format, "hara.noir.artifact/v1");
+  assert.equal(artifact.format, "hara/ledger.noir/v1");
   assert.equal(artifact.programKey, await loader.cacheKey(program));
   assert.deepEqual(Object.keys(artifact.circuit), ["program", "warnings"]);
   assert.strictEqual(cached, artifact);

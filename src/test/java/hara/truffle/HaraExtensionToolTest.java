@@ -13,14 +13,14 @@ import org.junit.Test;
 
 public class HaraExtensionToolTest {
   private static final Path PACKAGE =
-      Path.of("wasm/web/dist/extensions/blockchain/proof/noir").toAbsolutePath().normalize();
+      Path.of("wasm/web/dist/extensions/ledger/noir").toAbsolutePath().normalize();
 
   @Test
   public void checksACompleteBuiltPackage() {
     Assume.assumeTrue(Files.isRegularFile(PACKAGE.resolve("hara.extension.edn")));
     Result result = run("extension", "check", PACKAGE.toString());
     assertEquals(result.error, 0, result.status);
-    assertTrue(result.output.contains("blockchain.proof.noir 0.1.0 is valid"));
+    assertTrue(result.output.contains("ledger.noir [hara/ledger.noir] 0.1.0 is valid"));
   }
 
   @Test

@@ -13,7 +13,7 @@ export default defineConfig({
     outDir: "dist-node",
     emptyOutDir: true,
     lib: {
-      entry: resolve(import.meta.dirname, "../extensions/blockchain-proof-noir/node/worker.mjs"),
+      entry: resolve(import.meta.dirname, "../extensions/ledger-noir/node/worker.mjs"),
       formats: ["es"],
       fileName: () => "worker.mjs"
     },

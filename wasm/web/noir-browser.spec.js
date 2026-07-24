@@ -5,7 +5,9 @@ test("descriptor-selected browser worker compiles, proves, and verifies Noir", a
   await page.goto("/wasm/web/noir-browser.html");
   const result = await page.evaluate(() => window.noirSmoke);
   expect(result).toEqual({
-    artifact: "hara.noir.artifact/v1",
+    identity: "hara/ledger.noir",
+    namespace: "ledger.noir",
+    artifact: "hara/ledger.noir/v1",
     proof: "hara.noir.proof/v1",
     verified: true
   });

@@ -55,8 +55,8 @@ function proofEnvelope(proof) {
 }
 
 function restoreArtifact(value) {
-  if (!value || value.format !== "hara.noir.artifact/v1") {
-    throw new TypeError("noir/artifact-format: expected hara.noir.artifact/v1");
+  if (!value || value.format !== "hara/ledger.noir/v1") {
+    throw new TypeError("noir/artifact-format: expected hara/ledger.noir/v1");
   }
   return {
     format: value.format,

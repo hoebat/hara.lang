@@ -68,7 +68,7 @@ export class NoirBrowserLoader {
     await fileManager.writeFile("src/main.nr", stream(program.source));
     const artifacts = await compile_program(fileManager, "/", () => {}, () => {});
     const artifact = Object.freeze({
-      format: "hara.noir.artifact/v1",
+      format: "hara/ledger.noir/v1",
       programKey,
       loaderId: LOADER_ID,
       compilerVersion: NOIR_VERSION,
@@ -163,8 +163,8 @@ function validateProgram(program) {
 }
 
 function validateArtifact(artifact) {
-  if (artifact?.format !== "hara.noir.artifact/v1") {
-    throw new TypeError("noir/artifact-format: expected hara.noir.artifact/v1");
+  if (artifact?.format !== "hara/ledger.noir/v1") {
+    throw new TypeError("noir/artifact-format: expected hara/ledger.noir/v1");
   }
   if (artifact.loaderId !== LOADER_ID) {
     throw new Error(

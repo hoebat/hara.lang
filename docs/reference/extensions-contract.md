@@ -42,7 +42,7 @@ An extension package contains a `hara.extension.edn` manifest beside its provide
  :capabilities []}
 ```
 
-The portable fields are `namespace`, `version`, `provider`, `module`, `abi`, `exports`,
+The portable fields are `namespace`, the optional registry `identity`, `version`, `provider`, `module`, `abi`, `exports`,
 `capabilities`, and the optional `host-calls` and `handles` maps. Public handle tags are declared by
 wire type:
 
@@ -159,7 +159,7 @@ project contains only the built result:
 ```text
 project.hal
 extensions/
-  blockchain/proof/noir/
+  ledger/noir/
     hara.extension.edn
     node/
       worker.mjs
@@ -173,11 +173,13 @@ extensions/
       thread.worker.js
 ```
 
-A multi-target descriptor declares target-specific entry points and the shared assets required by
-those entry points:
+A package identity such as `hara/ledger.noir` is the immutable registry owner/name coordinate;
+`ledger.noir` remains the namespace used by Hara source. A multi-target descriptor declares
+target-specific entry points and the shared assets required by those entry points:
 
 ```clojure
-{:namespace "blockchain.proof.noir"
+{:namespace "ledger.noir"
+ :identity "hara/ledger.noir"
  :version "0.1.0"
  :provider :hta
  :abi :hta.v1
@@ -221,7 +223,9 @@ Hara in browser
 ```
 
 Both workers implement the same request operations, values, errors, promises, and artifact
-formats. Only the transport differs. Target modules and every path in `:assets` are package-relative
+formats. A compiled circuit uses the exact format identity `hara/ledger.noir/v1`; the final
+`/v1` versions the circuit envelope independently of the extension release. Only the transport
+differs. Target modules and every path in `:assets` are package-relative
 paths and must remain inside the extension directory. The runtime validates the selected target
 and all declared assets before starting the worker.
 
@@ -263,8 +267,8 @@ call site.
 ## Project installation and build workflow
 
 The nearest `project.hal` fixes the project extension root at `extensions/`. A namespace maps to a
-package directory by replacing dots with path separators, so `blockchain.proof.noir` is discovered
-at `extensions/blockchain/proof/noir/hara.extension.edn`. `hara.extensions.path` and
+package directory by replacing dots with path separators, so `ledger.noir` is discovered
+at `extensions/ledger/noir/hara.extension.edn`. `hara.extensions.path` and
 `HARA_EXTENSION_PATH` remain explicit additional roots for launchers and test harnesses.
 
 Source checkouts may carry a `hara.build.edn`; installed packages do not. The canonical command
@@ -274,7 +278,7 @@ adapter is explicit and contains no shell interpolation:
 {:adapter :command
  :command ["npm" "run" "build:noir"]
  :working-directory "../../web"
- :output "../../web/dist/extensions/blockchain/proof/noir"}
+ :output "../../web/dist/extensions/ledger/noir"}
 ```
 
 The packaging commands are:
@@ -314,7 +318,7 @@ namespace-derived directory layout.
 The template works with the repository's raw Rust fixture copied as `answer-42.wasm`. The initial
 `:core.v1` ABI supports import-free core-WASM functions using `:i32`, `:i64`, `:f32`, `:f64`,
 `:boolean`, and `:void`. The demonstration is deliberately separate from Noir, leaving
-`blockchain.proof.noir` available for the compiler, prover, and verifier integration.
+`ledger.noir` available for the compiler, prover, and verifier integration.
 
 Classpath discovery rejects duplicate namespace packages, malformed manifests, unknown providers,
 unknown modules, and denied capability requests before installing any exported vars.

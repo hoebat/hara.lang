@@ -1871,7 +1871,7 @@ function Je(e) {
 	};
 }
 function Ye(e) {
-	if (!e || e.format !== "hara.noir.artifact/v1") throw TypeError("noir/artifact-format: expected hara.noir.artifact/v1");
+	if (!e || e.format !== "hara/ledger.noir/v1") throw TypeError("noir/artifact-format: expected hara/ledger.noir/v1");
 	return {
 		format: e.format,
 		programKey: e.programKey,
@@ -1912,7 +1912,7 @@ function Qe(e) {
 	return e.replace(/-([a-z])/g, (e, t) => t.toUpperCase());
 }
 //#endregion
-//#region ../extensions/blockchain-proof-noir/node/worker.mjs
+//#region ../extensions/ledger-noir/node/worker.mjs
 var $e = new URL("../assets/noir-loader.js", "" + import.meta.url).toString(), Z = /* @__PURE__ */ new Set(), Q = /* @__PURE__ */ new Uint8Array(), $ = null;
 console.log = (...e) => console.error(...e), console.info = (...e) => console.error(...e), process.stdin.on("data", (e) => {
 	let t = new Uint8Array(Q.length + e.length);

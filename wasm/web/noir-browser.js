@@ -1,7 +1,7 @@
 import { HtaKeyword, loadHtaExtension } from "./hta.js";
 
 const descriptorUrl = new URL(
-  "./dist/extensions/blockchain/proof/noir/hara.extension.edn",
+  "./dist/extensions/ledger/noir/hara.extension.edn",
   import.meta.url
 ).toString();
 const context = await loadHtaExtension({ descriptorUrl });
@@ -14,6 +14,8 @@ window.noirSmoke = (async () => {
   const proof = await context.call("prove", [artifact, map({ secret: "7", expected: "49" })]);
   const verified = await context.call("verify", [artifact, proof]);
   return {
+    identity: context.manifest.identity,
+    namespace: context.manifest.namespace,
     artifact: field(artifact, "format"),
     proof: field(proof, "format"),
     verified

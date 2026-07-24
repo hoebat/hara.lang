@@ -3,8 +3,8 @@ import { resolve } from "node:path";
 
 const web = import.meta.dirname;
 const repository = resolve(web, "../..");
-const source = resolve(repository, "wasm/extensions/blockchain-proof-noir");
-const output = resolve(web, "dist/extensions/blockchain/proof/noir");
+const source = resolve(repository, "wasm/extensions/ledger-noir");
+const output = resolve(web, "dist/extensions/ledger/noir");
 const assets = resolve(output, "assets");
 
 await rm(output, { recursive: true, force: true });

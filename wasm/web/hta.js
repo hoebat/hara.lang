@@ -65,8 +65,9 @@ export function parseHtaManifest(source) {
   const value = reader.value();
   reader.space();
   if (reader.cursor !== source.length || !(value instanceof Map)) throw new Error("hta/manifest-malformed: expected one EDN map");
-  const namespace = manifestField(value,"namespace"), providerValue = manifestField(value,"provider"), module = manifestField(value,"module"), abiValue = manifestField(value,"abi");
+  const namespace = manifestField(value,"namespace"), identity = manifestField(value,"identity"), providerValue = manifestField(value,"provider"), module = manifestField(value,"module"), abiValue = manifestField(value,"abi");
   if (typeof namespace !== "string" || !/^[a-z][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)+$/.test(namespace)) throw new Error("hta/manifest-malformed: invalid namespace");
+  if (identity !== undefined && (typeof identity !== "string" || !/^[a-z][a-z0-9-]*\/[a-z][a-z0-9-]*(\.[a-z0-9][a-z0-9-]*)*$/.test(identity))) throw new Error("hta/manifest-malformed: invalid identity");
   if (!(providerValue instanceof HtaKeyword) || !["wasm","hta"].includes(providerValue.name)) throw new Error("hta/manifest-malformed: provider must be :wasm or :hta");
   if (!(abiValue instanceof HtaKeyword)) throw new Error("hta/manifest-malformed: abi must be a keyword");
   const provider=providerValue.name,abi=abiValue.name;
@@ -95,7 +96,7 @@ export function parseHtaManifest(source) {
       handleTags[type] = tag.name;
     }
   }
-  return Object.freeze({namespace,provider,module,abi,browserTarget,assets:Object.freeze(assets),handleTags:Object.freeze(handleTags)});
+  return Object.freeze({namespace,identity,provider,module,abi,browserTarget,assets:Object.freeze(assets),handleTags:Object.freeze(handleTags)});
 }
 
 function validPackagePath(value,suffix) {

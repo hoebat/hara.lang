@@ -59,6 +59,9 @@ final class HaraExtensionTool {
     output.println(
         "Extension "
             + extensionPackage.manifest().namespace()
+            + (extensionPackage.manifest().identity() == null
+                ? ""
+                : " [" + extensionPackage.manifest().identity() + "]")
             + " "
             + extensionPackage.manifest().version()
             + " is valid ("
@@ -134,7 +137,11 @@ final class HaraExtensionTool {
       String lock =
           "{:namespace \""
               + manifest.namespace()
-              + "\"\n :version \""
+              + "\"\n"
+              + (manifest.identity() == null
+                  ? ""
+                  : " :identity \"" + manifest.identity() + "\"\n")
+              + " :version \""
               + manifest.version()
               + "\"\n :files\n {"
               + String.join("\n", lockEntries)
