@@ -56,6 +56,7 @@ struct Runtime {
     calls: HashMap<u64, (u64, Promise)>,
     fibers: HashMap<u64, EvalFiber>,
     tasks: HashMap<u64, Promise>,
+    resources: Rc<RefCell<HashMap<String, String>>>,
 }
 impl Runtime {
     fn new() -> Self {
@@ -69,6 +70,7 @@ impl Runtime {
             calls: HashMap::new(),
             fibers: HashMap::new(),
             tasks: HashMap::new(),
+            resources: Rc::new(RefCell::new(HashMap::new())),
         }
     }
     fn event(&self, value: Value) {
@@ -124,8 +126,12 @@ impl Runtime {
     fn start_fiber(&mut self, task: u64, source: &str) -> Result<(), String> {
         let (handler, pending, next) = self.host_handler(task);
         let namespaces = self.namespaces.clone();
+        let resources = self.resources.clone();
+        let provider = Rc::new(move |name: &str| resources.borrow().get(name).cloned());
         let fiber = core::with_namespace_registry(&namespaces, || {
-            core::with_host_calls(handler, || EvalFiber::start(source, self.env.clone()))
+            core::with_namespace_source(provider, || {
+                core::with_host_calls(handler, || EvalFiber::start(source, self.env.clone()))
+            })
         })?;
         self.collect_calls(task, pending, next);
         self.drive(task, fiber);
@@ -137,9 +143,13 @@ impl Runtime {
         };
         let (handler, pending, next) = self.host_handler(task);
         let namespaces = self.namespaces.clone();
+        let resources = self.resources.clone();
+        let provider = Rc::new(move |name: &str| resources.borrow().get(name).cloned());
         core::with_namespace_registry(&namespaces, || {
-            core::with_host_calls(handler, || {
-                fiber.resume(state);
+            core::with_namespace_source(provider, || {
+                core::with_host_calls(handler, || {
+                    fiber.resume(state);
+                });
             });
         });
         self.collect_calls(task, pending, next);
@@ -251,6 +261,17 @@ pub extern "C" fn hta_start(pointer: *const u8, size: usize) -> i64 {
             Ok((target, args)) if target == "eval" => match args.as_slice() {
                 [Value::String(source)] => runtime.start_fiber(task, source),
                 _ => Err("hta eval expects one source string".into()),
+            },
+            Ok((target, args)) if target == "register-resource" => match args.as_slice() {
+                [Value::String(name), Value::String(source)] => {
+                    runtime
+                        .resources
+                        .borrow_mut()
+                        .insert(name.clone(), source.clone());
+                    runtime.event(event(0, task, Value::Bool(true)));
+                    Ok(())
+                }
+                _ => Err("hta register-resource expects name and source strings".into()),
             },
             Ok((target, _)) => Err(format!("hta/target-unknown: {target}")),
             Err(error) => Err(error),
@@ -477,6 +498,69 @@ mod tests {
             "(let (it (iter-map (fn [x] x) [1 2])) (do (iter-close it) (if (iter-has? it) 0 42)))",
         ] {
             assert_eq!(evaluate(source), Ok(42), "{source}");
+        }
+    }
+
+    fn completion_value(runtime: &mut Runtime, task: u64) -> crate::core::Value {
+        let frame = runtime
+            .events
+            .borrow_mut()
+            .pop_front()
+            .expect("completion event");
+        match super::hta::decode(&frame).unwrap() {
+            crate::core::Value::Vector(values) => {
+                assert_eq!(values[0], crate::core::Value::Number(0), "eval failed");
+                assert_eq!(values[1], crate::core::Value::Number(task as i64));
+                values[2].clone()
+            }
+            other => panic!("unexpected event: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn require_loads_registered_resource_and_binds_alias() {
+        let mut runtime = Runtime::new();
+        runtime.resources.borrow_mut().insert(
+            "chrome.api".to_string(),
+            "(ns chrome.api) (defn answer [] 42)".to_string(),
+        );
+        runtime
+            .start_fiber(1, "(require [chrome.api :as api]) (api/answer)")
+            .unwrap();
+        assert_eq!(completion_value(&mut runtime, 1), crate::core::Value::Number(42));
+    }
+
+    #[test]
+    fn require_supports_ns_form_clauses_and_qualified_access() {
+        let mut runtime = Runtime::new();
+        runtime.resources.borrow_mut().insert(
+            "acme.tools".to_string(),
+            "(ns acme.tools) (defn seven [] 7)".to_string(),
+        );
+        runtime
+            .start_fiber(2, "(ns demo (:require [acme.tools :as tools])) (tools/seven)")
+            .unwrap();
+        assert_eq!(completion_value(&mut runtime, 2), crate::core::Value::Number(7));
+        runtime
+            .start_fiber(3, "(acme.tools/seven)")
+            .unwrap();
+        assert_eq!(completion_value(&mut runtime, 3), crate::core::Value::Number(7));
+    }
+
+    #[test]
+    fn require_missing_namespace_is_a_clean_error() {
+        let mut runtime = Runtime::new();
+        runtime.start_fiber(4, "(require [no.such.ns])").unwrap();
+        let frame = runtime
+            .events
+            .borrow_mut()
+            .pop_front()
+            .expect("error event");
+        match super::hta::decode(&frame).unwrap() {
+            crate::core::Value::Vector(values) => {
+                assert_eq!(values[0], crate::core::Value::Number(1), "expected failure");
+            }
+            other => panic!("unexpected event: {other:?}"),
         }
     }
 

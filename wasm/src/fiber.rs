@@ -259,7 +259,9 @@ fn list(v: Vec<Form>, env: Rc<RefCell<HashMap<String, Value>>>, k: Cont) -> Step
             )
         }
         Some("def") | Some("set!") | Some("var/set") => bind_form(v, env, k),
-        Some("fn") | Some("defn") | Some("var") | Some("ns") => sync(Form::List(v), env, k),
+        Some("fn") | Some("defn") | Some("var") | Some("ns") | Some("require") => {
+            sync(Form::List(v), env, k)
+        }
         _ => application(v, env, k),
     }
 }
@@ -556,6 +558,16 @@ fn application(v: Vec<Form>, env: Rc<RefCell<HashMap<String, Value>>>, k: Cont) 
     )
 }
 fn call(f: Rc<Function>, args: Vec<Value>, k: Cont) -> Step {
+    if !f.clauses.is_empty() {
+        let Some(clause) = select_clause(&f.clauses, args.len()) else {
+            let name = f.name.clone().unwrap_or_else(|| "<anonymous>".into());
+            return k(Err(format!(
+                "{name} has no arity accepting {} arguments",
+                args.len()
+            )));
+        };
+        return call(clause, args, k);
+    }
     if f.variadic.is_none() && f.params.len() != args.len() {
         return k(Err(format!(
             "function expects {} arguments",
@@ -621,6 +633,28 @@ mod tests {
         p.resolve(Value::Number(40));
         assert_eq!(
             f.resume(p.state()),
+            EvalFiberState::Completed(Value::Number(42))
+        );
+    }
+    #[test]
+    fn resumes_multi_arity_dispatch() {
+        let p = Promise::new();
+        let mut e = HashMap::new();
+        e.insert("p".into(), Value::Promise(p.clone()));
+        let mut f = EvalFiber::start(
+            "(do (defn g ([x] (+ x 1)) ([x y] (+ x y (deref p)))) (g 1 2))",
+            e,
+        )
+        .unwrap();
+        assert_eq!(f.state(), EvalFiberState::Suspended);
+        p.resolve(Value::Number(39));
+        assert_eq!(
+            f.resume(p.state()),
+            EvalFiberState::Completed(Value::Number(42))
+        );
+        let mut f = EvalFiber::start("(do (defn h ([x] (+ x 1)) ([x y] (+ x y))) (h 41))", HashMap::new()).unwrap();
+        assert_eq!(
+            f.state(),
             EvalFiberState::Completed(Value::Number(42))
         );
     }

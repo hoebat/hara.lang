@@ -77,6 +77,8 @@ pub struct Function {
     captured: Rc<RefCell<HashMap<String, Value>>>,
     pub name: Option<String>,
     native: Option<Rc<dyn Fn(Vec<Value>) -> Result<Value, String>>>,
+    /// Arity clauses for multi-arity `defn`/`fn` dispatchers; empty otherwise.
+    clauses: Vec<Rc<Function>>,
 }
 
 impl std::fmt::Debug for Function {
@@ -196,6 +198,7 @@ pub(crate) fn native_function(
         captured: Rc::new(RefCell::new(HashMap::new())),
         name: Some(name.into()),
         native: Some(Rc::new(callback)),
+        clauses: Vec::new(),
     }))
 }
 
@@ -1084,6 +1087,7 @@ thread_local! {
     static ACTIVE_FILE_PROVIDER: RefCell<Option<Rc<dyn FileProvider>>> = const { RefCell::new(None) };
     static ACTIVE_SOCKET_PROVIDER: RefCell<Option<Rc<dyn SocketProvider>>> = const { RefCell::new(None) };
     static HOST_CALL_HANDLER: RefCell<Option<Rc<dyn Fn(String, String, Vec<Value>) -> Result<Value, String>>>> = const { RefCell::new(None) };
+    static NAMESPACE_SOURCE_PROVIDER: RefCell<Option<Rc<dyn Fn(&str) -> Option<String>>>> = const { RefCell::new(None) };
 }
 
 /// Runs an evaluation with a namespace registry available to namespace builtins.
@@ -1422,6 +1426,19 @@ pub fn with_host_calls<R>(
         let previous = active.replace(Some(handler));
         let result = operation();
         active.replace(previous);
+        result
+    })
+}
+
+/// Runs an evaluation with a source provider used to satisfy `require` loads.
+pub fn with_namespace_source<R>(
+    provider: Rc<dyn Fn(&str) -> Option<String>>,
+    action: impl FnOnce() -> R,
+) -> R {
+    NAMESPACE_SOURCE_PROVIDER.with(|active| {
+        let previous = active.borrow_mut().replace(provider);
+        let result = action();
+        *active.borrow_mut() = previous;
         result
     })
 }
@@ -4060,6 +4077,7 @@ fn generated_function(
         captured: Rc::new(RefCell::new(captured)),
         name: None,
         native: None,
+        clauses: Vec::new(),
     }))
 }
 
@@ -4093,6 +4111,23 @@ fn function_parts(form: &Form) -> Result<(Vec<String>, Option<String>), String> 
     Ok((params, variadic))
 }
 
+fn select_clause(functions: &[Rc<Function>], argument_count: usize) -> Option<Rc<Function>> {
+    functions
+        .iter()
+        .find(|function| {
+            function.variadic.is_none() && function.params.len() == argument_count
+        })
+        .or_else(|| {
+            functions
+                .iter()
+                .filter(|function| {
+                    function.variadic.is_some() && argument_count >= function.params.len()
+                })
+                .max_by_key(|function| function.params.len())
+        })
+        .cloned()
+}
+
 fn multi_arity_function(
     name: &str,
     clauses: &[Form],
@@ -4112,39 +4147,29 @@ fn multi_arity_function(
             captured: Rc::new(RefCell::new(captured.clone())),
             name: Some(name.into()),
             native: None,
+            clauses: Vec::new(),
         }));
     }
     if functions.is_empty() {
         return Err("defn expects at least one arity".into());
     }
     let dispatch_name = name.to_owned();
+    let clauses = functions.clone();
     Ok(Value::Function(Rc::new(Function {
         params: Vec::new(),
         variadic: Some("arguments".into()),
         body: Vec::new(),
         captured: Rc::new(RefCell::new(HashMap::new())),
         name: Some(dispatch_name.clone()),
+        clauses,
         native: Some(Rc::new(move |arguments| {
-            let function = functions
-                .iter()
-                .find(|function| {
-                    function.variadic.is_none() && function.params.len() == arguments.len()
-                })
-                .or_else(|| {
-                    functions
-                        .iter()
-                        .filter(|function| {
-                            function.variadic.is_some() && arguments.len() >= function.params.len()
-                        })
-                        .max_by_key(|function| function.params.len())
-                })
-                .ok_or_else(|| {
-                    format!(
-                        "{dispatch_name} has no arity accepting {} arguments",
-                        arguments.len()
-                    )
-                })?;
-            call_function(function, arguments)
+            let function = select_clause(&functions, arguments.len()).ok_or_else(|| {
+                format!(
+                    "{dispatch_name} has no arity accepting {} arguments",
+                    arguments.len()
+                )
+            })?;
+            call_function(&function, arguments)
         })),
     })))
 }
@@ -4346,6 +4371,114 @@ fn syntax_quote_value(form: &Form, env: &mut HashMap<String, Value>) -> Result<V
         ))),
         _ => literal_value(form),
     }
+}
+
+fn ensure_namespace(
+    registry: &NamespaceRegistry<Value>,
+    env: &mut HashMap<String, Value>,
+    name: &str,
+) -> Result<(), String> {
+    if registry.find(name).is_some() {
+        return Ok(());
+    }
+    let source = NAMESPACE_SOURCE_PROVIDER
+        .with(|active| active.borrow().as_ref().and_then(|provider| provider(name)))
+        .ok_or_else(|| format!("Cannot require missing namespace: {name}"))?;
+    let requiring = registry.current().name().as_str().to_owned();
+    for form in crate::kernel::parse_forms(&source)? {
+        eval(&form, env)?;
+    }
+    select_namespace_environment(registry, env, &requiring);
+    Ok(())
+}
+
+fn eval_require_spec(
+    registry: &NamespaceRegistry<Value>,
+    env: &mut HashMap<String, Value>,
+    form: &Form,
+) -> Result<(), String> {
+    let spec = match form {
+        Form::Vector(items) => items,
+        _ => return Err("require expects vectors such as [chrome.api :as api]".into()),
+    };
+    let target = match spec.first() {
+        Some(Form::Symbol(target)) => target.clone(),
+        _ => return Err("require namespace must be a symbol".into()),
+    };
+    ensure_namespace(registry, env, &target)?;
+    if (spec.len() - 1) % 2 != 0 {
+        return Err(format!("Malformed require options for {target}"));
+    }
+    for option in spec[1..].chunks(2) {
+        let name = match &option[0] {
+            Form::Keyword(keyword) => keyword.as_str(),
+            _ => return Err("Malformed require options".into()),
+        };
+        match name {
+            "as" => {
+                let alias = match &option[1] {
+                    Form::Symbol(alias) if !alias.contains('/') => alias.clone(),
+                    _ => return Err("require :as expects an unqualified symbol".into()),
+                };
+                let namespace = registry
+                    .find(&target)
+                    .ok_or_else(|| format!("Cannot require missing namespace: {target}"))?;
+                registry.current().alias(alias, namespace);
+            }
+            other => return Err(format!("Unsupported require option: :{other}")),
+        }
+    }
+    Ok(())
+}
+
+fn eval_require_specs(
+    registry: &NamespaceRegistry<Value>,
+    env: &mut HashMap<String, Value>,
+    specs: &[Form],
+) -> Result<(), String> {
+    for spec in specs {
+        eval_require_spec(registry, env, spec)?;
+    }
+    refresh_namespace_environment(registry, env);
+    Ok(())
+}
+
+/// Handles the `ns` and `require` special forms.
+///
+/// Kept out of line so the giant `eval` dispatch does not reserve stack for
+/// these locals on every recursive call (the native runtime recurses through
+/// `eval` and test threads run on small stacks).
+#[inline(never)]
+fn eval_namespace_form(fs: &[Form], env: &mut HashMap<String, Value>) -> Result<Value, String> {
+    let head = match &fs[0] {
+        Form::Symbol(head) => head.as_str(),
+        _ => unreachable!("ns/require dispatch guarantees a symbol head"),
+    };
+    if head == "require" {
+        let registry = namespace_registry()?;
+        eval_require_specs(&registry, env, &fs[1..])?;
+        return Ok(Value::Nil);
+    }
+    if fs.len() < 2 {
+        return Err("ns expects a namespace symbol".into());
+    }
+    let name = match &fs[1] {
+        Form::Symbol(name) if !name.contains('/') => name.clone(),
+        _ => return Err("ns expects a namespace symbol".into()),
+    };
+    let registry = namespace_registry()?;
+    select_namespace_environment(&registry, env, &name);
+    for clause in &fs[2..] {
+        match clause {
+            Form::List(clause_forms)
+                if matches!(clause_forms.first(), Some(Form::Keyword(k)) if k == "require") =>
+            {
+                eval_require_specs(&registry, env, &clause_forms[1..])?;
+            }
+            _ => return Err("unsupported ns clause (only :require is supported)".into()),
+        }
+    }
+    Ok(Value::Nil)
 }
 
 #[inline(never)]
@@ -4657,6 +4790,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     captured: Rc::new(RefCell::new(env.clone())),
                     name: None,
                     native: None,
+                    clauses: Vec::new(),
                 })))
             }
             Form::Symbol(n) if n == "eval" => {
@@ -4877,6 +5011,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                         captured: Rc::new(RefCell::new(env.clone())),
                         name: Some(name.clone()),
                         native: None,
+                        clauses: Vec::new(),
                     }))
                 } else {
                     multi_arity_function(&name, &fs[2..], env)?
@@ -4909,19 +5044,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                         .all(|value| *value == first),
                 ))
             }
-            Form::Symbol(n) if n == "ns" => {
-                if fs.len() < 2 {
-                    return Err("ns expects a namespace symbol".into());
-                }
-                match &fs[1] {
-                    Form::Symbol(name) if !name.contains('/') => {
-                        let registry = namespace_registry()?;
-                        select_namespace_environment(&registry, env, name);
-                        Ok(Value::Nil)
-                    }
-                    _ => Err("ns expects a namespace symbol".into()),
-                }
-            }
+            Form::Symbol(n) if n == "ns" || n == "require" => eval_namespace_form(fs, env),
             Form::Symbol(n) if matches!(env.get(n), Some(Value::Var(var)) if (binding_is_local(var) || var.origin() == VarOrigin::RustLibrary) && matches!(var.deref_value(), Value::Function(_))) =>
             {
                 let function = binding_value(env, n).expect("function binding was checked");
@@ -5941,6 +6064,7 @@ pub fn eval(form: &Form, env: &mut HashMap<String, Value>) -> Result<Value, Stri
                     captured: Rc::new(RefCell::new(captured)),
                     name: None,
                     native: None,
+                    clauses: Vec::new(),
                 })))
             }
             Form::Symbol(n) if n == "complement" => {
