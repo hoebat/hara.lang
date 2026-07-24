@@ -59,6 +59,9 @@ the portable Hara runtime:
 | Macros imported by an `ns` declaration | `:refer-macros` in the generated `:require` specification | Hara runtime `require` supported macro references, but source namespace declarations did not |
 | Nested macro argument destructuring | Bind the vector as one macro argument and emit a runtime `first` | Hara macro parameters are symbols, while the public call shape remains unchanged |
 | Clojure `integer?` in index-offset folding | Hara `number?` | Target grammar offsets are numeric indices and Hara currently exposes the broader numeric predicate |
+| `std.lib.walk/prewalk` plus volatile accumulators | Explicit pending-node loop with persistent maps and sets | Keeps xtalk scanning portable and prevents mutable host values from escaping |
+| Clojure set union, subset, and membership helpers | Small persistent reductions local to the xtalk system | Hara deliberately does not expose the whole `clojure.set` surface |
+| Symbol-valued `code.test` `:id` metadata | Fact names and `:refer` metadata only | Unquoted metadata symbols are resolved by Hara; the test registry already has stable names |
 
 ## Project convention
 
