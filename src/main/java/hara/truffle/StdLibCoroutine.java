@@ -8,6 +8,8 @@ import org.graalvm.nativeimage.ImageInfo;
 public final class StdLibCoroutine {
   private StdLibCoroutine() {}
 
+  private static final ThreadLocal<HaraCoroutine> CURRENT = new ThreadLocal<>();
+
   static final Keyword STATUS_SUSPENDED = Keyword.create("suspended");
   static final Keyword STATUS_RUNNING = Keyword.create("running");
   static final Keyword STATUS_DEAD = Keyword.create("dead");
@@ -32,6 +34,9 @@ public final class StdLibCoroutine {
 
   /** A coroutine backed by a parked (virtual) thread. */
   static final class HaraCoroutine {
+    /** Queue stand-in for nil: SynchronousQueue rejects null elements. */
+    private static final Object NIL = new Object();
+
     private final HaraContext context;
     private final Object function;
     private final SynchronousQueue<Object> input = new SynchronousQueue<>();
@@ -81,7 +86,15 @@ public final class StdLibCoroutine {
       started.start();
     }
 
+    Object doYield(Object value) {
+      if (status == STATUS_DEAD) throw new CoroutineClosed();
+      status = STATUS_SUSPENDED;
+      putOutput(new Transfer(value, null));
+      return takeInput();
+    }
+
     private void runBody(Object[] args) {
+      CURRENT.set(this);
       try {
         Object result = context.invokeInContext(() -> context.invokeCallable(function, args));
         status = STATUS_DEAD;
@@ -92,12 +105,14 @@ public final class StdLibCoroutine {
       } catch (Throwable error) {
         status = STATUS_DEAD;
         putOutput(new Transfer(null, error));
+      } finally {
+        CURRENT.remove();
       }
     }
 
     private void putInput(Object value) {
       try {
-        input.put(value);
+        input.put(value == null ? NIL : value);
       } catch (InterruptedException error) {
         Thread.currentThread().interrupt();
         throw new HaraException("coroutine/resume: interrupted while resuming");
@@ -115,7 +130,8 @@ public final class StdLibCoroutine {
 
     Object takeInput() {
       try {
-        return input.take();
+        Object value = input.take();
+        return value == NIL ? null : value;
       } catch (InterruptedException error) {
         Thread.currentThread().interrupt();
         throw new CoroutineClosed();
@@ -205,5 +221,19 @@ public final class StdLibCoroutine {
     Object[] args = new Object[values.length - 1];
     System.arraycopy(values, 1, args, 0, args.length);
     return coroutine.resume(args);
+  }
+
+  @HaraExport(
+      name = "yield",
+      doc =
+          "Suspends the current coroutine, handing vals to the resumer. The next resume's args"
+              + " become this expression's return. Throws outside a coroutine.",
+      arglists = {"[& vals]"})
+  public static Object yield(HaraContext context, Object[] values) {
+    HaraCoroutine coroutine = CURRENT.get();
+    if (coroutine == null) {
+      throw new HaraException("coroutine/yield: cannot yield outside a coroutine");
+    }
+    return coroutine.doYield(pack(values));
   }
 }

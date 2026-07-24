@@ -75,4 +75,168 @@ public class StdLibCoroutineTest {
               .asBoolean());
     }
   }
+
+  @Test
+  public void yieldExchangesValuesBothWays() {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(require 'std.lib.coroutine)");
+      context.eval(
+          HaraLanguage.ID,
+          "(def c-y (std.lib.coroutine/create"
+              + " (fn [start]"
+              + "   (let [a (std.lib.coroutine/yield (* start start))]"
+              + "     (let [b (std.lib.coroutine/yield :second)]"
+              + "       [a b])))))");
+      assertEquals(
+          100, context.eval(HaraLanguage.ID, "(std.lib.coroutine/resume c-y 10)").asLong());
+      assertTrue(
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(= :second (std.lib.coroutine/resume c-y :got-a))")
+              .asBoolean());
+      assertEquals(
+          "[:got-a :got-b]",
+          context.eval(HaraLanguage.ID, "(std.lib.coroutine/resume c-y :got-b)").toString());
+      assertTrue(
+          context.eval(HaraLanguage.ID, "(= :dead (std.lib.coroutine/status c-y))").asBoolean());
+    }
+  }
+
+  @Test
+  public void multiYieldPacksVectorAndZeroYieldsNil() {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(require 'std.lib.coroutine)");
+      context.eval(
+          HaraLanguage.ID,
+          "(def c-m (std.lib.coroutine/create"
+              + " (fn [] (std.lib.coroutine/yield 1 2 3) (std.lib.coroutine/yield))))");
+      assertEquals(
+          "[1 2 3]",
+          context.eval(HaraLanguage.ID, "(std.lib.coroutine/resume c-m)").toString());
+      assertTrue(context.eval(HaraLanguage.ID, "(std.lib.coroutine/resume c-m 9 8)").isNull());
+      assertTrue(
+          context
+              .eval(HaraLanguage.ID, "(= :suspended (std.lib.coroutine/status c-m))")
+              .asBoolean());
+      context.eval(HaraLanguage.ID, "(std.lib.coroutine/resume c-m)");
+      assertTrue(
+          context.eval(HaraLanguage.ID, "(= :dead (std.lib.coroutine/status c-m))").asBoolean());
+    }
+  }
+
+  @Test
+  public void yieldWorksFromNestedHelper() {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(require 'std.lib.coroutine)");
+      context.eval(
+          HaraLanguage.ID, "(defn helper-n [x] (std.lib.coroutine/yield (* x 10)))");
+      context.eval(
+          HaraLanguage.ID,
+          "(def c-n (std.lib.coroutine/create (fn [] (helper-n 3) :end)))");
+      assertEquals(30, context.eval(HaraLanguage.ID, "(std.lib.coroutine/resume c-n)").asLong());
+      assertTrue(
+          context
+              .eval(HaraLanguage.ID, "(= :end (std.lib.coroutine/resume c-n))")
+              .asBoolean());
+    }
+  }
+
+  @Test
+  public void yieldOutsideCoroutineThrows() {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(require 'std.lib.coroutine)");
+      PolyglotException error =
+          assertThrows(
+              PolyglotException.class,
+              () -> context.eval(HaraLanguage.ID, "(std.lib.coroutine/yield 1)"));
+      assertTrue(error.getMessage().contains("outside"));
+    }
+  }
+
+  @Test
+  public void reentrantResumeThrows() {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(require 'std.lib.coroutine)");
+      context.eval(
+          HaraLanguage.ID,
+          "(def c-r (std.lib.coroutine/create (fn [] (std.lib.coroutine/resume c-r))))");
+      PolyglotException error =
+          assertThrows(
+              PolyglotException.class,
+              () -> context.eval(HaraLanguage.ID, "(std.lib.coroutine/resume c-r)"));
+      assertTrue(error.getMessage().contains("running"));
+    }
+  }
+
+  @Test
+  public void nestedCoroutinesResumeEachOther() {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(require 'std.lib.coroutine)");
+      context.eval(
+          HaraLanguage.ID,
+          "(def c-inner (std.lib.coroutine/create"
+              + " (fn [] (std.lib.coroutine/yield :inner-yield) :inner-end)))");
+      context.eval(
+          HaraLanguage.ID,
+          "(def c-outer (std.lib.coroutine/create"
+              + " (fn []"
+              + "   (std.lib.coroutine/yield (std.lib.coroutine/resume c-inner))"
+              + "   (std.lib.coroutine/yield (std.lib.coroutine/resume c-inner :x))"
+              + "   :outer-end)))");
+      assertTrue(
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(= :inner-yield (std.lib.coroutine/resume c-outer))")
+              .asBoolean());
+      assertTrue(
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(= :inner-end (std.lib.coroutine/resume c-outer))")
+              .asBoolean());
+      assertTrue(
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "(= :outer-end (std.lib.coroutine/resume c-outer))")
+              .asBoolean());
+      assertTrue(
+          context
+              .eval(HaraLanguage.ID, "(= :dead (std.lib.coroutine/status c-outer))")
+              .asBoolean());
+    }
+  }
+
+  @Test
+  public void generatorPipelineProducesLazily() {
+    try (Context context = Context.newBuilder(HaraLanguage.ID).build()) {
+      context.eval(HaraLanguage.ID, "(require 'std.lib.coroutine)");
+      context.eval(
+          HaraLanguage.ID,
+          "(def c-gen (std.lib.coroutine/create"
+              + " (fn [n] (loop [i 0]"
+              + "   (if (< i n)"
+              + "     (do (std.lib.coroutine/yield (* i i)) (recur (inc i)))"
+              + "     :done)))))");
+      assertEquals(
+          "[0 1 4]",
+          context
+              .eval(
+                  HaraLanguage.ID,
+                  "[(std.lib.coroutine/resume c-gen 3)"
+                      + " (std.lib.coroutine/resume c-gen)"
+                      + " (std.lib.coroutine/resume c-gen)]")
+              .toString());
+      assertTrue(
+          context
+              .eval(HaraLanguage.ID, "(= :done (std.lib.coroutine/resume c-gen))")
+              .asBoolean());
+      assertTrue(
+          context
+              .eval(HaraLanguage.ID, "(= :dead (std.lib.coroutine/status c-gen))")
+              .asBoolean());
+    }
+  }
 }
