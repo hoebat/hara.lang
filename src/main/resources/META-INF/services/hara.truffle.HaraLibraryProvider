@@ -12,3 +12,4 @@ hara.truffle.StdLibTaskLibraryProvider
 hara.truffle.StdLibContextLibraryProvider
 hara.truffle.StdLibWalkLibraryProvider
 hara.truffle.StdRespClientLibraryProvider
+hara.truffle.StdLibCoroutineLibraryProvider
