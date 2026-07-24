@@ -7,21 +7,26 @@
 (def ^:dynamic *macro-skip-deps* nil)
 
 (defn macro-form
-  "Gets the current macro form."
+  "gets the current macro form"
+  {:added "4.0"}
   []
   *macro-form*)
 
 (defn macro-opts
-  "Gets the current macro options."
+  "gets current macro-opts"
+  {:added "4.0"}
   []
   *macro-opts*)
 
 (defn macro-grammar
-  "Gets the current macro grammar."
+  "gets the current grammar"
+  {:added "4.0"}
   []
   *macro-grammar*)
 
 (defmacro with:macro-opts
+  "bind macro opts"
+  {:added "4.0"}
   [binding & body]
   `(binding [polis.common.preprocess-base/*macro-opts* (first ~binding)]
      ~@body))

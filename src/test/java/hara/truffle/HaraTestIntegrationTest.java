@@ -40,9 +40,14 @@ public class HaraTestIntegrationTest {
       context.eval(HaraLanguage.ID, "(fact \"map subset\" {:a 1 :b 2} => (contains {:a 1}))");
       context.eval(HaraLanguage.ID, "(fact \"any value\" (+ 1 1) => anything)");
       context.eval(HaraLanguage.ID, "(fact \"throws\" (/ 1 0) => (throws))");
+      context.eval(HaraLanguage.ID, "(fact \"bare throws\" (/ 1 0) => throws)");
       Value results = context.eval(HaraLanguage.ID, "(code.test/run {:filter \"user/throws\"})");
       assertEquals(1, results.getArraySize());
       assertEquals("PASS", results.getArrayElement(0).getHashValue("status").asString());
+      Value bareResults =
+          context.eval(HaraLanguage.ID, "(code.test/run {:filter \"user/bare throws\"})");
+      assertEquals(1, bareResults.getArraySize());
+      assertEquals("PASS", bareResults.getArrayElement(0).getHashValue("status").asString());
     }
   }
 

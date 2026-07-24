@@ -940,6 +940,7 @@ public final class HaraContext {
     macros
         .computeIfAbsent(currentNamespace.name(), ignored -> new ConcurrentHashMap<>())
         .put(symbol.getName(), macro);
+    currentNamespace.define(symbol.getName(), macro, symbol.meta(), definitionOrigin);
   }
 
   private void defineIntrinsicMacro(Symbol symbol, HaraMacro macro) {

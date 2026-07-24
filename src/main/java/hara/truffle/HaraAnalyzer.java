@@ -1469,22 +1469,65 @@ final class HaraAnalyzer {
   }
 
   private HaraExpressionNode analyzeDefMacro(List<?> form) {
-    if (form.count() < 4 || !isBindingVector(form.nth(2))) {
+    if (form.count() < 4) {
       throw error("defmacro expects a name, parameter vector, and body");
     }
     Object name = form.nth(1);
     if (!(name instanceof Symbol)) {
       throw error("defmacro name must be a symbol");
     }
-    Symbol symbol = (Symbol) name;
+    Symbol symbol = definitionSymbol((Symbol) name, form);
     if (symbol.getNamespace() != null) {
       throw error("defmacro name must not be qualified");
     }
-    Object[] body = new Object[(int) form.count() - 3];
-    for (int i = 3; i < form.count(); i++) {
-      body[i - 3] = form.nth(i);
+
+    int parametersIndex = 2;
+    String docstring = null;
+    if (form.nth(parametersIndex) instanceof String) {
+      docstring = (String) form.nth(parametersIndex);
+      parametersIndex++;
     }
-    context.defineMacro(symbol, new HaraMacro(symbol, (ILinearType<?>) form.nth(2), body));
+    IMapType<?, ?> attributes = null;
+    if (parametersIndex < form.count() && form.nth(parametersIndex) instanceof IMapType<?, ?>) {
+      attributes = (IMapType<?, ?>) form.nth(parametersIndex);
+      parametersIndex++;
+    }
+    if (parametersIndex >= form.count()
+        || !isBindingVector(form.nth(parametersIndex))
+        || parametersIndex + 1 >= form.count()) {
+      throw error("defmacro expects a name, parameter vector, and body");
+    }
+
+    Object parameters = form.nth(parametersIndex);
+    Object[] body = new Object[(int) form.count() - parametersIndex - 1];
+    for (int i = parametersIndex + 1; i < form.count(); i++) {
+      body[i - parametersIndex - 1] = form.nth(i);
+    }
+
+    @SuppressWarnings("unchecked")
+    IMapType<Object, Object> metadata =
+        symbol.meta() instanceof IMapType<?, ?>
+            ? (IMapType<Object, Object>) symbol.meta()
+            : hara.lang.data.Map.Standard.EMPTY;
+    if (attributes != null) {
+      for (Object entryObject : attributes) {
+        java.util.Map.Entry<?, ?> entry = (java.util.Map.Entry<?, ?>) entryObject;
+        metadata = (IMapType<Object, Object>) metadata.assoc(entry.getKey(), entry.getValue());
+      }
+    }
+    if (docstring != null) {
+      metadata = (IMapType<Object, Object>) metadata.assoc(Keyword.create("doc"), docstring);
+    }
+    metadata =
+        (IMapType<Object, Object>)
+            metadata
+                .assoc(
+                    Keyword.create("arglists"),
+                    hara.lang.data.Vector.Standard.from(null, parameters))
+                .assoc(Keyword.create("macro"), Boolean.TRUE);
+    Symbol definition = symbol.withMeta(metadata);
+    context.defineMacro(
+        definition, new HaraMacro(definition, (ILinearType<?>) parameters, body));
     return new HaraNodes.Literal(null);
   }
 

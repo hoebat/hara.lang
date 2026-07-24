@@ -67,6 +67,7 @@ the portable Hara runtime:
 | Recursive lookup over lazy path tails | Materialize the remaining path in `get-in` and `assoc-in` | Hara lazy iterators are one-shot; probing them with `empty?` must not consume the next lookup key |
 | Keyword lookup against sets | Hara keywords now query persistent and Java sets | Foundation argument parsing uses keyword lookup on grammar allow-lists and expects missing members to return `nil` |
 | Metadata-bearing symbol equality | Symbol equality and hashing ignore metadata | Matches Clojure/Foundation value semantics and allows copied metadata assertions to compare unchanged |
+| Macro parameter destructuring | Bind the vector parameter and select its first value inside `with:macro-opts` | Hara macro parameters currently support symbols and `&`, so the public call shape remains unchanged while the implementation avoids nested parameter destructuring |
 
 Translated `code.test` files are copied from Foundation by default. Namespace
 ownership and unsupported dependency syntax may be translated, but fact

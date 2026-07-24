@@ -823,10 +823,20 @@ public final class CodeTest {
           && invocation.nth(i + 1) instanceof Symbol arrow
           && "=>".equals(arrow.getName())) {
         Object expected = invocation.nth(i + 2);
-        if (expected instanceof List<?> expectedForm
-            && expectedForm.count() > 0
-            && expectedForm.nth(0) instanceof Symbol operator
-            && "throws".equals(operator.getName())) {
+        boolean bareThrows =
+            expected instanceof Symbol expectedSymbol
+                && expectedSymbol.getNamespace() == null
+                && "throws".equals(expectedSymbol.getName());
+        boolean throwsForm =
+            expected instanceof List<?> expectedForm
+                && expectedForm.count() > 0
+                && expectedForm.nth(0) instanceof Symbol operator
+                && "throws".equals(operator.getName());
+        if (bareThrows || throwsForm) {
+          Object matcher =
+              bareThrows
+                  ? List.Standard.from(null, Symbol.create("code.test", "throws"))
+                  : expected;
           body.add(
               List.Standard.from(
                   null,
@@ -836,7 +846,7 @@ public final class CodeTest {
                       Symbol.create("fn"),
                       hara.lang.data.Vector.Standard.EMPTY,
                       form),
-                  expected));
+                  matcher));
         } else {
           body.add(
               List.Standard.from(

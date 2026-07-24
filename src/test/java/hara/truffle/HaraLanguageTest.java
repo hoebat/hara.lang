@@ -278,6 +278,25 @@ public class HaraLanguageTest {
   }
 
   @Test
+  public void defmacroPreservesDocumentationAttributesAndArglists() {
+    try (Context context = context()) {
+      var metadata =
+          context.eval(
+              HaraLanguage.ID,
+              "(do"
+                  + " (defmacro documented \"macro docs\" {:added \"1.2\"} [value]"
+                  + "   `(identity ~value))"
+                  + " (let [m (meta (var documented))]"
+                  + "   [(:doc m) (:added m) (:arglists m) (:macro m)]))");
+      assertEquals("macro docs", metadata.getArrayElement(0).asString());
+      assertEquals("1.2", metadata.getArrayElement(1).asString());
+      assertEquals("[[value]]", metadata.getArrayElement(2).toString());
+      assertTrue(metadata.getArrayElement(3).asBoolean());
+      assertEquals(9L, context.eval(HaraLanguage.ID, "(documented 9)").asLong());
+    }
+  }
+
+  @Test
   public void supportsDeclarationsAndPrivateDefinitions() {
     try (Context context = context()) {
       assertEquals(
